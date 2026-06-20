@@ -16,8 +16,8 @@ export interface Vehiculo {
 }
 
 export interface CompatibilidadVehiculo {
-  marca: string;     // "Ford", "Isuzu", "Volkswagen"
-  modelos: string[]; // ["F-150", "F-250"] — empty = any model of that marca
+  marca: string;
+  modelos: string[];
 }
 
 export interface Refaccion {
@@ -31,18 +31,18 @@ export interface Refaccion {
   stockMinimo: number;
   vehiculoId?: string;
   proveedorId?: string;
-  compatibilidad?: CompatibilidadVehiculo[]; // undefined = universal
+  compatibilidad?: CompatibilidadVehiculo[];
 }
 
 export interface TrabajoRefaccion {
   refaccionId: string;
-  nombre: string;         // snapshot at time of job
-  codigo: string;         // snapshot
+  nombre: string;
+  codigo: string;
   cantidad: number;
-  precioCompra: number;   // snapshot — supplier cost
-  precioVenta: number;    // snapshot — sale price to customer
-  subtotal: number;       // cantidad × precioVenta
-  costoTotal: number;     // cantidad × precioCompra
+  precioCompra: number;
+  precioVenta: number;
+  subtotal: number;
+  costoTotal: number;
 }
 
 export interface ManoDeObraItem {
@@ -53,7 +53,7 @@ export interface ManoDeObraItem {
 
 export interface Pago {
   id: string;
-  fecha: string; // YYYY-MM-DD
+  fecha: string;
   monto: number;
   nota?: string;
 }
@@ -64,17 +64,22 @@ export interface Trabajo {
   vehiculoId: string;
   fecha: string;
   descripcion: string;
-  manoDeObra: number;          // derived: sum of manoDeObraItems
+  manoDeObra: number;
   manoDeObraItems: ManoDeObraItem[];
-  refacciones: number;         // revenue: sum of partes.subtotal
-  costoRefacciones: number;    // cost: sum of partes.costoTotal
-  total: number;               // manoDeObra + refacciones
+  refacciones: number;
+  costoRefacciones: number;
+  requiereFactura: boolean;
+  folioFiscal?: string;
+  iva: number;
+  total: number;
   partes: TrabajoRefaccion[];
-  pagos: Pago[];               // payment history — empty = pending
+  pagos: Pago[];
+  facturaId?: string;
+  estadoFacturacion?: 'sin_facturar' | 'facturado';
   estado: 'pendiente' | 'completado' | 'pagado';
 }
 
-// ─── Proveedores & Compras ────────────────────────────────────────────────────
+// ─── Proveedores, Órdenes de Compra & Facturas ───────────────────────────────
 
 export interface Proveedor {
   id: string;
@@ -86,7 +91,7 @@ export interface Proveedor {
 
 export interface CompraItem {
   refaccionId: string;
-  nombre: string;    // snapshot
+  nombre: string;
   cantidad: number;
   precioCompra: number;
   subtotal: number;
@@ -99,6 +104,7 @@ export interface PagoCompra {
   nota?: string;
 }
 
+// Legacy shape kept for localStorage migration compatibility.
 export interface Compra {
   id: string;
   proveedorId: string;
@@ -109,15 +115,60 @@ export interface Compra {
   pagos: PagoCompra[];
 }
 
+export interface OrdenCompra {
+  id: string;
+  proveedorId: string;
+  fecha: string;
+  numeroOrden?: string;
+  descripcion: string;
+  partes: CompraItem[];
+  total: number;
+  estado: 'pendiente' | 'recibida' | 'cancelada';
+  fechaRecibida?: string;
+  pagos: PagoCompra[];
+}
+
+export interface PagoFactura {
+  id: string;
+  fecha: string;
+  monto: number;
+  metodoPago: string;
+}
+
+export interface FacturaConcepto {
+  tipo: 'parte' | 'mano_de_obra';
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+}
+
+/** Formal fiscal invoice generated from a Trabajo */
+export interface Factura {
+  id: string;
+  numeroFactura: string;
+  trabajoId: string;
+  clienteId: string;
+  vehiculoId: string;
+  fecha: string;
+  fechaVencimiento?: string;
+  conceptos: FacturaConcepto[];
+  subtotal: number;
+  iva?: number;
+  total: number;
+  pagos: PagoFactura[];
+  notas?: string;
+}
+
 // ─── Pricing Intelligence ─────────────────────────────────────────────────────
 
 export interface PricingIntel {
   cost: number;
-  markups: { pct: number; price: number }[];        // 30/40/50% margin-on-sale suggestions
-  clientLastSale: { precio: number; fecha: string } | null; // highest price to this client
+  markups: { pct: number; price: number }[];
+  clientLastSale: { precio: number; fecha: string } | null;
   clientAllSales: { precio: number; fecha: string }[];
-  otherMin: number | null;  // min price to other clients
-  otherMax: number | null;  // max price to other clients
+  otherMin: number | null;
+  otherMax: number | null;
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
@@ -128,7 +179,8 @@ export type Vista =
   | 'trabajos'
   | 'cuentas'
   | 'proveedores'
-  | 'pagos'
+  | 'ordenes'
+  | 'facturas'
   | 'resumen';
 
 export type FiltroCuenta = 'todos' | 'pendiente' | 'parcial' | 'pagado';

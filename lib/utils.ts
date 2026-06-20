@@ -2,6 +2,8 @@ import type {
   Vehiculo,
   Trabajo,
   Compra,
+  OrdenCompra,
+  Factura,
   Refaccion,
   PricingIntel,
   EstadoPago,
@@ -35,7 +37,7 @@ export function getSaldo(t: Trabajo): number {
   return Math.max(0, t.total - getMontoPagado(t));
 }
 
-// ─── Compra payment helpers ───────────────────────────────────────────────────
+// ─── Compra payment helpers (legacy) ──────────────────────────────────────────
 
 export function getMontoPagadoCompra(c: Compra): number {
   return (c.pagos ?? []).reduce((s, p) => s + p.monto, 0);
@@ -52,19 +54,59 @@ export function getSaldoCompra(c: Compra): number {
   return Math.max(0, c.total - getMontoPagadoCompra(c));
 }
 
+// ─── Orden / Factura payment helpers ──────────────────────────────────────────
+
+export function getMontoPagadoOrden(o: OrdenCompra): number {
+  return (o.pagos ?? []).reduce((s, p) => s + p.monto, 0);
+}
+
+export function getEstadoPagoOrden(o: OrdenCompra): EstadoPago {
+  const p = getMontoPagadoOrden(o);
+  if (p <= 0) return 'pendiente';
+  if (p >= o.total) return 'pagado';
+  return 'parcial';
+}
+
+export function getSaldoOrden(o: OrdenCompra): number {
+  return Math.max(0, o.total - getMontoPagadoOrden(o));
+}
+
+export function getMontoPagadoFactura(f: Factura): number {
+  return (f.pagos ?? []).reduce((s, p) => s + p.monto, 0);
+}
+
+export function getEstadoPagoFactura(f: Factura): EstadoPago {
+  const p = getMontoPagadoFactura(f);
+  if (p <= 0) return 'pendiente';
+  if (p >= f.total) return 'pagado';
+  return 'parcial';
+}
+
+export function getSaldoFactura(f: Factura): number {
+  return Math.max(0, f.total - getMontoPagadoFactura(f));
+}
+
+export function generarNumeroFactura(facturas: Factura[]): string {
+  const year = new Date().getFullYear();
+  const count = facturas.filter(f => f.numeroFactura.startsWith(`FAC-${year}`)).length + 1;
+  return `FAC-${year}-${String(count).padStart(3, '0')}`;
+}
+
+export function generarNumeroOrden(ordenes: OrdenCompra[]): string {
+  const year = new Date().getFullYear();
+  const count = ordenes.filter(o => (o.numeroOrden ?? '').startsWith(`OC-${year}`)).length + 1;
+  return `OC-${year}-${String(count).padStart(3, '0')}`;
+}
+
 // ─── Vehicle compatibility ────────────────────────────────────────────────────
 
-/**
- * Returns true if the refaccion is compatible with the given vehicle.
- * Universal parts (no compatibilidad) are always compatible.
- */
 export function isPartCompatibleWithVehiculo(
   r: Refaccion,
   vehiculo: Vehiculo | undefined
 ): boolean {
   if (!vehiculo) return true;
-  if (!r.compatibilidad || r.compatibilidad.length === 0) return true; // universal
-  const marca  = vehiculo.marca.toLowerCase().trim();
+  if (!r.compatibilidad || r.compatibilidad.length === 0) return true;
+  const marca = vehiculo.marca.toLowerCase().trim();
   const modelo = vehiculo.modelo.toLowerCase().trim();
   return r.compatibilidad.some(
     c =>
@@ -75,23 +117,17 @@ export function isPartCompatibleWithVehiculo(
 
 // ─── Pricing intelligence ─────────────────────────────────────────────────────
 
-/**
- * Computes pricing suggestions and historical context for a part + client combo.
- * Uses highest price ever charged to this client as the price floor.
- */
 export function getPricingIntel(
   refaccionId: string,
   clienteId: string,
   precioCompra: number,
   trabajos: Trabajo[]
 ): PricingIntel {
-  // Margin-on-sale formula: sale = cost / (1 - margin%)
   const markups = [30, 40, 50].map(pct => ({
     pct,
     price: Math.round((precioCompra / (1 - pct / 100)) * 100) / 100,
   }));
 
-  // All sales of this part to THIS client — highest price first
   const clientSales = trabajos
     .filter(t => t.clienteId === clienteId)
     .flatMap(t =>
@@ -99,9 +135,8 @@ export function getPricingIntel(
         .filter(p => p.refaccionId === refaccionId && p.precioVenta > 0)
         .map(p => ({ precio: p.precioVenta, fecha: t.fecha }))
     )
-    .sort((a, b) => b.precio - a.precio); // highest first
+    .sort((a, b) => b.precio - a.precio);
 
-  // Prices to OTHER clients
   const otherPrices = trabajos
     .filter(t => t.clienteId !== clienteId)
     .flatMap(t =>
@@ -140,12 +175,12 @@ export function calcularResumenMensual(
 ): ResumenMensual {
   const mes = trabajos.filter(t => t.fecha.startsWith(mesActual));
 
-  const facturado             = mes.reduce((s, t) => s + t.total, 0);
+  const facturado = mes.reduce((s, t) => s + t.total, 0);
   const totalVentaRefacciones = mes.reduce((s, t) => s + t.refacciones, 0);
   const totalCostoRefacciones = mes.reduce((s, t) => s + (t.costoRefacciones ?? t.refacciones), 0);
-  const totalManoObra         = mes.reduce((s, t) => s + t.manoDeObra, 0);
-  const margenRefacciones     = totalVentaRefacciones - totalCostoRefacciones;
-  const ganancia              = totalManoObra + margenRefacciones;
+  const totalManoObra = mes.reduce((s, t) => s + t.manoDeObra, 0);
+  const margenRefacciones = totalVentaRefacciones - totalCostoRefacciones;
+  const ganancia = totalManoObra + margenRefacciones;
 
   const cobradoEnMes = trabajos.reduce(
     (s, t) =>

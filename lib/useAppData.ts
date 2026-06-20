@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type {
   Cliente,
   Vehiculo,
@@ -12,82 +12,76 @@ import type {
   CompraItem,
   PagoCompra,
   Compra,
+  OrdenCompra,
+  Factura,
+  PagoFactura,
   Vista,
 } from './types';
-import { getSaldo, calcularResumenMensual, type ResumenMensual } from './utils';
-import { getMontoPagado, getEstadoPago } from './utils';
-import { getMontoPagadoCompra, getEstadoPagoCompra } from './utils';
-
-// ─── App state returned by the hook ──────────────────────────────────────────
+import {
+  calcularResumenMensual,
+  generarNumeroFactura,
+  generarNumeroOrden,
+  getEstadoPago,
+  getEstadoPagoOrden,
+  type ResumenMensual,
+} from './utils';
 
 export interface AppData {
-  // State
-  clientes:   Cliente[];
-  vehiculos:  Vehiculo[];
+  clientes: Cliente[];
+  vehiculos: Vehiculo[];
   inventario: Refaccion[];
-  trabajos:   Trabajo[];
+  trabajos: Trabajo[];
   proveedores: Proveedor[];
-  compras:    Compra[];
-  vista:      Vista;
-  mesActual:  string;
-
-  // Derived counts (for tab badges)
-  stockBajo:             number;
-  pendientesPorCobrar:   number;
-  pendientesPorPagar:    number;
-
-  // Navigation
-  setVista:     (v: Vista) => void;
+  ordenes: OrdenCompra[];
+  facturas: Factura[];
+  vista: Vista;
+  mesActual: string;
+  stockBajo: number;
+  pendientesPorCobrar: number;
+  pendientesPorPagar: number;
+  setVista: (v: Vista) => void;
   setMesActual: (m: string) => void;
-
-  // Handlers — Clientes
-  guardarCliente:  (data: Omit<Cliente, 'id'>) => void;
+  guardarCliente: (data: Omit<Cliente, 'id'>) => void;
   guardarVehiculo: (data: Omit<Vehiculo, 'id'>) => void;
-
-  // Handlers — Inventario
   guardarRefaccion: (data: Omit<Refaccion, 'id'>) => void;
-  recibirStock:     (refaccionId: string, cantidad: number) => void;
-
-  // Handlers — Trabajos
-  guardarTrabajo:  (data: Omit<Trabajo, 'id' | 'total'>) => void;
-  registrarPago:   (trabajoId: string, pago: Omit<Pago, 'id'>) => void;
-
-  // Handlers — Proveedores & Compras
-  guardarProveedor:   (data: Omit<Proveedor, 'id'>) => void;
-  guardarCompra:      (data: Omit<Compra, 'id'>) => void;
-  registrarPagoCompra: (compraId: string, pago: Omit<PagoCompra, 'id'>) => void;
-
-  // Resumen
+  recibirStock: (refaccionId: string, cantidad: number) => void;
+  guardarTrabajo: (data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => void;
+  registrarPago: (trabajoId: string, pago: Omit<Pago, 'id'>) => void;
+  guardarProveedor: (data: Omit<Proveedor, 'id'>) => void;
+  guardarOrden: (data: Omit<OrdenCompra, 'id'>) => void;
+  recibirOrden: (ordenId: string) => void;
+  registrarPagoOrden: (ordenId: string, pago: Omit<PagoCompra, 'id'>) => void;
+  guardarFactura: (data: Omit<Factura, 'id' | 'numeroFactura'>) => void;
+  registrarPagoFactura: (facturaId: string, pago: Omit<PagoFactura, 'id'>) => void;
   resumen: ResumenMensual;
 }
 
-// ─── The hook ─────────────────────────────────────────────────────────────────
-
 export function useAppData(): AppData {
-  const [clientes,    setClientes]    = useState<Cliente[]>([]);
-  const [vehiculos,   setVehiculos]   = useState<Vehiculo[]>([]);
-  const [inventario,  setInventario]  = useState<Refaccion[]>([]);
-  const [trabajos,    setTrabajos]    = useState<Trabajo[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
+  const [inventario, setInventario] = useState<Refaccion[]>([]);
+  const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [compras,     setCompras]     = useState<Compra[]>([]);
-  const [vista,       setVista]       = useState<Vista>('clientes');
-  const [mesActual,   setMesActual]   = useState(new Date().toISOString().slice(0, 7));
+  const [ordenes, setOrdenes] = useState<OrdenCompra[]>([]);
+  const [facturas, setFacturas] = useState<Factura[]>([]);
+  const [vista, setVista] = useState<Vista>('clientes');
+  const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
 
-  // ── Load from localStorage with migrations ──
   useEffect(() => {
-    const rawClientes    = localStorage.getItem('clientes');
-    const rawVehiculos   = localStorage.getItem('vehiculos');
-    const rawInventario  = localStorage.getItem('inventario');
-    const rawTrabajos    = localStorage.getItem('trabajos');
+    const rawClientes = localStorage.getItem('clientes');
+    const rawVehiculos = localStorage.getItem('vehiculos');
+    const rawInventario = localStorage.getItem('inventario');
+    const rawTrabajos = localStorage.getItem('trabajos');
     const rawProveedores = localStorage.getItem('proveedores');
-    const rawCompras     = localStorage.getItem('compras');
+    const rawOrdenes = localStorage.getItem('ordenes');
+    const rawCompras = localStorage.getItem('compras');
+    const rawFacturas = localStorage.getItem('facturas');
 
     type ClienteViejo = Cliente & { vehiculo?: string };
-    let parsedClientes: ClienteViejo[]  = rawClientes  ? JSON.parse(rawClientes)  : [];
-    let parsedVehiculos: Vehiculo[]     = rawVehiculos  ? JSON.parse(rawVehiculos) : [];
+    let parsedClientes: ClienteViejo[] = rawClientes ? JSON.parse(rawClientes) : [];
+    let parsedVehiculos: Vehiculo[] = rawVehiculos ? JSON.parse(rawVehiculos) : [];
     const parsedInventario: Refaccion[] = rawInventario ? JSON.parse(rawInventario) : [];
 
-    // Migration: Cliente used to have a `vehiculo` string field
     if (parsedClientes.some(c => 'vehiculo' in c && c.vehiculo)) {
       const migrados: Vehiculo[] = [];
       parsedClientes = parsedClientes.map(({ vehiculo, ...c }) => {
@@ -97,21 +91,21 @@ export function useAppData(): AppData {
         return c;
       });
       parsedVehiculos = [...parsedVehiculos, ...migrados];
-      localStorage.setItem('clientes',  JSON.stringify(parsedClientes));
+      localStorage.setItem('clientes', JSON.stringify(parsedClientes));
       localStorage.setItem('vehiculos', JSON.stringify(parsedVehiculos));
     }
 
-    // Migration: add partes, manoDeObraItems, costoRefacciones, pagos if missing
     const parsedTrabajos: Trabajo[] = (rawTrabajos ? JSON.parse(rawTrabajos) : []).map(
       (t: Trabajo & { manoDeObra: number }) => {
         const partes: TrabajoRefaccion[] = (t.partes ?? []).map(
           (p: TrabajoRefaccion & { precioUnitario?: number }) => ({
             ...p,
             precioCompra: p.precioCompra ?? p.precioUnitario ?? 0,
-            precioVenta:  p.precioVenta  ?? p.precioUnitario ?? 0,
-            costoTotal:   p.costoTotal   ?? p.subtotal       ?? 0,
+            precioVenta: p.precioVenta ?? p.precioUnitario ?? 0,
+            costoTotal: p.costoTotal ?? p.subtotal ?? 0,
           })
         );
+
         return {
           ...t,
           partes,
@@ -120,23 +114,44 @@ export function useAppData(): AppData {
               ? [{ id: `mig_${t.id}`, concepto: 'Mano de obra', precio: t.manoDeObra }]
               : []
           ),
-          costoRefacciones: t.costoRefacciones
-            ?? partes.reduce((s, p) => s + p.costoTotal, 0)
-            ?? t.refacciones,
+          costoRefacciones: t.costoRefacciones ?? partes.reduce((s, p) => s + p.costoTotal, 0) ?? t.refacciones,
           pagos: t.pagos ?? [],
+          estadoFacturacion: t.estadoFacturacion ?? 'sin_facturar',
+          requiereFactura: t.requiereFactura ?? false,
+          iva: t.iva ?? 0,
         };
       }
     );
 
+    let parsedOrdenes: OrdenCompra[] = rawOrdenes ? JSON.parse(rawOrdenes) : [];
+    if (!rawOrdenes && rawCompras) {
+      type CompraLegacy = Compra & { items: CompraItem[] };
+      const legacyCompras: CompraLegacy[] = JSON.parse(rawCompras);
+      parsedOrdenes = legacyCompras.map(c => ({
+        id: c.id,
+        proveedorId: c.proveedorId,
+        fecha: c.fecha,
+        numeroOrden: undefined,
+        descripcion: c.descripcion,
+        partes: c.items,
+        total: c.total,
+        estado: 'recibida',
+        fechaRecibida: c.fecha,
+        pagos: c.pagos ?? [],
+      }));
+      localStorage.setItem('ordenes', JSON.stringify(parsedOrdenes));
+    }
+
+    /* eslint-disable react-hooks/set-state-in-effect */
     setClientes(parsedClientes);
     setVehiculos(parsedVehiculos);
     setInventario(parsedInventario);
     setTrabajos(parsedTrabajos);
     setProveedores(rawProveedores ? JSON.parse(rawProveedores) : []);
-    setCompras(rawCompras ? JSON.parse(rawCompras) : []);
+    setOrdenes(parsedOrdenes);
+    setFacturas(rawFacturas ? JSON.parse(rawFacturas) : []);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
-
-  // ── Clientes / Vehiculos ──
 
   const guardarCliente = (data: Omit<Cliente, 'id'>) => {
     const nuevo: Cliente = { ...data, id: Date.now().toString() };
@@ -151,8 +166,6 @@ export function useAppData(): AppData {
     setVehiculos(nuevos);
     localStorage.setItem('vehiculos', JSON.stringify(nuevos));
   };
-
-  // ── Inventario ──
 
   const guardarRefaccion = (data: Omit<Refaccion, 'id'>) => {
     const nuevo: Refaccion = { ...data, id: Date.now().toString() };
@@ -169,16 +182,21 @@ export function useAppData(): AppData {
     localStorage.setItem('inventario', JSON.stringify(nuevos));
   };
 
-  // ── Trabajos ──
+  const guardarTrabajo = (data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => {
+    const subtotal = data.manoDeObra + data.refacciones;
+    const iva = data.requiereFactura ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+    const total = subtotal + iva;
+    const nuevo: Trabajo = {
+      ...data,
+      id: Date.now().toString(),
+      iva,
+      total,
+      estadoFacturacion: data.requiereFactura ? data.estadoFacturacion ?? 'sin_facturar' : data.estadoFacturacion,
+    };
 
-  const guardarTrabajo = (data: Omit<Trabajo, 'id' | 'total'>) => {
-    const total = data.manoDeObra + data.refacciones;
-    const nuevo: Trabajo = { ...data, id: Date.now().toString(), total };
-
-    // Deduct inventory for parts used
     if (data.partes.length > 0) {
       const nuevoInv = inventario.map(r => {
-        const usada = data.partes.find((p: TrabajoRefaccion) => p.refaccionId === r.id);
+        const usada = data.partes.find(p => p.refaccionId === r.id);
         return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
       });
       setInventario(nuevoInv);
@@ -199,8 +217,6 @@ export function useAppData(): AppData {
     localStorage.setItem('trabajos', JSON.stringify(nuevos));
   };
 
-  // ── Proveedores & Compras ──
-
   const guardarProveedor = (data: Omit<Proveedor, 'id'>) => {
     const nuevo: Proveedor = { ...data, id: Date.now().toString() };
     const nuevos = [...proveedores, nuevo];
@@ -208,47 +224,112 @@ export function useAppData(): AppData {
     localStorage.setItem('proveedores', JSON.stringify(nuevos));
   };
 
-  const guardarCompra = (data: Omit<Compra, 'id'>) => {
-    const nueva: Compra = { ...data, id: Date.now().toString() };
-    // Increase inventory stock for each item received
-    if (data.items.length > 0) {
+  const guardarOrden = (data: Omit<OrdenCompra, 'id'>) => {
+    const nueva: OrdenCompra = {
+      ...data,
+      id: Date.now().toString(),
+      numeroOrden: data.numeroOrden || generarNumeroOrden(ordenes),
+      estado: data.estado ?? 'pendiente',
+      pagos: data.pagos ?? [],
+    };
+    const nuevas = [...ordenes, nueva];
+    setOrdenes(nuevas);
+    localStorage.setItem('ordenes', JSON.stringify(nuevas));
+  };
+
+  const recibirOrden = (ordenId: string) => {
+    const orden = ordenes.find(o => o.id === ordenId);
+    if (!orden || orden.estado !== 'pendiente') return;
+
+    const nuevasOrdenes = ordenes.map(o =>
+      o.id === ordenId
+        ? { ...o, estado: 'recibida' as const, fechaRecibida: new Date().toISOString().split('T')[0] }
+        : o
+    );
+    setOrdenes(nuevasOrdenes);
+    localStorage.setItem('ordenes', JSON.stringify(nuevasOrdenes));
+
+    if (orden.partes.length > 0) {
       const nuevoInv = inventario.map(r => {
-        const item = data.items.find((i: CompraItem) => i.refaccionId === r.id);
+        const item = orden.partes.find(p => p.refaccionId === r.id);
         return item ? { ...r, stock: r.stock + item.cantidad } : r;
       });
       setInventario(nuevoInv);
       localStorage.setItem('inventario', JSON.stringify(nuevoInv));
     }
-    const nuevas = [...compras, nueva];
-    setCompras(nuevas);
-    localStorage.setItem('compras', JSON.stringify(nuevas));
   };
 
-  const registrarPagoCompra = (compraId: string, pago: Omit<PagoCompra, 'id'>) => {
+  const registrarPagoOrden = (ordenId: string, pago: Omit<PagoCompra, 'id'>) => {
     const nuevoPago: PagoCompra = { ...pago, id: Date.now().toString() };
-    const nuevas = compras.map(c =>
-      c.id === compraId ? { ...c, pagos: [...(c.pagos ?? []), nuevoPago] } : c
+    const nuevas = ordenes.map(o =>
+      o.id === ordenId ? { ...o, pagos: [...(o.pagos ?? []), nuevoPago] } : o
     );
-    setCompras(nuevas);
-    localStorage.setItem('compras', JSON.stringify(nuevas));
+    setOrdenes(nuevas);
+    localStorage.setItem('ordenes', JSON.stringify(nuevas));
   };
 
-  // ── Derived values ──
+  const guardarFactura = (data: Omit<Factura, 'id' | 'numeroFactura'>) => {
+    if (facturas.some(f => f.trabajoId === data.trabajoId)) return;
 
-  const stockBajo           = inventario.filter(r => r.stock <= r.stockMinimo).length;
+    const nueva: Factura = {
+      ...data,
+      id: Date.now().toString(),
+      numeroFactura: generarNumeroFactura(facturas),
+    };
+    const nuevasFacturas = [...facturas, nueva];
+    setFacturas(nuevasFacturas);
+    localStorage.setItem('facturas', JSON.stringify(nuevasFacturas));
+
+    const nuevosTrabajos = trabajos.map(t =>
+      t.id === data.trabajoId
+        ? { ...t, facturaId: nueva.id, estadoFacturacion: 'facturado' as const }
+        : t
+    );
+    setTrabajos(nuevosTrabajos);
+    localStorage.setItem('trabajos', JSON.stringify(nuevosTrabajos));
+  };
+
+  const registrarPagoFactura = (facturaId: string, pago: Omit<PagoFactura, 'id'>) => {
+    const nuevoPago: PagoFactura = { ...pago, id: Date.now().toString() };
+    const nuevas = facturas.map(f =>
+      f.id === facturaId ? { ...f, pagos: [...(f.pagos ?? []), nuevoPago] } : f
+    );
+    setFacturas(nuevas);
+    localStorage.setItem('facturas', JSON.stringify(nuevas));
+  };
+
+  const stockBajo = inventario.filter(r => r.stock <= r.stockMinimo).length;
   const pendientesPorCobrar = trabajos.filter(t => getEstadoPago(t) !== 'pagado').length;
-  const pendientesPorPagar  = compras.filter(c => getEstadoPagoCompra(c) !== 'pagado').length;
-  const resumen             = calcularResumenMensual(trabajos, mesActual);
+  const pendientesPorPagar = ordenes.filter(o => getEstadoPagoOrden(o) !== 'pagado').length;
+  const resumen = calcularResumenMensual(trabajos, mesActual);
 
   return {
-    clientes, vehiculos, inventario, trabajos, proveedores, compras,
-    vista, mesActual,
-    stockBajo, pendientesPorCobrar, pendientesPorPagar,
-    setVista, setMesActual,
-    guardarCliente, guardarVehiculo,
-    guardarRefaccion, recibirStock,
-    guardarTrabajo, registrarPago,
-    guardarProveedor, guardarCompra, registrarPagoCompra,
+    clientes,
+    vehiculos,
+    inventario,
+    trabajos,
+    proveedores,
+    ordenes,
+    facturas,
+    vista,
+    mesActual,
+    stockBajo,
+    pendientesPorCobrar,
+    pendientesPorPagar,
+    setVista,
+    setMesActual,
+    guardarCliente,
+    guardarVehiculo,
+    guardarRefaccion,
+    recibirStock,
+    guardarTrabajo,
+    registrarPago,
+    guardarProveedor,
+    guardarOrden,
+    recibirOrden,
+    registrarPagoOrden,
+    guardarFactura,
+    registrarPagoFactura,
     resumen,
   };
 }
