@@ -21,14 +21,15 @@ interface Vehiculo {
 
 interface Refaccion {
   id: string;
-  nombre: string;        // "Filtro de aceite Fram PH3614"
-  codigo: string;        // Optional SKU/código de parte
-  categoria: string;     // "Filtros" | "Aceites" | "Frenos" | "Motor" | "Eléctrico" | "Otros"
-  unidad: string;        // "pza" | "lt" | "par" | "kg" | "metro"
-  precioCompra: number;  // precio de compra por unidad
-  stock: number;         // existencias actuales
-  stockMinimo: number;   // alerta cuando stock <= esto
-  vehiculoId?: string;   // opcional: pieza comprada para una unidad específica
+  nombre: string;
+  codigo: string;
+  categoria: string;
+  unidad: string;
+  precioCompra: number;
+  stock: number;
+  stockMinimo: number;
+  vehiculoId?: string;
+  proveedorId?: string;  // proveedor habitual de esta pieza
 }
 
 interface TrabajoRefaccion {
@@ -50,9 +51,44 @@ interface ManoDeObraItem {
 
 interface Pago {
   id: string;
-  fecha: string;  // YYYY-MM-DD
+  fecha: string;
   monto: number;
   nota?: string;
+}
+
+// ─── Proveedores & Compras ─────────────────────────────────────────────────────
+
+interface Proveedor {
+  id: string;
+  nombre: string;
+  telefono: string;
+  contacto?: string;
+  notas?: string;
+}
+
+interface CompraItem {
+  refaccionId: string;
+  nombre: string;    // snapshot
+  cantidad: number;
+  precioCompra: number;
+  subtotal: number;
+}
+
+interface PagoCompra {
+  id: string;
+  fecha: string;
+  monto: number;
+  nota?: string;
+}
+
+interface Compra {
+  id: string;
+  proveedorId: string;
+  fecha: string;
+  descripcion: string;
+  items: CompraItem[];
+  total: number;
+  pagos: PagoCompra[];
 }
 
 interface Trabajo {
@@ -84,6 +120,19 @@ function getEstadoPago(t: Trabajo): 'pendiente' | 'parcial' | 'pagado' {
 }
 function getSaldo(t: Trabajo): number {
   return Math.max(0, t.total - getMontoPagado(t));
+}
+
+function getMontoPagadoCompra(c: Compra): number {
+  return (c.pagos ?? []).reduce((s, p) => s + p.monto, 0);
+}
+function getEstadoPagoCompra(c: Compra): 'pendiente' | 'parcial' | 'pagado' {
+  const p = getMontoPagadoCompra(c);
+  if (p <= 0) return 'pendiente';
+  if (p >= c.total) return 'pagado';
+  return 'parcial';
+}
+function getSaldoCompra(c: Compra): number {
+  return Math.max(0, c.total - getMontoPagadoCompra(c));
 }
 
 function labelVehiculo(v: Vehiculo) {
@@ -201,15 +250,19 @@ export default function TallerMecanico() {
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [inventario, setInventario] = useState<Refaccion[]>([]);
   const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
-    const [vista, setVista] = useState<'clientes' | 'inventario' | 'trabajos' | 'cuentas' | 'resumen'>('clientes');
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+  const [compras, setCompras] = useState<Compra[]>([]);
+  const [vista, setVista] = useState<'clientes' | 'inventario' | 'trabajos' | 'cuentas' | 'proveedores' | 'pagos' | 'resumen'>('clientes');
   const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
 
   // ── Cargar datos con migración de formatos anteriores ──
   useEffect(() => {
-    const rawClientes   = localStorage.getItem('clientes');
-    const rawVehiculos  = localStorage.getItem('vehiculos');
-    const rawInventario = localStorage.getItem('inventario');
-    const rawTrabajos   = localStorage.getItem('trabajos');
+    const rawClientes    = localStorage.getItem('clientes');
+    const rawVehiculos   = localStorage.getItem('vehiculos');
+    const rawInventario  = localStorage.getItem('inventario');
+    const rawTrabajos    = localStorage.getItem('trabajos');
+    const rawProveedores = localStorage.getItem('proveedores');
+    const rawCompras     = localStorage.getItem('compras');
 
     type ClienteViejo = Cliente & { vehiculo?: string };
     let parsedClientes: ClienteViejo[]  = rawClientes   ? JSON.parse(rawClientes)   : [];
@@ -260,6 +313,8 @@ export default function TallerMecanico() {
     setVehiculos(parsedVehiculos);
     setInventario(parsedInventario);
     setTrabajos(parsedTrabajos);
+    setProveedores(rawProveedores ? JSON.parse(rawProveedores) : []);
+    setCompras(rawCompras ? JSON.parse(rawCompras) : []);
   }, []);
 
   // ── Handlers ──
@@ -321,6 +376,38 @@ export default function TallerMecanico() {
     localStorage.setItem('trabajos', JSON.stringify(nuevos));
   };
 
+  const guardarProveedor = (data: Omit<Proveedor, 'id'>) => {
+    const nuevo: Proveedor = { ...data, id: Date.now().toString() };
+    const nuevos = [...proveedores, nuevo];
+    setProveedores(nuevos);
+    localStorage.setItem('proveedores', JSON.stringify(nuevos));
+  };
+
+  const guardarCompra = (data: Omit<Compra, 'id'>) => {
+    const nueva: Compra = { ...data, id: Date.now().toString() };
+    // Increase stock for each item received
+    if (data.items.length > 0) {
+      const nuevoInv = inventario.map(r => {
+        const item = data.items.find(i => i.refaccionId === r.id);
+        return item ? { ...r, stock: r.stock + item.cantidad } : r;
+      });
+      setInventario(nuevoInv);
+      localStorage.setItem('inventario', JSON.stringify(nuevoInv));
+    }
+    const nuevas = [...compras, nueva];
+    setCompras(nuevas);
+    localStorage.setItem('compras', JSON.stringify(nuevas));
+  };
+
+  const registrarPagoCompra = (compraId: string, pago: Omit<PagoCompra, 'id'>) => {
+    const nuevoPago: PagoCompra = { ...pago, id: Date.now().toString() };
+    const nuevas = compras.map(c =>
+      c.id === compraId ? { ...c, pagos: [...(c.pagos ?? []), nuevoPago] } : c
+    );
+    setCompras(nuevas);
+    localStorage.setItem('compras', JSON.stringify(nuevas));
+  };
+
   const calcularResumen = () => {
     const mes = trabajos.filter(t => t.fecha.startsWith(mesActual));
     // Accrual metrics (what was invoiced/done this month)
@@ -345,12 +432,16 @@ export default function TallerMecanico() {
 
   const pendientesPorCobrar = trabajos.filter(t => getEstadoPago(t) !== 'pagado').length;
 
+  const pendientesPorPagar = compras.filter(c => getEstadoPagoCompra(c) !== 'pagado').length;
+
   const tabs = [
-    { key: 'clientes',   icon: '👥', label: 'Clientes',          count: clientes.length },
-    { key: 'inventario', icon: '📦', label: 'Inventario',         count: stockBajo > 0 ? `⚠ ${stockBajo}` : inventario.length > 0 ? inventario.length : null },
-    { key: 'trabajos',   icon: '🔧', label: 'Trabajos',           count: trabajos.length },
-    { key: 'cuentas',    icon: '💰', label: 'Cuentas por Cobrar', count: pendientesPorCobrar > 0 ? pendientesPorCobrar : null },
-    { key: 'resumen',    icon: '📊', label: 'Resumen',            count: null },
+    { key: 'clientes',    icon: '👥', label: 'Clientes',            count: clientes.length },
+    { key: 'inventario',  icon: '📦', label: 'Inventario',           count: stockBajo > 0 ? `⚠ ${stockBajo}` : inventario.length > 0 ? inventario.length : null },
+    { key: 'trabajos',    icon: '🔧', label: 'Trabajos',             count: trabajos.length },
+    { key: 'cuentas',     icon: '💰', label: 'Por Cobrar',           count: pendientesPorCobrar > 0 ? pendientesPorCobrar : null },
+    { key: 'proveedores', icon: '🏪', label: 'Proveedores',          count: proveedores.length > 0 ? proveedores.length : null },
+    { key: 'pagos',       icon: '🧾', label: 'Por Pagar',            count: pendientesPorPagar > 0 ? pendientesPorPagar : null },
+    { key: 'resumen',     icon: '📊', label: 'Resumen',              count: null },
   ] as const;
 
   return (
@@ -382,7 +473,7 @@ export default function TallerMecanico() {
                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
                   vista === key ? 'bg-indigo-400 text-white'
                     : (typeof count === 'string' && count.startsWith('⚠')) ? 'bg-rose-100 text-rose-600'
-                    : key === 'cuentas' && pendientesPorCobrar > 0 ? 'bg-rose-100 text-rose-600'
+                    : (key === 'cuentas' && pendientesPorCobrar > 0) || (key === 'pagos' && pendientesPorPagar > 0) ? 'bg-rose-100 text-rose-600'
                     : 'bg-slate-200 text-slate-600'
                 }`}>
                   {count}
@@ -400,6 +491,7 @@ export default function TallerMecanico() {
           )}
           {vista === 'inventario' && (
             <VistaInventario inventario={inventario} clientes={clientes} vehiculos={vehiculos}
+              proveedores={proveedores}
               onGuardarRefaccion={guardarRefaccion} onRecibirStock={recibirStock} />
           )}
           {vista === 'trabajos' && (
@@ -410,6 +502,15 @@ export default function TallerMecanico() {
           {vista === 'cuentas' && (
             <VistaCuentas trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
               onRegistrarPago={registrarPago} />
+          )}
+          {vista === 'proveedores' && (
+            <VistaProveedores proveedores={proveedores} inventario={inventario}
+              onGuardarProveedor={guardarProveedor} />
+          )}
+          {vista === 'pagos' && (
+            <VistaCuentasPorPagar compras={compras} proveedores={proveedores} inventario={inventario}
+              onGuardarCompra={guardarCompra} onRegistrarPago={registrarPagoCompra}
+              onIrAProveedores={() => setVista('proveedores')} />
           )}
           {vista === 'resumen' && (
             <VistaResumen mesActual={mesActual} setMesActual={setMesActual}
@@ -640,18 +741,20 @@ function VistaInventario({
   inventario,
   clientes,
   vehiculos,
+  proveedores,
   onGuardarRefaccion,
   onRecibirStock,
 }: {
   inventario: Refaccion[];
   clientes: Cliente[];
   vehiculos: Vehiculo[];
+  proveedores: Proveedor[];
   onGuardarRefaccion: (r: Omit<Refaccion, 'id'>) => void;
   onRecibirStock: (id: string, cantidad: number) => void;
 }) {
   const [form, setForm] = useState({
     nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza',
-    precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '',
+    precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '', proveedorId: '',
   });
   const [formClienteId, setFormClienteId] = useState('');  // UI only — cascades to vehiculoId
   const [expandido, setExpandido] = useState<string | null>(null);
@@ -663,7 +766,7 @@ function VistaInventario({
     e.preventDefault();
     if (!form.nombre || form.precioCompra <= 0) return;
     onGuardarRefaccion(form);
-    setForm({ nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza', precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '' });
+    setForm({ nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza', precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '', proveedorId: '' });
     setFormClienteId('');
   };
 
@@ -695,6 +798,8 @@ function VistaInventario({
     const c = clientes.find(x => x.id === v.clienteId);
     return `${c?.nombre ?? '?'} · ${[v.anio, v.marca, v.modelo].filter(Boolean).join(' ')}`;
   };
+  const proveedorNombre = (proveedorId?: string) =>
+    proveedores.find(p => p.id === proveedorId)?.nombre ?? null;
 
   return (
     <div>
@@ -791,6 +896,17 @@ function VistaInventario({
             </div>
           </div>
 
+          {/* ── Proveedor (opcional) ── */}
+          {proveedores.length > 0 && (
+            <div>
+              <Label>🏪 Proveedor habitual <span className="font-normal text-slate-400">(opcional)</span></Label>
+              <Select value={form.proveedorId} onChange={e => setForm(f => ({ ...f, proveedorId: e.target.value }))}>
+                <option value="">Sin proveedor asignado</option>
+                {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </Select>
+            </div>
+          )}
+
           <Btn type="submit" variant="primary" disabled={!form.nombre || form.precioCompra <= 0}>
             + Agregar al Inventario
           </Btn>
@@ -834,6 +950,13 @@ function VistaInventario({
                             <div className="mt-0.5 flex items-center gap-1">
                               <span className="text-xs bg-violet-100 text-violet-700 font-semibold px-2 py-0.5 rounded-full">
                                 🎯 {vLabel}
+                              </span>
+                            </div>
+                          )}
+                          {proveedorNombre(r.proveedorId) && (
+                            <div className="mt-0.5">
+                              <span className="text-xs bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded-full">
+                                🏪 {proveedorNombre(r.proveedorId)}
                               </span>
                             </div>
                           )}
@@ -1475,6 +1598,105 @@ function VistaTrabajo({
   );
 }
 
+// ─── VistaProveedores ─────────────────────────────────────────────────────────
+
+function VistaProveedores({
+  proveedores,
+  inventario,
+  onGuardarProveedor,
+}: {
+  proveedores: Proveedor[];
+  inventario: Refaccion[];
+  onGuardarProveedor: (p: Omit<Proveedor, 'id'>) => void;
+}) {
+  const [form, setForm] = useState({ nombre: '', telefono: '', contacto: '', notas: '' });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.nombre) return;
+    onGuardarProveedor(form);
+    setForm({ nombre: '', telefono: '', contacto: '', notas: '' });
+  };
+
+  return (
+    <div>
+      <SectionTitle
+        title="Proveedores"
+        subtitle="Registra tus proveedores de refacciones para vincularlos al inventario y rastrear lo que les debes."
+      />
+
+      {/* ── Formulario nuevo proveedor ── */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-6">
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Nuevo Proveedor</h3>
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <Label>Nombre *</Label>
+            <Input type="text" placeholder="Ej. Refacciones García" value={form.nombre}
+              onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} required />
+          </div>
+          <div>
+            <Label>Teléfono</Label>
+            <Input type="tel" placeholder="Ej. 555-100-2000" value={form.telefono}
+              onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Contacto</Label>
+            <Input type="text" placeholder="Nombre del vendedor" value={form.contacto}
+              onChange={e => setForm(f => ({ ...f, contacto: e.target.value }))} />
+          </div>
+          <div className="flex items-end">
+            <Btn type="submit" variant="primary" fullWidth disabled={!form.nombre}>
+              + Agregar Proveedor
+            </Btn>
+          </div>
+        </form>
+      </div>
+
+      {/* ── Lista ── */}
+      {proveedores.length === 0 ? (
+        <div className="text-center py-14 text-slate-400">
+          <div className="text-5xl mb-3">🏪</div>
+          <p className="font-medium text-slate-500">Sin proveedores registrados</p>
+          <p className="text-sm mt-1">Agrega el primero arriba. Después podrás vincularlo a tus refacciones.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-800 text-white">
+                {['Proveedor','Teléfono','Contacto','Piezas en inventario'].map((h, i) => (
+                  <th key={h} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i === 3 ? 'text-right' : 'text-left'}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {proveedores.map((p, i) => {
+                const piezas = inventario.filter(r => r.proveedorId === p.id);
+                return (
+                  <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                    <td className="px-4 py-3 font-semibold text-slate-800">{p.nombre}</td>
+                    <td className="px-4 py-3 text-slate-600">{p.telefono || '—'}</td>
+                    <td className="px-4 py-3 text-slate-600">{p.contacto || '—'}</td>
+                    <td className="px-4 py-3 text-right">
+                      {piezas.length > 0 ? (
+                        <span className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded-full">
+                          {piezas.length} pieza{piezas.length !== 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs">Sin piezas</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── VistaCuentas ─────────────────────────────────────────────────────────────
 
 type FiltroCuenta = 'todos' | 'pendiente' | 'parcial' | 'pagado';
@@ -1689,6 +1911,351 @@ function VistaCuentas({
                     )}
                     {estado === 'pagado' && trabajo.pagos?.length > 0 && (
                       <p className="text-xs text-emerald-600 font-semibold text-center">✅ Este trabajo está completamente pagado.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── VistaCuentasPorPagar ─────────────────────────────────────────────────────
+
+function VistaCuentasPorPagar({
+  compras,
+  proveedores,
+  inventario,
+  onGuardarCompra,
+  onRegistrarPago,
+  onIrAProveedores,
+}: {
+  compras: Compra[];
+  proveedores: Proveedor[];
+  inventario: Refaccion[];
+  onGuardarCompra: (c: Omit<Compra, 'id'>) => void;
+  onRegistrarPago: (compraId: string, pago: Omit<PagoCompra, 'id'>) => void;
+  onIrAProveedores: () => void;
+}) {
+  const hoy = new Date().toISOString().split('T')[0];
+  const [formProveedorId, setFormProveedorId] = useState('');
+  const [formFecha, setFormFecha] = useState(hoy);
+  const [formDesc, setFormDesc] = useState('');
+  const [itemsCompra, setItemsCompra] = useState<CompraItem[]>([]);
+  const [pickerRefId, setPickerRefId] = useState('');
+  const [pickerCantidad, setPickerCantidad] = useState(1);
+  const [pickerPrecio, setPickerPrecio] = useState(0);
+  const [filtro, setFiltro] = useState<'todos' | 'pendiente' | 'parcial' | 'pagado'>('todos');
+  const [expandido, setExpandido] = useState<string | null>(null);
+  const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, nota: '' });
+
+  const totalCompra = itemsCompra.reduce((s, i) => s + i.subtotal, 0);
+  const pickerRef = inventario.find(r => r.id === pickerRefId);
+
+  const agregarItem = () => {
+    if (!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0) return;
+    const ref = inventario.find(r => r.id === pickerRefId);
+    if (!ref) return;
+    setItemsCompra(prev => {
+      const ex = prev.find(i => i.refaccionId === ref.id);
+      if (ex) {
+        const nc = ex.cantidad + pickerCantidad;
+        return prev.map(i => i.refaccionId === ref.id ? { ...i, cantidad: nc, subtotal: nc * i.precioCompra } : i);
+      }
+      return [...prev, { refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad, precioCompra: pickerPrecio, subtotal: pickerCantidad * pickerPrecio }];
+    });
+    setPickerRefId('');
+    setPickerCantidad(1);
+    setPickerPrecio(0);
+  };
+
+  const handlePickerRefChange = (id: string) => {
+    setPickerRefId(id);
+    const ref = inventario.find(r => r.id === id);
+    setPickerPrecio(ref?.precioCompra ?? 0);
+  };
+
+  const handleSubmitCompra = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formProveedorId || itemsCompra.length === 0) return;
+    onGuardarCompra({ proveedorId: formProveedorId, fecha: formFecha, descripcion: formDesc, items: itemsCompra, total: totalCompra, pagos: [] });
+    setFormProveedorId(''); setFormFecha(hoy); setFormDesc(''); setItemsCompra([]);
+  };
+
+  const handleRegistrarPago = (compraId: string, saldo: number) => {
+    if (pagoForm.monto <= 0) return;
+    onRegistrarPago(compraId, { monto: Math.min(pagoForm.monto, saldo), fecha: pagoForm.fecha, nota: pagoForm.nota || undefined });
+    setPagoForm({ monto: 0, fecha: hoy, nota: '' });
+    setExpandido(null);
+  };
+
+  const totalPendiente = compras.filter(c => getEstadoPagoCompra(c) !== 'pagado').reduce((s, c) => s + getSaldoCompra(c), 0);
+  const counts = {
+    todos: compras.length,
+    pendiente: compras.filter(c => getEstadoPagoCompra(c) === 'pendiente').length,
+    parcial: compras.filter(c => getEstadoPagoCompra(c) === 'parcial').length,
+    pagado: compras.filter(c => getEstadoPagoCompra(c) === 'pagado').length,
+  };
+  const comprasFiltradas = [...compras]
+    .sort((a, b) => b.fecha.localeCompare(a.fecha))
+    .filter(c => filtro === 'todos' || getEstadoPagoCompra(c) === filtro);
+
+  return (
+    <div>
+      <SectionTitle title="Cuentas por Pagar" subtitle="Registra tus compras a proveedores y lleva el control de lo que les debes." />
+
+      {/* ── Registrar compra ── */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-6">
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5">Registrar Compra a Proveedor</h3>
+        {proveedores.length === 0 ? (
+          <div className="text-center py-6 text-slate-400 text-sm">
+            <p>Necesitas registrar proveedores primero.</p>
+            <button type="button" onClick={onIrAProveedores}
+              className="mt-2 text-indigo-600 font-semibold hover:underline">Ir a Proveedores →</button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmitCompra} className="space-y-5">
+            {/* Proveedor + fecha + desc */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <Label>Proveedor *</Label>
+                <Select value={formProveedorId} onChange={e => setFormProveedorId(e.target.value)} required>
+                  <option value="">Seleccionar proveedor...</option>
+                  {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                </Select>
+              </div>
+              <div>
+                <Label>Fecha</Label>
+                <Input type="date" value={formFecha} onChange={e => setFormFecha(e.target.value)} required />
+              </div>
+              <div>
+                <Label>Descripción (opcional)</Label>
+                <Input type="text" placeholder="Ej. Compra semanal filtros" value={formDesc}
+                  onChange={e => setFormDesc(e.target.value)} />
+              </div>
+            </div>
+
+            {/* Items picker */}
+            <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+              <div className="px-4 py-3 bg-slate-700">
+                <span className="text-xs font-bold text-white uppercase tracking-widest">Piezas Recibidas</span>
+                <span className="ml-3 text-slate-400 text-xs">Al guardar, el stock se actualiza automáticamente</span>
+              </div>
+              <div className="p-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                  <div className="sm:col-span-2">
+                    <Label>Refacción</Label>
+                    <Select value={pickerRefId} onChange={e => handlePickerRefChange(e.target.value)}>
+                      <option value="">Seleccionar pieza...</option>
+                      {inventario.map(r => (
+                        <option key={r.id} value={r.id}>{r.nombre}{r.codigo ? ` (${r.codigo})` : ''}</option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Cantidad</Label>
+                    <Input type="number" min="1" step="1" placeholder="1"
+                      value={pickerCantidad || ''} onChange={e => setPickerCantidad(Number(e.target.value))} />
+                  </div>
+                  <div>
+                    <Label>Precio compra ($)</Label>
+                    <Input type="number" min="0.01" step="0.01" placeholder="0.00"
+                      value={pickerPrecio || ''} onChange={e => setPickerPrecio(Number(e.target.value))} />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  {pickerRef && pickerPrecio > 0 && (
+                    <span className="text-xs text-slate-500">
+                      Subtotal: <strong className="text-slate-700">${fmt(pickerPrecio * pickerCantidad)}</strong>
+                    </span>
+                  )}
+                  <Btn variant="primary" disabled={!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0}
+                    onClick={agregarItem} size="sm">
+                    + Agregar
+                  </Btn>
+                </div>
+
+                {itemsCompra.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-100">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Pieza</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Cant.</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Precio</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Subtotal</th>
+                          <th className="px-3 py-2 w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {itemsCompra.map(it => (
+                          <tr key={it.refaccionId} className="bg-white">
+                            <td className="px-3 py-2 font-medium text-slate-800">{it.nombre}</td>
+                            <td className="px-3 py-2 text-right text-slate-700">{it.cantidad}</td>
+                            <td className="px-3 py-2 text-right text-slate-600">${fmt(it.precioCompra)}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(it.subtotal)}</td>
+                            <td className="px-3 py-2 text-center">
+                              <Btn size="sm" variant="danger" onClick={() => setItemsCompra(prev => prev.filter(i => i.refaccionId !== it.refaccionId))}>✕</Btn>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                        <tr>
+                          <td colSpan={3} className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total compra:</td>
+                          <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(totalCompra)}</td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+                {itemsCompra.length === 0 && (
+                  <p className="text-xs text-slate-400 text-center py-2">Agrega las piezas que recibiste en esta compra.</p>
+                )}
+              </div>
+            </div>
+
+            <Btn type="submit" variant="primary" fullWidth
+              disabled={!formProveedorId || itemsCompra.length === 0}>
+              ✓ Registrar Compra y Actualizar Inventario
+            </Btn>
+          </form>
+        )}
+      </div>
+
+      {/* ── Compras registradas ── */}
+      {totalPendiente > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 mb-5 flex flex-wrap gap-6 items-center">
+          <div>
+            <div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Total por Pagar</div>
+            <div className="text-2xl font-extrabold text-rose-700">${fmt(totalPendiente)}</div>
+          </div>
+          <div className="text-sm text-rose-600">
+            <span className="font-semibold">{counts.pendiente}</span> compra{counts.pendiente !== 1 ? 's' : ''} pendientes
+            {counts.parcial > 0 && <span> · <span className="font-semibold">{counts.parcial}</span> parciales</span>}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2 mb-5 flex-wrap">
+        {(['todos', 'pendiente', 'parcial', 'pagado'] as const).map(f => (
+          <button key={f} onClick={() => setFiltro(f)}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+              filtro === f ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'
+            }`}>
+            {f === 'todos' ? 'Todas' : BADGE_ESTADO[f].label} ({counts[f]})
+          </button>
+        ))}
+      </div>
+
+      {comprasFiltradas.length === 0 ? (
+        <div className="text-center py-14 text-slate-400">
+          <div className="text-5xl mb-3">🧾</div>
+          <p className="font-medium text-slate-500">Sin compras registradas</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {comprasFiltradas.map(compra => {
+            const prov = proveedores.find(p => p.id === compra.proveedorId);
+            const estado = getEstadoPagoCompra(compra);
+            const montoPag = getMontoPagadoCompra(compra);
+            const saldo = getSaldoCompra(compra);
+            const badge = BADGE_ESTADO[estado];
+            const isExp = expandido === compra.id;
+
+            return (
+              <div key={compra.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className={`grid grid-cols-1 sm:grid-cols-6 gap-2 items-center px-4 py-3 ${isExp ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'} transition-colors`}>
+                  <div className="sm:col-span-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-slate-800 text-sm">🏪 {prov?.nombre ?? 'Proveedor'}</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
+                      <span>{new Date(compra.fecha).toLocaleDateString('es-MX')}</span>
+                      {compra.descripcion && <span>· {compra.descripcion}</span>}
+                      <span>· {compra.items.length} pieza{compra.items.length !== 1 ? 's' : ''}</span>
+                    </div>
+                  </div>
+                  <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Total</div>
+                    <div className="font-semibold text-slate-800">${fmt(compra.total)}</div></div>
+                  <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div>
+                    <div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
+                  <div className="flex items-center justify-between sm:justify-end gap-2">
+                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div>
+                      <div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
+                    {estado !== 'pagado' ? (
+                      <Btn size="sm" variant={isExp ? 'ghost' : 'success'} onClick={() => { setExpandido(isExp ? null : compra.id); setPagoForm({ monto: 0, fecha: hoy, nota: '' }); }}>
+                        {isExp ? '✕' : '+ Pago'}
+                      </Btn>
+                    ) : (
+                      <Btn size="sm" variant="ghost" onClick={() => setExpandido(isExp ? null : compra.id)}>
+                        {isExp ? '✕' : 'Ver'}
+                      </Btn>
+                    )}
+                  </div>
+                </div>
+
+                {isExp && (
+                  <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200 space-y-4">
+                    {/* Items */}
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Piezas recibidas</p>
+                      <div className="space-y-1">
+                        {compra.items.map(it => (
+                          <div key={it.refaccionId} className="flex justify-between bg-white border border-slate-200 rounded px-3 py-1.5 text-sm">
+                            <span className="text-slate-700">{it.nombre} × {it.cantidad}</span>
+                            <span className="font-semibold text-slate-800">${fmt(it.subtotal)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Historial pagos */}
+                    {compra.pagos?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
+                        <div className="space-y-1">
+                          {compra.pagos.map(p => (
+                            <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                              <div className="flex gap-3">
+                                <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
+                                {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
+                              </div>
+                              <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Registrar pago */}
+                    {estado !== 'pagado' && (
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Registrar Pago al Proveedor</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div><Label>Fecha</Label>
+                            <Input type="date" value={pagoForm.fecha} onChange={e => setPagoForm(f => ({ ...f, fecha: e.target.value }))} /></div>
+                          <div><Label>Monto ($) — saldo: ${fmt(saldo)}</Label>
+                            <Input type="number" placeholder="0.00" min="0.01" step="0.01"
+                              value={pagoForm.monto || ''} onChange={e => setPagoForm(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
+                          <div><Label>Nota (opcional)</Label>
+                            <Input type="text" placeholder="Efectivo, transferencia..."
+                              value={pagoForm.nota} onChange={e => setPagoForm(f => ({ ...f, nota: e.target.value }))} /></div>
+                          <div className="flex items-end">
+                            <Btn variant="success" fullWidth disabled={pagoForm.monto <= 0}
+                              onClick={() => handleRegistrarPago(compra.id, saldo)}>✓ Registrar</Btn>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {estado === 'pagado' && (
+                      <p className="text-xs text-emerald-600 font-semibold text-center">✅ Esta compra está completamente pagada.</p>
                     )}
                   </div>
                 )}
