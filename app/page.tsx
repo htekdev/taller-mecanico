@@ -28,6 +28,7 @@ interface Refaccion {
   precioCompra: number;  // precio de compra por unidad
   stock: number;         // existencias actuales
   stockMinimo: number;   // alerta cuando stock <= esto
+  vehiculoId?: string;   // opcional: pieza comprada para una unidad específica
 }
 
 interface TrabajoRefaccion {
@@ -318,7 +319,7 @@ export default function TallerMecanico() {
               onGuardarCliente={guardarCliente} onGuardarVehiculo={guardarVehiculo} />
           )}
           {vista === 'inventario' && (
-            <VistaInventario inventario={inventario}
+            <VistaInventario inventario={inventario} clientes={clientes} vehiculos={vehiculos}
               onGuardarRefaccion={guardarRefaccion} onRecibirStock={recibirStock} />
           )}
           {vista === 'trabajos' && (
@@ -500,25 +501,38 @@ const UNIDADES   = ['pza', 'lt', 'par', 'kg', 'metro', 'rollo', 'caja'];
 
 function VistaInventario({
   inventario,
+  clientes,
+  vehiculos,
   onGuardarRefaccion,
   onRecibirStock,
 }: {
   inventario: Refaccion[];
+  clientes: Cliente[];
+  vehiculos: Vehiculo[];
   onGuardarRefaccion: (r: Omit<Refaccion, 'id'>) => void;
   onRecibirStock: (id: string, cantidad: number) => void;
 }) {
   const [form, setForm] = useState({
     nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza',
-    precioCompra: 0, stock: 0, stockMinimo: 1,
+    precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '',
   });
+  const [formClienteId, setFormClienteId] = useState('');  // UI only — cascades to vehiculoId
   const [expandido, setExpandido] = useState<string | null>(null);
   const [recibirCantidad, setRecibirCantidad] = useState<Record<string, number>>({});
+
+  const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === formClienteId);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nombre || form.precioCompra <= 0) return;
     onGuardarRefaccion(form);
-    setForm({ nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza', precioCompra: 0, stock: 0, stockMinimo: 1 });
+    setForm({ nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza', precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '' });
+    setFormClienteId('');
+  };
+
+  const handleClienteChange = (clienteId: string) => {
+    setFormClienteId(clienteId);
+    setForm(f => ({ ...f, vehiculoId: '' }));  // reset vehicle when client changes
   };
 
   const handleRecibir = (id: string) => {
@@ -531,22 +545,32 @@ function VistaInventario({
   };
 
   const stockStatus = (r: Refaccion) => {
-    if (r.stock <= 0)           return { label: 'Sin stock', cls: 'bg-rose-100 text-rose-700' };
+    if (r.stock <= 0)             return { label: 'Sin stock',           cls: 'bg-rose-100 text-rose-700' };
     if (r.stock <= r.stockMinimo) return { label: `Stock bajo (${r.stock})`, cls: 'bg-amber-100 text-amber-700' };
     return { label: `${r.stock} ${r.unidad}`, cls: 'bg-emerald-100 text-emerald-700' };
+  };
+
+  // Resolve vehiculo label for display in table
+  const vehiculoLabel = (vehiculoId?: string) => {
+    if (!vehiculoId) return null;
+    const v = vehiculos.find(x => x.id === vehiculoId);
+    if (!v) return null;
+    const c = clientes.find(x => x.id === v.clienteId);
+    return `${c?.nombre ?? '?'} · ${[v.anio, v.marca, v.modelo].filter(Boolean).join(' ')}`;
   };
 
   return (
     <div>
       <SectionTitle
         title="Inventario de Refacciones"
-        subtitle="Registra las piezas en stock. Al crear un trabajo podrás seleccionar las refacciones usadas y se descontarán automáticamente."
+        subtitle="Registra las piezas en stock. Puedes vincular una pieza a una unidad específica si fue comprada para esa reparación."
       />
 
       {/* ── Formulario nueva refacción ── */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-6">
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5">Agregar Refacción al Inventario</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Nombre + Código + Categoría */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="sm:col-span-2 lg:col-span-1">
               <Label>Nombre de la refacción *</Label>
@@ -565,6 +589,8 @@ function VistaInventario({
               </Select>
             </div>
           </div>
+
+          {/* Unidad + Precio + Stock + Stock mínimo */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <Label>Unidad</Label>
@@ -591,6 +617,43 @@ function VistaInventario({
                 onChange={e => setForm(f => ({ ...f, stockMinimo: Number(e.target.value) }))} />
             </div>
           </div>
+
+          {/* ── Vincular a unidad (opcional) ── */}
+          <div className="border border-slate-200 rounded-xl p-4 bg-white">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+              🎯 Vincular a una unidad específica <span className="font-normal normal-case text-slate-400">(opcional)</span>
+            </p>
+            <p className="text-xs text-slate-400 mb-3">
+              Si compraste esta pieza específicamente para la reparación de una unidad, selecciónala aquí.
+              Aparecerá destacada cuando registres un trabajo para esa unidad.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label>Cliente</Label>
+                <Select value={formClienteId} onChange={e => handleClienteChange(e.target.value)}>
+                  <option value="">Sin vincular (stock general)</option>
+                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </Select>
+              </div>
+              <div>
+                <Label>Unidad del cliente</Label>
+                <Select
+                  value={form.vehiculoId}
+                  onChange={e => setForm(f => ({ ...f, vehiculoId: e.target.value }))}
+                  disabled={!formClienteId || vehiculosDelCliente.length === 0}
+                >
+                  <option value="">Seleccionar unidad...</option>
+                  {vehiculosDelCliente.map(v => (
+                    <option key={v.id} value={v.id}>{labelVehiculo(v)}</option>
+                  ))}
+                </Select>
+                {formClienteId && vehiculosDelCliente.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">Este cliente no tiene unidades registradas.</p>
+                )}
+              </div>
+            </div>
+          </div>
+
           <Btn type="submit" variant="primary" disabled={!form.nombre || form.precioCompra <= 0}>
             + Agregar al Inventario
           </Btn>
@@ -614,20 +677,30 @@ function VistaInventario({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-800 text-white">
-                  {['Código','Nombre','Categoría','Precio Compra','Stock','Acciones'].map((h, i) => (
+                  {['Código','Nombre / Unidad vinculada','Categoría','Precio Compra','Stock','Acciones'].map((h, i) => (
                     <th key={h} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 3 ? 'text-right' : 'text-left'} ${i === 5 ? 'text-center' : ''}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {inventario.map((r, i) => {
-                  const status = stockStatus(r);
-                  const isExpanded = expandido === r.id;
+                  const status  = stockStatus(r);
+                  const isExp   = expandido === r.id;
+                  const vLabel  = vehiculoLabel(r.vehiculoId);
                   return (
                     <>
                       <tr key={r.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                         <td className="px-4 py-3 font-mono text-slate-500 text-xs">{r.codigo || '—'}</td>
-                        <td className="px-4 py-3 font-medium text-slate-800">{r.nombre}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-slate-800">{r.nombre}</div>
+                          {vLabel && (
+                            <div className="mt-0.5 flex items-center gap-1">
+                              <span className="text-xs bg-violet-100 text-violet-700 font-semibold px-2 py-0.5 rounded-full">
+                                🎯 {vLabel}
+                              </span>
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <span className="text-xs bg-indigo-50 text-indigo-700 font-medium px-2 py-0.5 rounded-full">{r.categoria}</span>
                         </td>
@@ -636,13 +709,13 @@ function VistaInventario({
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status.cls}`}>{status.label}</span>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <Btn size="sm" variant={isExpanded ? 'ghost' : 'success'}
-                            onClick={() => setExpandido(isExpanded ? null : r.id)}>
-                            {isExpanded ? '✕ Cerrar' : '+ Existencias'}
+                          <Btn size="sm" variant={isExp ? 'ghost' : 'success'}
+                            onClick={() => setExpandido(isExp ? null : r.id)}>
+                            {isExp ? '✕ Cerrar' : '+ Existencias'}
                           </Btn>
                         </td>
                       </tr>
-                      {isExpanded && (
+                      {isExp && (
                         <tr key={`${r.id}-recibir`} className="bg-emerald-50 border-t border-emerald-200">
                           <td colSpan={6} className="px-4 py-3">
                             <div className="flex items-center gap-3 flex-wrap">
@@ -827,11 +900,40 @@ function VistaTrabajo({
                     <Label>Refacción</Label>
                     <Select value={pickerRefId} onChange={e => setPickerRefId(e.target.value)}>
                       <option value="">Seleccionar pieza...</option>
-                      {inventario.map(r => (
-                        <option key={r.id} value={r.id}>
-                          {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                        </option>
-                      ))}
+                      {/* Parts bought for this specific vehicle — shown first */}
+                      {form.vehiculoId && inventario.some(r => r.vehiculoId === form.vehiculoId) && (
+                        <optgroup label="🎯 Compradas para esta unidad">
+                          {inventario
+                            .filter(r => r.vehiculoId === form.vehiculoId)
+                            .map(r => (
+                              <option key={r.id} value={r.id}>
+                                {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                      {/* General stock and parts for other vehicles */}
+                      <optgroup label="📦 Stock general">
+                        {inventario
+                          .filter(r => !r.vehiculoId)
+                          .map(r => (
+                            <option key={r.id} value={r.id}>
+                              {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
+                            </option>
+                          ))}
+                      </optgroup>
+                      {/* Parts for other vehicles — available but de-prioritized */}
+                      {inventario.some(r => r.vehiculoId && r.vehiculoId !== form.vehiculoId) && (
+                        <optgroup label="🔧 Piezas de otras unidades">
+                          {inventario
+                            .filter(r => r.vehiculoId && r.vehiculoId !== form.vehiculoId)
+                            .map(r => (
+                              <option key={r.id} value={r.id}>
+                                {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
                     </Select>
                   </div>
                   <div className="w-28">
