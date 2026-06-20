@@ -165,12 +165,13 @@ RETURNS BOOLEAN AS $$
   );
 $$ LANGUAGE sql SECURITY DEFINER;
 
--- talleres: user can see their talleres
+-- talleres: creator can always see their own taller; members can see talleres they belong to
 CREATE POLICY "ver_mis_talleres" ON talleres
-  FOR SELECT USING (is_taller_member(id));
+  FOR SELECT USING (created_by = auth.uid() OR is_taller_member(id));
 
+-- Any authenticated user can create a new taller
 CREATE POLICY "crear_taller" ON talleres
-  FOR INSERT WITH CHECK (created_by = auth.uid());
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 CREATE POLICY "editar_mi_taller" ON talleres
   FOR UPDATE USING (is_taller_member(id));
@@ -179,8 +180,9 @@ CREATE POLICY "editar_mi_taller" ON talleres
 CREATE POLICY "ver_mis_memberships" ON taller_members
   FOR SELECT USING (user_id = auth.uid() OR is_taller_member(taller_id));
 
+-- Users can add themselves; existing members can add others (invite flow)
 CREATE POLICY "insertar_membership" ON taller_members
-  FOR INSERT WITH CHECK (true);
+  FOR INSERT WITH CHECK (auth.uid() = user_id OR is_taller_member(taller_id));
 
 -- taller_invites: only taller members can manage invites
 CREATE POLICY "ver_invitaciones" ON taller_invites
