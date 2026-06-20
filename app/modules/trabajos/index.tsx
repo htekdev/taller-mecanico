@@ -25,8 +25,25 @@ function ModalFinalizacion({
   const totalFactura = subtotal + ivaFactura;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+    /* Backdrop — tap anywhere outside the card to cerrar */
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={onCancelar}
+    >
+      {/* Card — stopPropagation so tapping inside doesn't close */}
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 relative"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* ✕ Close button — top right corner */}
+        <button
+          onClick={onCancelar}
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all text-lg font-bold"
+          aria-label="Cerrar"
+        >
+          &#x2715;
+        </button>
+
         <div className="text-center space-y-1">
           <div className="text-4xl mb-2">&#127937;</div>
           <h2 className="text-xl font-bold text-slate-800">Finalizar Trabajo</h2>
@@ -78,11 +95,13 @@ function ModalFinalizacion({
             </div>
           </button>
         </div>
+
+        {/* Prominent Regresar button */}
         <button
           onClick={onCancelar}
-          className="w-full text-sm text-slate-400 hover:text-slate-600 transition-colors py-1"
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400 transition-all text-slate-700 font-semibold text-sm"
         >
-          Cancelar — el trabajo sigue en progreso
+          &#8592; Regresar — el trabajo sigue en progreso
         </button>
       </div>
     </div>
