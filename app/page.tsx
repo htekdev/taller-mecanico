@@ -442,7 +442,9 @@ function getPricingIntel(
 ): PricingIntel {
   const markups = [30, 40, 50].map(pct => ({
     pct,
-    price: Math.round(precioCompra * (1 + pct / 100) * 100) / 100,
+    // Margen sobre venta: sale = cost / (1 - margin%)
+    // Guarantees profit is `pct`% of the sale price, not of cost
+    price: Math.round((precioCompra / (1 - pct / 100)) * 100) / 100,
   }));
 
   // All sales of this part to THIS client (most recent first)
@@ -1239,7 +1241,7 @@ function VistaTrabajo({
                               ? 'bg-indigo-600 text-white border-indigo-600'
                               : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50'
                           }`}>
-                          +{m.pct}% ${fmt(m.price)}
+                          {m.pct}% margen ${fmt(m.price)}
                         </button>
                       ))}
                       {pickerRef.stock < pickerCantidad && (
