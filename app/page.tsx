@@ -548,7 +548,9 @@ function getPricingIntel(
     price: Math.round((precioCompra / (1 - pct / 100)) * 100) / 100,
   }));
 
-  // All sales of this part to THIS client (most recent first)
+  // All sales of this part to THIS client — sorted highest price first
+  // (we want the max price ever charged, not the most recent, per Hector's rule:
+  //  "never charge less than the highest you've ever charged this client")
   const clientSales = trabajos
     .filter(t => t.clienteId === clienteId)
     .flatMap(t =>
@@ -556,7 +558,7 @@ function getPricingIntel(
         .filter(p => p.refaccionId === refaccionId && p.precioVenta > 0)
         .map(p => ({ precio: p.precioVenta, fecha: t.fecha }))
     )
-    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+    .sort((a, b) => b.precio - a.precio);  // highest price first
 
   // Prices charged to OTHER clients
   const otherPrices = trabajos
@@ -1099,13 +1101,12 @@ function VistaTrabajo({
     setPickerRefId(id);
     const ref = inventario.find(r => r.id === id);
     if (!ref) { setPickerPrecioVenta(0); return; }
-    // Look up client history immediately for the default price
+    // Look up client history — use highest price ever charged (never charge less)
     if (form.clienteId) {
-      const clientSales = trabajos
+      const prices = trabajos
         .filter(t => t.clienteId === form.clienteId)
-        .flatMap(t => t.partes.filter(p => p.refaccionId === id && p.precioVenta > 0).map(p => ({ precio: p.precioVenta, fecha: t.fecha })))
-        .sort((a, b) => b.fecha.localeCompare(a.fecha));
-      if (clientSales[0]) { setPickerPrecioVenta(clientSales[0].precio); return; }
+        .flatMap(t => t.partes.filter(p => p.refaccionId === id && p.precioVenta > 0).map(p => p.precioVenta));
+      if (prices.length > 0) { setPickerPrecioVenta(Math.max(...prices)); return; }
     }
     setPickerPrecioVenta(ref.precioCompra);
   };
@@ -1389,8 +1390,8 @@ function VistaTrabajo({
                               {isLower
                                 ? `Estás cobrando menos que antes ($${fmt(pickerPrecioVenta)} vs $${fmt(intel.clientLastSale!.precio)})`
                                 : isSame
-                                  ? `Mismo precio que la última vez ($${fmt(intel.clientLastSale!.precio)})`
-                                  : `Última venta a este cliente: $${fmt(intel.clientLastSale!.precio)}`
+                                  ? `Mismo precio que el máximo cobrado ($${fmt(intel.clientLastSale!.precio)})`
+                                  : `Mayor precio cobrado a este cliente: $${fmt(intel.clientLastSale!.precio)}`
                               }
                             </span>
                             <span className="text-slate-400 ml-1">
