@@ -26,9 +26,22 @@ export default function SetupPage() {
     if (!nombre.trim()) return;
     setCreando(true);
     setError('');
-    const taller = await crearTaller(nombre.trim());
+    const result = await crearTaller(nombre.trim());
     setCreando(false);
-    if (!taller) { setError('Error al crear el taller. Intenta de nuevo.'); return; }
+
+    // null = user not logged in
+    if (!result) { setError('No estás autenticado. Recarga la página.'); return; }
+
+    // { error } = Supabase error with code
+    if ('error' in result) {
+      if (result.error === 'PGRST205' || result.error === '42P01') {
+        setError('⚠️ Base de datos no configurada. Pide al administrador que ejecute el esquema SQL en Supabase.');
+      } else {
+        setError(`Error del servidor (${result.error}). Intenta de nuevo.`);
+      }
+      return;
+    }
+
     router.push('/');
   };
 

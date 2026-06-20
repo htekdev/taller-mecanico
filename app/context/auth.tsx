@@ -18,7 +18,7 @@ interface AuthContextValue {
   signUp:      (email: string, password: string) => Promise<string | null>;
   signOut:     () => Promise<void>;
   selectTaller: (id: string) => void;
-  crearTaller: (nombre: string) => Promise<TallerRow | null>;
+  crearTaller: (nombre: string) => Promise<TallerRow | { error: string } | null>;
   recargarTalleres: () => Promise<TallerRow[]>;
 }
 
@@ -119,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const crearTaller = async (nombre: string): Promise<TallerRow | null> => {
+  const crearTaller = async (nombre: string): Promise<TallerRow | { error: string } | null> => {
     if (!user) return null;
 
     // 1. Insert taller
@@ -129,7 +129,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .select()
       .single();
 
-    if (tallerErr || !tallerData) return null;
+    if (tallerErr || !tallerData) {
+      console.error('crearTaller error:', tallerErr);
+      // Surface a useful error code to the UI
+      return { error: tallerErr?.code ?? 'unknown' };
+    }
     const nuevoTaller = tallerData as TallerRow;
 
     // 2. Add creator as owner member
