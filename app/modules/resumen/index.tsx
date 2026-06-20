@@ -2,7 +2,7 @@
 
 import type { Trabajo, Cliente, Vehiculo } from '@/app/types';
 import { Label, Input, SectionTitle, EmptyRow } from '@/app/components/ui';
-import { fmt, getSaldoFactura } from '@/app/lib/utils';
+import { fmt } from '@/app/lib/utils';
 
 export function VistaResumen({
   mesActual,
@@ -18,6 +18,7 @@ export function VistaResumen({
     facturadoMes: number; totalVentaRef: number; totalCostoRef: number;
     margenRef: number; totalManoObra: number; ganancia: number; cantidad: number;
     cobradoEnMes: number; porCobrarDelMes: number; totalOrdenes: number; porPagarOrdenes: number;
+    pagadoAProveedoresMes: number; porPagarTotal: number;
     totalIVA: number; ingresoConIVA: number; ingresoSinIVA: number;
   };
   trabajos: Trabajo[];
@@ -25,6 +26,7 @@ export function VistaResumen({
   vehiculos: Vehiculo[];
 }) {
   const getCliente = (id: string) => clientes.find(c => c.id === id);
+  const flujoCaja = resumen.cobradoEnMes - resumen.pagadoAProveedoresMes;
 
   return (
     <div>
@@ -78,6 +80,47 @@ export function VistaResumen({
             <div className="text-xs font-bold text-rose-600 uppercase tracking-widest mb-1">Por Cobrar del Mes</div>
             <div className="text-2xl font-extrabold text-slate-900">${fmt(resumen.porCobrarDelMes)}</div>
             <div className="text-xs text-slate-400 mt-0.5">Pendiente de trabajos de este mes</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Pagos a Proveedores ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div className="bg-white border-2 border-violet-200 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">🏪</div>
+          <div>
+            <div className="text-xs font-bold text-violet-600 uppercase tracking-widest mb-1">Pagado a Proveedores (mes)</div>
+            <div className="text-2xl font-extrabold text-slate-900">${fmt(resumen.pagadoAProveedoresMes)}</div>
+            <div className="text-xs text-slate-400 mt-0.5">Pagos realizados a proveedores este mes</div>
+          </div>
+        </div>
+        <div className="bg-white border-2 border-orange-200 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">🔴</div>
+          <div>
+            <div className="text-xs font-bold text-orange-600 uppercase tracking-widest mb-1">Saldo Pendiente Proveedores</div>
+            <div className="text-2xl font-extrabold text-slate-900">${fmt(resumen.porPagarTotal)}</div>
+            <div className="text-xs text-slate-400 mt-0.5">Total que debemos a proveedores</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Flujo de Caja Real del Mes ── */}
+      <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 mb-4">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Flujo de Caja Real del Mes</p>
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="text-center">
+            <div className="text-slate-400 text-xs mb-1">Cobrado a clientes</div>
+            <div className="font-bold text-emerald-600 text-lg">+${fmt(resumen.cobradoEnMes)}</div>
+          </div>
+          <div className="text-center border-x border-slate-200">
+            <div className="text-slate-400 text-xs mb-1">Pagado a proveedores</div>
+            <div className="font-bold text-rose-600 text-lg">-${fmt(resumen.pagadoAProveedoresMes)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-slate-400 text-xs mb-1">Flujo neto</div>
+            <div className={`font-bold text-lg ${flujoCaja >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {flujoCaja >= 0 ? '+' : ''}{fmt(flujoCaja)}
+            </div>
           </div>
         </div>
       </div>

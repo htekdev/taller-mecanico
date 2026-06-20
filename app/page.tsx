@@ -243,6 +243,17 @@ export default function TallerMecanico() {
     const ordenesMes    = ordenes.filter(o => o.fecha.startsWith(mesActual) && o.estado !== 'cancelada');
     const totalOrdenes  = ordenesMes.reduce((s, o) => s + o.total, 0);
     const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0);
+    // Payments actually made to suppliers during this month (cash flow view)
+    const pagadoAProveedoresMes = ordenes.flatMap(o => (o.pagos ?? []))
+      .filter(p => p.fecha.startsWith(mesActual))
+      .reduce((s, p) => s + p.monto, 0);
+    // Total outstanding balance across ALL received orders (all-time AP)
+    const porPagarTotal = ordenes
+      .filter(o => o.estado === 'recibida')
+      .reduce((s, o) => {
+        const pagado = (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0);
+        return s + Math.max(0, o.total - pagado);
+      }, 0);
     const mesConIVA    = mes.filter(t => t.requiereFactura);
     const mesSinIVA    = mes.filter(t => !t.requiereFactura);
     const totalIVA     = mesConIVA.reduce((s, t) => s + (t.iva ?? 0), 0);
@@ -251,6 +262,7 @@ export default function TallerMecanico() {
     return {
       facturadoMes, totalVentaRef, totalCostoRef, margenRef, totalManoObra, ganancia,
       cantidad: mes.length, cobradoEnMes, porCobrarDelMes, totalOrdenes, porPagarOrdenes,
+      pagadoAProveedoresMes, porPagarTotal,
       totalIVA, ingresoConIVA, ingresoSinIVA,
     };
   };
