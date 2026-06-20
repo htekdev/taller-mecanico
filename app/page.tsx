@@ -40,16 +40,23 @@ interface TrabajoRefaccion {
   subtotal: number;       // cantidad × precioUnitario
 }
 
+interface ManoDeObraItem {
+  id: string;
+  concepto: string;  // "Arreglo de frenos"
+  precio: number;    // 350.00
+}
+
 interface Trabajo {
   id: string;
   clienteId: string;
   vehiculoId: string;
   fecha: string;
   descripcion: string;
-  manoDeObra: number;
-  refacciones: number;       // suma de partes (o manual para trabajos anteriores)
+  manoDeObra: number;              // DERIVADO: suma de manoDeObraItems
+  manoDeObraItems: ManoDeObraItem[]; // líneas de mano de obra (vacío en trabajos anteriores)
+  refacciones: number;             // suma de partes (o manual para trabajos anteriores)
   total: number;
-  partes: TrabajoRefaccion[]; // vacío en trabajos anteriores
+  partes: TrabajoRefaccion[];      // vacío en trabajos anteriores
   estado: 'pendiente' | 'completado' | 'pagado';
 }
 
@@ -198,9 +205,17 @@ export default function TallerMecanico() {
       localStorage.setItem('vehiculos', JSON.stringify(parsedVehiculos));
     }
 
-    // Migrar: Trabajo no tenía campo `partes`
+    // Migrar: Trabajo no tenía campos `partes` ni `manoDeObraItems`
     const parsedTrabajos: Trabajo[] = (rawTrabajos ? JSON.parse(rawTrabajos) : [])
-      .map((t: Trabajo) => ({ ...t, partes: t.partes ?? [] }));
+      .map((t: Trabajo & { manoDeObra: number }) => ({
+        ...t,
+        partes: t.partes ?? [],
+        manoDeObraItems: t.manoDeObraItems ?? (
+          t.manoDeObra > 0
+            ? [{ id: `mig_${t.id}`, concepto: 'Mano de obra', precio: t.manoDeObra }]
+            : []
+        ),
+      }));
 
     setClientes(parsedClientes);
     setVehiculos(parsedVehiculos);
@@ -769,19 +784,37 @@ function VistaTrabajo({
   const emptyForm = {
     clienteId: '', vehiculoId: '',
     fecha: new Date().toISOString().split('T')[0],
-    descripcion: '', manoDeObra: 0,
+    descripcion: '',
     estado: 'pendiente' as Trabajo['estado'],
   };
   const [form, setForm] = useState(emptyForm);
+  const [laborItems, setLaborItems] = useState<ManoDeObraItem[]>([]);
+  const [laborConcepto, setLaborConcepto] = useState('');
+  const [laborPrecio, setLaborPrecio]     = useState(0);
   const [partesSeleccionadas, setPartesSeleccionadas] = useState<TrabajoRefaccion[]>([]);
   const [pickerRefId, setPickerRefId]   = useState('');
   const [pickerCantidad, setPickerCantidad] = useState(1);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
+  const totalManoDeObra  = laborItems.reduce((s, l) => s + l.precio, 0);
   const totalRefacciones = partesSeleccionadas.reduce((s, p) => s + p.subtotal, 0);
 
   const handleClienteChange = (clienteId: string) =>
     setForm(f => ({ ...f, clienteId, vehiculoId: '' }));
+
+  const agregarLabor = () => {
+    if (!laborConcepto.trim() || laborPrecio <= 0) return;
+    setLaborItems(prev => [...prev, {
+      id: `${Date.now()}-${Math.random()}`,
+      concepto: laborConcepto.trim(),
+      precio: laborPrecio,
+    }]);
+    setLaborConcepto('');
+    setLaborPrecio(0);
+  };
+
+  const removerLabor = (id: string) =>
+    setLaborItems(prev => prev.filter(l => l.id !== id));
 
   const agregarParte = () => {
     const ref = inventario.find(r => r.id === pickerRefId);
@@ -809,8 +842,17 @@ function VistaTrabajo({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.clienteId || !form.vehiculoId || !form.descripcion) return;
-    onGuardar({ ...form, refacciones: totalRefacciones, partes: partesSeleccionadas });
+    onGuardar({
+      ...form,
+      manoDeObra: totalManoDeObra,
+      manoDeObraItems: laborItems,
+      refacciones: totalRefacciones,
+      partes: partesSeleccionadas,
+    });
     setForm(emptyForm);
+    setLaborItems([]);
+    setLaborConcepto('');
+    setLaborPrecio(0);
     setPartesSeleccionadas([]);
     setPickerRefId('');
     setPickerCantidad(1);
@@ -854,21 +896,88 @@ function VistaTrabajo({
             </div>
           )}
 
-          {/* Fecha + Descripción + Mano de obra */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Fecha + Descripción (2-col, mano de obra moved to its own section) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Fecha</Label>
               <Input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} required />
             </div>
-            <div className="sm:col-span-1">
-              <Label>Descripción del trabajo</Label>
-              <Input type="text" placeholder="Ej. Cambio de aceite y filtros..." value={form.descripcion}
+            <div>
+              <Label>Descripción general del trabajo</Label>
+              <Input type="text" placeholder="Ej. Servicio completo frenos y aceite..." value={form.descripcion}
                 onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} required />
             </div>
-            <div>
-              <Label>Mano de obra ($)</Label>
-              <Input type="number" placeholder="0.00" value={form.manoDeObra || ''}
-                onChange={e => setForm(f => ({ ...f, manoDeObra: Number(e.target.value) }))} min="0" step="0.01" />
+          </div>
+
+          {/* ② Mano de Obra — multi-item */}
+          <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+            <div className="px-4 py-3 bg-slate-700">
+              <span className="text-xs font-bold text-white uppercase tracking-widest">② Mano de Obra</span>
+              <span className="ml-3 text-slate-400 text-xs">Agrega cada tarea con su precio</span>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Labor picker */}
+              <div className="flex gap-2 flex-wrap items-end">
+                <div className="flex-1 min-w-48">
+                  <Label>Concepto</Label>
+                  <Input type="text" placeholder="Ej. Arreglo de frenos, engrase de pernos..."
+                    value={laborConcepto}
+                    onChange={e => setLaborConcepto(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarLabor(); } }}
+                  />
+                </div>
+                <div className="w-36">
+                  <Label>Precio ($)</Label>
+                  <Input type="number" placeholder="0.00" min="0.01" step="0.01"
+                    value={laborPrecio || ''}
+                    onChange={e => setLaborPrecio(Number(e.target.value))} />
+                </div>
+                <div className="flex items-end">
+                  <Btn variant="primary"
+                    disabled={!laborConcepto.trim() || laborPrecio <= 0}
+                    onClick={agregarLabor}>
+                    + Agregar
+                  </Btn>
+                </div>
+              </div>
+
+              {/* Labor items table */}
+              {laborItems.length > 0 && (
+                <div className="rounded-lg border border-slate-200 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-100">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Concepto</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Precio</th>
+                        <th className="px-3 py-2 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {laborItems.map(l => (
+                        <tr key={l.id} className="bg-white">
+                          <td className="px-3 py-2 text-slate-800 font-medium">{l.concepto}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(l.precio)}</td>
+                          <td className="px-3 py-2 text-center">
+                            <Btn size="sm" variant="danger" onClick={() => removerLabor(l.id)}>✕</Btn>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                      <tr>
+                        <td className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total Mano de Obra:</td>
+                        <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(totalManoDeObra)}</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+              {laborItems.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-2">
+                  Sin conceptos de mano de obra. El trabajo se registra con mano de obra = $0.00
+                </p>
+              )}
             </div>
           </div>
 
@@ -1008,11 +1117,15 @@ function VistaTrabajo({
           </div>
 
           {/* Resumen del trabajo */}
-          {(form.manoDeObra > 0 || totalRefacciones > 0) && (
+          {(totalManoDeObra > 0 || totalRefacciones > 0) && (
             <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-4 flex flex-wrap gap-6 text-sm">
-              <div><span className="text-indigo-500 font-semibold">Mano de obra:</span> <span className="font-bold text-slate-800">${fmt(form.manoDeObra)}</span></div>
+              <div>
+                <span className="text-indigo-500 font-semibold">Mano de obra</span>
+                {laborItems.length > 0 && <span className="text-indigo-400 ml-1">({laborItems.length} concepto{laborItems.length !== 1 ? 's' : ''})</span>}
+                {': '}<span className="font-bold text-slate-800">${fmt(totalManoDeObra)}</span>
+              </div>
               <div><span className="text-indigo-500 font-semibold">Refacciones:</span> <span className="font-bold text-slate-800">${fmt(totalRefacciones)}</span></div>
-              <div><span className="text-indigo-700 font-bold">Total trabajo: </span><span className="font-extrabold text-indigo-800 text-base">${fmt(form.manoDeObra + totalRefacciones)}</span></div>
+              <div><span className="text-indigo-700 font-bold">Total trabajo: </span><span className="font-extrabold text-indigo-800 text-base">${fmt(totalManoDeObra + totalRefacciones)}</span></div>
             </div>
           )}
 
@@ -1064,8 +1177,17 @@ function VistaTrabajo({
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-700">${fmt(trabajo.refacciones)}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">${fmt(trabajo.manoDeObra)}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      <div>${fmt(trabajo.refacciones)}</div>
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      <div>${fmt(trabajo.manoDeObra)}</div>
+                      {trabajo.manoDeObraItems?.length > 1 && (
+                        <div className="text-xs text-slate-400 mt-0.5">
+                          {trabajo.manoDeObraItems.length} conceptos
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right font-bold text-slate-900">${fmt(trabajo.total)}</td>
                   </tr>
                 );
