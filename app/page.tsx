@@ -120,6 +120,13 @@ export default function TallerMecanico() {
     const nuevos = [...inventario, nuevo];
     setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
   };
+  /** Crea una nueva refacción en el catálogo y la devuelve con ID asignado — usada desde OC */
+  const crearRefaccionDesdeOrden = (data: Omit<Refaccion, 'id'>): Refaccion => {
+    const nuevo: Refaccion = { ...data, id: Date.now().toString() };
+    const nuevos = [...inventario, nuevo];
+    setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
+    return nuevo;
+  };
   const recibirStock = (refaccionId: string, cantidad: number) => {
     const nuevos = inventario.map(r => r.id === refaccionId ? { ...r, stock: r.stock + cantidad } : r);
     setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
@@ -329,7 +336,8 @@ export default function TallerMecanico() {
           {vista === 'ordenes' && (
             <VistaOrdenesCompra ordenes={ordenes} proveedores={proveedores} inventario={inventario}
               onCrearOrden={crearOrden} onRecibirOrden={recibirOrden} onCancelarOrden={cancelarOrden}
-              onIrAProveedores={() => setVista('proveedores')} />
+              onIrAProveedores={() => setVista('proveedores')}
+              onCrearRefaccionNueva={crearRefaccionDesdeOrden} />
           )}
           {vista === 'facturas' && (
             <VistaFacturas facturas={facturas} clientes={clientes} vehiculos={vehiculos} trabajos={trabajos}
