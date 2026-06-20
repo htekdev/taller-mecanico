@@ -48,22 +48,43 @@ interface ManoDeObraItem {
   precio: number;
 }
 
+interface Pago {
+  id: string;
+  fecha: string;  // YYYY-MM-DD
+  monto: number;
+  nota?: string;
+}
+
 interface Trabajo {
   id: string;
   clienteId: string;
   vehiculoId: string;
   fecha: string;
   descripcion: string;
-  manoDeObra: number;              // DERIVADO: suma de manoDeObraItems
+  manoDeObra: number;
   manoDeObraItems: ManoDeObraItem[];
-  refacciones: number;             // INGRESOS: suma de partes.subtotal (precioVenta × qty)
-  costoRefacciones: number;        // COSTOS: suma de partes.costoTotal (precioCompra × qty)
-  total: number;                   // manoDeObra + refacciones (lo que cobra el cliente)
+  refacciones: number;
+  costoRefacciones: number;
+  total: number;
   partes: TrabajoRefaccion[];
+  pagos: Pago[];          // historial de cobros — vacío = pendiente
   estado: 'pendiente' | 'completado' | 'pagado';
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getMontoPagado(t: Trabajo): number {
+  return (t.pagos ?? []).reduce((s, p) => s + p.monto, 0);
+}
+function getEstadoPago(t: Trabajo): 'pendiente' | 'parcial' | 'pagado' {
+  const pagado = getMontoPagado(t);
+  if (pagado <= 0)        return 'pendiente';
+  if (pagado >= t.total)  return 'pagado';
+  return 'parcial';
+}
+function getSaldo(t: Trabajo): number {
+  return Math.max(0, t.total - getMontoPagado(t));
+}
 
 function labelVehiculo(v: Vehiculo) {
   const base = [v.anio, v.marca, v.modelo].filter(Boolean).join(' ');
@@ -180,7 +201,7 @@ export default function TallerMecanico() {
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [inventario, setInventario] = useState<Refaccion[]>([]);
   const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
-  const [vista, setVista] = useState<'clientes' | 'inventario' | 'trabajos' | 'resumen'>('clientes');
+    const [vista, setVista] = useState<'clientes' | 'inventario' | 'trabajos' | 'cuentas' | 'resumen'>('clientes');
   const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
 
   // ── Cargar datos con migración de formatos anteriores ──
@@ -231,6 +252,7 @@ export default function TallerMecanico() {
           costoRefacciones: t.costoRefacciones
             ?? partes.reduce((s, p) => s + p.costoTotal, 0)
             ?? t.refacciones,
+          pagos: t.pagos ?? [],
         };
       });
 
@@ -290,27 +312,45 @@ export default function TallerMecanico() {
     localStorage.setItem('trabajos', JSON.stringify(nuevos));
   };
 
+  const registrarPago = (trabajoId: string, pago: Omit<Pago, 'id'>) => {
+    const nuevoPago: Pago = { ...pago, id: Date.now().toString() };
+    const nuevos = trabajos.map(t =>
+      t.id === trabajoId ? { ...t, pagos: [...(t.pagos ?? []), nuevoPago] } : t
+    );
+    setTrabajos(nuevos);
+    localStorage.setItem('trabajos', JSON.stringify(nuevos));
+  };
+
   const calcularResumen = () => {
     const mes = trabajos.filter(t => t.fecha.startsWith(mesActual));
-    const totalCobrado          = mes.reduce((s, t) => s + t.total, 0);
+    // Accrual metrics (what was invoiced/done this month)
+    const facturado            = mes.reduce((s, t) => s + t.total, 0);
     const totalVentaRefacciones = mes.reduce((s, t) => s + t.refacciones, 0);
     const totalCostoRefacciones = mes.reduce((s, t) => s + (t.costoRefacciones ?? t.refacciones), 0);
     const totalManoObra         = mes.reduce((s, t) => s + t.manoDeObra, 0);
     const margenRefacciones     = totalVentaRefacciones - totalCostoRefacciones;
-    const ganancia              = totalManoObra + margenRefacciones; // labor + parts markup
+    const ganancia              = totalManoObra + margenRefacciones;
+    // Cash metrics
+    const cobradoEnMes = trabajos.reduce((s, t) =>
+      s + (t.pagos ?? []).filter(p => p.fecha.startsWith(mesActual)).reduce((s2, p) => s2 + p.monto, 0), 0);
+    const porCobrarDelMes = mes.reduce((s, t) => s + getSaldo(t), 0);
     return {
-      totalCobrado, totalVentaRefacciones, totalCostoRefacciones,
+      facturado, totalVentaRefacciones, totalCostoRefacciones,
       margenRefacciones, totalManoObra, ganancia, cantidad: mes.length,
+      cobradoEnMes, porCobrarDelMes,
     };
   };
 
   const stockBajo = inventario.filter(r => r.stock <= r.stockMinimo).length;
 
+  const pendientesPorCobrar = trabajos.filter(t => getEstadoPago(t) !== 'pagado').length;
+
   const tabs = [
-    { key: 'clientes',   icon: '👥', label: 'Clientes',   count: clientes.length },
-    { key: 'inventario', icon: '📦', label: 'Inventario', count: stockBajo > 0 ? `⚠ ${stockBajo}` : inventario.length > 0 ? inventario.length : null },
-    { key: 'trabajos',   icon: '🔧', label: 'Trabajos',   count: trabajos.length },
-    { key: 'resumen',    icon: '📊', label: 'Resumen',    count: null },
+    { key: 'clientes',   icon: '👥', label: 'Clientes',          count: clientes.length },
+    { key: 'inventario', icon: '📦', label: 'Inventario',         count: stockBajo > 0 ? `⚠ ${stockBajo}` : inventario.length > 0 ? inventario.length : null },
+    { key: 'trabajos',   icon: '🔧', label: 'Trabajos',           count: trabajos.length },
+    { key: 'cuentas',    icon: '💰', label: 'Cuentas por Cobrar', count: pendientesPorCobrar > 0 ? pendientesPorCobrar : null },
+    { key: 'resumen',    icon: '📊', label: 'Resumen',            count: null },
   ] as const;
 
   return (
@@ -340,7 +380,10 @@ export default function TallerMecanico() {
               <span>{label}</span>
               {count !== null && (
                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                  vista === key ? 'bg-indigo-400 text-white' : (typeof count === 'string' && count.startsWith('⚠') ? 'bg-rose-100 text-rose-600' : 'bg-slate-200 text-slate-600')
+                  vista === key ? 'bg-indigo-400 text-white'
+                    : (typeof count === 'string' && count.startsWith('⚠')) ? 'bg-rose-100 text-rose-600'
+                    : key === 'cuentas' && pendientesPorCobrar > 0 ? 'bg-rose-100 text-rose-600'
+                    : 'bg-slate-200 text-slate-600'
                 }`}>
                   {count}
                 </span>
@@ -363,6 +406,10 @@ export default function TallerMecanico() {
             <VistaTrabajo clientes={clientes} vehiculos={vehiculos} inventario={inventario}
               trabajos={trabajos} onGuardar={guardarTrabajo}
               onIrAInventario={() => setVista('inventario')} />
+          )}
+          {vista === 'cuentas' && (
+            <VistaCuentas trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
+              onRegistrarPago={registrarPago} />
           )}
           {vista === 'resumen' && (
             <VistaResumen mesActual={mesActual} setMesActual={setMesActual}
@@ -891,6 +938,7 @@ function VistaTrabajo({
       refacciones: totalVentaRefacciones,
       costoRefacciones: totalCostoRefacciones,
       partes: partesSeleccionadas,
+      pagos: [],
     });
     setForm(emptyForm);
     setLaborItems([]);
@@ -1275,6 +1323,232 @@ function VistaTrabajo({
   );
 }
 
+// ─── VistaCuentas ─────────────────────────────────────────────────────────────
+
+type FiltroCuenta = 'todos' | 'pendiente' | 'parcial' | 'pagado';
+
+const BADGE_ESTADO: Record<'pendiente' | 'parcial' | 'pagado', { label: string; cls: string }> = {
+  pendiente: { label: 'Pendiente', cls: 'bg-rose-100 text-rose-700' },
+  parcial:   { label: 'Parcial',   cls: 'bg-amber-100 text-amber-700' },
+  pagado:    { label: 'Pagado',    cls: 'bg-emerald-100 text-emerald-700' },
+};
+
+function VistaCuentas({
+  trabajos,
+  clientes,
+  vehiculos,
+  onRegistrarPago,
+}: {
+  trabajos: Trabajo[];
+  clientes: Cliente[];
+  vehiculos: Vehiculo[];
+  onRegistrarPago: (trabajoId: string, pago: Omit<Pago, 'id'>) => void;
+}) {
+  const [filtro, setFiltro] = useState<FiltroCuenta>('todos');
+  const [expandido, setExpandido] = useState<string | null>(null);
+  const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: new Date().toISOString().split('T')[0], nota: '' });
+
+  const getCliente  = (id: string) => clientes.find(c => c.id === id);
+  const getVehiculo = (id: string) => vehiculos.find(v => v.id === id);
+
+  const trabajosFiltrados = [...trabajos]
+    .sort((a, b) => b.fecha.localeCompare(a.fecha))
+    .filter(t => filtro === 'todos' || getEstadoPago(t) === filtro);
+
+  const handleRegistrar = (trabajoId: string, saldo: number) => {
+    if (pagoForm.monto <= 0) return;
+    onRegistrarPago(trabajoId, { monto: Math.min(pagoForm.monto, saldo), fecha: pagoForm.fecha, nota: pagoForm.nota || undefined });
+    setPagoForm({ monto: 0, fecha: new Date().toISOString().split('T')[0], nota: '' });
+    setExpandido(null);
+  };
+
+  const toggleExpand = (id: string) => {
+    if (expandido === id) { setExpandido(null); return; }
+    setExpandido(id);
+    setPagoForm({ monto: 0, fecha: new Date().toISOString().split('T')[0], nota: '' });
+  };
+
+  // Counts for filter chips
+  const counts = {
+    todos:     trabajos.length,
+    pendiente: trabajos.filter(t => getEstadoPago(t) === 'pendiente').length,
+    parcial:   trabajos.filter(t => getEstadoPago(t) === 'parcial').length,
+    pagado:    trabajos.filter(t => getEstadoPago(t) === 'pagado').length,
+  };
+
+  const totalPendiente = trabajos.filter(t => getEstadoPago(t) !== 'pagado').reduce((s, t) => s + getSaldo(t), 0);
+
+  return (
+    <div>
+      <SectionTitle
+        title="Cuentas por Cobrar"
+        subtitle="Registra los pagos recibidos por cada trabajo. Los créditos pendientes aparecen en rojo."
+      />
+
+      {/* ── Resumen rápido ── */}
+      {totalPendiente > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 mb-6 flex flex-wrap gap-6 items-center">
+          <div>
+            <div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Total por Cobrar</div>
+            <div className="text-2xl font-extrabold text-rose-700">${fmt(totalPendiente)}</div>
+          </div>
+          <div className="text-sm text-rose-600">
+            <span className="font-semibold">{counts.pendiente}</span> trabajo{counts.pendiente !== 1 ? 's' : ''} pendientes de pago
+            {counts.parcial > 0 && <span> · <span className="font-semibold">{counts.parcial}</span> parciales</span>}
+          </div>
+        </div>
+      )}
+
+      {/* ── Filtros ── */}
+      <div className="flex gap-2 mb-5 flex-wrap">
+        {(['todos', 'pendiente', 'parcial', 'pagado'] as FiltroCuenta[]).map(f => (
+          <button key={f} onClick={() => setFiltro(f)}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+              filtro === f
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'
+            }`}>
+            {f === 'todos' ? 'Todos' : BADGE_ESTADO[f].label} ({counts[f]})
+          </button>
+        ))}
+      </div>
+
+      {/* ── Tabla ── */}
+      {trabajosFiltrados.length === 0 ? (
+        <div className="text-center py-14 text-slate-400">
+          <div className="text-5xl mb-3">💰</div>
+          <p className="font-medium text-slate-500">
+            {filtro === 'todos' ? 'Sin trabajos registrados' : `Sin trabajos con estado "${BADGE_ESTADO[filtro as Exclude<FiltroCuenta,'todos'>].label}"`}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {trabajosFiltrados.map(trabajo => {
+            const cliente  = getCliente(trabajo.clienteId);
+            const vehiculo = getVehiculo(trabajo.vehiculoId);
+            const estado   = getEstadoPago(trabajo);
+            const montoPag = getMontoPagado(trabajo);
+            const saldo    = getSaldo(trabajo);
+            const badge    = BADGE_ESTADO[estado];
+            const isExp    = expandido === trabajo.id;
+
+            return (
+              <div key={trabajo.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                {/* ── Row ── */}
+                <div className={`grid grid-cols-1 sm:grid-cols-6 gap-2 items-center px-4 py-3 ${
+                  isExp ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'
+                } transition-colors`}>
+                  {/* Info */}
+                  <div className="sm:col-span-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-slate-800 text-sm">{cliente?.nombre ?? '—'}</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
+                      <span>{new Date(trabajo.fecha).toLocaleDateString('es-MX')}</span>
+                      {vehiculo && <span>· {[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>}
+                      <span>· {trabajo.descripcion}</span>
+                    </div>
+                  </div>
+                  {/* Amounts */}
+                  <div className="text-right">
+                    <div className="text-xs text-slate-400 uppercase tracking-wide">Total</div>
+                    <div className="font-semibold text-slate-800">${fmt(trabajo.total)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div>
+                    <div className="font-semibold text-emerald-600">${fmt(montoPag)}</div>
+                  </div>
+                  <div className="flex items-center justify-between sm:justify-end gap-2">
+                    <div className="text-right">
+                      <div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div>
+                      <div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div>
+                    </div>
+                    {estado !== 'pagado' && (
+                      <Btn size="sm" variant={isExp ? 'ghost' : 'success'} onClick={() => toggleExpand(trabajo.id)}>
+                        {isExp ? '✕' : '+ Pago'}
+                      </Btn>
+                    )}
+                    {estado === 'pagado' && (
+                      <Btn size="sm" variant="ghost" onClick={() => toggleExpand(trabajo.id)}>
+                        {isExp ? '✕' : 'Ver'}
+                      </Btn>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Expanded: historial + form ── */}
+                {isExp && (
+                  <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200 space-y-4">
+                    {/* Historial de pagos */}
+                    {trabajo.pagos?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
+                        <div className="space-y-1">
+                          {trabajo.pagos.map(p => (
+                            <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                              <div className="flex gap-3">
+                                <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
+                                {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
+                              </div>
+                              <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Formulario registrar pago */}
+                    {estado !== 'pagado' && (
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Registrar Pago</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div>
+                            <Label>Fecha del pago</Label>
+                            <Input type="date" value={pagoForm.fecha}
+                              onChange={e => setPagoForm(f => ({ ...f, fecha: e.target.value }))} />
+                          </div>
+                          <div>
+                            <Label>Monto ($) {saldo < trabajo.total && `— saldo: $${fmt(saldo)}`}</Label>
+                            <Input type="number" placeholder="0.00" min="0.01" step="0.01"
+                              value={pagoForm.monto || ''}
+                              onChange={e => setPagoForm(f => ({ ...f, monto: Number(e.target.value) }))} />
+                          </div>
+                          <div>
+                            <Label>Nota (opcional)</Label>
+                            <Input type="text" placeholder="Efectivo, transferencia..."
+                              value={pagoForm.nota}
+                              onChange={e => setPagoForm(f => ({ ...f, nota: e.target.value }))} />
+                          </div>
+                          <div className="flex items-end">
+                            <Btn variant="success" fullWidth
+                              disabled={pagoForm.monto <= 0}
+                              onClick={() => handleRegistrar(trabajo.id, saldo)}>
+                              ✓ Registrar
+                            </Btn>
+                          </div>
+                        </div>
+                        {pagoForm.monto > 0 && (
+                          <p className="text-xs text-slate-400 mt-2">
+                            Después de este pago, saldo restante: <strong className="text-slate-600">${fmt(Math.max(0, saldo - pagoForm.monto))}</strong>
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {estado === 'pagado' && trabajo.pagos?.length > 0 && (
+                      <p className="text-xs text-emerald-600 font-semibold text-center">✅ Este trabajo está completamente pagado.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── VistaResumen ─────────────────────────────────────────────────────────────
 
 function VistaResumen({
@@ -1288,8 +1562,9 @@ function VistaResumen({
   mesActual: string;
   setMesActual: (m: string) => void;
   resumen: {
-    totalCobrado: number; totalVentaRefacciones: number; totalCostoRefacciones: number;
+    facturado: number; totalVentaRefacciones: number; totalCostoRefacciones: number;
     margenRefacciones: number; totalManoObra: number; ganancia: number; cantidad: number;
+    cobradoEnMes: number; porCobrarDelMes: number;
   };
   trabajos: Trabajo[];
   clientes: Cliente[];
@@ -1311,9 +1586,9 @@ function VistaResumen({
       {/* ── 4 tarjetas principales ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-5 text-white shadow-md">
-          <div className="text-indigo-200 text-xs font-bold uppercase tracking-widest mb-2">Total Cobrado</div>
-          <div className="text-3xl font-extrabold tracking-tight">${fmt(resumen.totalCobrado)}</div>
-          <div className="text-indigo-200 text-xs mt-2">{resumen.cantidad} trabajo{resumen.cantidad !== 1 ? 's' : ''} en el mes</div>
+          <div className="text-indigo-200 text-xs font-bold uppercase tracking-widest mb-2">Facturado del Mes</div>
+          <div className="text-3xl font-extrabold tracking-tight">${fmt(resumen.facturado)}</div>
+          <div className="text-indigo-200 text-xs mt-2">{resumen.cantidad} trabajo{resumen.cantidad !== 1 ? 's' : ''} realizados</div>
         </div>
         <div className="bg-gradient-to-br from-rose-500 to-rose-600 rounded-2xl p-5 text-white shadow-md">
           <div className="text-rose-200 text-xs font-bold uppercase tracking-widest mb-2">Costo Refacciones</div>
@@ -1329,7 +1604,27 @@ function VistaResumen({
           <div className="text-emerald-200 text-xs font-bold uppercase tracking-widest mb-2">Ganancia Neta</div>
           <div className="text-3xl font-extrabold tracking-tight">${fmt(resumen.ganancia)}</div>
           <div className="text-emerald-200 text-xs mt-2">
-            {resumen.totalCobrado > 0 ? `${((resumen.ganancia / resumen.totalCobrado) * 100).toFixed(1)}% margen` : 'Sin movimientos'}
+            {resumen.facturado > 0 ? `${((resumen.ganancia / resumen.facturado) * 100).toFixed(1)}% margen` : 'Sin movimientos'}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Cuentas por Cobrar del Mes ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div className="bg-white border-2 border-emerald-200 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">💵</div>
+          <div>
+            <div className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">Pagos Recibidos en el Mes</div>
+            <div className="text-2xl font-extrabold text-slate-900">${fmt(resumen.cobradoEnMes)}</div>
+            <div className="text-xs text-slate-400 mt-0.5">Efectivo/transferencias recibidas</div>
+          </div>
+        </div>
+        <div className="bg-white border-2 border-rose-200 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 bg-rose-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">⏳</div>
+          <div>
+            <div className="text-xs font-bold text-rose-600 uppercase tracking-widest mb-1">Por Cobrar del Mes</div>
+            <div className="text-2xl font-extrabold text-slate-900">${fmt(resumen.porCobrarDelMes)}</div>
+            <div className="text-xs text-slate-400 mt-0.5">Pendiente de trabajos de este mes</div>
           </div>
         </div>
       </div>
