@@ -62,7 +62,7 @@ interface Pago {
   nota?: string;
 }
 
-// ─── Proveedores & Compras ─────────────────────────────────────────────────────
+// ─── Proveedores, Órdenes de Compra & Facturas ───────────────────────────────
 
 interface Proveedor {
   id: string;
@@ -87,14 +87,50 @@ interface PagoCompra {
   nota?: string;
 }
 
-interface Compra {
+/** Purchase Order — starts as 'pendiente', inventory increased when 'recibida' */
+interface OrdenCompra {
   id: string;
   proveedorId: string;
   fecha: string;
+  numeroOrden?: string;
   descripcion: string;
-  items: CompraItem[];
+  partes: CompraItem[];
   total: number;
+  estado: 'pendiente' | 'recibida' | 'cancelada';
+  fechaRecibida?: string;
   pagos: PagoCompra[];
+}
+
+interface FacturaConcepto {
+  tipo: 'parte' | 'mano_de_obra';
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+}
+
+interface PagoFactura {
+  id: string;
+  fecha: string;
+  monto: number;
+  metodoPago: string;  // efectivo, transferencia, tarjeta, cheque...
+}
+
+/** Formal invoice generated from a Trabajo */
+interface Factura {
+  id: string;
+  numeroFactura: string;   // auto-generated e.g. FAC-2026-001
+  trabajoId: string;
+  clienteId: string;
+  vehiculoId: string;
+  fecha: string;
+  fechaVencimiento?: string;
+  conceptos: FacturaConcepto[];
+  subtotal: number;
+  iva?: number;            // optional tax %
+  total: number;
+  pagos: PagoFactura[];
+  notas?: string;
 }
 
 interface Trabajo {
@@ -109,7 +145,9 @@ interface Trabajo {
   costoRefacciones: number;
   total: number;
   partes: TrabajoRefaccion[];
-  pagos: Pago[];          // historial de cobros — vacío = pendiente
+  pagos: Pago[];                   // legacy: direct payments (pre-invoice system)
+  facturaId?: string;              // set when a Factura has been generated
+  estadoFacturacion?: 'sin_facturar' | 'facturado';  // invoice status
   estado: 'pendiente' | 'completado' | 'pagado';
 }
 
@@ -128,17 +166,44 @@ function getSaldo(t: Trabajo): number {
   return Math.max(0, t.total - getMontoPagado(t));
 }
 
-function getMontoPagadoCompra(c: Compra): number {
-  return (c.pagos ?? []).reduce((s, p) => s + p.monto, 0);
+function getMontoPagadoOrden(o: OrdenCompra): number {
+  return (o.pagos ?? []).reduce((s, p) => s + p.monto, 0);
 }
-function getEstadoPagoCompra(c: Compra): 'pendiente' | 'parcial' | 'pagado' {
-  const p = getMontoPagadoCompra(c);
+function getEstadoPagoOrden(o: OrdenCompra): 'pendiente' | 'parcial' | 'pagado' {
+  const p = getMontoPagadoOrden(o);
   if (p <= 0) return 'pendiente';
-  if (p >= c.total) return 'pagado';
+  if (p >= o.total) return 'pagado';
   return 'parcial';
 }
-function getSaldoCompra(c: Compra): number {
-  return Math.max(0, c.total - getMontoPagadoCompra(c));
+function getSaldoOrden(o: OrdenCompra): number {
+  return Math.max(0, o.total - getMontoPagadoOrden(o));
+}
+
+function getMontoPagadoFactura(f: Factura): number {
+  return (f.pagos ?? []).reduce((s, p) => s + p.monto, 0);
+}
+function getEstadoPagoFactura(f: Factura): 'pendiente' | 'parcial' | 'pagado' {
+  const p = getMontoPagadoFactura(f);
+  if (p <= 0) return 'pendiente';
+  if (p >= f.total) return 'pagado';
+  return 'parcial';
+}
+function getSaldoFactura(f: Factura): number {
+  return Math.max(0, f.total - getMontoPagadoFactura(f));
+}
+
+/** Auto-generate a factura number like FAC-2026-001 */
+function generarNumeroFactura(facturas: Factura[]): string {
+  const year = new Date().getFullYear();
+  const count = facturas.filter(f => f.numeroFactura.startsWith(`FAC-${year}`)).length + 1;
+  return `FAC-${year}-${String(count).padStart(3, '0')}`;
+}
+
+/** Auto-generate a purchase order number like OC-2026-001 */
+function generarNumeroOrden(ordenes: OrdenCompra[]): string {
+  const year = new Date().getFullYear();
+  const count = ordenes.filter(o => (o.numeroOrden ?? '').startsWith(`OC-${year}`)).length + 1;
+  return `OC-${year}-${String(count).padStart(3, '0')}`;
 }
 
 function labelVehiculo(v: Vehiculo) {
@@ -252,13 +317,14 @@ function EmptyRow({ cols, message }: { cols: number; message: string }) {
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function TallerMecanico() {
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
-  const [inventario, setInventario] = useState<Refaccion[]>([]);
-  const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
+  const [clientes,    setClientes]    = useState<Cliente[]>([]);
+  const [vehiculos,   setVehiculos]   = useState<Vehiculo[]>([]);
+  const [inventario,  setInventario]  = useState<Refaccion[]>([]);
+  const [trabajos,    setTrabajos]    = useState<Trabajo[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [compras, setCompras] = useState<Compra[]>([]);
-  const [vista, setVista] = useState<'clientes' | 'inventario' | 'trabajos' | 'cuentas' | 'proveedores' | 'pagos' | 'resumen'>('clientes');
+  const [ordenes,     setOrdenes]     = useState<OrdenCompra[]>([]);   // POs
+  const [facturas,    setFacturas]    = useState<Factura[]>([]);
+  const [vista, setVista] = useState<'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'>('clientes');
   const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
 
   // ── Cargar datos con migración de formatos anteriores ──
@@ -268,16 +334,16 @@ export default function TallerMecanico() {
     const rawInventario  = localStorage.getItem('inventario');
     const rawTrabajos    = localStorage.getItem('trabajos');
     const rawProveedores = localStorage.getItem('proveedores');
-    const rawCompras     = localStorage.getItem('compras');
+    const rawOrdenes     = localStorage.getItem('ordenes');
+    const rawCompras     = localStorage.getItem('compras');  // legacy key
+    const rawFacturas    = localStorage.getItem('facturas');
 
     type ClienteViejo = Cliente & { vehiculo?: string };
-    let parsedClientes: ClienteViejo[]  = rawClientes   ? JSON.parse(rawClientes)   : [];
-    let parsedVehiculos: Vehiculo[]     = rawVehiculos  ? JSON.parse(rawVehiculos)  : [];
+    let parsedClientes: ClienteViejo[]  = rawClientes  ? JSON.parse(rawClientes)  : [];
+    let parsedVehiculos: Vehiculo[]     = rawVehiculos  ? JSON.parse(rawVehiculos) : [];
     const parsedInventario: Refaccion[] = rawInventario ? JSON.parse(rawInventario) : [];
 
-    // Migrar: Cliente tenía campo `vehiculo` (string)
-    const necesitaMigracion = parsedClientes.some(c => 'vehiculo' in c && c.vehiculo);
-    if (necesitaMigracion) {
+    if (parsedClientes.some(c => 'vehiculo' in c && c.vehiculo)) {
       const migrados: Vehiculo[] = [];
       parsedClientes = parsedClientes.map(({ vehiculo, ...c }) => {
         if (vehiculo) migrados.push({ id: `mig_${c.id}`, clienteId: c.id, marca: vehiculo, modelo: '', anio: '', placa: '' });
@@ -288,10 +354,8 @@ export default function TallerMecanico() {
       localStorage.setItem('vehiculos', JSON.stringify(parsedVehiculos));
     }
 
-    // Migrar: añadir partes, manoDeObraItems, costoRefacciones si faltan
     const parsedTrabajos: Trabajo[] = (rawTrabajos ? JSON.parse(rawTrabajos) : [])
       .map((t: Trabajo & { manoDeObra: number }) => {
-        // Migrar partes: añadir precioCompra/precioVenta/costoTotal si faltan
         const partes: TrabajoRefaccion[] = (t.partes ?? []).map(
           (p: TrabajoRefaccion & { precioUnitario?: number }) => ({
             ...p,
@@ -301,26 +365,36 @@ export default function TallerMecanico() {
           })
         );
         return {
-          ...t,
-          partes,
-          manoDeObraItems: t.manoDeObraItems ?? (
-            t.manoDeObra > 0
-              ? [{ id: `mig_${t.id}`, concepto: 'Mano de obra', precio: t.manoDeObra }]
-              : []
-          ),
-          costoRefacciones: t.costoRefacciones
-            ?? partes.reduce((s, p) => s + p.costoTotal, 0)
-            ?? t.refacciones,
+          ...t, partes,
+          manoDeObraItems: t.manoDeObraItems ?? (t.manoDeObra > 0 ? [{ id: `mig_${t.id}`, concepto: 'Mano de obra', precio: t.manoDeObra }] : []),
+          costoRefacciones: t.costoRefacciones ?? partes.reduce((s, p) => s + p.costoTotal, 0) ?? t.refacciones,
           pagos: t.pagos ?? [],
+          estadoFacturacion: t.estadoFacturacion ?? 'sin_facturar',
         };
       });
+
+    // Migrate legacy `compras` → `ordenes` (all treated as already-received POs)
+    let parsedOrdenes: OrdenCompra[] = rawOrdenes ? JSON.parse(rawOrdenes) : [];
+    if (!rawOrdenes && rawCompras) {
+      type CompraLegacy = { id: string; proveedorId: string; fecha: string; descripcion: string; items: CompraItem[]; total: number; pagos: PagoCompra[] };
+      const legacyCompras: CompraLegacy[] = JSON.parse(rawCompras);
+      parsedOrdenes = legacyCompras.map(c => ({
+        id: c.id, proveedorId: c.proveedorId, fecha: c.fecha,
+        descripcion: c.descripcion, partes: c.items, total: c.total,
+        estado: 'recibida' as const, fechaRecibida: c.fecha,
+        pagos: c.pagos ?? [],
+        numeroOrden: undefined,
+      }));
+      localStorage.setItem('ordenes', JSON.stringify(parsedOrdenes));
+    }
 
     setClientes(parsedClientes);
     setVehiculos(parsedVehiculos);
     setInventario(parsedInventario);
     setTrabajos(parsedTrabajos);
     setProveedores(rawProveedores ? JSON.parse(rawProveedores) : []);
-    setCompras(rawCompras ? JSON.parse(rawCompras) : []);
+    setOrdenes(parsedOrdenes);
+    setFacturas(rawFacturas ? JSON.parse(rawFacturas) : []);
   }, []);
 
   // ── Handlers ──
@@ -328,126 +402,166 @@ export default function TallerMecanico() {
   const guardarCliente = (data: Omit<Cliente, 'id'>) => {
     const nuevo: Cliente = { ...data, id: Date.now().toString() };
     const nuevos = [...clientes, nuevo];
-    setClientes(nuevos);
-    localStorage.setItem('clientes', JSON.stringify(nuevos));
+    setClientes(nuevos); localStorage.setItem('clientes', JSON.stringify(nuevos));
   };
-
   const guardarVehiculo = (data: Omit<Vehiculo, 'id'>) => {
     const nuevo: Vehiculo = { ...data, id: Date.now().toString() };
     const nuevos = [...vehiculos, nuevo];
-    setVehiculos(nuevos);
-    localStorage.setItem('vehiculos', JSON.stringify(nuevos));
+    setVehiculos(nuevos); localStorage.setItem('vehiculos', JSON.stringify(nuevos));
   };
-
   const guardarRefaccion = (data: Omit<Refaccion, 'id'>) => {
     const nuevo: Refaccion = { ...data, id: Date.now().toString() };
     const nuevos = [...inventario, nuevo];
-    setInventario(nuevos);
-    localStorage.setItem('inventario', JSON.stringify(nuevos));
+    setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
   };
-
   const recibirStock = (refaccionId: string, cantidad: number) => {
-    const nuevos = inventario.map(r =>
-      r.id === refaccionId ? { ...r, stock: r.stock + cantidad } : r
-    );
-    setInventario(nuevos);
-    localStorage.setItem('inventario', JSON.stringify(nuevos));
+    const nuevos = inventario.map(r => r.id === refaccionId ? { ...r, stock: r.stock + cantidad } : r);
+    setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
   };
-
   const guardarTrabajo = (data: Omit<Trabajo, 'id' | 'total'>) => {
     const total = data.manoDeObra + data.refacciones;
-    const nuevo: Trabajo = { ...data, id: Date.now().toString(), total };
-
-    // Descontar del inventario las piezas usadas
+    const nuevo: Trabajo = { ...data, id: Date.now().toString(), total, estadoFacturacion: 'sin_facturar' };
     if (data.partes.length > 0) {
       const nuevoInv = inventario.map(r => {
         const usada = data.partes.find(p => p.refaccionId === r.id);
         return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
       });
-      setInventario(nuevoInv);
-      localStorage.setItem('inventario', JSON.stringify(nuevoInv));
+      setInventario(nuevoInv); localStorage.setItem('inventario', JSON.stringify(nuevoInv));
     }
-
     const nuevos = [...trabajos, nuevo];
-    setTrabajos(nuevos);
-    localStorage.setItem('trabajos', JSON.stringify(nuevos));
+    setTrabajos(nuevos); localStorage.setItem('trabajos', JSON.stringify(nuevos));
   };
-
   const registrarPago = (trabajoId: string, pago: Omit<Pago, 'id'>) => {
     const nuevoPago: Pago = { ...pago, id: Date.now().toString() };
-    const nuevos = trabajos.map(t =>
-      t.id === trabajoId ? { ...t, pagos: [...(t.pagos ?? []), nuevoPago] } : t
-    );
-    setTrabajos(nuevos);
-    localStorage.setItem('trabajos', JSON.stringify(nuevos));
+    const nuevos = trabajos.map(t => t.id === trabajoId ? { ...t, pagos: [...(t.pagos ?? []), nuevoPago] } : t);
+    setTrabajos(nuevos); localStorage.setItem('trabajos', JSON.stringify(nuevos));
   };
-
   const guardarProveedor = (data: Omit<Proveedor, 'id'>) => {
     const nuevo: Proveedor = { ...data, id: Date.now().toString() };
     const nuevos = [...proveedores, nuevo];
-    setProveedores(nuevos);
-    localStorage.setItem('proveedores', JSON.stringify(nuevos));
+    setProveedores(nuevos); localStorage.setItem('proveedores', JSON.stringify(nuevos));
   };
 
-  const guardarCompra = (data: Omit<Compra, 'id'>) => {
-    const nueva: Compra = { ...data, id: Date.now().toString() };
-    // Increase stock for each item received
-    if (data.items.length > 0) {
+  // ── Purchase Order handlers ──
+  const crearOrden = (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => {
+    const nueva: OrdenCompra = {
+      ...data, id: Date.now().toString(),
+      numeroOrden: data.numeroOrden || generarNumeroOrden(ordenes),
+      estado: 'pendiente', pagos: [],
+    };
+    const nuevas = [...ordenes, nueva];
+    setOrdenes(nuevas); localStorage.setItem('ordenes', JSON.stringify(nuevas));
+  };
+  const recibirOrden = (ordenId: string) => {
+    const orden = ordenes.find(o => o.id === ordenId);
+    if (!orden || orden.estado !== 'pendiente') return;
+    // Mark as received
+    const nuevasOrdenes = ordenes.map(o =>
+      o.id === ordenId ? { ...o, estado: 'recibida' as const, fechaRecibida: new Date().toISOString().split('T')[0] } : o
+    );
+    setOrdenes(nuevasOrdenes); localStorage.setItem('ordenes', JSON.stringify(nuevasOrdenes));
+    // Increase inventory
+    if (orden.partes.length > 0) {
       const nuevoInv = inventario.map(r => {
-        const item = data.items.find(i => i.refaccionId === r.id);
+        const item = orden.partes.find(p => p.refaccionId === r.id);
         return item ? { ...r, stock: r.stock + item.cantidad } : r;
       });
-      setInventario(nuevoInv);
-      localStorage.setItem('inventario', JSON.stringify(nuevoInv));
+      setInventario(nuevoInv); localStorage.setItem('inventario', JSON.stringify(nuevoInv));
     }
-    const nuevas = [...compras, nueva];
-    setCompras(nuevas);
-    localStorage.setItem('compras', JSON.stringify(nuevas));
+  };
+  const cancelarOrden = (ordenId: string) => {
+    const nuevas = ordenes.map(o => o.id === ordenId ? { ...o, estado: 'cancelada' as const } : o);
+    setOrdenes(nuevas); localStorage.setItem('ordenes', JSON.stringify(nuevas));
+  };
+  const registrarPagoOrden = (ordenId: string, pago: Omit<PagoCompra, 'id'>) => {
+    const nuevoPago: PagoCompra = { ...pago, id: Date.now().toString() };
+    const nuevas = ordenes.map(o => o.id === ordenId ? { ...o, pagos: [...(o.pagos ?? []), nuevoPago] } : o);
+    setOrdenes(nuevas); localStorage.setItem('ordenes', JSON.stringify(nuevas));
   };
 
-  const registrarPagoCompra = (compraId: string, pago: Omit<PagoCompra, 'id'>) => {
-    const nuevoPago: PagoCompra = { ...pago, id: Date.now().toString() };
-    const nuevas = compras.map(c =>
-      c.id === compraId ? { ...c, pagos: [...(c.pagos ?? []), nuevoPago] } : c
+  // ── Invoice (Factura) handlers ──
+  const generarFactura = (trabajoId: string) => {
+    const trabajo = trabajos.find(t => t.id === trabajoId);
+    if (!trabajo || trabajo.facturaId) return;
+    // Build conceptos from trabajo
+    const conceptos: FacturaConcepto[] = [
+      ...trabajo.manoDeObraItems.map(m => ({
+        tipo: 'mano_de_obra' as const,
+        descripcion: m.concepto,
+        cantidad: 1,
+        precioUnitario: m.precio,
+        subtotal: m.precio,
+      })),
+      ...trabajo.partes.map(p => ({
+        tipo: 'parte' as const,
+        descripcion: p.nombre,
+        cantidad: p.cantidad,
+        precioUnitario: p.precioVenta,
+        subtotal: p.subtotal,
+      })),
+    ];
+    const subtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
+    const nuevaFactura: Factura = {
+      id: Date.now().toString(),
+      numeroFactura: generarNumeroFactura(facturas),
+      trabajoId, clienteId: trabajo.clienteId, vehiculoId: trabajo.vehiculoId,
+      fecha: new Date().toISOString().split('T')[0],
+      conceptos, subtotal, total: subtotal, pagos: [],
+    };
+    const nuevasFacturas = [...facturas, nuevaFactura];
+    setFacturas(nuevasFacturas); localStorage.setItem('facturas', JSON.stringify(nuevasFacturas));
+    // Link factura back to trabajo
+    const nuevosTrabajos = trabajos.map(t =>
+      t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 'facturado' as const } : t
     );
-    setCompras(nuevas);
-    localStorage.setItem('compras', JSON.stringify(nuevas));
+    setTrabajos(nuevosTrabajos); localStorage.setItem('trabajos', JSON.stringify(nuevosTrabajos));
+  };
+  const registrarPagoFactura = (facturaId: string, pago: Omit<PagoFactura, 'id'>) => {
+    const nuevoPago: PagoFactura = { ...pago, id: Date.now().toString() };
+    const nuevas = facturas.map(f => f.id === facturaId ? { ...f, pagos: [...(f.pagos ?? []), nuevoPago] } : f);
+    setFacturas(nuevas); localStorage.setItem('facturas', JSON.stringify(nuevas));
   };
 
   const calcularResumen = () => {
     const mes = trabajos.filter(t => t.fecha.startsWith(mesActual));
-    // Accrual metrics (what was invoiced/done this month)
-    const facturado            = mes.reduce((s, t) => s + t.total, 0);
-    const totalVentaRefacciones = mes.reduce((s, t) => s + t.refacciones, 0);
-    const totalCostoRefacciones = mes.reduce((s, t) => s + (t.costoRefacciones ?? t.refacciones), 0);
-    const totalManoObra         = mes.reduce((s, t) => s + t.manoDeObra, 0);
-    const margenRefacciones     = totalVentaRefacciones - totalCostoRefacciones;
-    const ganancia              = totalManoObra + margenRefacciones;
-    // Cash metrics
-    const cobradoEnMes = trabajos.reduce((s, t) =>
-      s + (t.pagos ?? []).filter(p => p.fecha.startsWith(mesActual)).reduce((s2, p) => s2 + p.monto, 0), 0);
-    const porCobrarDelMes = mes.reduce((s, t) => s + getSaldo(t), 0);
+    const facturadoMes       = mes.reduce((s, t) => s + t.total, 0);
+    const totalVentaRef      = mes.reduce((s, t) => s + t.refacciones, 0);
+    const totalCostoRef      = mes.reduce((s, t) => s + (t.costoRefacciones ?? t.refacciones), 0);
+    const totalManoObra      = mes.reduce((s, t) => s + t.manoDeObra, 0);
+    const margenRef          = totalVentaRef - totalCostoRef;
+    const ganancia           = totalManoObra + margenRef;
+    // Cash metrics from invoices
+    const cobradoEnMes = facturas.reduce((s, f) =>
+      s + (f.pagos ?? []).filter(p => p.fecha.startsWith(mesActual)).reduce((s2, p) => s2 + p.monto, 0), 0);
+    const porCobrarDelMes = facturas.filter(f => {
+      const t = trabajos.find(t => t.id === f.trabajoId);
+      return t?.fecha.startsWith(mesActual);
+    }).reduce((s, f) => s + getSaldoFactura(f), 0);
+    // POs this month
+    const ordenesMes    = ordenes.filter(o => o.fecha.startsWith(mesActual) && o.estado !== 'cancelada');
+    const totalOrdenes  = ordenesMes.reduce((s, o) => s + o.total, 0);
+    const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + getSaldoOrden(o), 0);
     return {
-      facturado, totalVentaRefacciones, totalCostoRefacciones,
-      margenRefacciones, totalManoObra, ganancia, cantidad: mes.length,
-      cobradoEnMes, porCobrarDelMes,
+      facturadoMes, totalVentaRef, totalCostoRef, margenRef, totalManoObra, ganancia,
+      cantidad: mes.length, cobradoEnMes, porCobrarDelMes, totalOrdenes, porPagarOrdenes,
     };
   };
 
-  const stockBajo = inventario.filter(r => r.stock <= r.stockMinimo).length;
-
-  const pendientesPorCobrar = trabajos.filter(t => getEstadoPago(t) !== 'pagado').length;
-
-  const pendientesPorPagar = compras.filter(c => getEstadoPagoCompra(c) !== 'pagado').length;
+  const stockBajo              = inventario.filter(r => r.stock <= r.stockMinimo).length;
+  const facturasPendientes     = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').length;
+  const ordenesPendientesPago  = ordenes.filter(o => o.estado === 'recibida' && getEstadoPagoOrden(o) !== 'pagado').length;
+  const ordenesPendientesRecibir = ordenes.filter(o => o.estado === 'pendiente').length;
 
   const tabs = [
-    { key: 'clientes',    icon: '👥', label: 'Clientes',            count: clientes.length },
-    { key: 'inventario',  icon: '📦', label: 'Inventario',           count: stockBajo > 0 ? `⚠ ${stockBajo}` : inventario.length > 0 ? inventario.length : null },
-    { key: 'trabajos',    icon: '🔧', label: 'Trabajos',             count: trabajos.length },
-    { key: 'cuentas',     icon: '💰', label: 'Por Cobrar',           count: pendientesPorCobrar > 0 ? pendientesPorCobrar : null },
-    { key: 'proveedores', icon: '🏪', label: 'Proveedores',          count: proveedores.length > 0 ? proveedores.length : null },
-    { key: 'pagos',       icon: '🧾', label: 'Por Pagar',            count: pendientesPorPagar > 0 ? pendientesPorPagar : null },
-    { key: 'resumen',     icon: '📊', label: 'Resumen',              count: null },
+    { key: 'clientes',    icon: '👥', label: 'Clientes',         count: clientes.length },
+    { key: 'inventario',  icon: '📦', label: 'Inventario',        count: stockBajo > 0 ? `⚠ ${stockBajo}` : inventario.length > 0 ? inventario.length : null },
+    { key: 'trabajos',    icon: '🔧', label: 'Trabajos',          count: trabajos.length },
+    { key: 'proveedores', icon: '🏪', label: 'Proveedores',       count: proveedores.length > 0 ? proveedores.length : null },
+    { key: 'ordenes',     icon: '📋', label: 'Órdenes de Compra', count: ordenesPendientesRecibir > 0 ? ordenesPendientesRecibir : ordenes.length > 0 ? ordenes.length : null },
+    { key: 'facturas',    icon: '🧾', label: 'Facturas',          count: facturas.length > 0 ? facturas.length : null },
+    { key: 'cuentas',     icon: '💰', label: 'Por Cobrar',        count: facturasPendientes > 0 ? facturasPendientes : null },
+    { key: 'pagos',       icon: '🔴', label: 'Por Pagar',         count: ordenesPendientesPago > 0 ? ordenesPendientesPago : null },
+    { key: 'resumen',     icon: '📊', label: 'Resumen',           count: null },
   ] as const;
 
   return (
@@ -463,33 +577,26 @@ export default function TallerMecanico() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* ── Nav tabs ── */}
         <nav className="flex gap-1 mb-6 bg-white rounded-xl p-1.5 shadow-sm border border-slate-200 overflow-x-auto">
           {tabs.map(({ key, icon, label, count }) => (
-            <button
-              key={key}
-              onClick={() => setVista(key)}
-              className={`relative flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 whitespace-nowrap ${
+            <button key={key} onClick={() => setVista(key)}
+              className={`relative flex items-center gap-2 px-3 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 whitespace-nowrap ${
                 vista === key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
+              }`}>
               <span>{icon}</span>
               <span>{label}</span>
               {count !== null && (
                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
                   vista === key ? 'bg-indigo-400 text-white'
                     : (typeof count === 'string' && count.startsWith('⚠')) ? 'bg-rose-100 text-rose-600'
-                    : (key === 'cuentas' && pendientesPorCobrar > 0) || (key === 'pagos' && pendientesPorPagar > 0) ? 'bg-rose-100 text-rose-600'
+                    : (key === 'cuentas' && facturasPendientes > 0) || (key === 'pagos' && ordenesPendientesPago > 0) || (key === 'ordenes' && ordenesPendientesRecibir > 0) ? 'bg-rose-100 text-rose-600'
                     : 'bg-slate-200 text-slate-600'
-                }`}>
-                  {count}
-                </span>
+                }`}>{count}</span>
               )}
             </button>
           ))}
         </nav>
 
-        {/* ── Content ── */}
         <Card className="p-6 sm:p-8">
           {vista === 'clientes' && (
             <VistaClientes clientes={clientes} vehiculos={vehiculos}
@@ -502,21 +609,33 @@ export default function TallerMecanico() {
           )}
           {vista === 'trabajos' && (
             <VistaTrabajo clientes={clientes} vehiculos={vehiculos} inventario={inventario}
-              trabajos={trabajos} onGuardar={guardarTrabajo}
-              onIrAInventario={() => setVista('inventario')} />
-          )}
-          {vista === 'cuentas' && (
-            <VistaCuentas trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
-              onRegistrarPago={registrarPago} />
+              trabajos={trabajos} facturas={facturas} onGuardar={guardarTrabajo}
+              onIrAInventario={() => setVista('inventario')}
+              onGenerarFactura={generarFactura}
+              onIrAFacturas={() => setVista('facturas')} />
           )}
           {vista === 'proveedores' && (
             <VistaProveedores proveedores={proveedores} inventario={inventario}
               onGuardarProveedor={guardarProveedor} />
           )}
-          {vista === 'pagos' && (
-            <VistaCuentasPorPagar compras={compras} proveedores={proveedores} inventario={inventario}
-              onGuardarCompra={guardarCompra} onRegistrarPago={registrarPagoCompra}
+          {vista === 'ordenes' && (
+            <VistaOrdenesCompra ordenes={ordenes} proveedores={proveedores} inventario={inventario}
+              onCrearOrden={crearOrden} onRecibirOrden={recibirOrden} onCancelarOrden={cancelarOrden}
               onIrAProveedores={() => setVista('proveedores')} />
+          )}
+          {vista === 'facturas' && (
+            <VistaFacturas facturas={facturas} clientes={clientes} vehiculos={vehiculos} trabajos={trabajos}
+              onRegistrarPago={registrarPagoFactura} />
+          )}
+          {vista === 'cuentas' && (
+            <VistaCuentas facturas={facturas} trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
+              onRegistrarPagoFactura={registrarPagoFactura}
+              onRegistrarPagoTrabajo={registrarPago} />
+          )}
+          {vista === 'pagos' && (
+            <VistaCuentasPorPagar ordenes={ordenes} proveedores={proveedores}
+              onRegistrarPago={registrarPagoOrden}
+              onIrAOrdenes={() => setVista('ordenes')} />
           )}
           {vista === 'resumen' && (
             <VistaResumen mesActual={mesActual} setMesActual={setMesActual}
@@ -1112,15 +1231,21 @@ function VistaTrabajo({
   vehiculos,
   inventario,
   trabajos,
+  facturas,
   onGuardar,
   onIrAInventario,
+  onGenerarFactura,
+  onIrAFacturas,
 }: {
   clientes: Cliente[];
   vehiculos: Vehiculo[];
   inventario: Refaccion[];
   trabajos: Trabajo[];
+  facturas: Factura[];
   onGuardar: (t: Omit<Trabajo, 'id' | 'total'>) => void;
   onIrAInventario: () => void;
+  onGenerarFactura: (trabajoId: string) => void;
+  onIrAFacturas: () => void;
 }) {
   const emptyForm = {
     clienteId: '', vehiculoId: '',
@@ -1716,6 +1841,15 @@ function VistaTrabajo({
                           {trabajo.partes.length} pieza{trabajo.partes.length !== 1 ? 's' : ''}
                         </span>
                       )}
+                      {trabajo.estadoFacturacion === 'facturado' ? (
+                        <span className="ml-2 text-xs bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">🧾 Facturado</span>
+                      ) : (
+                        <button type="button"
+                          onClick={() => { onGenerarFactura(trabajo.id); onIrAFacturas(); }}
+                          className="ml-2 text-xs bg-amber-100 text-amber-700 font-semibold px-1.5 py-0.5 rounded-full hover:bg-amber-200 transition-colors">
+                          + Generar Factura
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right text-slate-700">
                       <div>${fmt(trabajo.refacciones)}</div>
@@ -1840,6 +1974,377 @@ function VistaProveedores({
   );
 }
 
+// ─── VistaOrdenesCompra ───────────────────────────────────────────────────────
+
+function VistaOrdenesCompra({
+  ordenes,
+  proveedores,
+  inventario,
+  onCrearOrden,
+  onRecibirOrden,
+  onCancelarOrden,
+  onIrAProveedores,
+}: {
+  ordenes: OrdenCompra[];
+  proveedores: Proveedor[];
+  inventario: Refaccion[];
+  onCrearOrden: (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => void;
+  onRecibirOrden: (id: string) => void;
+  onCancelarOrden: (id: string) => void;
+  onIrAProveedores: () => void;
+}) {
+  const hoy = new Date().toISOString().split('T')[0];
+  const [formProveedorId, setFormProveedorId] = useState('');
+  const [formFecha, setFormFecha] = useState(hoy);
+  const [formDesc, setFormDesc] = useState('');
+  const [formNumOrden, setFormNumOrden] = useState('');
+  const [itemsOrden, setItemsOrden] = useState<CompraItem[]>([]);
+  const [pickerRefId, setPickerRefId] = useState('');
+  const [pickerCantidad, setPickerCantidad] = useState(1);
+  const [pickerPrecio, setPickerPrecio] = useState(0);
+  const [filtro, setFiltro] = useState<'todos'|'pendiente'|'recibida'|'cancelada'>('todos');
+
+  const totalOrden = itemsOrden.reduce((s, i) => s + i.subtotal, 0);
+  const pickerRef  = inventario.find(r => r.id === pickerRefId);
+
+  const agregarItem = () => {
+    if (!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0) return;
+    const ref = inventario.find(r => r.id === pickerRefId);
+    if (!ref) return;
+    setItemsOrden(prev => {
+      const ex = prev.find(i => i.refaccionId === ref.id);
+      if (ex) { const nc = ex.cantidad + pickerCantidad; return prev.map(i => i.refaccionId === ref.id ? { ...i, cantidad: nc, subtotal: nc * i.precioCompra } : i); }
+      return [...prev, { refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad, precioCompra: pickerPrecio, subtotal: pickerCantidad * pickerPrecio }];
+    });
+    setPickerRefId(''); setPickerCantidad(1); setPickerPrecio(0);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formProveedorId || itemsOrden.length === 0) return;
+    onCrearOrden({ proveedorId: formProveedorId, fecha: formFecha, descripcion: formDesc, partes: itemsOrden, total: totalOrden, numeroOrden: formNumOrden || undefined });
+    setFormProveedorId(''); setFormFecha(hoy); setFormDesc(''); setFormNumOrden(''); setItemsOrden([]);
+  };
+
+  const BADGE_ORDEN: Record<string, { label: string; cls: string }> = {
+    pendiente: { label: '⏳ Pendiente de recibir', cls: 'bg-amber-100 text-amber-700' },
+    recibida:  { label: '✅ Recibida',             cls: 'bg-emerald-100 text-emerald-700' },
+    cancelada: { label: '✗ Cancelada',             cls: 'bg-slate-100 text-slate-500' },
+  };
+
+  const ordenesFiltradas = [...ordenes]
+    .sort((a, b) => b.fecha.localeCompare(a.fecha))
+    .filter(o => filtro === 'todos' || o.estado === filtro);
+
+  const counts = { todos: ordenes.length, pendiente: ordenes.filter(o => o.estado === 'pendiente').length, recibida: ordenes.filter(o => o.estado === 'recibida').length, cancelada: ordenes.filter(o => o.estado === 'cancelada').length };
+  const pendientesRecibir = counts.pendiente;
+
+  return (
+    <div>
+      <SectionTitle title="Órdenes de Compra" subtitle="Crea una OC para un proveedor. Al marcarla como 'recibida', el inventario se actualiza y pasa a Cuentas por Pagar." />
+
+      {pendientesRecibir > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-5 flex items-center gap-3 text-sm">
+          <span className="text-amber-600 font-semibold">⏳ {pendientesRecibir} orden{pendientesRecibir !== 1 ? 'es' : ''} pendiente{pendientesRecibir !== 1 ? 's' : ''} de recibir</span>
+        </div>
+      )}
+
+      {/* Crear OC */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-6">
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5">Nueva Orden de Compra</h3>
+        {proveedores.length === 0 ? (
+          <div className="text-center py-4 text-sm text-slate-400">
+            <p>Registra un proveedor primero.</p>
+            <button type="button" onClick={onIrAProveedores} className="mt-1 text-indigo-600 font-semibold hover:underline">Ir a Proveedores →</button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="sm:col-span-2"><Label>Proveedor *</Label>
+                <Select value={formProveedorId} onChange={e => setFormProveedorId(e.target.value)} required>
+                  <option value="">Seleccionar proveedor...</option>
+                  {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                </Select></div>
+              <div><Label>Fecha</Label>
+                <Input type="date" value={formFecha} onChange={e => setFormFecha(e.target.value)} required /></div>
+              <div><Label>Nº Orden (opcional)</Label>
+                <Input type="text" placeholder="Ej. OC-2026-001" value={formNumOrden} onChange={e => setFormNumOrden(e.target.value)} className="font-mono" /></div>
+            </div>
+            <div><Label>Descripción (opcional)</Label>
+              <Input type="text" placeholder="Ej. Reposición mensual filtros" value={formDesc} onChange={e => setFormDesc(e.target.value)} /></div>
+
+            <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+              <div className="px-4 py-3 bg-slate-700">
+                <span className="text-xs font-bold text-white uppercase tracking-widest">Piezas a Ordenar</span>
+                <span className="ml-3 text-slate-400 text-xs">El inventario aumentará cuando marques la OC como recibida</span>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                  <div className="sm:col-span-2"><Label>Refacción</Label>
+                    <Select value={pickerRefId} onChange={e => { setPickerRefId(e.target.value); const r = inventario.find(x => x.id === e.target.value); setPickerPrecio(r?.precioCompra ?? 0); }}>
+                      <option value="">Seleccionar pieza...</option>
+                      {inventario.map(r => <option key={r.id} value={r.id}>{r.nombre}{r.codigo ? ` (${r.codigo})` : ''}</option>)}
+                    </Select></div>
+                  <div><Label>Cantidad</Label>
+                    <Input type="number" min="1" step="1" placeholder="1" value={pickerCantidad || ''} onChange={e => setPickerCantidad(Number(e.target.value))} /></div>
+                  <div><Label>Precio compra ($)</Label>
+                    <Input type="number" min="0.01" step="0.01" placeholder="0.00" value={pickerPrecio || ''} onChange={e => setPickerPrecio(Number(e.target.value))} /></div>
+                </div>
+                <div className="flex justify-between items-center">
+                  {pickerRef && pickerPrecio > 0 && <span className="text-xs text-slate-500">Subtotal: <strong>${fmt(pickerPrecio * pickerCantidad)}</strong></span>}
+                  <Btn variant="primary" size="sm" disabled={!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0} onClick={agregarItem}>+ Agregar</Btn>
+                </div>
+                {itemsOrden.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-100">
+                        <tr>{['Pieza','Cant.','Precio','Subtotal',''].map((h,i) => <th key={i} className={`px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide ${i > 0 && i < 4 ? 'text-right' : i === 0 ? 'text-left' : ''}`}>{h}</th>)}</tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {itemsOrden.map(it => (
+                          <tr key={it.refaccionId} className="bg-white">
+                            <td className="px-3 py-2 font-medium text-slate-800">{it.nombre}</td>
+                            <td className="px-3 py-2 text-right text-slate-700">{it.cantidad}</td>
+                            <td className="px-3 py-2 text-right text-slate-600">${fmt(it.precioCompra)}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(it.subtotal)}</td>
+                            <td className="px-3 py-2 text-center"><Btn size="sm" variant="danger" onClick={() => setItemsOrden(prev => prev.filter(i => i.refaccionId !== it.refaccionId))}>✕</Btn></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                        <tr><td colSpan={3} className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total OC:</td>
+                          <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(totalOrden)}</td><td></td></tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+            <Btn type="submit" variant="primary" fullWidth disabled={!formProveedorId || itemsOrden.length === 0}>+ Crear Orden de Compra</Btn>
+          </form>
+        )}
+      </div>
+
+      {/* Filtros */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {(['todos','pendiente','recibida','cancelada'] as const).map(f => (
+          <button key={f} onClick={() => setFiltro(f)}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${filtro === f ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'}`}>
+            {f === 'todos' ? 'Todas' : BADGE_ORDEN[f].label} ({counts[f]})
+          </button>
+        ))}
+      </div>
+
+      {ordenesFiltradas.length === 0 ? (
+        <div className="text-center py-12 text-slate-400"><div className="text-5xl mb-3">📋</div><p className="font-medium text-slate-500">Sin órdenes registradas</p></div>
+      ) : (
+        <div className="space-y-2">
+          {ordenesFiltradas.map((orden, i) => {
+            const prov = proveedores.find(p => p.id === orden.proveedorId);
+            const badge = BADGE_ORDEN[orden.estado];
+            return (
+              <div key={orden.id} className={`border border-slate-200 rounded-xl p-4 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-slate-800">🏪 {prov?.nombre ?? '—'}</span>
+                      {orden.numeroOrden && <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{orden.numeroOrden}</span>}
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1 flex gap-2 flex-wrap">
+                      <span>{new Date(orden.fecha).toLocaleDateString('es-MX')}</span>
+                      {orden.descripcion && <span>· {orden.descripcion}</span>}
+                      <span>· {orden.partes.length} pieza{orden.partes.length !== 1 ? 's' : ''}</span>
+                      <span>· Total: <strong className="text-slate-700">${fmt(orden.total)}</strong></span>
+                    </div>
+                    {orden.estado === 'recibida' && orden.fechaRecibida && (
+                      <div className="text-xs text-emerald-600 mt-0.5">Recibida: {new Date(orden.fechaRecibida).toLocaleDateString('es-MX')}</div>
+                    )}
+                  </div>
+                  {orden.estado === 'pendiente' && (
+                    <div className="flex gap-2">
+                      <Btn size="sm" variant="success" onClick={() => onRecibirOrden(orden.id)}>✓ Marcar Recibida</Btn>
+                      <Btn size="sm" variant="danger" onClick={() => onCancelarOrden(orden.id)}>Cancelar</Btn>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── VistaFacturas ─────────────────────────────────────────────────────────────
+
+function VistaFacturas({
+  facturas,
+  clientes,
+  vehiculos,
+  trabajos,
+  onRegistrarPago,
+}: {
+  facturas: Factura[];
+  clientes: Cliente[];
+  vehiculos: Vehiculo[];
+  trabajos: Trabajo[];
+  onRegistrarPago: (facturaId: string, pago: Omit<PagoFactura, 'id'>) => void;
+}) {
+  const hoy = new Date().toISOString().split('T')[0];
+  const [expandido, setExpandido] = useState<string | null>(null);
+  const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
+  const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
+
+  const facturasFiltradas = [...facturas]
+    .sort((a, b) => b.fecha.localeCompare(a.fecha))
+    .filter(f => filtro === 'todos' || getEstadoPagoFactura(f) === filtro);
+
+  const counts = { todos: facturas.length, pendiente: facturas.filter(f => getEstadoPagoFactura(f) === 'pendiente').length, parcial: facturas.filter(f => getEstadoPagoFactura(f) === 'parcial').length, pagado: facturas.filter(f => getEstadoPagoFactura(f) === 'pagado').length };
+  const totalPendiente = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0);
+
+  const handlePago = (facturaId: string, saldo: number) => {
+    if (pagoForm.monto <= 0) return;
+    onRegistrarPago(facturaId, { monto: Math.min(pagoForm.monto, saldo), fecha: pagoForm.fecha, metodoPago: pagoForm.metodoPago });
+    setPagoForm({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
+    setExpandido(null);
+  };
+
+  return (
+    <div>
+      <SectionTitle title="Facturas" subtitle="Facturas generadas desde trabajos. Aquí se registran los pagos de clientes." />
+
+      {facturas.length === 0 && (
+        <div className="text-center py-16 text-slate-400"><div className="text-5xl mb-3">🧾</div>
+          <p className="font-medium text-slate-500">Sin facturas aún</p>
+          <p className="text-sm mt-1">Ve a Trabajos y usa el botón <strong>+ Generar Factura</strong> en cualquier trabajo.</p></div>
+      )}
+
+      {facturas.length > 0 && <>
+        {totalPendiente > 0 && (
+          <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 mb-5 flex flex-wrap gap-6 items-center">
+            <div><div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Total por Cobrar</div>
+              <div className="text-2xl font-extrabold text-rose-700">${fmt(totalPendiente)}</div></div>
+          </div>
+        )}
+
+        <div className="flex gap-2 mb-5 flex-wrap">
+          {(['todos','pendiente','parcial','pagado'] as const).map(f => (
+            <button key={f} onClick={() => setFiltro(f)}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${filtro === f ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'}`}>
+              {f === 'todos' ? 'Todas' : BADGE_ESTADO[f].label} ({counts[f]})
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          {facturasFiltradas.map(factura => {
+            const cliente  = clientes.find(c => c.id === factura.clienteId);
+            const vehiculo = vehiculos.find(v => v.id === factura.vehiculoId);
+            const estado   = getEstadoPagoFactura(factura);
+            const montoPag = getMontoPagadoFactura(factura);
+            const saldo    = getSaldoFactura(factura);
+            const badge    = BADGE_ESTADO[estado];
+            const isExp    = expandido === factura.id;
+
+            return (
+              <div key={factura.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className={`grid grid-cols-1 sm:grid-cols-6 gap-2 items-center px-4 py-3 ${isExp ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'} transition-colors`}>
+                  <div className="sm:col-span-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{factura.numeroFactura}</span>
+                      <span className="font-semibold text-slate-800 text-sm">{cliente?.nombre ?? '—'}</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
+                      <span>{new Date(factura.fecha).toLocaleDateString('es-MX')}</span>
+                      {vehiculo && <span>· {[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>}
+                      <span>· {factura.conceptos.length} conceptos</span>
+                    </div>
+                  </div>
+                  <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Total</div><div className="font-semibold text-slate-800">${fmt(factura.total)}</div></div>
+                  <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
+                  <div className="flex items-center justify-between sm:justify-end gap-2">
+                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
+                    <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'}
+                      onClick={() => { setExpandido(isExp ? null : factura.id); setPagoForm({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' }); }}>
+                      {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
+                    </Btn>
+                  </div>
+                </div>
+
+                {isExp && (
+                  <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200 space-y-4">
+                    {/* Conceptos */}
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Conceptos</p>
+                      <div className="rounded-lg border border-slate-200 overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-100"><tr>
+                            {['Tipo','Descripción','Cant.','Precio','Subtotal'].map((h,i) => <th key={i} className={`px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide ${i >= 2 ? 'text-right' : 'text-left'}`}>{h}</th>)}
+                          </tr></thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {factura.conceptos.map((c, ci) => (
+                              <tr key={ci} className="bg-white">
+                                <td className="px-3 py-2"><span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${c.tipo === 'parte' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{c.tipo === 'parte' ? '🔩 Parte' : '🔧 M.O.'}</span></td>
+                                <td className="px-3 py-2 text-slate-800">{c.descripcion}</td>
+                                <td className="px-3 py-2 text-right text-slate-700">{c.cantidad}</td>
+                                <td className="px-3 py-2 text-right text-slate-600">${fmt(c.precioUnitario)}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(c.subtotal)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                            <tr><td colSpan={4} className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total factura:</td>
+                              <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(factura.total)}</td></tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Pagos historial */}
+                    {factura.pagos?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
+                        <div className="space-y-1">
+                          {factura.pagos.map(p => (
+                            <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                              <div className="flex gap-3"><span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span><span className="text-slate-500">{p.metodoPago}</span></div>
+                              <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Registrar pago */}
+                    {estado !== 'pagado' && (
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Registrar Pago</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div><Label>Fecha</Label><Input type="date" value={pagoForm.fecha} onChange={e => setPagoForm(f => ({ ...f, fecha: e.target.value }))} /></div>
+                          <div><Label>Monto ($) — saldo: ${fmt(saldo)}</Label><Input type="number" placeholder="0.00" min="0.01" step="0.01" value={pagoForm.monto || ''} onChange={e => setPagoForm(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
+                          <div><Label>Método de pago</Label>
+                            <Select value={pagoForm.metodoPago} onChange={e => setPagoForm(f => ({ ...f, metodoPago: e.target.value }))}>
+                              {['Efectivo','Transferencia','Tarjeta','Cheque','Otro'].map(m => <option key={m}>{m}</option>)}
+                            </Select></div>
+                          <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoForm.monto <= 0} onClick={() => handlePago(factura.id, saldo)}>✓ Registrar</Btn></div>
+                        </div>
+                      </div>
+                    )}
+                    {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Esta factura está completamente pagada.</p>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </>}
+    </div>
+  );
+}
+
 // ─── VistaCuentas ─────────────────────────────────────────────────────────────
 
 type FiltroCuenta = 'todos' | 'pendiente' | 'parcial' | 'pagado';
@@ -1851,496 +2356,274 @@ const BADGE_ESTADO: Record<'pendiente' | 'parcial' | 'pagado', { label: string; 
 };
 
 function VistaCuentas({
+  facturas,
   trabajos,
   clientes,
   vehiculos,
-  onRegistrarPago,
+  onRegistrarPagoFactura,
+  onRegistrarPagoTrabajo,
 }: {
+  facturas: Factura[];
   trabajos: Trabajo[];
   clientes: Cliente[];
   vehiculos: Vehiculo[];
-  onRegistrarPago: (trabajoId: string, pago: Omit<Pago, 'id'>) => void;
+  onRegistrarPagoFactura: (facturaId: string, pago: Omit<PagoFactura, 'id'>) => void;
+  onRegistrarPagoTrabajo: (trabajoId: string, pago: Omit<Pago, 'id'>) => void;
 }) {
+  const hoy = new Date().toISOString().split('T')[0];
   const [filtro, setFiltro] = useState<FiltroCuenta>('todos');
-  const [expandido, setExpandido] = useState<string | null>(null);
-  const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: new Date().toISOString().split('T')[0], nota: '' });
+  const [expandidoF, setExpandidoF] = useState<string | null>(null);
+  const [expandidoT, setExpandidoT] = useState<string | null>(null);
+  const [pagoFormF, setPagoFormF] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
+  const [pagoFormT, setPagoFormT] = useState({ monto: 0, fecha: hoy, nota: '' });
 
-  const getCliente  = (id: string) => clientes.find(c => c.id === id);
-  const getVehiculo = (id: string) => vehiculos.find(v => v.id === id);
+  // Legacy: trabajos without a facturaId
+  const legacyTrabajos = trabajos.filter(t => !t.facturaId);
 
-  const trabajosFiltrados = [...trabajos]
+  const facturasFiltradas = [...facturas]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
-    .filter(t => filtro === 'todos' || getEstadoPago(t) === filtro);
+    .filter(f => filtro === 'todos' || getEstadoPagoFactura(f) === filtro);
 
-  const handleRegistrar = (trabajoId: string, saldo: number) => {
-    if (pagoForm.monto <= 0) return;
-    onRegistrarPago(trabajoId, { monto: Math.min(pagoForm.monto, saldo), fecha: pagoForm.fecha, nota: pagoForm.nota || undefined });
-    setPagoForm({ monto: 0, fecha: new Date().toISOString().split('T')[0], nota: '' });
-    setExpandido(null);
-  };
+  const legacyFiltrados = legacyTrabajos.filter(t => filtro === 'todos' || getEstadoPago(t) === filtro);
 
-  const toggleExpand = (id: string) => {
-    if (expandido === id) { setExpandido(null); return; }
-    setExpandido(id);
-    setPagoForm({ monto: 0, fecha: new Date().toISOString().split('T')[0], nota: '' });
-  };
+  const totalPendiente = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
+    + legacyTrabajos.filter(t => getEstadoPago(t) !== 'pagado').reduce((s, t) => s + getSaldo(t), 0);
 
-  // Counts for filter chips
   const counts = {
-    todos:     trabajos.length,
-    pendiente: trabajos.filter(t => getEstadoPago(t) === 'pendiente').length,
-    parcial:   trabajos.filter(t => getEstadoPago(t) === 'parcial').length,
-    pagado:    trabajos.filter(t => getEstadoPago(t) === 'pagado').length,
+    todos: facturas.length + legacyTrabajos.length,
+    pendiente: facturas.filter(f => getEstadoPagoFactura(f) === 'pendiente').length + legacyTrabajos.filter(t => getEstadoPago(t) === 'pendiente').length,
+    parcial: facturas.filter(f => getEstadoPagoFactura(f) === 'parcial').length + legacyTrabajos.filter(t => getEstadoPago(t) === 'parcial').length,
+    pagado: facturas.filter(f => getEstadoPagoFactura(f) === 'pagado').length + legacyTrabajos.filter(t => getEstadoPago(t) === 'pagado').length,
   };
-
-  const totalPendiente = trabajos.filter(t => getEstadoPago(t) !== 'pagado').reduce((s, t) => s + getSaldo(t), 0);
 
   return (
     <div>
-      <SectionTitle
-        title="Cuentas por Cobrar"
-        subtitle="Registra los pagos recibidos por cada trabajo. Los créditos pendientes aparecen en rojo."
-      />
+      <SectionTitle title="Cuentas por Cobrar" subtitle="Pagos de clientes: facturas emitidas y trabajos pendientes de cobro." />
 
-      {/* ── Resumen rápido ── */}
       {totalPendiente > 0 && (
-        <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 mb-6 flex flex-wrap gap-6 items-center">
-          <div>
-            <div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Total por Cobrar</div>
-            <div className="text-2xl font-extrabold text-rose-700">${fmt(totalPendiente)}</div>
-          </div>
-          <div className="text-sm text-rose-600">
-            <span className="font-semibold">{counts.pendiente}</span> trabajo{counts.pendiente !== 1 ? 's' : ''} pendientes de pago
-            {counts.parcial > 0 && <span> · <span className="font-semibold">{counts.parcial}</span> parciales</span>}
-          </div>
+        <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 mb-5 flex flex-wrap gap-6 items-center">
+          <div><div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Total por Cobrar</div>
+            <div className="text-2xl font-extrabold text-rose-700">${fmt(totalPendiente)}</div></div>
         </div>
       )}
 
-      {/* ── Filtros ── */}
       <div className="flex gap-2 mb-5 flex-wrap">
-        {(['todos', 'pendiente', 'parcial', 'pagado'] as FiltroCuenta[]).map(f => (
+        {(['todos','pendiente','parcial','pagado'] as FiltroCuenta[]).map(f => (
           <button key={f} onClick={() => setFiltro(f)}
-            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-              filtro === f
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'
-            }`}>
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${filtro === f ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'}`}>
             {f === 'todos' ? 'Todos' : BADGE_ESTADO[f].label} ({counts[f]})
           </button>
         ))}
       </div>
 
-      {/* ── Tabla ── */}
-      {trabajosFiltrados.length === 0 ? (
-        <div className="text-center py-14 text-slate-400">
-          <div className="text-5xl mb-3">💰</div>
-          <p className="font-medium text-slate-500">
-            {filtro === 'todos' ? 'Sin trabajos registrados' : `Sin trabajos con estado "${BADGE_ESTADO[filtro as Exclude<FiltroCuenta,'todos'>].label}"`}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {trabajosFiltrados.map(trabajo => {
-            const cliente  = getCliente(trabajo.clienteId);
-            const vehiculo = getVehiculo(trabajo.vehiculoId);
-            const estado   = getEstadoPago(trabajo);
-            const montoPag = getMontoPagado(trabajo);
-            const saldo    = getSaldo(trabajo);
-            const badge    = BADGE_ESTADO[estado];
-            const isExp    = expandido === trabajo.id;
-
-            return (
-              <div key={trabajo.id} className="border border-slate-200 rounded-xl overflow-hidden">
-                {/* ── Row ── */}
-                <div className={`grid grid-cols-1 sm:grid-cols-6 gap-2 items-center px-4 py-3 ${
-                  isExp ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'
-                } transition-colors`}>
-                  {/* Info */}
-                  <div className="sm:col-span-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-slate-800 text-sm">{cliente?.nombre ?? '—'}</span>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+      {/* ── Facturas section ── */}
+      {facturasFiltradas.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-sm font-bold text-slate-600 mb-2 uppercase tracking-wide">🧾 Facturas emitidas</h3>
+          <div className="space-y-2">
+            {facturasFiltradas.map(factura => {
+              const cliente  = clientes.find(c => c.id === factura.clienteId);
+              const estado   = getEstadoPagoFactura(factura);
+              const montoPag = getMontoPagadoFactura(factura);
+              const saldo    = getSaldoFactura(factura);
+              const badge    = BADGE_ESTADO[estado];
+              const isExp    = expandidoF === factura.id;
+              return (
+                <div key={factura.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className={`grid grid-cols-1 sm:grid-cols-6 gap-2 items-center px-4 py-3 ${isExp ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'} transition-colors`}>
+                    <div className="sm:col-span-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{factura.numeroFactura}</span>
+                        <span className="font-semibold text-slate-800 text-sm">{cliente?.nombre ?? '—'}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">{new Date(factura.fecha).toLocaleDateString('es-MX')}</div>
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
-                      <span>{new Date(trabajo.fecha).toLocaleDateString('es-MX')}</span>
-                      {vehiculo && <span>· {[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>}
-                      <span>· {trabajo.descripcion}</span>
-                    </div>
-                  </div>
-                  {/* Amounts */}
-                  <div className="text-right">
-                    <div className="text-xs text-slate-400 uppercase tracking-wide">Total</div>
-                    <div className="font-semibold text-slate-800">${fmt(trabajo.total)}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div>
-                    <div className="font-semibold text-emerald-600">${fmt(montoPag)}</div>
-                  </div>
-                  <div className="flex items-center justify-between sm:justify-end gap-2">
-                    <div className="text-right">
-                      <div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div>
-                      <div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div>
-                    </div>
-                    {estado !== 'pagado' && (
-                      <Btn size="sm" variant={isExp ? 'ghost' : 'success'} onClick={() => toggleExpand(trabajo.id)}>
-                        {isExp ? '✕' : '+ Pago'}
+                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Total</div><div className="font-semibold text-slate-800">${fmt(factura.total)}</div></div>
+                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
+                    <div className="flex items-center justify-between sm:justify-end gap-2">
+                      <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
+                      <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'}
+                        onClick={() => { setExpandidoF(isExp ? null : factura.id); setPagoFormF({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' }); }}>
+                        {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
                       </Btn>
-                    )}
-                    {estado === 'pagado' && (
-                      <Btn size="sm" variant="ghost" onClick={() => toggleExpand(trabajo.id)}>
-                        {isExp ? '✕' : 'Ver'}
-                      </Btn>
-                    )}
+                    </div>
                   </div>
+                  {isExp && estado !== 'pagado' && (
+                    <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Registrar Pago</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div><Label>Fecha</Label><Input type="date" value={pagoFormF.fecha} onChange={e => setPagoFormF(f => ({ ...f, fecha: e.target.value }))} /></div>
+                        <div><Label>Monto ($)</Label><Input type="number" placeholder="0.00" min="0.01" step="0.01" value={pagoFormF.monto || ''} onChange={e => setPagoFormF(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
+                        <div><Label>Método</Label>
+                          <Select value={pagoFormF.metodoPago} onChange={e => setPagoFormF(f => ({ ...f, metodoPago: e.target.value }))}>
+                            {['Efectivo','Transferencia','Tarjeta','Cheque','Otro'].map(m => <option key={m}>{m}</option>)}
+                          </Select></div>
+                        <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoFormF.monto <= 0} onClick={() => { onRegistrarPagoFactura(factura.id, { monto: Math.min(pagoFormF.monto, saldo), fecha: pagoFormF.fecha, metodoPago: pagoFormF.metodoPago }); setPagoFormF({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' }); setExpandidoF(null); }}>✓ Registrar</Btn></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-
-                {/* ── Expanded: historial + form ── */}
-                {isExp && (
-                  <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200 space-y-4">
-                    {/* Historial de pagos */}
-                    {trabajo.pagos?.length > 0 && (
-                      <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
-                        <div className="space-y-1">
-                          {trabajo.pagos.map(p => (
-                            <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                              <div className="flex gap-3">
-                                <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
-                                {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
-                              </div>
-                              <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Formulario registrar pago */}
-                    {estado !== 'pagado' && (
-                      <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Registrar Pago</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                          <div>
-                            <Label>Fecha del pago</Label>
-                            <Input type="date" value={pagoForm.fecha}
-                              onChange={e => setPagoForm(f => ({ ...f, fecha: e.target.value }))} />
-                          </div>
-                          <div>
-                            <Label>Monto ($) {saldo < trabajo.total && `— saldo: $${fmt(saldo)}`}</Label>
-                            <Input type="number" placeholder="0.00" min="0.01" step="0.01"
-                              value={pagoForm.monto || ''}
-                              onChange={e => setPagoForm(f => ({ ...f, monto: Number(e.target.value) }))} />
-                          </div>
-                          <div>
-                            <Label>Nota (opcional)</Label>
-                            <Input type="text" placeholder="Efectivo, transferencia..."
-                              value={pagoForm.nota}
-                              onChange={e => setPagoForm(f => ({ ...f, nota: e.target.value }))} />
-                          </div>
-                          <div className="flex items-end">
-                            <Btn variant="success" fullWidth
-                              disabled={pagoForm.monto <= 0}
-                              onClick={() => handleRegistrar(trabajo.id, saldo)}>
-                              ✓ Registrar
-                            </Btn>
-                          </div>
-                        </div>
-                        {pagoForm.monto > 0 && (
-                          <p className="text-xs text-slate-400 mt-2">
-                            Después de este pago, saldo restante: <strong className="text-slate-600">${fmt(Math.max(0, saldo - pagoForm.monto))}</strong>
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    {estado === 'pagado' && trabajo.pagos?.length > 0 && (
-                      <p className="text-xs text-emerald-600 font-semibold text-center">✅ Este trabajo está completamente pagado.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
+      )}
+
+      {/* ── Legacy trabajos (without factura) ── */}
+      {legacyFiltrados.length > 0 && (
+        <div>
+          <h3 className="text-sm font-bold text-slate-600 mb-2 uppercase tracking-wide">🔧 Trabajos sin factura (legado)</h3>
+          <div className="space-y-2">
+            {legacyFiltrados.map(trabajo => {
+              const cliente  = clientes.find(c => c.id === trabajo.clienteId);
+              const vehiculo = vehiculos.find(v => v.id === trabajo.vehiculoId);
+              const estado   = getEstadoPago(trabajo);
+              const montoPag = getMontoPagado(trabajo);
+              const saldo    = getSaldo(trabajo);
+              const badge    = BADGE_ESTADO[estado];
+              const isExp    = expandidoT === trabajo.id;
+              return (
+                <div key={trabajo.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className={`grid grid-cols-1 sm:grid-cols-6 gap-2 items-center px-4 py-3 ${isExp ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'} transition-colors`}>
+                    <div className="sm:col-span-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-slate-800 text-sm">{cliente?.nombre ?? '—'}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
+                        <span>{new Date(trabajo.fecha).toLocaleDateString('es-MX')}</span>
+                        {vehiculo && <span>· {[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>}
+                        <span>· {trabajo.descripcion}</span>
+                      </div>
+                    </div>
+                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Total</div><div className="font-semibold text-slate-800">${fmt(trabajo.total)}</div></div>
+                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
+                    <div className="flex items-center justify-between sm:justify-end gap-2">
+                      <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
+                      {estado !== 'pagado' && <Btn size="sm" variant={isExp ? 'ghost' : 'success'} onClick={() => { setExpandidoT(isExp ? null : trabajo.id); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); }}>{isExp ? '✕' : '+ Pago'}</Btn>}
+                    </div>
+                  </div>
+                  {isExp && estado !== 'pagado' && (
+                    <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div><Label>Fecha</Label><Input type="date" value={pagoFormT.fecha} onChange={e => setPagoFormT(f => ({ ...f, fecha: e.target.value }))} /></div>
+                        <div><Label>Monto ($)</Label><Input type="number" placeholder="0.00" min="0.01" step="0.01" value={pagoFormT.monto || ''} onChange={e => setPagoFormT(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
+                        <div><Label>Nota</Label><Input type="text" placeholder="Efectivo, transferencia..." value={pagoFormT.nota} onChange={e => setPagoFormT(f => ({ ...f, nota: e.target.value }))} /></div>
+                        <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoFormT.monto <= 0} onClick={() => { onRegistrarPagoTrabajo(trabajo.id, { monto: Math.min(pagoFormT.monto, saldo), fecha: pagoFormT.fecha, nota: pagoFormT.nota || undefined }); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); setExpandidoT(null); }}>✓ Registrar</Btn></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {facturasFiltradas.length === 0 && legacyFiltrados.length === 0 && (
+        <div className="text-center py-14 text-slate-400"><div className="text-5xl mb-3">💰</div><p className="font-medium text-slate-500">{filtro === 'todos' ? 'Sin registros' : `Sin registros con estado "${BADGE_ESTADO[filtro as 'pendiente'|'parcial'|'pagado'].label}"`}</p></div>
       )}
     </div>
   );
 }
-
 // ─── VistaCuentasPorPagar ─────────────────────────────────────────────────────
 
 function VistaCuentasPorPagar({
-  compras,
+  ordenes,
   proveedores,
-  inventario,
-  onGuardarCompra,
   onRegistrarPago,
-  onIrAProveedores,
+  onIrAOrdenes,
 }: {
-  compras: Compra[];
+  ordenes: OrdenCompra[];
   proveedores: Proveedor[];
-  inventario: Refaccion[];
-  onGuardarCompra: (c: Omit<Compra, 'id'>) => void;
-  onRegistrarPago: (compraId: string, pago: Omit<PagoCompra, 'id'>) => void;
-  onIrAProveedores: () => void;
+  onRegistrarPago: (ordenId: string, pago: Omit<PagoCompra, 'id'>) => void;
+  onIrAOrdenes: () => void;
 }) {
   const hoy = new Date().toISOString().split('T')[0];
-  const [formProveedorId, setFormProveedorId] = useState('');
-  const [formFecha, setFormFecha] = useState(hoy);
-  const [formDesc, setFormDesc] = useState('');
-  const [itemsCompra, setItemsCompra] = useState<CompraItem[]>([]);
-  const [pickerRefId, setPickerRefId] = useState('');
-  const [pickerCantidad, setPickerCantidad] = useState(1);
-  const [pickerPrecio, setPickerPrecio] = useState(0);
-  const [filtro, setFiltro] = useState<'todos' | 'pendiente' | 'parcial' | 'pagado'>('todos');
   const [expandido, setExpandido] = useState<string | null>(null);
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, nota: '' });
+  const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
 
-  const totalCompra = itemsCompra.reduce((s, i) => s + i.subtotal, 0);
-  const pickerRef = inventario.find(r => r.id === pickerRefId);
+  // Only show received POs (they're the ones that create a payable)
+  const ordenesPagables = ordenes.filter(o => o.estado === 'recibida');
 
-  const agregarItem = () => {
-    if (!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0) return;
-    const ref = inventario.find(r => r.id === pickerRefId);
-    if (!ref) return;
-    setItemsCompra(prev => {
-      const ex = prev.find(i => i.refaccionId === ref.id);
-      if (ex) {
-        const nc = ex.cantidad + pickerCantidad;
-        return prev.map(i => i.refaccionId === ref.id ? { ...i, cantidad: nc, subtotal: nc * i.precioCompra } : i);
-      }
-      return [...prev, { refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad, precioCompra: pickerPrecio, subtotal: pickerCantidad * pickerPrecio }];
-    });
-    setPickerRefId('');
-    setPickerCantidad(1);
-    setPickerPrecio(0);
-  };
+  const ordenesFiltradas = [...ordenesPagables]
+    .sort((a, b) => b.fecha.localeCompare(a.fecha))
+    .filter(o => filtro === 'todos' || getEstadoPagoOrden(o) === filtro);
 
-  const handlePickerRefChange = (id: string) => {
-    setPickerRefId(id);
-    const ref = inventario.find(r => r.id === id);
-    setPickerPrecio(ref?.precioCompra ?? 0);
-  };
+  const counts = { todos: ordenesPagables.length, pendiente: ordenesPagables.filter(o => getEstadoPagoOrden(o) === 'pendiente').length, parcial: ordenesPagables.filter(o => getEstadoPagoOrden(o) === 'parcial').length, pagado: ordenesPagables.filter(o => getEstadoPagoOrden(o) === 'pagado').length };
+  const totalPendiente = ordenesPagables.filter(o => getEstadoPagoOrden(o) !== 'pagado').reduce((s, o) => s + getSaldoOrden(o), 0);
 
-  const handleSubmitCompra = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formProveedorId || itemsCompra.length === 0) return;
-    onGuardarCompra({ proveedorId: formProveedorId, fecha: formFecha, descripcion: formDesc, items: itemsCompra, total: totalCompra, pagos: [] });
-    setFormProveedorId(''); setFormFecha(hoy); setFormDesc(''); setItemsCompra([]);
-  };
-
-  const handleRegistrarPago = (compraId: string, saldo: number) => {
+  const handlePago = (ordenId: string, saldo: number) => {
     if (pagoForm.monto <= 0) return;
-    onRegistrarPago(compraId, { monto: Math.min(pagoForm.monto, saldo), fecha: pagoForm.fecha, nota: pagoForm.nota || undefined });
+    onRegistrarPago(ordenId, { monto: Math.min(pagoForm.monto, saldo), fecha: pagoForm.fecha, nota: pagoForm.nota || undefined });
     setPagoForm({ monto: 0, fecha: hoy, nota: '' });
     setExpandido(null);
   };
 
-  const totalPendiente = compras.filter(c => getEstadoPagoCompra(c) !== 'pagado').reduce((s, c) => s + getSaldoCompra(c), 0);
-  const counts = {
-    todos: compras.length,
-    pendiente: compras.filter(c => getEstadoPagoCompra(c) === 'pendiente').length,
-    parcial: compras.filter(c => getEstadoPagoCompra(c) === 'parcial').length,
-    pagado: compras.filter(c => getEstadoPagoCompra(c) === 'pagado').length,
-  };
-  const comprasFiltradas = [...compras]
-    .sort((a, b) => b.fecha.localeCompare(a.fecha))
-    .filter(c => filtro === 'todos' || getEstadoPagoCompra(c) === filtro);
-
   return (
     <div>
-      <SectionTitle title="Cuentas por Pagar" subtitle="Registra tus compras a proveedores y lleva el control de lo que les debes." />
+      <SectionTitle title="Cuentas por Pagar" subtitle="Pagos pendientes a proveedores por órdenes de compra recibidas." />
 
-      {/* ── Registrar compra ── */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-6">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5">Registrar Compra a Proveedor</h3>
-        {proveedores.length === 0 ? (
-          <div className="text-center py-6 text-slate-400 text-sm">
-            <p>Necesitas registrar proveedores primero.</p>
-            <button type="button" onClick={onIrAProveedores}
-              className="mt-2 text-indigo-600 font-semibold hover:underline">Ir a Proveedores →</button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmitCompra} className="space-y-5">
-            {/* Proveedor + fecha + desc */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <Label>Proveedor *</Label>
-                <Select value={formProveedorId} onChange={e => setFormProveedorId(e.target.value)} required>
-                  <option value="">Seleccionar proveedor...</option>
-                  {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                </Select>
-              </div>
-              <div>
-                <Label>Fecha</Label>
-                <Input type="date" value={formFecha} onChange={e => setFormFecha(e.target.value)} required />
-              </div>
-              <div>
-                <Label>Descripción (opcional)</Label>
-                <Input type="text" placeholder="Ej. Compra semanal filtros" value={formDesc}
-                  onChange={e => setFormDesc(e.target.value)} />
-              </div>
-            </div>
-
-            {/* Items picker */}
-            <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
-              <div className="px-4 py-3 bg-slate-700">
-                <span className="text-xs font-bold text-white uppercase tracking-widest">Piezas Recibidas</span>
-                <span className="ml-3 text-slate-400 text-xs">Al guardar, el stock se actualiza automáticamente</span>
-              </div>
-              <div className="p-4 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                  <div className="sm:col-span-2">
-                    <Label>Refacción</Label>
-                    <Select value={pickerRefId} onChange={e => handlePickerRefChange(e.target.value)}>
-                      <option value="">Seleccionar pieza...</option>
-                      {inventario.map(r => (
-                        <option key={r.id} value={r.id}>{r.nombre}{r.codigo ? ` (${r.codigo})` : ''}</option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Cantidad</Label>
-                    <Input type="number" min="1" step="1" placeholder="1"
-                      value={pickerCantidad || ''} onChange={e => setPickerCantidad(Number(e.target.value))} />
-                  </div>
-                  <div>
-                    <Label>Precio compra ($)</Label>
-                    <Input type="number" min="0.01" step="0.01" placeholder="0.00"
-                      value={pickerPrecio || ''} onChange={e => setPickerPrecio(Number(e.target.value))} />
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  {pickerRef && pickerPrecio > 0 && (
-                    <span className="text-xs text-slate-500">
-                      Subtotal: <strong className="text-slate-700">${fmt(pickerPrecio * pickerCantidad)}</strong>
-                    </span>
-                  )}
-                  <Btn variant="primary" disabled={!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0}
-                    onClick={agregarItem} size="sm">
-                    + Agregar
-                  </Btn>
-                </div>
-
-                {itemsCompra.length > 0 && (
-                  <div className="rounded-lg border border-slate-200 overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-100">
-                        <tr>
-                          <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Pieza</th>
-                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Cant.</th>
-                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Precio</th>
-                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Subtotal</th>
-                          <th className="px-3 py-2 w-8"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {itemsCompra.map(it => (
-                          <tr key={it.refaccionId} className="bg-white">
-                            <td className="px-3 py-2 font-medium text-slate-800">{it.nombre}</td>
-                            <td className="px-3 py-2 text-right text-slate-700">{it.cantidad}</td>
-                            <td className="px-3 py-2 text-right text-slate-600">${fmt(it.precioCompra)}</td>
-                            <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(it.subtotal)}</td>
-                            <td className="px-3 py-2 text-center">
-                              <Btn size="sm" variant="danger" onClick={() => setItemsCompra(prev => prev.filter(i => i.refaccionId !== it.refaccionId))}>✕</Btn>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-slate-50 border-t-2 border-slate-200">
-                        <tr>
-                          <td colSpan={3} className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total compra:</td>
-                          <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(totalCompra)}</td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
-                {itemsCompra.length === 0 && (
-                  <p className="text-xs text-slate-400 text-center py-2">Agrega las piezas que recibiste en esta compra.</p>
-                )}
-              </div>
-            </div>
-
-            <Btn type="submit" variant="primary" fullWidth
-              disabled={!formProveedorId || itemsCompra.length === 0}>
-              ✓ Registrar Compra y Actualizar Inventario
-            </Btn>
-          </form>
-        )}
-      </div>
-
-      {/* ── Compras registradas ── */}
-      {totalPendiente > 0 && (
-        <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 mb-5 flex flex-wrap gap-6 items-center">
-          <div>
-            <div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Total por Pagar</div>
-            <div className="text-2xl font-extrabold text-rose-700">${fmt(totalPendiente)}</div>
-          </div>
-          <div className="text-sm text-rose-600">
-            <span className="font-semibold">{counts.pendiente}</span> compra{counts.pendiente !== 1 ? 's' : ''} pendientes
-            {counts.parcial > 0 && <span> · <span className="font-semibold">{counts.parcial}</span> parciales</span>}
-          </div>
+      {ordenesPagables.length === 0 && (
+        <div className="text-center py-14 text-slate-400">
+          <div className="text-5xl mb-3">🔴</div>
+          <p className="font-medium text-slate-500">Sin cuentas por pagar</p>
+          <p className="text-sm mt-1">Las cuentas por pagar se generan cuando marcas una OC como recibida.</p>
+          <button type="button" onClick={onIrAOrdenes} className="mt-2 text-indigo-600 font-semibold hover:underline text-sm">Ver Órdenes de Compra →</button>
         </div>
       )}
 
-      <div className="flex gap-2 mb-5 flex-wrap">
-        {(['todos', 'pendiente', 'parcial', 'pagado'] as const).map(f => (
-          <button key={f} onClick={() => setFiltro(f)}
-            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-              filtro === f ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'
-            }`}>
-            {f === 'todos' ? 'Todas' : BADGE_ESTADO[f].label} ({counts[f]})
-          </button>
-        ))}
-      </div>
+      {ordenesPagables.length > 0 && <>
+        {totalPendiente > 0 && (
+          <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 mb-5 flex flex-wrap gap-6 items-center">
+            <div><div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Total por Pagar</div>
+              <div className="text-2xl font-extrabold text-rose-700">${fmt(totalPendiente)}</div></div>
+          </div>
+        )}
 
-      {comprasFiltradas.length === 0 ? (
-        <div className="text-center py-14 text-slate-400">
-          <div className="text-5xl mb-3">🧾</div>
-          <p className="font-medium text-slate-500">Sin compras registradas</p>
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {(['todos','pendiente','parcial','pagado'] as const).map(f => (
+            <button key={f} onClick={() => setFiltro(f)}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${filtro === f ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'}`}>
+              {f === 'todos' ? 'Todas' : BADGE_ESTADO[f].label} ({counts[f]})
+            </button>
+          ))}
         </div>
-      ) : (
+
         <div className="space-y-2">
-          {comprasFiltradas.map(compra => {
-            const prov = proveedores.find(p => p.id === compra.proveedorId);
-            const estado = getEstadoPagoCompra(compra);
-            const montoPag = getMontoPagadoCompra(compra);
-            const saldo = getSaldoCompra(compra);
-            const badge = BADGE_ESTADO[estado];
-            const isExp = expandido === compra.id;
+          {ordenesFiltradas.map(orden => {
+            const prov    = proveedores.find(p => p.id === orden.proveedorId);
+            const estado  = getEstadoPagoOrden(orden);
+            const montoPag = getMontoPagadoOrden(orden);
+            const saldo   = getSaldoOrden(orden);
+            const badge   = BADGE_ESTADO[estado];
+            const isExp   = expandido === orden.id;
 
             return (
-              <div key={compra.id} className="border border-slate-200 rounded-xl overflow-hidden">
+              <div key={orden.id} className="border border-slate-200 rounded-xl overflow-hidden">
                 <div className={`grid grid-cols-1 sm:grid-cols-6 gap-2 items-center px-4 py-3 ${isExp ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'} transition-colors`}>
                   <div className="sm:col-span-3">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-slate-800 text-sm">🏪 {prov?.nombre ?? 'Proveedor'}</span>
+                      {orden.numeroOrden && <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{orden.numeroOrden}</span>}
+                      <span className="font-semibold text-slate-800 text-sm">🏪 {prov?.nombre ?? '—'}</span>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
                     </div>
                     <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
-                      <span>{new Date(compra.fecha).toLocaleDateString('es-MX')}</span>
-                      {compra.descripcion && <span>· {compra.descripcion}</span>}
-                      <span>· {compra.items.length} pieza{compra.items.length !== 1 ? 's' : ''}</span>
+                      <span>{orden.fechaRecibida ? `Recibida: ${new Date(orden.fechaRecibida).toLocaleDateString('es-MX')}` : new Date(orden.fecha).toLocaleDateString('es-MX')}</span>
+                      {orden.descripcion && <span>· {orden.descripcion}</span>}
+                      <span>· {orden.partes.length} pieza{orden.partes.length !== 1 ? 's' : ''}</span>
                     </div>
                   </div>
-                  <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Total</div>
-                    <div className="font-semibold text-slate-800">${fmt(compra.total)}</div></div>
-                  <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div>
-                    <div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
+                  <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Total</div><div className="font-semibold text-slate-800">${fmt(orden.total)}</div></div>
+                  <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
                   <div className="flex items-center justify-between sm:justify-end gap-2">
-                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div>
-                      <div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
-                    {estado !== 'pagado' ? (
-                      <Btn size="sm" variant={isExp ? 'ghost' : 'success'} onClick={() => { setExpandido(isExp ? null : compra.id); setPagoForm({ monto: 0, fecha: hoy, nota: '' }); }}>
-                        {isExp ? '✕' : '+ Pago'}
-                      </Btn>
-                    ) : (
-                      <Btn size="sm" variant="ghost" onClick={() => setExpandido(isExp ? null : compra.id)}>
-                        {isExp ? '✕' : 'Ver'}
-                      </Btn>
-                    )}
+                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
+                    <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'}
+                      onClick={() => { setExpandido(isExp ? null : orden.id); setPagoForm({ monto: 0, fecha: hoy, nota: '' }); }}>
+                      {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
+                    </Btn>
                   </div>
                 </div>
 
@@ -2350,7 +2633,7 @@ function VistaCuentasPorPagar({
                     <div>
                       <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Piezas recibidas</p>
                       <div className="space-y-1">
-                        {compra.items.map(it => (
+                        {orden.partes.map(it => (
                           <div key={it.refaccionId} className="flex justify-between bg-white border border-slate-200 rounded px-3 py-1.5 text-sm">
                             <span className="text-slate-700">{it.nombre} × {it.cantidad}</span>
                             <span className="font-semibold text-slate-800">${fmt(it.subtotal)}</span>
@@ -2358,55 +2641,40 @@ function VistaCuentasPorPagar({
                         ))}
                       </div>
                     </div>
-
                     {/* Historial pagos */}
-                    {compra.pagos?.length > 0 && (
+                    {orden.pagos?.length > 0 && (
                       <div>
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
                         <div className="space-y-1">
-                          {compra.pagos.map(p => (
+                          {orden.pagos.map(p => (
                             <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                              <div className="flex gap-3">
-                                <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
-                                {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
-                              </div>
+                              <div className="flex gap-3"><span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>{p.nota && <span className="text-slate-500 italic">{p.nota}</span>}</div>
                               <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
-
                     {/* Registrar pago */}
                     {estado !== 'pagado' && (
                       <div>
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Registrar Pago al Proveedor</p>
                         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                          <div><Label>Fecha</Label>
-                            <Input type="date" value={pagoForm.fecha} onChange={e => setPagoForm(f => ({ ...f, fecha: e.target.value }))} /></div>
-                          <div><Label>Monto ($) — saldo: ${fmt(saldo)}</Label>
-                            <Input type="number" placeholder="0.00" min="0.01" step="0.01"
-                              value={pagoForm.monto || ''} onChange={e => setPagoForm(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
-                          <div><Label>Nota (opcional)</Label>
-                            <Input type="text" placeholder="Efectivo, transferencia..."
-                              value={pagoForm.nota} onChange={e => setPagoForm(f => ({ ...f, nota: e.target.value }))} /></div>
-                          <div className="flex items-end">
-                            <Btn variant="success" fullWidth disabled={pagoForm.monto <= 0}
-                              onClick={() => handleRegistrarPago(compra.id, saldo)}>✓ Registrar</Btn>
-                          </div>
+                          <div><Label>Fecha</Label><Input type="date" value={pagoForm.fecha} onChange={e => setPagoForm(f => ({ ...f, fecha: e.target.value }))} /></div>
+                          <div><Label>Monto ($) — saldo: ${fmt(saldo)}</Label><Input type="number" placeholder="0.00" min="0.01" step="0.01" value={pagoForm.monto || ''} onChange={e => setPagoForm(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
+                          <div><Label>Nota (opcional)</Label><Input type="text" placeholder="Efectivo, transferencia..." value={pagoForm.nota} onChange={e => setPagoForm(f => ({ ...f, nota: e.target.value }))} /></div>
+                          <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoForm.monto <= 0} onClick={() => handlePago(orden.id, saldo)}>✓ Registrar</Btn></div>
                         </div>
                       </div>
                     )}
-                    {estado === 'pagado' && (
-                      <p className="text-xs text-emerald-600 font-semibold text-center">✅ Esta compra está completamente pagada.</p>
-                    )}
+                    {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Esta orden está completamente pagada.</p>}
                   </div>
                 )}
               </div>
             );
           })}
         </div>
-      )}
+      </>}
     </div>
   );
 }
@@ -2424,9 +2692,9 @@ function VistaResumen({
   mesActual: string;
   setMesActual: (m: string) => void;
   resumen: {
-    facturado: number; totalVentaRefacciones: number; totalCostoRefacciones: number;
-    margenRefacciones: number; totalManoObra: number; ganancia: number; cantidad: number;
-    cobradoEnMes: number; porCobrarDelMes: number;
+    facturadoMes: number; totalVentaRef: number; totalCostoRef: number;
+    margenRef: number; totalManoObra: number; ganancia: number; cantidad: number;
+    cobradoEnMes: number; porCobrarDelMes: number; totalOrdenes: number; porPagarOrdenes: number;
   };
   trabajos: Trabajo[];
   clientes: Cliente[];
@@ -2449,12 +2717,12 @@ function VistaResumen({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-5 text-white shadow-md">
           <div className="text-indigo-200 text-xs font-bold uppercase tracking-widest mb-2">Facturado del Mes</div>
-          <div className="text-3xl font-extrabold tracking-tight">${fmt(resumen.facturado)}</div>
+          <div className="text-3xl font-extrabold tracking-tight">${fmt(resumen.facturadoMes)}</div>
           <div className="text-indigo-200 text-xs mt-2">{resumen.cantidad} trabajo{resumen.cantidad !== 1 ? 's' : ''} realizados</div>
         </div>
         <div className="bg-gradient-to-br from-rose-500 to-rose-600 rounded-2xl p-5 text-white shadow-md">
           <div className="text-rose-200 text-xs font-bold uppercase tracking-widest mb-2">Costo Refacciones</div>
-          <div className="text-3xl font-extrabold tracking-tight">${fmt(resumen.totalCostoRefacciones)}</div>
+          <div className="text-3xl font-extrabold tracking-tight">${fmt(resumen.totalCostoRef)}</div>
           <div className="text-rose-200 text-xs mt-2">Lo que pagaste al proveedor</div>
         </div>
         <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl p-5 text-white shadow-md">
@@ -2466,7 +2734,7 @@ function VistaResumen({
           <div className="text-emerald-200 text-xs font-bold uppercase tracking-widest mb-2">Ganancia Neta</div>
           <div className="text-3xl font-extrabold tracking-tight">${fmt(resumen.ganancia)}</div>
           <div className="text-emerald-200 text-xs mt-2">
-            {resumen.facturado > 0 ? `${((resumen.ganancia / resumen.facturado) * 100).toFixed(1)}% margen` : 'Sin movimientos'}
+            {resumen.facturadoMes > 0 ? `${((resumen.ganancia / resumen.facturadoMes) * 100).toFixed(1)}% margen` : 'Sin movimientos'}
           </div>
         </div>
       </div>
@@ -2492,22 +2760,22 @@ function VistaResumen({
       </div>
 
       {/* ── Desglose de utilidades en refacciones ── */}
-      {resumen.totalVentaRefacciones > 0 && (
+      {resumen.totalVentaRef > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 mb-8">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Desglose de Refacciones</p>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="text-center">
               <div className="text-slate-400 text-xs mb-1">Venta al cliente</div>
-              <div className="font-bold text-slate-900 text-lg">${fmt(resumen.totalVentaRefacciones)}</div>
+              <div className="font-bold text-slate-900 text-lg">${fmt(resumen.totalVentaRef)}</div>
             </div>
             <div className="text-center border-x border-slate-200">
               <div className="text-slate-400 text-xs mb-1">Costo proveedor</div>
-              <div className="font-bold text-rose-600 text-lg">${fmt(resumen.totalCostoRefacciones)}</div>
+              <div className="font-bold text-rose-600 text-lg">${fmt(resumen.totalCostoRef)}</div>
             </div>
             <div className="text-center">
               <div className="text-slate-400 text-xs mb-1">Margen en partes</div>
-              <div className={`font-bold text-lg ${resumen.margenRefacciones >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                ${fmt(resumen.margenRefacciones)}
+              <div className={`font-bold text-lg ${resumen.margenRef >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                ${fmt(resumen.margenRef)}
               </div>
             </div>
           </div>
