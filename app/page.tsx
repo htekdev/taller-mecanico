@@ -32,18 +32,20 @@ interface Refaccion {
 }
 
 interface TrabajoRefaccion {
-  refaccionId: string;    // referencia al id de la Refaccion
-  nombre: string;         // SNAPSHOT en el momento del trabajo
+  refaccionId: string;
+  nombre: string;         // SNAPSHOT
   codigo: string;         // SNAPSHOT
   cantidad: number;
-  precioUnitario: number; // SNAPSHOT — no cambia si el precio de la pieza cambia después
-  subtotal: number;       // cantidad × precioUnitario
+  precioCompra: number;   // SNAPSHOT costo proveedor — para calcular utilidad
+  precioVenta: number;    // precio cobrado al cliente (editable, defecto = precioCompra)
+  subtotal: number;       // cantidad × precioVenta — lo que cobras
+  costoTotal: number;     // cantidad × precioCompra — lo que pagaste
 }
 
 interface ManoDeObraItem {
   id: string;
-  concepto: string;  // "Arreglo de frenos"
-  precio: number;    // 350.00
+  concepto: string;
+  precio: number;
 }
 
 interface Trabajo {
@@ -53,10 +55,11 @@ interface Trabajo {
   fecha: string;
   descripcion: string;
   manoDeObra: number;              // DERIVADO: suma de manoDeObraItems
-  manoDeObraItems: ManoDeObraItem[]; // líneas de mano de obra (vacío en trabajos anteriores)
-  refacciones: number;             // suma de partes (o manual para trabajos anteriores)
-  total: number;
-  partes: TrabajoRefaccion[];      // vacío en trabajos anteriores
+  manoDeObraItems: ManoDeObraItem[];
+  refacciones: number;             // INGRESOS: suma de partes.subtotal (precioVenta × qty)
+  costoRefacciones: number;        // COSTOS: suma de partes.costoTotal (precioCompra × qty)
+  total: number;                   // manoDeObra + refacciones (lo que cobra el cliente)
+  partes: TrabajoRefaccion[];
   estado: 'pendiente' | 'completado' | 'pagado';
 }
 
@@ -205,17 +208,31 @@ export default function TallerMecanico() {
       localStorage.setItem('vehiculos', JSON.stringify(parsedVehiculos));
     }
 
-    // Migrar: Trabajo no tenía campos `partes` ni `manoDeObraItems`
+    // Migrar: añadir partes, manoDeObraItems, costoRefacciones si faltan
     const parsedTrabajos: Trabajo[] = (rawTrabajos ? JSON.parse(rawTrabajos) : [])
-      .map((t: Trabajo & { manoDeObra: number }) => ({
-        ...t,
-        partes: t.partes ?? [],
-        manoDeObraItems: t.manoDeObraItems ?? (
-          t.manoDeObra > 0
-            ? [{ id: `mig_${t.id}`, concepto: 'Mano de obra', precio: t.manoDeObra }]
-            : []
-        ),
-      }));
+      .map((t: Trabajo & { manoDeObra: number }) => {
+        // Migrar partes: añadir precioCompra/precioVenta/costoTotal si faltan
+        const partes: TrabajoRefaccion[] = (t.partes ?? []).map(
+          (p: TrabajoRefaccion & { precioUnitario?: number }) => ({
+            ...p,
+            precioCompra: p.precioCompra ?? p.precioUnitario ?? 0,
+            precioVenta:  p.precioVenta  ?? p.precioUnitario ?? 0,
+            costoTotal:   p.costoTotal   ?? p.subtotal       ?? 0,
+          })
+        );
+        return {
+          ...t,
+          partes,
+          manoDeObraItems: t.manoDeObraItems ?? (
+            t.manoDeObra > 0
+              ? [{ id: `mig_${t.id}`, concepto: 'Mano de obra', precio: t.manoDeObra }]
+              : []
+          ),
+          costoRefacciones: t.costoRefacciones
+            ?? partes.reduce((s, p) => s + p.costoTotal, 0)
+            ?? t.refacciones,
+        };
+      });
 
     setClientes(parsedClientes);
     setVehiculos(parsedVehiculos);
@@ -275,11 +292,16 @@ export default function TallerMecanico() {
 
   const calcularResumen = () => {
     const mes = trabajos.filter(t => t.fecha.startsWith(mesActual));
-    const totalCobrado     = mes.reduce((s, t) => s + t.total, 0);
-    const totalRefacciones = mes.reduce((s, t) => s + t.refacciones, 0);
-    const totalManoObra    = mes.reduce((s, t) => s + t.manoDeObra, 0);
-    const ganancia         = totalCobrado - totalRefacciones;
-    return { totalCobrado, totalRefacciones, totalManoObra, ganancia, cantidad: mes.length };
+    const totalCobrado          = mes.reduce((s, t) => s + t.total, 0);
+    const totalVentaRefacciones = mes.reduce((s, t) => s + t.refacciones, 0);
+    const totalCostoRefacciones = mes.reduce((s, t) => s + (t.costoRefacciones ?? t.refacciones), 0);
+    const totalManoObra         = mes.reduce((s, t) => s + t.manoDeObra, 0);
+    const margenRefacciones     = totalVentaRefacciones - totalCostoRefacciones;
+    const ganancia              = totalManoObra + margenRefacciones; // labor + parts markup
+    return {
+      totalCobrado, totalVentaRefacciones, totalCostoRefacciones,
+      margenRefacciones, totalManoObra, ganancia, cantidad: mes.length,
+    };
   };
 
   const stockBajo = inventario.filter(r => r.stock <= r.stockMinimo).length;
@@ -792,12 +814,15 @@ function VistaTrabajo({
   const [laborConcepto, setLaborConcepto] = useState('');
   const [laborPrecio, setLaborPrecio]     = useState(0);
   const [partesSeleccionadas, setPartesSeleccionadas] = useState<TrabajoRefaccion[]>([]);
-  const [pickerRefId, setPickerRefId]   = useState('');
-  const [pickerCantidad, setPickerCantidad] = useState(1);
+  const [pickerRefId, setPickerRefId]         = useState('');
+  const [pickerCantidad, setPickerCantidad]   = useState(1);
+  const [pickerPrecioVenta, setPickerPrecioVenta] = useState(0);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
-  const totalManoDeObra  = laborItems.reduce((s, l) => s + l.precio, 0);
-  const totalRefacciones = partesSeleccionadas.reduce((s, p) => s + p.subtotal, 0);
+  const totalManoDeObra       = laborItems.reduce((s, l) => s + l.precio, 0);
+  const totalVentaRefacciones = partesSeleccionadas.reduce((s, p) => s + p.subtotal, 0);
+  const totalCostoRefacciones = partesSeleccionadas.reduce((s, p) => s + p.costoTotal, 0);
+  const utilidadRefacciones   = totalVentaRefacciones - totalCostoRefacciones;
 
   const handleClienteChange = (clienteId: string) =>
     setForm(f => ({ ...f, clienteId, vehiculoId: '' }));
@@ -819,21 +844,38 @@ function VistaTrabajo({
   const agregarParte = () => {
     const ref = inventario.find(r => r.id === pickerRefId);
     if (!ref || pickerCantidad <= 0) return;
+    const pVenta = pickerPrecioVenta > 0 ? pickerPrecioVenta : ref.precioCompra;
     setPartesSeleccionadas(prev => {
       const existente = prev.find(p => p.refaccionId === ref.id);
       if (existente) {
+        // Merge: update quantity keeping existing sale price
         const nuevaCantidad = existente.cantidad + pickerCantidad;
-        return prev.map(p => p.refaccionId === ref.id
-          ? { ...p, cantidad: nuevaCantidad, subtotal: nuevaCantidad * p.precioUnitario } : p);
+        return prev.map(p => p.refaccionId === ref.id ? {
+          ...p,
+          cantidad: nuevaCantidad,
+          subtotal:   nuevaCantidad * p.precioVenta,
+          costoTotal: nuevaCantidad * p.precioCompra,
+        } : p);
       }
       return [...prev, {
         refaccionId: ref.id, nombre: ref.nombre, codigo: ref.codigo,
-        cantidad: pickerCantidad, precioUnitario: ref.precioCompra,
-        subtotal: pickerCantidad * ref.precioCompra,
+        cantidad: pickerCantidad,
+        precioCompra: ref.precioCompra,
+        precioVenta: pVenta,
+        subtotal:   pickerCantidad * pVenta,
+        costoTotal: pickerCantidad * ref.precioCompra,
       }];
     });
     setPickerRefId('');
     setPickerCantidad(1);
+    setPickerPrecioVenta(0);
+  };
+
+  // Auto-fill precio venta when part changes
+  const handlePickerRefChange = (id: string) => {
+    setPickerRefId(id);
+    const ref = inventario.find(r => r.id === id);
+    setPickerPrecioVenta(ref?.precioCompra ?? 0);
   };
 
   const removerParte = (refaccionId: string) =>
@@ -846,7 +888,8 @@ function VistaTrabajo({
       ...form,
       manoDeObra: totalManoDeObra,
       manoDeObraItems: laborItems,
-      refacciones: totalRefacciones,
+      refacciones: totalVentaRefacciones,
+      costoRefacciones: totalCostoRefacciones,
       partes: partesSeleccionadas,
     });
     setForm(emptyForm);
@@ -856,6 +899,7 @@ function VistaTrabajo({
     setPartesSeleccionadas([]);
     setPickerRefId('');
     setPickerCantidad(1);
+    setPickerPrecioVenta(0);
   };
 
   const getCliente  = (id: string) => clientes.find(c => c.id === id);
@@ -1003,69 +1047,83 @@ function VistaTrabajo({
               </div>
             ) : (
               <div className="p-4 space-y-4">
-                {/* Picker */}
-                <div className="flex gap-2 flex-wrap items-end">
-                  <div className="flex-1 min-w-48">
+                {/* Picker: refacción + cantidad + precio venta */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+                  <div className="sm:col-span-2 lg:col-span-2">
                     <Label>Refacción</Label>
-                    <Select value={pickerRefId} onChange={e => setPickerRefId(e.target.value)}>
+                    <Select value={pickerRefId} onChange={e => handlePickerRefChange(e.target.value)}>
                       <option value="">Seleccionar pieza...</option>
-                      {/* Parts bought for this specific vehicle — shown first */}
                       {form.vehiculoId && inventario.some(r => r.vehiculoId === form.vehiculoId) && (
                         <optgroup label="🎯 Compradas para esta unidad">
-                          {inventario
-                            .filter(r => r.vehiculoId === form.vehiculoId)
-                            .map(r => (
-                              <option key={r.id} value={r.id}>
-                                {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                              </option>
-                            ))}
-                        </optgroup>
-                      )}
-                      {/* General stock and parts for other vehicles */}
-                      <optgroup label="📦 Stock general">
-                        {inventario
-                          .filter(r => !r.vehiculoId)
-                          .map(r => (
+                          {inventario.filter(r => r.vehiculoId === form.vehiculoId).map(r => (
                             <option key={r.id} value={r.id}>
                               {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
                             </option>
                           ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="📦 Stock general">
+                        {inventario.filter(r => !r.vehiculoId).map(r => (
+                          <option key={r.id} value={r.id}>
+                            {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
+                          </option>
+                        ))}
                       </optgroup>
-                      {/* Parts for other vehicles — available but de-prioritized */}
                       {inventario.some(r => r.vehiculoId && r.vehiculoId !== form.vehiculoId) && (
                         <optgroup label="🔧 Piezas de otras unidades">
-                          {inventario
-                            .filter(r => r.vehiculoId && r.vehiculoId !== form.vehiculoId)
-                            .map(r => (
-                              <option key={r.id} value={r.id}>
-                                {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                              </option>
-                            ))}
+                          {inventario.filter(r => r.vehiculoId && r.vehiculoId !== form.vehiculoId).map(r => (
+                            <option key={r.id} value={r.id}>
+                              {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
+                            </option>
+                          ))}
                         </optgroup>
                       )}
                     </Select>
                   </div>
-                  <div className="w-28">
+                  <div>
                     <Label>Cantidad</Label>
                     <Input type="number" min="1" step="1" placeholder="1"
                       value={pickerCantidad || ''}
                       onChange={e => setPickerCantidad(Number(e.target.value))} />
                   </div>
-                  <div className="flex items-end">
-                    <Btn variant="primary" disabled={!pickerRefId || pickerCantidad <= 0} onClick={agregarParte}>
-                      + Agregar
-                    </Btn>
+                  <div>
+                    <Label>Precio venta ($)</Label>
+                    <Input type="number" min="0" step="0.01" placeholder="0.00"
+                      value={pickerPrecioVenta || ''}
+                      onChange={e => setPickerPrecioVenta(Number(e.target.value))} />
                   </div>
-                  {pickerRef && (
-                    <div className="text-xs text-slate-500 flex items-end pb-2.5">
-                      ${fmt(pickerRef.precioCompra)} / {pickerRef.unidad}
-                      {pickerCantidad > 0 && ` · subtotal $${fmt(pickerRef.precioCompra * pickerCantidad)}`}
+                </div>
+
+                {/* Cost hint + add button */}
+                {pickerRef && (
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="text-xs text-slate-500 space-y-0.5">
+                      <div>
+                        Costo proveedor: <span className="font-semibold">${fmt(pickerRef.precioCompra)}</span> / {pickerRef.unidad}
+                        {pickerCantidad > 1 && ` · costo total $${fmt(pickerRef.precioCompra * pickerCantidad)}`}
+                      </div>
+                      {(pickerPrecioVenta > 0 && pickerPrecioVenta !== pickerRef.precioCompra) && (
+                        <div className="text-emerald-600 font-medium">
+                          Margen: ${fmt((pickerPrecioVenta - pickerRef.precioCompra) * pickerCantidad)}
+                          {' '}({(((pickerPrecioVenta - pickerRef.precioCompra) / pickerRef.precioCompra) * 100).toFixed(0)}% markup)
+                        </div>
+                      )}
                       {pickerRef.stock < pickerCantidad && (
-                        <span className="ml-2 text-amber-600 font-semibold">⚠ solo {pickerRef.stock} en stock</span>
+                        <div className="text-amber-600 font-semibold">⚠ solo {pickerRef.stock} en stock</div>
                       )}
                     </div>
-                  )}
-                </div>
+                    <Btn variant="primary" disabled={!pickerRefId || pickerCantidad <= 0} onClick={agregarParte}>
+                      + Agregar pieza
+                    </Btn>
+                  </div>
+                )}
+                {!pickerRef && (
+                  <div className="flex justify-end">
+                    <Btn variant="primary" disabled={!pickerRefId || pickerCantidad <= 0} onClick={agregarParte}>
+                      + Agregar pieza
+                    </Btn>
+                  </div>
+                )}
 
                 {/* Lista de partes seleccionadas */}
                 {partesSeleccionadas.length > 0 && (
@@ -1075,31 +1133,38 @@ function VistaTrabajo({
                         <tr>
                           <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Refacción</th>
                           <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Cant.</th>
-                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">P. Unit.</th>
-                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Subtotal</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Costo</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Venta</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-emerald-600 uppercase tracking-wide">Margen</th>
                           <th className="px-3 py-2"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {partesSeleccionadas.map(p => (
-                          <tr key={p.refaccionId} className="bg-white">
-                            <td className="px-3 py-2 text-slate-800 font-medium">
-                              {p.nombre}
-                              {p.codigo && <span className="ml-1.5 text-xs font-mono text-slate-400">{p.codigo}</span>}
-                            </td>
-                            <td className="px-3 py-2 text-right text-slate-700">{p.cantidad}</td>
-                            <td className="px-3 py-2 text-right text-slate-600">${fmt(p.precioUnitario)}</td>
-                            <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(p.subtotal)}</td>
-                            <td className="px-3 py-2 text-center">
-                              <Btn size="sm" variant="danger" onClick={() => removerParte(p.refaccionId)}>✕</Btn>
-                            </td>
-                          </tr>
-                        ))}
+                        {partesSeleccionadas.map(p => {
+                          const margen = p.subtotal - p.costoTotal;
+                          return (
+                            <tr key={p.refaccionId} className="bg-white">
+                              <td className="px-3 py-2 text-slate-800 font-medium">
+                                {p.nombre}
+                                {p.codigo && <span className="ml-1.5 text-xs font-mono text-slate-400">{p.codigo}</span>}
+                              </td>
+                              <td className="px-3 py-2 text-right text-slate-700">{p.cantidad}</td>
+                              <td className="px-3 py-2 text-right text-slate-400 text-xs">${fmt(p.costoTotal)}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(p.subtotal)}</td>
+                              <td className="px-3 py-2 text-right font-medium text-emerald-600">${fmt(margen)}</td>
+                              <td className="px-3 py-2 text-center">
+                                <Btn size="sm" variant="danger" onClick={() => removerParte(p.refaccionId)}>✕</Btn>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                       <tfoot className="bg-slate-50 border-t-2 border-slate-200">
                         <tr>
-                          <td colSpan={3} className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total Refacciones:</td>
-                          <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(totalRefacciones)}</td>
+                          <td colSpan={2} className="px-3 py-2 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Totales:</td>
+                          <td className="px-3 py-2 text-right text-xs text-slate-400 font-semibold">${fmt(totalCostoRefacciones)}</td>
+                          <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(totalVentaRefacciones)}</td>
+                          <td className="px-3 py-2 text-right font-extrabold text-emerald-600">${fmt(utilidadRefacciones)}</td>
                           <td></td>
                         </tr>
                       </tfoot>
@@ -1117,15 +1182,24 @@ function VistaTrabajo({
           </div>
 
           {/* Resumen del trabajo */}
-          {(totalManoDeObra > 0 || totalRefacciones > 0) && (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-4 flex flex-wrap gap-6 text-sm">
-              <div>
-                <span className="text-indigo-500 font-semibold">Mano de obra</span>
-                {laborItems.length > 0 && <span className="text-indigo-400 ml-1">({laborItems.length} concepto{laborItems.length !== 1 ? 's' : ''})</span>}
-                {': '}<span className="font-bold text-slate-800">${fmt(totalManoDeObra)}</span>
+          {(totalManoDeObra > 0 || totalVentaRefacciones > 0) && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-4 space-y-2 text-sm">
+              <div className="flex flex-wrap gap-6">
+                <div>
+                  <span className="text-indigo-500 font-semibold">Mano de obra</span>
+                  {laborItems.length > 0 && <span className="text-indigo-400 ml-1">({laborItems.length} concepto{laborItems.length !== 1 ? 's' : ''})</span>}
+                  {': '}<span className="font-bold text-slate-800">${fmt(totalManoDeObra)}</span>
+                </div>
+                <div><span className="text-indigo-500 font-semibold">Venta refacciones:</span> <span className="font-bold text-slate-800">${fmt(totalVentaRefacciones)}</span></div>
+                <div><span className="text-indigo-700 font-bold">Total cobrado: </span><span className="font-extrabold text-indigo-800 text-base">${fmt(totalManoDeObra + totalVentaRefacciones)}</span></div>
               </div>
-              <div><span className="text-indigo-500 font-semibold">Refacciones:</span> <span className="font-bold text-slate-800">${fmt(totalRefacciones)}</span></div>
-              <div><span className="text-indigo-700 font-bold">Total trabajo: </span><span className="font-extrabold text-indigo-800 text-base">${fmt(totalManoDeObra + totalRefacciones)}</span></div>
+              {utilidadRefacciones !== 0 && (
+                <div className="text-xs text-slate-500 border-t border-indigo-100 pt-2 flex flex-wrap gap-4">
+                  <span>Costo refacciones: <strong className="text-slate-700">${fmt(totalCostoRefacciones)}</strong></span>
+                  <span>Margen en partes: <strong className={utilidadRefacciones >= 0 ? 'text-emerald-600' : 'text-rose-600'}>${fmt(utilidadRefacciones)}</strong></span>
+                  <span>Utilidad total: <strong className="text-emerald-700">${fmt(totalManoDeObra + utilidadRefacciones)}</strong></span>
+                </div>
+              )}
             </div>
           )}
 
@@ -1213,7 +1287,10 @@ function VistaResumen({
 }: {
   mesActual: string;
   setMesActual: (m: string) => void;
-  resumen: { totalCobrado: number; totalRefacciones: number; totalManoObra: number; ganancia: number; cantidad: number };
+  resumen: {
+    totalCobrado: number; totalVentaRefacciones: number; totalCostoRefacciones: number;
+    margenRefacciones: number; totalManoObra: number; ganancia: number; cantidad: number;
+  };
   trabajos: Trabajo[];
   clientes: Cliente[];
   vehiculos: Vehiculo[];
@@ -1231,17 +1308,17 @@ function VistaResumen({
         </div>
       </div>
 
-      {/* ── Tarjetas ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* ── 4 tarjetas principales ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-5 text-white shadow-md">
           <div className="text-indigo-200 text-xs font-bold uppercase tracking-widest mb-2">Total Cobrado</div>
           <div className="text-3xl font-extrabold tracking-tight">${fmt(resumen.totalCobrado)}</div>
           <div className="text-indigo-200 text-xs mt-2">{resumen.cantidad} trabajo{resumen.cantidad !== 1 ? 's' : ''} en el mes</div>
         </div>
         <div className="bg-gradient-to-br from-rose-500 to-rose-600 rounded-2xl p-5 text-white shadow-md">
-          <div className="text-rose-200 text-xs font-bold uppercase tracking-widest mb-2">Gastos Refacciones</div>
-          <div className="text-3xl font-extrabold tracking-tight">${fmt(resumen.totalRefacciones)}</div>
-          <div className="text-rose-200 text-xs mt-2">Costo de materiales</div>
+          <div className="text-rose-200 text-xs font-bold uppercase tracking-widest mb-2">Costo Refacciones</div>
+          <div className="text-3xl font-extrabold tracking-tight">${fmt(resumen.totalCostoRefacciones)}</div>
+          <div className="text-rose-200 text-xs mt-2">Lo que pagaste al proveedor</div>
         </div>
         <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl p-5 text-white shadow-md">
           <div className="text-slate-300 text-xs font-bold uppercase tracking-widest mb-2">Mano de Obra</div>
@@ -1257,6 +1334,29 @@ function VistaResumen({
         </div>
       </div>
 
+      {/* ── Desglose de utilidades en refacciones ── */}
+      {resumen.totalVentaRefacciones > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 mb-8">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Desglose de Refacciones</p>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="text-center">
+              <div className="text-slate-400 text-xs mb-1">Venta al cliente</div>
+              <div className="font-bold text-slate-900 text-lg">${fmt(resumen.totalVentaRefacciones)}</div>
+            </div>
+            <div className="text-center border-x border-slate-200">
+              <div className="text-slate-400 text-xs mb-1">Costo proveedor</div>
+              <div className="font-bold text-rose-600 text-lg">${fmt(resumen.totalCostoRefacciones)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-slate-400 text-xs mb-1">Margen en partes</div>
+              <div className={`font-bold text-lg ${resumen.margenRefacciones >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                ${fmt(resumen.margenRefacciones)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Tabla detalle ── */}
       <div>
         <h3 className="text-base font-bold text-slate-700 mb-3">
@@ -1267,16 +1367,17 @@ function VistaResumen({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-800 text-white">
-                {['Fecha','Cliente','Unidad','Trabajo','Cobrado','Refacciones','Ganancia'].map((h, i) => (
+                {['Fecha','Cliente','Unidad','Trabajo','Cobrado','Costo Partes','Ganancia'].map((h, i) => (
                   <th key={h} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 4 ? 'text-right' : 'text-left'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {trabajos.map((trabajo, i) => {
-                const cliente = getCliente(trabajo.clienteId);
+                const cliente  = getCliente(trabajo.clienteId);
                 const vehiculo = getVehiculo(trabajo.vehiculoId);
-                const ganancia = trabajo.total - trabajo.refacciones;
+                const costoPartes = trabajo.costoRefacciones ?? trabajo.refacciones;
+                const ganancia = trabajo.manoDeObra + (trabajo.refacciones - costoPartes);
                 return (
                   <tr key={trabajo.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-700 font-medium">{new Date(trabajo.fecha).toLocaleDateString('es-MX')}</td>
@@ -1284,7 +1385,7 @@ function VistaResumen({
                     <td className="px-4 py-3 text-slate-700">{vehiculo ? [vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ') : '—'}</td>
                     <td className="px-4 py-3 text-slate-700">{trabajo.descripcion}</td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-900">${fmt(trabajo.total)}</td>
-                    <td className="px-4 py-3 text-right text-rose-600 font-medium">${fmt(trabajo.refacciones)}</td>
+                    <td className="px-4 py-3 text-right text-rose-600 font-medium">${fmt(costoPartes)}</td>
                     <td className="px-4 py-3 text-right font-bold text-emerald-600">${fmt(ganancia)}</td>
                   </tr>
                 );
