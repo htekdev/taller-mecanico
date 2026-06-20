@@ -139,6 +139,20 @@ export default function TallerMecanico() {
     const nuevos = [...trabajos, nuevo];
     setTrabajos(nuevos); localStorage.setItem('trabajos', JSON.stringify(nuevos));
   };
+  const finalizarTrabajo = (trabajoId: string, tipo: 'factura' | 'nota') => {
+    const trabajo = trabajos.find(t => t.id === trabajoId);
+    if (!trabajo) return;
+    const requiereFactura = tipo === 'factura';
+    const subtotal = trabajo.manoDeObra + trabajo.refacciones;
+    const iva      = requiereFactura ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+    const total    = subtotal + iva;
+    const nuevos = trabajos.map(t =>
+      t.id === trabajoId
+        ? { ...t, estado: 'completado' as const, tipoDocumento: tipo, requiereFactura, iva, total, fechaFinalizacion: new Date().toISOString() }
+        : t
+    );
+    setTrabajos(nuevos); localStorage.setItem('trabajos', JSON.stringify(nuevos));
+  };
   const registrarPago = (trabajoId: string, pago: Omit<Pago, 'id'>) => {
     const nuevoPago: Pago = { ...pago, id: Date.now().toString() };
     const nuevos = trabajos.map(t => t.id === trabajoId ? { ...t, pagos: [...(t.pagos ?? []), nuevoPago] } : t);
@@ -259,11 +273,12 @@ export default function TallerMecanico() {
   const facturasPendientes     = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').length;
   const ordenesPendientesPago  = ordenes.filter(o => o.estado === 'recibida' && getEstadoPagoOrden(o) !== 'pagado').length;
   const ordenesPendientesRecibir = ordenes.filter(o => o.estado === 'pendiente').length;
+  const trabajosPendientes     = trabajos.filter(t => t.estado === 'pendiente').length;
 
   const tabs = [
     { key: 'clientes',    icon: '👥', label: 'Clientes',         count: clientes.length },
     { key: 'inventario',  icon: '📦', label: 'Inventario',        count: stockBajo > 0 ? `⚠ ${stockBajo}` : inventario.length > 0 ? inventario.length : null },
-    { key: 'trabajos',    icon: '🔧', label: 'Trabajos',          count: trabajos.length },
+    { key: 'trabajos',    icon: '🔧', label: 'Trabajos',          count: trabajosPendientes > 0 ? `🕐 ${trabajosPendientes}` : trabajos.length > 0 ? trabajos.length : null },
     { key: 'proveedores', icon: '🏪', label: 'Proveedores',       count: proveedores.length > 0 ? proveedores.length : null },
     { key: 'ordenes',     icon: '📋', label: 'Órdenes de Compra', count: ordenesPendientesRecibir > 0 ? ordenesPendientesRecibir : ordenes.length > 0 ? ordenes.length : null },
     { key: 'facturas',    icon: '🧾', label: 'Facturas',          count: facturas.length > 0 ? facturas.length : null },
@@ -297,6 +312,7 @@ export default function TallerMecanico() {
                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
                   vista === key ? 'bg-indigo-400 text-white'
                     : (typeof count === 'string' && count.startsWith('⚠')) ? 'bg-rose-100 text-rose-600'
+                    : (typeof count === 'string' && count.startsWith('🕐')) ? 'bg-amber-100 text-amber-700'
                     : (key === 'cuentas' && facturasPendientes > 0) || (key === 'pagos' && ordenesPendientesPago > 0) || (key === 'ordenes' && ordenesPendientesRecibir > 0) ? 'bg-rose-100 text-rose-600'
                     : 'bg-slate-200 text-slate-600'
                 }`}>{count}</span>
@@ -318,6 +334,7 @@ export default function TallerMecanico() {
           {vista === 'trabajos' && (
             <VistaTrabajo clientes={clientes} vehiculos={vehiculos} inventario={inventario}
               trabajos={trabajos} facturas={facturas} onGuardar={guardarTrabajo}
+              onFinalizar={finalizarTrabajo}
               onIrAInventario={() => setVista('inventario')}
               onGenerarFactura={generarFactura}
               onIrAFacturas={() => setVista('facturas')} />
