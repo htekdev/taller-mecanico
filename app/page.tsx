@@ -19,6 +19,11 @@ interface Vehiculo {
   placa: string;
 }
 
+interface CompatibilidadVehiculo {
+  marca: string;     // "Ford", "Isuzu", "Volkswagen"
+  modelos: string[]; // ["F-150", "F-250"] — empty means any model of that marca
+}
+
 interface Refaccion {
   id: string;
   nombre: string;
@@ -29,7 +34,8 @@ interface Refaccion {
   stock: number;
   stockMinimo: number;
   vehiculoId?: string;
-  proveedorId?: string;  // proveedor habitual de esta pieza
+  proveedorId?: string;
+  compatibilidad?: CompatibilidadVehiculo[];  // vacío/undefined = universal (aplica a todos)
 }
 
 interface TrabajoRefaccion {
@@ -758,18 +764,44 @@ function VistaInventario({
     nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza',
     precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '', proveedorId: '',
   });
-  const [formClienteId, setFormClienteId] = useState('');  // UI only — cascades to vehiculoId
+  const [formClienteId, setFormClienteId] = useState('');
+  const [compatibilidad, setCompatibilidad] = useState<CompatibilidadVehiculo[]>([]);
+  const [modeloInputs, setModeloInputs] = useState<Record<number, string>>({});
   const [expandido, setExpandido] = useState<string | null>(null);
   const [recibirCantidad, setRecibirCantidad] = useState<Record<string, number>>({});
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === formClienteId);
 
+  const addCompatMarca = () =>
+    setCompatibilidad(prev => [...prev, { marca: '', modelos: [] }]);
+  const removeCompatMarca = (i: number) => {
+    setCompatibilidad(prev => prev.filter((_, idx) => idx !== i));
+    setModeloInputs(prev => { const n = { ...prev }; delete n[i]; return n; });
+  };
+  const updateCompatMarca = (i: number, marca: string) =>
+    setCompatibilidad(prev => prev.map((g, idx) => idx === i ? { ...g, marca } : g));
+  const addCompatModelo = (i: number) => {
+    const m = (modeloInputs[i] ?? '').trim();
+    if (!m) return;
+    setCompatibilidad(prev => prev.map((g, idx) =>
+      idx === i ? { ...g, modelos: g.modelos.includes(m) ? g.modelos : [...g.modelos, m] } : g
+    ));
+    setModeloInputs(prev => ({ ...prev, [i]: '' }));
+  };
+  const removeCompatModelo = (i: number, modelo: string) =>
+    setCompatibilidad(prev => prev.map((g, idx) =>
+      idx === i ? { ...g, modelos: g.modelos.filter(m => m !== modelo) } : g
+    ));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nombre || form.precioCompra <= 0) return;
-    onGuardarRefaccion(form);
+    const compatFinal = compatibilidad.filter(c => c.marca.trim() && c.modelos.length > 0);
+    onGuardarRefaccion({ ...form, compatibilidad: compatFinal.length > 0 ? compatFinal : undefined });
     setForm({ nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza', precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '', proveedorId: '' });
     setFormClienteId('');
+    setCompatibilidad([]);
+    setModeloInputs({});
   };
 
   const handleClienteChange = (clienteId: string) => {
@@ -909,6 +941,59 @@ function VistaInventario({
             </div>
           )}
 
+          {/* ── Compatibilidad de vehículos ── */}
+          <div className="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">🚗 Compatibilidad de Vehículos</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {compatibilidad.length === 0
+                    ? 'Sin restricciones — aparecerá para cualquier vehículo (universal)'
+                    : `${compatibilidad.filter(c => c.marca && c.modelos.length > 0).length} grupo(s) de compatibilidad`}
+                </p>
+              </div>
+              <Btn size="sm" variant="ghost" onClick={addCompatMarca} type="button">+ Agregar marca</Btn>
+            </div>
+
+            {compatibilidad.map((grupo, gi) => (
+              <div key={gi} className="bg-slate-50 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Input type="text" placeholder="Marca (ej. Ford, Isuzu, VW...)"
+                      value={grupo.marca}
+                      onChange={e => updateCompatMarca(gi, e.target.value)} />
+                  </div>
+                  <Btn size="sm" variant="danger" type="button" onClick={() => removeCompatMarca(gi)}>✕</Btn>
+                </div>
+                {grupo.marca && (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {grupo.modelos.map(m => (
+                        <span key={m} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                          {m}
+                          <button type="button" onClick={() => removeCompatModelo(gi, m)} className="hover:text-rose-600">×</button>
+                        </span>
+                      ))}
+                      {grupo.modelos.length === 0 && (
+                        <span className="text-xs text-amber-600">Agrega al menos un modelo</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input type="text" placeholder="Modelo (ej. F-150, 300...)"
+                        value={modeloInputs[gi] ?? ''}
+                        onChange={e => setModeloInputs(prev => ({ ...prev, [gi]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCompatModelo(gi); } }}
+                        className="flex-1" />
+                      <Btn size="sm" variant="primary" type="button"
+                        disabled={!(modeloInputs[gi] ?? '').trim()}
+                        onClick={() => addCompatModelo(gi)}>+ Modelo</Btn>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
           <Btn type="submit" variant="primary" disabled={!form.nombre || form.precioCompra <= 0}>
             + Agregar al Inventario
           </Btn>
@@ -960,6 +1045,15 @@ function VistaInventario({
                               <span className="text-xs bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded-full">
                                 🏪 {proveedorNombre(r.proveedorId)}
                               </span>
+                            </div>
+                          )}
+                          {r.compatibilidad && r.compatibilidad.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {r.compatibilidad.map((c, ci) => (
+                                <span key={ci} className="text-xs bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded-full border border-emerald-200">
+                                  🚗 {c.marca}: {c.modelos.join(', ')}
+                                </span>
+                              ))}
                             </div>
                           )}
                         </td>
@@ -1147,6 +1241,29 @@ function VistaTrabajo({
     return getPricingIntel(pickerRefId, form.clienteId, ref.precioCompra, trabajos);
   }, [pickerRefId, form.clienteId, inventario, trabajos]);
 
+  // ── Compatibility filtering ──
+  const vehiculoDelTrabajo = vehiculos.find(v => v.id === form.vehiculoId);
+
+  const isCompatible = (r: Refaccion): boolean => {
+    if (!vehiculoDelTrabajo) return true;
+    if (!r.compatibilidad || r.compatibilidad.length === 0) return true; // universal
+    const marca  = vehiculoDelTrabajo.marca.toLowerCase().trim();
+    const modelo = vehiculoDelTrabajo.modelo.toLowerCase().trim();
+    return r.compatibilidad.some(c =>
+      c.marca.toLowerCase().trim() === marca &&
+      c.modelos.some(m => m.toLowerCase().trim() === modelo)
+    );
+  };
+
+  // Parts grouped for the picker optgroups
+  const partesParaEstaUnidad  = inventario.filter(r => r.vehiculoId === form.vehiculoId && isCompatible(r));
+  const partesCompatibles      = inventario.filter(r => r.vehiculoId !== form.vehiculoId && r.compatibilidad?.length && isCompatible(r));
+  const partesUniversales      = inventario.filter(r => r.vehiculoId !== form.vehiculoId && (!r.compatibilidad || r.compatibilidad.length === 0));
+  // When vehicle is selected: only compatible+universal+linked-to-this-unit; otherwise all
+  const totalCompatibles = form.vehiculoId
+    ? partesParaEstaUnidad.length + partesCompatibles.length + partesUniversales.length
+    : inventario.length;
+
   return (
     <div>
       <SectionTitle title="Registro de Trabajos" subtitle="Selecciona cliente, unidad y las refacciones usadas del inventario." />
@@ -1288,37 +1405,62 @@ function VistaTrabajo({
               </div>
             ) : (
               <div className="p-4 space-y-4">
+                {/* Compatibility filter indicator */}
+                {form.vehiculoId && vehiculoDelTrabajo && (
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
+                    totalCompatibles > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}>
+                    <span>🚗</span>
+                    <span>
+                      {totalCompatibles > 0
+                        ? `Mostrando ${totalCompatibles} refacción${totalCompatibles !== 1 ? 'es' : ''} compatibles con ${vehiculoDelTrabajo.marca} ${vehiculoDelTrabajo.modelo}`
+                        : `Sin refacciones marcadas como compatibles con ${vehiculoDelTrabajo.marca} ${vehiculoDelTrabajo.modelo} — se muestran las universales`}
+                    </span>
+                  </div>
+                )}
+
                 {/* Picker: refacción + cantidad + precio venta */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
                   <div className="sm:col-span-2 lg:col-span-2">
                     <Label>Refacción</Label>
                     <Select value={pickerRefId} onChange={e => handlePickerRefChange(e.target.value)}>
                       <option value="">Seleccionar pieza...</option>
-                      {form.vehiculoId && inventario.some(r => r.vehiculoId === form.vehiculoId) && (
+                      {/* 1. Parts bought specifically for this vehicle unit */}
+                      {partesParaEstaUnidad.length > 0 && (
                         <optgroup label="🎯 Compradas para esta unidad">
-                          {inventario.filter(r => r.vehiculoId === form.vehiculoId).map(r => (
+                          {partesParaEstaUnidad.map(r => (
                             <option key={r.id} value={r.id}>
                               {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
                             </option>
                           ))}
                         </optgroup>
                       )}
-                      <optgroup label="📦 Stock general">
-                        {inventario.filter(r => !r.vehiculoId).map(r => (
-                          <option key={r.id} value={r.id}>
-                            {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                          </option>
-                        ))}
-                      </optgroup>
-                      {inventario.some(r => r.vehiculoId && r.vehiculoId !== form.vehiculoId) && (
-                        <optgroup label="🔧 Piezas de otras unidades">
-                          {inventario.filter(r => r.vehiculoId && r.vehiculoId !== form.vehiculoId).map(r => (
+                      {/* 2. Parts with matching make/model compatibility */}
+                      {partesCompatibles.length > 0 && vehiculoDelTrabajo && (
+                        <optgroup label={`✅ Compatible con ${vehiculoDelTrabajo.marca} ${vehiculoDelTrabajo.modelo}`}>
+                          {partesCompatibles.map(r => (
                             <option key={r.id} value={r.id}>
                               {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
                             </option>
                           ))}
                         </optgroup>
                       )}
+                      {/* 3. Universal parts (no compatibility restrictions) */}
+                      {partesUniversales.length > 0 && (
+                        <optgroup label="🌐 Universales (todos los vehículos)">
+                          {partesUniversales.map(r => (
+                            <option key={r.id} value={r.id}>
+                              {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {/* When no vehicle selected: show all with old grouping */}
+                      {!form.vehiculoId && inventario.map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
+                        </option>
+                      ))}
                     </Select>
                   </div>
                   <div>
