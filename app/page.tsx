@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -421,6 +421,57 @@ export default function TallerMecanico() {
       </div>
     </div>
   );
+}
+
+// ─── Pricing Intelligence ─────────────────────────────────────────────────────
+
+interface PricingIntel {
+  cost: number;
+  markups: { pct: number; price: number }[];        // 30/40/50% suggestions
+  clientLastSale: { precio: number; fecha: string } | null;  // last price to THIS client
+  clientAllSales: { precio: number; fecha: string }[];
+  otherMin: number | null;   // min price charged to other clients
+  otherMax: number | null;   // max price charged to other clients
+}
+
+function getPricingIntel(
+  refaccionId: string,
+  clienteId: string,
+  precioCompra: number,
+  trabajos: Trabajo[]
+): PricingIntel {
+  const markups = [30, 40, 50].map(pct => ({
+    pct,
+    price: Math.round(precioCompra * (1 + pct / 100) * 100) / 100,
+  }));
+
+  // All sales of this part to THIS client (most recent first)
+  const clientSales = trabajos
+    .filter(t => t.clienteId === clienteId)
+    .flatMap(t =>
+      t.partes
+        .filter(p => p.refaccionId === refaccionId && p.precioVenta > 0)
+        .map(p => ({ precio: p.precioVenta, fecha: t.fecha }))
+    )
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  // Prices charged to OTHER clients
+  const otherPrices = trabajos
+    .filter(t => t.clienteId !== clienteId)
+    .flatMap(t =>
+      t.partes
+        .filter(p => p.refaccionId === refaccionId && p.precioVenta > 0)
+        .map(p => p.precioVenta)
+    );
+
+  return {
+    cost: precioCompra,
+    markups,
+    clientLastSale: clientSales[0] ?? null,
+    clientAllSales: clientSales,
+    otherMin: otherPrices.length ? Math.min(...otherPrices) : null,
+    otherMax: otherPrices.length ? Math.max(...otherPrices) : null,
+  };
 }
 
 // ─── VistaClientes ────────────────────────────────────────────────────────────
@@ -918,11 +969,20 @@ function VistaTrabajo({
     setPickerPrecioVenta(0);
   };
 
-  // Auto-fill precio venta when part changes
+  // Auto-fill precio venta when part changes — prefer client's last price
   const handlePickerRefChange = (id: string) => {
     setPickerRefId(id);
     const ref = inventario.find(r => r.id === id);
-    setPickerPrecioVenta(ref?.precioCompra ?? 0);
+    if (!ref) { setPickerPrecioVenta(0); return; }
+    // Look up client history immediately for the default price
+    if (form.clienteId) {
+      const clientSales = trabajos
+        .filter(t => t.clienteId === form.clienteId)
+        .flatMap(t => t.partes.filter(p => p.refaccionId === id && p.precioVenta > 0).map(p => ({ precio: p.precioVenta, fecha: t.fecha })))
+        .sort((a, b) => b.fecha.localeCompare(a.fecha));
+      if (clientSales[0]) { setPickerPrecioVenta(clientSales[0].precio); return; }
+    }
+    setPickerPrecioVenta(ref.precioCompra);
   };
 
   const removerParte = (refaccionId: string) =>
@@ -953,6 +1013,13 @@ function VistaTrabajo({
   const getCliente  = (id: string) => clientes.find(c => c.id === id);
   const getVehiculo = (id: string) => vehiculos.find(v => v.id === id);
   const pickerRef   = inventario.find(r => r.id === pickerRefId);
+
+  const intel: PricingIntel | null = useMemo(() => {
+    if (!pickerRefId || !form.clienteId) return null;
+    const ref = inventario.find(r => r.id === pickerRefId);
+    if (!ref) return null;
+    return getPricingIntel(pickerRefId, form.clienteId, ref.precioCompra, trabajos);
+  }, [pickerRefId, form.clienteId, inventario, trabajos]);
 
   return (
     <div>
@@ -1135,43 +1202,126 @@ function VistaTrabajo({
                       onChange={e => setPickerCantidad(Number(e.target.value))} />
                   </div>
                   <div>
-                    <Label>Precio venta ($)</Label>
+                    <Label>
+                      Precio venta ($)
+                      {intel?.clientLastSale && pickerPrecioVenta > 0 && pickerPrecioVenta < intel.clientLastSale.precio && (
+                        <span className="ml-2 text-amber-600 font-bold text-xs">⚠ menor que antes</span>
+                      )}
+                    </Label>
                     <Input type="number" min="0" step="0.01" placeholder="0.00"
                       value={pickerPrecioVenta || ''}
-                      onChange={e => setPickerPrecioVenta(Number(e.target.value))} />
+                      onChange={e => setPickerPrecioVenta(Number(e.target.value))}
+                      className={
+                        intel?.clientLastSale && pickerPrecioVenta > 0 && pickerPrecioVenta < intel.clientLastSale.precio
+                          ? '!border-amber-400 !ring-amber-400'
+                          : ''
+                      }
+                    />
                   </div>
                 </div>
 
-                {/* Cost hint + add button */}
-                {pickerRef && (
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div className="text-xs text-slate-500 space-y-0.5">
-                      <div>
-                        Costo proveedor: <span className="font-semibold">${fmt(pickerRef.precioCompra)}</span> / {pickerRef.unidad}
-                        {pickerCantidad > 1 && ` · costo total $${fmt(pickerRef.precioCompra * pickerCantidad)}`}
-                      </div>
-                      {(pickerPrecioVenta > 0 && pickerPrecioVenta !== pickerRef.precioCompra) && (
-                        <div className="text-emerald-600 font-medium">
-                          Margen: ${fmt((pickerPrecioVenta - pickerRef.precioCompra) * pickerCantidad)}
-                          {' '}({(((pickerPrecioVenta - pickerRef.precioCompra) / pickerRef.precioCompra) * 100).toFixed(0)}% markup)
-                        </div>
-                      )}
+                {/* ── Pricing intelligence panel ── */}
+                {pickerRef && intel && (
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 text-sm">
+
+                    {/* Row 1: Cost + Markup buttons */}
+                    <div className="flex items-center flex-wrap gap-2">
+                      <span className="text-slate-500 text-xs">
+                        Costo: <strong className="text-slate-700">${fmt(pickerRef.precioCompra)}</strong>/{pickerRef.unidad}
+                      </span>
+                      <span className="text-slate-300">·</span>
+                      <span className="text-xs text-slate-400 font-medium">Sugerencias:</span>
+                      {intel.markups.map(m => (
+                        <button key={m.pct} type="button"
+                          onClick={() => setPickerPrecioVenta(m.price)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                            pickerPrecioVenta === m.price
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50'
+                          }`}>
+                          +{m.pct}% ${fmt(m.price)}
+                        </button>
+                      ))}
                       {pickerRef.stock < pickerCantidad && (
-                        <div className="text-amber-600 font-semibold">⚠ solo {pickerRef.stock} en stock</div>
+                        <span className="text-xs font-semibold text-amber-600 ml-auto">
+                          ⚠ solo {pickerRef.stock} en stock
+                        </span>
                       )}
                     </div>
+
+                    {/* Row 2: Client history — most prominent */}
+                    {intel.clientLastSale && (() => {
+                      const isLower = pickerPrecioVenta > 0 && pickerPrecioVenta < intel.clientLastSale!.precio;
+                      const isSame  = pickerPrecioVenta === intel.clientLastSale!.precio;
+                      return (
+                        <div className={`flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 border ${
+                          isLower ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50 border-indigo-200'
+                        }`}>
+                          <div className="text-xs">
+                            <span className={`font-bold ${isLower ? 'text-amber-700' : 'text-indigo-700'}`}>
+                              {isLower ? '⚠️' : '📋'}
+                              {' '}
+                              {isLower
+                                ? `Estás cobrando menos que antes ($${fmt(pickerPrecioVenta)} vs $${fmt(intel.clientLastSale!.precio)})`
+                                : isSame
+                                  ? `Mismo precio que la última vez ($${fmt(intel.clientLastSale!.precio)})`
+                                  : `Última venta a este cliente: $${fmt(intel.clientLastSale!.precio)}`
+                              }
+                            </span>
+                            <span className="text-slate-400 ml-1">
+                              — {new Date(intel.clientLastSale!.fecha).toLocaleDateString('es-MX')}
+                              {intel.clientAllSales.length > 1 && ` · ${intel.clientAllSales.length} veces vendida`}
+                            </span>
+                          </div>
+                          {!isSame && (
+                            <button type="button"
+                              onClick={() => setPickerPrecioVenta(intel.clientLastSale!.precio)}
+                              className={`text-xs font-bold whitespace-nowrap px-2.5 py-1 rounded-lg border transition-all ${
+                                isLower
+                                  ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
+                                  : 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                              }`}>
+                              Usar ${fmt(intel.clientLastSale!.precio)}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Row 3: Cross-client range */}
+                    {intel.otherMin !== null && (
+                      <div className="text-xs text-slate-400 flex items-center gap-1">
+                        <span>💬</span>
+                        <span>
+                          Otros clientes pagaron:{' '}
+                          <strong className="text-slate-600">
+                            {intel.otherMin === intel.otherMax
+                              ? `$${fmt(intel.otherMin!)}`
+                              : `$${fmt(intel.otherMin!)} – $${fmt(intel.otherMax!)}`}
+                          </strong>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Agregar button (always visible) */}
+                <div className="flex justify-between items-center gap-3 flex-wrap">
+                  {pickerPrecioVenta > 0 && pickerRef && (
+                    <span className="text-xs text-slate-500">
+                      Margen: <strong className={pickerPrecioVenta > pickerRef.precioCompra ? 'text-emerald-600' : 'text-slate-600'}>
+                        ${fmt((pickerPrecioVenta - pickerRef.precioCompra) * pickerCantidad)}
+                        {' '}({(((pickerPrecioVenta - pickerRef.precioCompra) / pickerRef.precioCompra) * 100).toFixed(0)}%)
+                      </strong>
+                      {pickerCantidad > 1 && ` · subtotal cobrado $${fmt(pickerPrecioVenta * pickerCantidad)}`}
+                    </span>
+                  )}
+                  <div className={!pickerRef ? 'ml-auto' : ''}>
                     <Btn variant="primary" disabled={!pickerRefId || pickerCantidad <= 0} onClick={agregarParte}>
                       + Agregar pieza
                     </Btn>
                   </div>
-                )}
-                {!pickerRef && (
-                  <div className="flex justify-end">
-                    <Btn variant="primary" disabled={!pickerRefId || pickerCantidad <= 0} onClick={agregarParte}>
-                      + Agregar pieza
-                    </Btn>
-                  </div>
-                )}
+                </div>
 
                 {/* Lista de partes seleccionadas */}
                 {partesSeleccionadas.length > 0 && (
