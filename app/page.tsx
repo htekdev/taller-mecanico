@@ -141,13 +141,16 @@ interface Trabajo {
   descripcion: string;
   manoDeObra: number;
   manoDeObraItems: ManoDeObraItem[];
-  refacciones: number;
+  refacciones: number;             // subtotal of parts (before IVA)
   costoRefacciones: number;
-  total: number;
+  requiereFactura: boolean;        // Mexican fiscal invoice required?
+  folioFiscal?: string;            // Tax invoice folio/number
+  iva: number;                     // 16% IVA (0 if requiereFactura=false)
+  total: number;                   // subtotal + iva = final amount charged
   partes: TrabajoRefaccion[];
-  pagos: Pago[];                   // legacy: direct payments (pre-invoice system)
-  facturaId?: string;              // set when a Factura has been generated
-  estadoFacturacion?: 'sin_facturar' | 'facturado';  // invoice status
+  pagos: Pago[];
+  facturaId?: string;
+  estadoFacturacion?: 'sin_facturar' | 'facturado';
   estado: 'pendiente' | 'completado' | 'pagado';
 }
 
@@ -370,6 +373,9 @@ export default function TallerMecanico() {
           costoRefacciones: t.costoRefacciones ?? partes.reduce((s, p) => s + p.costoTotal, 0) ?? t.refacciones,
           pagos: t.pagos ?? [],
           estadoFacturacion: t.estadoFacturacion ?? 'sin_facturar',
+          // IVA migration: legacy jobs have no IVA
+          requiereFactura: t.requiereFactura ?? false,
+          iva: t.iva ?? 0,
         };
       });
 
@@ -418,9 +424,11 @@ export default function TallerMecanico() {
     const nuevos = inventario.map(r => r.id === refaccionId ? { ...r, stock: r.stock + cantidad } : r);
     setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
   };
-  const guardarTrabajo = (data: Omit<Trabajo, 'id' | 'total'>) => {
-    const total = data.manoDeObra + data.refacciones;
-    const nuevo: Trabajo = { ...data, id: Date.now().toString(), total, estadoFacturacion: 'sin_facturar' };
+  const guardarTrabajo = (data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => {
+    const subtotal = data.manoDeObra + data.refacciones;
+    const iva      = data.requiereFactura ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+    const total    = subtotal + iva;
+    const nuevo: Trabajo = { ...data, id: Date.now().toString(), iva, total, estadoFacturacion: 'sin_facturar' };
     if (data.partes.length > 0) {
       const nuevoInv = inventario.map(r => {
         const usada = data.partes.find(p => p.refaccionId === r.id);
@@ -541,9 +549,16 @@ export default function TallerMecanico() {
     const ordenesMes    = ordenes.filter(o => o.fecha.startsWith(mesActual) && o.estado !== 'cancelada');
     const totalOrdenes  = ordenesMes.reduce((s, o) => s + o.total, 0);
     const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + getSaldoOrden(o), 0);
+    // IVA breakdown
+    const mesConIVA    = mes.filter(t => t.requiereFactura);
+    const mesSinIVA    = mes.filter(t => !t.requiereFactura);
+    const totalIVA     = mesConIVA.reduce((s, t) => s + (t.iva ?? 0), 0);
+    const ingresoConIVA = mesConIVA.reduce((s, t) => s + t.total, 0);
+    const ingresoSinIVA = mesSinIVA.reduce((s, t) => s + t.total, 0);
     return {
       facturadoMes, totalVentaRef, totalCostoRef, margenRef, totalManoObra, ganancia,
       cantidad: mes.length, cobradoEnMes, porCobrarDelMes, totalOrdenes, porPagarOrdenes,
+      totalIVA, ingresoConIVA, ingresoSinIVA,
     };
   };
 
@@ -1242,7 +1257,7 @@ function VistaTrabajo({
   inventario: Refaccion[];
   trabajos: Trabajo[];
   facturas: Factura[];
-  onGuardar: (t: Omit<Trabajo, 'id' | 'total'>) => void;
+  onGuardar: (t: Omit<Trabajo, 'id' | 'total' | 'iva'>) => void;
   onIrAInventario: () => void;
   onGenerarFactura: (trabajoId: string) => void;
   onIrAFacturas: () => void;
@@ -1251,6 +1266,8 @@ function VistaTrabajo({
     clienteId: '', vehiculoId: '',
     fecha: new Date().toISOString().split('T')[0],
     descripcion: '',
+    requiereFactura: false,
+    folioFiscal: '',
     estado: 'pendiente' as Trabajo['estado'],
   };
   const [form, setForm] = useState(emptyForm);
@@ -1267,6 +1284,9 @@ function VistaTrabajo({
   const totalVentaRefacciones = partesSeleccionadas.reduce((s, p) => s + p.subtotal, 0);
   const totalCostoRefacciones = partesSeleccionadas.reduce((s, p) => s + p.costoTotal, 0);
   const utilidadRefacciones   = totalVentaRefacciones - totalCostoRefacciones;
+  const subtotalSinIVA        = totalManoDeObra + totalVentaRefacciones;
+  const ivaCalculado          = form.requiereFactura ? Math.round(subtotalSinIVA * 0.16 * 100) / 100 : 0;
+  const totalConIVA           = subtotalSinIVA + ivaCalculado;
 
   const handleClienteChange = (clienteId: string) =>
     setForm(f => ({ ...f, clienteId, vehiculoId: '' }));
@@ -1342,6 +1362,8 @@ function VistaTrabajo({
       manoDeObraItems: laborItems,
       refacciones: totalVentaRefacciones,
       costoRefacciones: totalCostoRefacciones,
+      requiereFactura: form.requiereFactura,
+      folioFiscal: form.requiereFactura && form.folioFiscal ? form.folioFiscal : undefined,
       partes: partesSeleccionadas,
       pagos: [],
     });
@@ -1772,6 +1794,45 @@ function VistaTrabajo({
             )}
           </div>
 
+          {/* ── Factura Fiscal (IVA) ── */}
+          <div className={`border rounded-xl p-4 space-y-3 ${form.requiereFactura ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.requiereFactura}
+                onChange={e => setForm(f => ({ ...f, requiereFactura: e.target.checked, folioFiscal: '' }))}
+                className="w-4 h-4 accent-amber-500 cursor-pointer"
+              />
+              <div>
+                <span className={`font-semibold text-sm ${form.requiereFactura ? 'text-amber-800' : 'text-slate-700'}`}>
+                  🧾 ¿Requiere factura fiscal?
+                </span>
+                <span className="text-xs text-slate-400 ml-2">
+                  {form.requiereFactura ? 'Se agrega IVA 16% al total' : 'Sin IVA — pago sin factura fiscal'}
+                </span>
+              </div>
+            </label>
+
+            {form.requiereFactura && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <Label>Folio Fiscal (opcional)</Label>
+                  <Input type="text" placeholder="Ej. FAC-2026-0042"
+                    value={form.folioFiscal}
+                    onChange={e => setForm(f => ({ ...f, folioFiscal: e.target.value }))}
+                    className="font-mono" />
+                </div>
+                <div className="flex items-end">
+                  <div className="w-full bg-amber-100 border border-amber-200 rounded-lg px-4 py-2.5 text-sm">
+                    <div className="flex justify-between text-amber-700"><span>Subtotal sin IVA:</span><span className="font-semibold">${fmt(subtotalSinIVA)}</span></div>
+                    <div className="flex justify-between text-amber-700 mt-0.5"><span>IVA 16%:</span><span className="font-semibold">+ ${fmt(ivaCalculado)}</span></div>
+                    <div className="flex justify-between text-amber-900 font-bold border-t border-amber-300 mt-1.5 pt-1.5"><span>Total con IVA:</span><span>${fmt(totalConIVA)}</span></div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Resumen del trabajo */}
           {(totalManoDeObra > 0 || totalVentaRefacciones > 0) && (
             <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-4 space-y-2 text-sm">
@@ -1782,7 +1843,14 @@ function VistaTrabajo({
                   {': '}<span className="font-bold text-slate-800">${fmt(totalManoDeObra)}</span>
                 </div>
                 <div><span className="text-indigo-500 font-semibold">Venta refacciones:</span> <span className="font-bold text-slate-800">${fmt(totalVentaRefacciones)}</span></div>
-                <div><span className="text-indigo-700 font-bold">Total cobrado: </span><span className="font-extrabold text-indigo-800 text-base">${fmt(totalManoDeObra + totalVentaRefacciones)}</span></div>
+                {form.requiereFactura ? (
+                  <>
+                    <div><span className="text-amber-600 font-semibold">IVA 16%:</span> <span className="font-bold text-amber-700">+ ${fmt(ivaCalculado)}</span></div>
+                    <div><span className="text-indigo-700 font-bold">Total con IVA: </span><span className="font-extrabold text-indigo-800 text-base">${fmt(totalConIVA)}</span></div>
+                  </>
+                ) : (
+                  <div><span className="text-indigo-700 font-bold">Total cobrado: </span><span className="font-extrabold text-indigo-800 text-base">${fmt(subtotalSinIVA)}</span></div>
+                )}
               </div>
               {utilidadRefacciones !== 0 && (
                 <div className="text-xs text-slate-500 border-t border-indigo-100 pt-2 flex flex-wrap gap-4">
@@ -1841,13 +1909,18 @@ function VistaTrabajo({
                           {trabajo.partes.length} pieza{trabajo.partes.length !== 1 ? 's' : ''}
                         </span>
                       )}
+                      {trabajo.requiereFactura && (
+                        <span className="ml-2 text-xs bg-amber-100 text-amber-700 font-semibold px-1.5 py-0.5 rounded-full">
+                          🧾 +IVA{trabajo.folioFiscal ? ` ${trabajo.folioFiscal}` : ''}
+                        </span>
+                      )}
                       {trabajo.estadoFacturacion === 'facturado' ? (
-                        <span className="ml-2 text-xs bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">🧾 Facturado</span>
+                        <span className="ml-2 text-xs bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">✓ Facturado</span>
                       ) : (
                         <button type="button"
                           onClick={() => { onGenerarFactura(trabajo.id); onIrAFacturas(); }}
-                          className="ml-2 text-xs bg-amber-100 text-amber-700 font-semibold px-1.5 py-0.5 rounded-full hover:bg-amber-200 transition-colors">
-                          + Generar Factura
+                          className="ml-2 text-xs bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.5 rounded-full hover:bg-amber-100 hover:text-amber-700 transition-colors">
+                          + Factura
                         </button>
                       )}
                     </td>
@@ -2695,6 +2768,7 @@ function VistaResumen({
     facturadoMes: number; totalVentaRef: number; totalCostoRef: number;
     margenRef: number; totalManoObra: number; ganancia: number; cantidad: number;
     cobradoEnMes: number; porCobrarDelMes: number; totalOrdenes: number; porPagarOrdenes: number;
+    totalIVA: number; ingresoConIVA: number; ingresoSinIVA: number;
   };
   trabajos: Trabajo[];
   clientes: Cliente[];
@@ -2782,6 +2856,30 @@ function VistaResumen({
         </div>
       )}
 
+      {/* ── IVA Breakdown ── */}
+      {(resumen.ingresoConIVA > 0 || resumen.ingresoSinIVA > 0) && (
+        <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 mb-4">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Desglose IVA</p>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="text-center">
+              <div className="text-slate-400 text-xs mb-1">Con factura fiscal</div>
+              <div className="font-bold text-amber-700 text-lg">${fmt(resumen.ingresoConIVA)}</div>
+              <div className="text-amber-500 text-xs mt-0.5">incluye ${fmt(resumen.totalIVA)} IVA</div>
+            </div>
+            <div className="text-center border-x border-slate-200">
+              <div className="text-slate-400 text-xs mb-1">Sin factura (cash)</div>
+              <div className="font-bold text-slate-900 text-lg">${fmt(resumen.ingresoSinIVA)}</div>
+              <div className="text-slate-400 text-xs mt-0.5">sin IVA</div>
+            </div>
+            <div className="text-center">
+              <div className="text-slate-400 text-xs mb-1">IVA total cobrado</div>
+              <div className="font-bold text-emerald-600 text-lg">${fmt(resumen.totalIVA)}</div>
+              <div className="text-slate-400 text-xs mt-0.5">a entregar al SAT</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Tabla detalle ── */}
       <div>
         <h3 className="text-base font-bold text-slate-700 mb-3">
@@ -2792,30 +2890,34 @@ function VistaResumen({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-800 text-white">
-                {['Fecha','Cliente','Unidad','Trabajo','Cobrado','Costo Partes','Ganancia'].map((h, i) => (
-                  <th key={h} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 4 ? 'text-right' : 'text-left'}`}>{h}</th>
+                {['Fecha','Cliente','Trabajo','Cobrado','IVA','Ganancia'].map((h, i) => (
+                  <th key={h} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 3 ? 'text-right' : 'text-left'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {trabajos.map((trabajo, i) => {
-                const cliente  = getCliente(trabajo.clienteId);
-                const vehiculo = getVehiculo(trabajo.vehiculoId);
+                const cliente    = getCliente(trabajo.clienteId);
                 const costoPartes = trabajo.costoRefacciones ?? trabajo.refacciones;
-                const ganancia = trabajo.manoDeObra + (trabajo.refacciones - costoPartes);
+                const ganancia   = trabajo.manoDeObra + (trabajo.refacciones - costoPartes);
+                const iva        = trabajo.iva ?? 0;
                 return (
                   <tr key={trabajo.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-700 font-medium">{new Date(trabajo.fecha).toLocaleDateString('es-MX')}</td>
                     <td className="px-4 py-3 text-slate-800 font-medium">{cliente?.nombre ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-700">{vehiculo ? [vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ') : '—'}</td>
-                    <td className="px-4 py-3 text-slate-700">{trabajo.descripcion}</td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {trabajo.descripcion}
+                      {trabajo.requiereFactura && (
+                        <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 font-semibold px-1.5 py-0.5 rounded-full">🧾 fiscal</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-900">${fmt(trabajo.total)}</td>
-                    <td className="px-4 py-3 text-right text-rose-600 font-medium">${fmt(costoPartes)}</td>
+                    <td className="px-4 py-3 text-right text-amber-600 font-medium">{iva > 0 ? `$${fmt(iva)}` : '—'}</td>
                     <td className="px-4 py-3 text-right font-bold text-emerald-600">${fmt(ganancia)}</td>
                   </tr>
                 );
               })}
-              {trabajos.length === 0 && <EmptyRow cols={7} message="No hay trabajos registrados en este mes." />}
+              {trabajos.length === 0 && <EmptyRow cols={6} message="No hay trabajos registrados en este mes." />}
             </tbody>
           </table>
         </div>
