@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { Factura, Trabajo, Cliente, Vehiculo, OrdenCompra, Proveedor, PagoFactura, Pago, PagoCompra } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import {
@@ -11,6 +11,186 @@ import {
   BADGE_ESTADO,
   type FiltroCuenta,
 } from '@/app/lib/utils';
+
+// ─── ReporteCliente — imprimible / compartible ────────────────────────────────
+
+function ReporteCliente({
+  cliente,
+  facturas,
+  trabajos,
+  vehiculos,
+  onCerrar,
+}: {
+  cliente: Cliente;
+  facturas: Factura[];
+  trabajos: Trabajo[];
+  vehiculos: Vehiculo[];
+  onCerrar: () => void;
+}) {
+  const reporteRef = useRef<HTMLDivElement>(null);
+
+  const facsPend = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado');
+  const trabsPend = trabajos.filter(t => getEstadoPago(t) !== 'pagado');
+  const totalPendiente = facsPend.reduce((s, f) => s + getSaldoFactura(f), 0)
+    + trabsPend.reduce((s, t) => s + getSaldo(t), 0);
+
+  const handleImprimir = () => {
+    const win = window.open('', '_blank');
+    if (!win || !reporteRef.current) return;
+    win.document.write(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8"/>
+        <title>Reporte — ${cliente.nombre}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color: #1e293b; font-size: 13px; }
+          h1 { font-size: 20px; margin-bottom: 4px; }
+          .sub { color: #64748b; font-size: 12px; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+          th { background: #f1f5f9; text-align: left; padding: 6px 10px; font-size: 11px; text-transform: uppercase; color: #475569; border-bottom: 1px solid #e2e8f0; }
+          td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+          .total-box { background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 14px 18px; display: inline-block; }
+          .total-label { font-size: 11px; font-weight: bold; color: #e11d48; text-transform: uppercase; letter-spacing: 0.08em; }
+          .total-val { font-size: 26px; font-weight: 900; color: #be123c; }
+          .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+          .badge-pend { background: #fff7ed; color: #c2410c; }
+          .badge-parc { background: #eff6ff; color: #1d4ed8; }
+          .footer { margin-top: 24px; font-size: 11px; color: #94a3b8; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        ${reporteRef.current.innerHTML}
+        <div class="footer">Generado: ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+        <script>window.onload = () => { window.print(); }<\/script>
+      </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
+  const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4">
+        {/* Modal header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">📄 Reporte de Saldo</h2>
+            <p className="text-sm text-slate-500">{cliente.nombre}</p>
+          </div>
+          <div className="flex gap-2">
+            <Btn variant="primary" size="sm" onClick={handleImprimir}>🖨️ Imprimir / Guardar PDF</Btn>
+            <Btn variant="ghost" size="sm" onClick={onCerrar}>✕</Btn>
+          </div>
+        </div>
+
+        {/* Printable content */}
+        <div ref={reporteRef} className="px-6 py-5">
+          <h1 className="text-xl font-black text-slate-800 mb-1">Estado de Cuenta</h1>
+          <p className="text-sm text-slate-500 mb-6">
+            Cliente: <strong>{cliente.nombre}</strong>
+            {cliente.telefono && <> · Tel: {cliente.telefono}</>}
+            <br />Fecha: {fechaHoy}
+          </p>
+
+          {/* Facturas pendientes */}
+          {facsPend.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">🧾 Facturas con saldo pendiente</h3>
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-slate-50">
+                    <th className="text-left py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Folio</th>
+                    <th className="text-left py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Fecha</th>
+                    <th className="text-right py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Total</th>
+                    <th className="text-right py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Pagado</th>
+                    <th className="text-right py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Saldo</th>
+                    <th className="text-center py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {facsPend.map(f => {
+                    const estado = getEstadoPagoFactura(f);
+                    const badge = BADGE_ESTADO[estado];
+                    return (
+                      <tr key={f.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="py-2 px-3 font-mono text-xs text-slate-600">{f.numeroFactura}</td>
+                        <td className="py-2 px-3 text-slate-600">{new Date(f.fecha).toLocaleDateString('es-MX')}</td>
+                        <td className="py-2 px-3 text-right text-slate-800 font-medium">${fmt(f.total)}</td>
+                        <td className="py-2 px-3 text-right text-emerald-600 font-medium">${fmt(getMontoPagadoFactura(f))}</td>
+                        <td className="py-2 px-3 text-right text-rose-600 font-bold">${fmt(getSaldoFactura(f))}</td>
+                        <td className="py-2 px-3 text-center"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Trabajos sin factura pendientes */}
+          {trabsPend.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">🔧 Trabajos con saldo pendiente</h3>
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-slate-50">
+                    <th className="text-left py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Descripción</th>
+                    <th className="text-left py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Fecha</th>
+                    <th className="text-left py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Unidad</th>
+                    <th className="text-right py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Total</th>
+                    <th className="text-right py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Pagado</th>
+                    <th className="text-right py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Saldo</th>
+                    <th className="text-center py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trabsPend.map(t => {
+                    const veh = vehiculos.find(v => v.id === t.vehiculoId);
+                    const estado = getEstadoPago(t);
+                    const badge = BADGE_ESTADO[estado];
+                    return (
+                      <tr key={t.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="py-2 px-3 text-slate-700 max-w-[180px] truncate">{t.descripcion}</td>
+                        <td className="py-2 px-3 text-slate-600">{new Date(t.fecha).toLocaleDateString('es-MX')}</td>
+                        <td className="py-2 px-3 text-slate-500 text-xs">{veh ? `${veh.anio} ${veh.marca} ${veh.modelo}`.trim() : '—'}</td>
+                        <td className="py-2 px-3 text-right text-slate-800 font-medium">${fmt(t.total)}</td>
+                        <td className="py-2 px-3 text-right text-emerald-600 font-medium">${fmt(getMontoPagado(t))}</td>
+                        <td className="py-2 px-3 text-right text-rose-600 font-bold">${fmt(getSaldo(t))}</td>
+                        <td className="py-2 px-3 text-center"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {facsPend.length === 0 && trabsPend.length === 0 && (
+            <div className="text-center py-8 text-slate-400">
+              <div className="text-3xl mb-2">✅</div>
+              <p className="font-medium text-slate-500">Este cliente no tiene saldos pendientes</p>
+            </div>
+          )}
+
+          {/* Total box */}
+          {totalPendiente > 0 && (
+            <div className="mt-4 bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Total por Cobrar a {cliente.nombre}</div>
+                <div className="text-3xl font-black text-rose-700">${fmt(totalPendiente)}</div>
+              </div>
+              <div className="text-4xl">💰</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── VistaCuentas (Por Cobrar) ────────────────────────────────────────────────
 
@@ -31,6 +211,9 @@ export function VistaCuentas({
 }) {
   const hoy = new Date().toISOString().split('T')[0];
   const [filtro, setFiltro] = useState<FiltroCuenta>('todos');
+  const [clienteFiltroId, setClienteFiltroId] = useState<string>('');
+  const [busquedaCliente, setBusquedaCliente] = useState('');
+  const [mostrarReporte, setMostrarReporte] = useState(false);
   const [expandidoF, setExpandidoF] = useState<string | null>(null);
   const [expandidoT, setExpandidoT] = useState<string | null>(null);
   const [pagoFormF, setPagoFormF] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
@@ -39,30 +222,172 @@ export function VistaCuentas({
   // Legacy: trabajos without a facturaId
   const legacyTrabajos = trabajos.filter(t => !t.facturaId);
 
-  const facturasFiltradas = [...facturas]
+  // Clients that actually have records in AR
+  const clientesConRegistros = clientes.filter(c =>
+    facturas.some(f => f.clienteId === c.id) || legacyTrabajos.some(t => t.clienteId === c.id)
+  ).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  // Filtered by text search (for dropdown suggestions)
+  const clientesFiltrados = busquedaCliente.trim()
+    ? clientesConRegistros.filter(c => c.nombre.toLowerCase().includes(busquedaCliente.toLowerCase()))
+    : clientesConRegistros;
+
+  const clienteSeleccionado = clienteFiltroId ? clientes.find(c => c.id === clienteFiltroId) ?? null : null;
+
+  // Apply client filter first, then status filter
+  const facturasPorCliente = clienteFiltroId ? facturas.filter(f => f.clienteId === clienteFiltroId) : facturas;
+  const legacyPorCliente   = clienteFiltroId ? legacyTrabajos.filter(t => t.clienteId === clienteFiltroId) : legacyTrabajos;
+
+  const facturasFiltradas = [...facturasPorCliente]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
     .filter(f => filtro === 'todos' || getEstadoPagoFactura(f) === filtro);
 
-  const legacyFiltrados = legacyTrabajos.filter(t => filtro === 'todos' || getEstadoPago(t) === filtro);
+  const legacyFiltrados = legacyPorCliente.filter(t => filtro === 'todos' || getEstadoPago(t) === filtro);
 
-  const totalPendiente = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
+  // Global total pending (all clients)
+  const totalPendienteGlobal = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
     + legacyTrabajos.filter(t => getEstadoPago(t) !== 'pagado').reduce((s, t) => s + getSaldo(t), 0);
 
+  // Client-specific pending total
+  const totalPendienteCliente = clienteFiltroId
+    ? facturasPorCliente.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
+      + legacyPorCliente.filter(t => getEstadoPago(t) !== 'pagado').reduce((s, t) => s + getSaldo(t), 0)
+    : 0;
+
+  const totalPendiente = clienteFiltroId ? totalPendienteCliente : totalPendienteGlobal;
+
   const counts = {
-    todos: facturas.length + legacyTrabajos.length,
-    pendiente: facturas.filter(f => getEstadoPagoFactura(f) === 'pendiente').length + legacyTrabajos.filter(t => getEstadoPago(t) === 'pendiente').length,
-    parcial: facturas.filter(f => getEstadoPagoFactura(f) === 'parcial').length + legacyTrabajos.filter(t => getEstadoPago(t) === 'parcial').length,
-    pagado: facturas.filter(f => getEstadoPagoFactura(f) === 'pagado').length + legacyTrabajos.filter(t => getEstadoPago(t) === 'pagado').length,
+    todos: facturasPorCliente.length + legacyPorCliente.length,
+    pendiente: facturasPorCliente.filter(f => getEstadoPagoFactura(f) === 'pendiente').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'pendiente').length,
+    parcial: facturasPorCliente.filter(f => getEstadoPagoFactura(f) === 'parcial').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'parcial').length,
+    pagado: facturasPorCliente.filter(f => getEstadoPagoFactura(f) === 'pagado').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'pagado').length,
+  };
+
+  const limpiarFiltroCliente = () => {
+    setClienteFiltroId('');
+    setBusquedaCliente('');
+    setFiltro('todos');
   };
 
   return (
     <div>
+      {mostrarReporte && clienteSeleccionado && (
+        <ReporteCliente
+          cliente={clienteSeleccionado}
+          facturas={facturasPorCliente}
+          trabajos={legacyPorCliente}
+          vehiculos={vehiculos}
+          onCerrar={() => setMostrarReporte(false)}
+        />
+      )}
+
       <SectionTitle title="Cuentas por Cobrar" subtitle="Pagos de clientes: facturas emitidas y trabajos pendientes de cobro." />
 
+      {/* ── Búsqueda / filtro por cliente ── */}
+      <div className="bg-white border border-slate-200 rounded-xl px-4 py-4 mb-5">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+          <div className="flex-1 w-full">
+            <Label>🔍 Buscar cliente</Label>
+            {clienteSeleccionado ? (
+              <div className="flex items-center gap-2 mt-1 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+                <span className="font-semibold text-indigo-800 flex-1">{clienteSeleccionado.nombre}</span>
+                {clienteSeleccionado.telefono && <span className="text-xs text-indigo-500">{clienteSeleccionado.telefono}</span>}
+                <button type="button" onClick={limpiarFiltroCliente} className="text-indigo-400 hover:text-indigo-700 text-lg font-bold leading-none ml-1">×</button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Nombre del cliente..."
+                  value={busquedaCliente}
+                  onChange={e => setBusquedaCliente(e.target.value)}
+                />
+                {busquedaCliente && clientesFiltrados.length > 0 && (
+                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                    {clientesFiltrados.map(c => {
+                      const saldo = facturas.filter(f => f.clienteId === c.id && getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
+                        + legacyTrabajos.filter(t => t.clienteId === c.id && getEstadoPago(t) !== 'pagado').reduce((s, t) => s + getSaldo(t), 0);
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 transition-colors border-b border-slate-100 last:border-0 flex items-center justify-between gap-3"
+                          onClick={() => { setClienteFiltroId(c.id); setBusquedaCliente(''); }}
+                        >
+                          <div>
+                            <span className="font-semibold text-slate-800 text-sm">{c.nombre}</span>
+                            {c.telefono && <span className="text-xs text-slate-400 ml-2">{c.telefono}</span>}
+                          </div>
+                          {saldo > 0 && <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full shrink-0">Debe ${fmt(saldo)}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {busquedaCliente && clientesFiltrados.length === 0 && (
+                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm text-slate-400">
+                    No se encontró ningún cliente con ese nombre
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {clienteSeleccionado && (
+            <Btn
+              variant="primary"
+              size="sm"
+              onClick={() => setMostrarReporte(true)}
+              disabled={totalPendienteCliente === 0}
+            >
+              📄 Ver Reporte
+            </Btn>
+          )}
+        </div>
+
+        {!clienteSeleccionado && clientesConRegistros.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="text-xs text-slate-400 self-center">Pendientes:</span>
+            {clientesConRegistros
+              .filter(c => {
+                const s = facturas.filter(f => f.clienteId === c.id && getEstadoPagoFactura(f) !== 'pagado').reduce((a, f) => a + getSaldoFactura(f), 0)
+                  + legacyTrabajos.filter(t => t.clienteId === c.id && getEstadoPago(t) !== 'pagado').reduce((a, t) => a + getSaldo(t), 0);
+                return s > 0;
+              })
+              .slice(0, 6)
+              .map(c => {
+                const saldo = facturas.filter(f => f.clienteId === c.id && getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
+                  + legacyTrabajos.filter(t => t.clienteId === c.id && getEstadoPago(t) !== 'pagado').reduce((s, t) => s + getSaldo(t), 0);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setClienteFiltroId(c.id)}
+                    className="text-xs font-semibold px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 transition-colors"
+                  >
+                    {c.nombre} · ${fmt(saldo)}
+                  </button>
+                );
+              })
+            }
+          </div>
+        )}
+      </div>
+
+      {/* ── Total por cobrar ── */}
       {totalPendiente > 0 && (
-        <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 mb-5 flex flex-wrap gap-6 items-center">
-          <div><div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Total por Cobrar</div>
-            <div className="text-2xl font-extrabold text-rose-700">${fmt(totalPendiente)}</div></div>
+        <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 mb-5 flex flex-wrap gap-6 items-center justify-between">
+          <div>
+            <div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">
+              {clienteSeleccionado ? `Saldo pendiente — ${clienteSeleccionado.nombre}` : 'Total por Cobrar'}
+            </div>
+            <div className="text-2xl font-extrabold text-rose-700">${fmt(totalPendiente)}</div>
+          </div>
+          {clienteSeleccionado && (
+            <Btn variant="primary" size="sm" onClick={() => setMostrarReporte(true)}>
+              📄 Generar Reporte
+            </Btn>
+          )}
         </div>
       )}
 
@@ -181,7 +506,16 @@ export function VistaCuentas({
       )}
 
       {facturasFiltradas.length === 0 && legacyFiltrados.length === 0 && (
-        <div className="text-center py-14 text-slate-400"><div className="text-5xl mb-3">💰</div><p className="font-medium text-slate-500">{filtro === 'todos' ? 'Sin registros' : `Sin registros con estado "${BADGE_ESTADO[filtro as 'pendiente'|'parcial'|'pagado'].label}"`}</p></div>
+        <div className="text-center py-14 text-slate-400">
+          <div className="text-5xl mb-3">💰</div>
+          <p className="font-medium text-slate-500">
+            {clienteSeleccionado
+              ? `${clienteSeleccionado.nombre} no tiene registros${filtro !== 'todos' ? ` con estado "${BADGE_ESTADO[filtro as 'pendiente'|'parcial'|'pagado'].label}"` : ''}`
+              : filtro === 'todos' ? 'Sin registros' : `Sin registros con estado "${BADGE_ESTADO[filtro as 'pendiente'|'parcial'|'pagado'].label}"`
+            }
+          </p>
+          {clienteSeleccionado && <button type="button" onClick={limpiarFiltroCliente} className="mt-2 text-indigo-600 font-semibold hover:underline text-sm">Ver todos los clientes →</button>}
+        </div>
       )}
     </div>
   );
