@@ -1,9 +1,10 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor, OrdenCompra, Factura,
   TrabajoRefaccion, Pago, PagoCompra, PagoFactura, FacturaConcepto, CompraItem,
+  CompatibilidadVehiculo,
 } from '@/app/types';
 import {
   generarNumeroFactura, generarNumeroOrden,
@@ -129,6 +130,10 @@ export default function TallerMecanico() {
   };
   const recibirStock = (refaccionId: string, cantidad: number) => {
     const nuevos = inventario.map(r => r.id === refaccionId ? { ...r, stock: r.stock + cantidad } : r);
+    setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
+  };
+  const actualizarCompatibilidad = (refaccionId: string, compatibilidad: CompatibilidadVehiculo[]) => {
+    const nuevos = inventario.map(r => r.id === refaccionId ? { ...r, compatibilidad: compatibilidad.length > 0 ? compatibilidad : undefined } : r);
     setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
   };
   const guardarTrabajo = (data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => {
@@ -332,7 +337,8 @@ export default function TallerMecanico() {
           {vista === 'inventario' && (
             <VistaInventario inventario={inventario} clientes={clientes} vehiculos={vehiculos}
               proveedores={proveedores}
-              onGuardarRefaccion={guardarRefaccion} onRecibirStock={recibirStock} />
+              onGuardarRefaccion={guardarRefaccion} onRecibirStock={recibirStock}
+              onActualizarCompatibilidad={actualizarCompatibilidad} />
           )}
           {vista === 'trabajos' && (
             <VistaTrabajo clientes={clientes} vehiculos={vehiculos} inventario={inventario}
