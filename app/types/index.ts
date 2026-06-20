@@ -134,6 +134,7 @@ export interface Trabajo {
   clienteId: string;
   vehiculoId: string;
   fecha: string;
+  numeroOrden?: string;            // Número de orden manual del taller
   descripcion: string;
   manoDeObra: number;
   manoDeObraItems: ManoDeObraItem[];

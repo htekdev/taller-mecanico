@@ -305,13 +305,18 @@ function PantallaHistorial({
               >
                 {/* Header del trabajo */}
                 <div className={`flex items-center justify-between px-5 py-3 ${isUltimo ? 'bg-indigo-50' : 'bg-slate-50'}`}>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     {isUltimo && (
                       <span className="text-xs font-bold px-2 py-0.5 bg-indigo-600 text-white rounded-full">
                         Último
                       </span>
                     )}
                     <span className="text-sm font-bold text-slate-700">{labelFecha(trabajo.fecha)}</span>
+                    {trabajo.numeroOrden && (
+                      <span className="text-xs font-semibold px-2.5 py-0.5 bg-slate-200 text-slate-700 rounded-full font-mono">
+                        # {trabajo.numeroOrden}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {trabajo.requiereFactura && (
