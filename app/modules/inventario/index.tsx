@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo } from '@/app/types';
@@ -12,6 +12,7 @@ export function VistaInventario({
   proveedores,
   onGuardarRefaccion,
   onRecibirStock,
+  onActualizarCompatibilidad,
 }: {
   inventario: Refaccion[];
   clientes: Cliente[];
@@ -19,6 +20,7 @@ export function VistaInventario({
   proveedores: Proveedor[];
   onGuardarRefaccion: (r: Omit<Refaccion, 'id'>) => void;
   onRecibirStock: (id: string, cantidad: number) => void;
+  onActualizarCompatibilidad: (id: string, compatibilidad: CompatibilidadVehiculo[]) => void;
 }) {
   const [form, setForm] = useState({
     nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza',
@@ -29,6 +31,11 @@ export function VistaInventario({
   const [modeloInputs, setModeloInputs] = useState<Record<number, string>>({});
   const [expandido, setExpandido] = useState<string | null>(null);
   const [recibirCantidad, setRecibirCantidad] = useState<Record<string, number>>({});
+
+  // ── Estado para edición de compatibilidad de piezas existentes ──
+  const [editandoCompat, setEditandoCompat] = useState<string | null>(null);
+  const [compatEdit, setCompatEdit] = useState<CompatibilidadVehiculo[]>([]);
+  const [modeloInputsEdit, setModeloInputsEdit] = useState<Record<number, string>>({});
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === formClienteId);
 
@@ -52,6 +59,41 @@ export function VistaInventario({
     setCompatibilidad(prev => prev.map((g, idx) =>
       idx === i ? { ...g, modelos: g.modelos.filter(m => m !== modelo) } : g
     ));
+
+  // ── Helpers para editar compatibilidad de piezas existentes ──
+  const abrirEditCompat = (r: Refaccion) => {
+    setEditandoCompat(r.id);
+    setCompatEdit(r.compatibilidad ? r.compatibilidad.map(c => ({ ...c, modelos: [...c.modelos] })) : []);
+    setModeloInputsEdit({});
+    setExpandido(null); // cerrar panel de existencias si está abierto
+  };
+  const addCompatMarcaEdit = () =>
+    setCompatEdit(prev => [...prev, { marca: '', modelos: [] }]);
+  const removeCompatMarcaEdit = (i: number) => {
+    setCompatEdit(prev => prev.filter((_, idx) => idx !== i));
+    setModeloInputsEdit(prev => { const n = { ...prev }; delete n[i]; return n; });
+  };
+  const updateCompatMarcaEdit = (i: number, marca: string) =>
+    setCompatEdit(prev => prev.map((g, idx) => idx === i ? { ...g, marca } : g));
+  const addCompatModeloEdit = (i: number) => {
+    const m = (modeloInputsEdit[i] ?? '').trim();
+    if (!m) return;
+    setCompatEdit(prev => prev.map((g, idx) =>
+      idx === i ? { ...g, modelos: g.modelos.includes(m) ? g.modelos : [...g.modelos, m] } : g
+    ));
+    setModeloInputsEdit(prev => ({ ...prev, [i]: '' }));
+  };
+  const removeCompatModeloEdit = (i: number, modelo: string) =>
+    setCompatEdit(prev => prev.map((g, idx) =>
+      idx === i ? { ...g, modelos: g.modelos.filter(m => m !== modelo) } : g
+    ));
+  const guardarCompatEdit = (id: string) => {
+    const compatFinal = compatEdit.filter(c => c.marca.trim() && c.modelos.length > 0);
+    onActualizarCompatibilidad(id, compatFinal.length > 0 ? compatFinal : []);
+    setEditandoCompat(null);
+    setCompatEdit([]);
+    setModeloInputsEdit({});
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,9 +326,10 @@ export function VistaInventario({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {inventario.map((r, i) => {
-                  const status  = stockStatus(r);
-                  const isExp   = expandido === r.id;
-                  const vLabel  = vehiculoLabel(r.vehiculoId);
+                  const status      = stockStatus(r);
+                  const isExp       = expandido === r.id;
+                  const isEditCompat = editandoCompat === r.id;
+                  const vLabel      = vehiculoLabel(r.vehiculoId);
                   return (
                     <>
                       <tr key={r.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
@@ -325,12 +368,18 @@ export function VistaInventario({
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status.cls}`}>{status.label}</span>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <Btn size="sm" variant={isExp ? 'ghost' : 'success'}
-                            onClick={() => setExpandido(isExp ? null : r.id)}>
-                            {isExp ? '✕ Cerrar' : '+ Existencias'}
-                          </Btn>
-                        </td>
-                      </tr>
+                            <div className="flex flex-col gap-1 items-center">
+                              <Btn size="sm" variant={isExp ? 'ghost' : 'success'}
+                                onClick={() => { setExpandido(isExp ? null : r.id); setEditandoCompat(null); }}>
+                                {isExp ? '✕ Cerrar' : '+ Existencias'}
+                              </Btn>
+                              <Btn size="sm" variant={isEditCompat ? 'ghost' : 'primary'}
+                                onClick={() => isEditCompat ? setEditandoCompat(null) : abrirEditCompat(r)}>
+                                {isEditCompat ? '✕ Cerrar' : '🚗 Compatibilidad'}
+                              </Btn>
+                            </div>
+                          </td>
+                        </tr>
                       {isExp && (
                         <tr key={`${r.id}-recibir`} className="bg-emerald-50 border-t border-emerald-200">
                           <td colSpan={6} className="px-4 py-3">
@@ -349,6 +398,73 @@ export function VistaInventario({
                                 </Btn>
                               </div>
                               <span className="text-xs text-emerald-600">Stock actual: {r.stock} {r.unidad}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {isEditCompat && (
+                        <tr key={`${r.id}-compat`} className="bg-indigo-50 border-t border-indigo-200">
+                          <td colSpan={6} className="px-4 py-4">
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <span className="text-sm font-semibold text-indigo-800">
+                                  🚗 Compatibilidad de vehículos — <em>{r.nombre}</em>
+                                </span>
+                                <Btn size="sm" variant="ghost" onClick={addCompatMarcaEdit} type="button">
+                                  + Agregar marca
+                                </Btn>
+                              </div>
+                              {compatEdit.length === 0 && (
+                                <p className="text-xs text-slate-500 italic">
+                                  Sin compatibilidad definida — esta pieza aplica a cualquier vehículo (universal).
+                                  Agrega una marca para restringirla a vehículos específicos.
+                                </p>
+                              )}
+                              {compatEdit.map((grupo, gi) => (
+                                <div key={gi} className="bg-white rounded-lg p-3 space-y-2 border border-indigo-100">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1">
+                                      <Input type="text" placeholder="Marca (ej. Ford, Isuzu, VW...)"
+                                        value={grupo.marca}
+                                        onChange={e => updateCompatMarcaEdit(gi, e.target.value)} />
+                                    </div>
+                                    <Btn size="sm" variant="danger" type="button" onClick={() => removeCompatMarcaEdit(gi)}>✕</Btn>
+                                  </div>
+                                  {grupo.marca && (
+                                    <>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {grupo.modelos.map(m => (
+                                          <span key={m} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                            {m}
+                                            <button type="button" onClick={() => removeCompatModeloEdit(gi, m)} className="hover:text-rose-600">×</button>
+                                          </span>
+                                        ))}
+                                        {grupo.modelos.length === 0 && (
+                                          <span className="text-xs text-amber-600">Agrega al menos un modelo</span>
+                                        )}
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <Input type="text" placeholder="Modelo (ej. F-150, Silverado...)"
+                                          value={modeloInputsEdit[gi] ?? ''}
+                                          onChange={e => setModeloInputsEdit(prev => ({ ...prev, [gi]: e.target.value }))}
+                                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCompatModeloEdit(gi); } }}
+                                          className="flex-1" />
+                                        <Btn size="sm" variant="primary" type="button"
+                                          disabled={!(modeloInputsEdit[gi] ?? '').trim()}
+                                          onClick={() => addCompatModeloEdit(gi)}>+ Modelo</Btn>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              ))}
+                              <div className="flex gap-2 pt-1">
+                                <Btn size="sm" variant="primary" onClick={() => guardarCompatEdit(r.id)}>
+                                  ✓ Guardar compatibilidad
+                                </Btn>
+                                <Btn size="sm" variant="ghost" onClick={() => setEditandoCompat(null)}>
+                                  Cancelar
+                                </Btn>
+                              </div>
                             </div>
                           </td>
                         </tr>
