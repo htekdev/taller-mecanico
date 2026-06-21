@@ -110,6 +110,7 @@ export function VistaTrabajo({
   trabajos,
   facturas,
   onGuardar,
+  onEditar,
   onFinalizar,
   onIrAInventario,
   onGenerarFactura,
@@ -121,6 +122,7 @@ export function VistaTrabajo({
   trabajos: Trabajo[];
   facturas: Factura[];
   onGuardar: (t: Omit<Trabajo, 'id' | 'total' | 'iva'>) => void;
+  onEditar: (trabajoId: string, data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => void;
   onFinalizar: (trabajoId: string, tipo: 'factura' | 'nota') => void;
   onIrAInventario: () => void;
   onGenerarFactura: (trabajoId: string) => void;
@@ -144,12 +146,13 @@ export function VistaTrabajo({
   const [pickerCantidad, setPickerCantidad]   = useState(1);
   const [pickerPrecioVenta, setPickerPrecioVenta] = useState(0);
   const [finalizandoId, setFinalizandoId] = useState<string | null>(null);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'completado'>('todos');
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
   const totalManoDeObra       = laborItems.reduce((s, l) => s + l.precio, 0);
-  const totalVentaRefacciones = partesSeleccionadas.reduce((s, p) => s + p.subtotal, 0);
-  const totalCostoRefacciones = partesSeleccionadas.reduce((s, p) => s + p.costoTotal, 0);
+  const totalVentaRefacciones = partesSeleccionadas.reduce((s, p) => s + (p.subtotal ?? 0), 0);
+  const totalCostoRefacciones = partesSeleccionadas.reduce((s, p) => s + (p.costoTotal ?? 0), 0);
   const utilidadRefacciones   = totalVentaRefacciones - totalCostoRefacciones;
   const subtotalSinIVA        = totalManoDeObra + totalVentaRefacciones;
   const ivaCalculado          = form.requiereFactura ? Math.round(subtotalSinIVA * 0.16 * 100) / 100 : 0;
@@ -220,10 +223,44 @@ export function VistaTrabajo({
   const removerParte = (refaccionId: string) =>
     setPartesSeleccionadas(prev => prev.filter(p => p.refaccionId !== refaccionId));
 
+  const resetForm = () => {
+    setForm(emptyForm);
+    setLaborItems([]);
+    setLaborConcepto('');
+    setLaborPrecio(0);
+    setPartesSeleccionadas([]);
+    setPickerRefId('');
+    setPickerCantidad(1);
+    setPickerPrecioVenta(0);
+    setEditandoId(null);
+  };
+
+  const iniciarEdicion = (trabajo: Trabajo) => {
+    setForm({
+      clienteId: trabajo.clienteId,
+      vehiculoId: trabajo.vehiculoId,
+      fecha: trabajo.fecha,
+      numeroOrden: trabajo.numeroOrden ?? '',
+      descripcion: trabajo.descripcion,
+      requiereFactura: trabajo.requiereFactura,
+      folioFiscal: trabajo.folioFiscal ?? '',
+      estado: trabajo.estado,
+    });
+    setLaborItems(trabajo.manoDeObraItems ?? []);
+    setPartesSeleccionadas(trabajo.partes ?? []);
+    setLaborConcepto('');
+    setLaborPrecio(0);
+    setPickerRefId('');
+    setPickerCantidad(1);
+    setPickerPrecioVenta(0);
+    setEditandoId(trabajo.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.clienteId || !form.vehiculoId || !form.descripcion) return;
-    onGuardar({
+    const trabajoData = {
       ...form,
       numeroOrden: form.numeroOrden?.trim() || undefined,
       manoDeObra: totalManoDeObra,
@@ -233,16 +270,14 @@ export function VistaTrabajo({
       requiereFactura: false,
       folioFiscal: undefined,
       partes: partesSeleccionadas,
-      pagos: [],
-    });
-    setForm(emptyForm);
-    setLaborItems([]);
-    setLaborConcepto('');
-    setLaborPrecio(0);
-    setPartesSeleccionadas([]);
-    setPickerRefId('');
-    setPickerCantidad(1);
-    setPickerPrecioVenta(0);
+      pagos: editandoId ? (trabajos.find(t => t.id === editandoId)?.pagos ?? []) : [],
+    };
+    if (editandoId) {
+      onEditar(editandoId, trabajoData);
+    } else {
+      onGuardar(trabajoData);
+    }
+    resetForm();
   };
 
   const getCliente  = (id: string) => clientes.find(c => c.id === id);
@@ -301,8 +336,23 @@ export function VistaTrabajo({
       )}
       <SectionTitle title="Registro de Trabajos" subtitle="Selecciona cliente, unidad y las refacciones usadas del inventario." />
 
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-8">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5">Nuevo Trabajo</h3>
+      <div className={`border rounded-xl p-5 mb-8 ${editandoId ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+            {editandoId ? 'Editar Trabajo' : 'Nuevo Trabajo'}
+          </h3>
+          {editandoId && (
+            <button type="button" onClick={resetForm}
+              className="text-xs font-semibold text-slate-500 hover:text-rose-600 transition-colors">
+              ✕ Cancelar edición
+            </button>
+          )}
+        </div>
+        {editandoId && (
+          <div className="mb-4 px-3 py-2 bg-amber-100 border border-amber-300 rounded-lg text-xs font-medium text-amber-800">
+            ✏️ Editando trabajo del {new Date(form.fecha + 'T00:00:00').toLocaleDateString('es-MX')}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* ① Cliente + ② Unidad */}
@@ -645,7 +695,7 @@ export function VistaTrabajo({
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {partesSeleccionadas.map(p => {
-                          const margen = p.subtotal - p.costoTotal;
+                          const margen = (p.subtotal ?? 0) - (p.costoTotal ?? 0);
                           return (
                             <tr key={p.refaccionId} className="bg-white">
                               <td className="px-3 py-2 text-slate-800 font-medium">
@@ -653,8 +703,8 @@ export function VistaTrabajo({
                                 {p.codigo && <span className="ml-1.5 text-xs font-mono text-slate-400">{p.codigo}</span>}
                               </td>
                               <td className="px-3 py-2 text-right text-slate-700">{p.cantidad}</td>
-                              <td className="px-3 py-2 text-right text-slate-400 text-xs">${fmt(p.costoTotal)}</td>
-                              <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(p.subtotal)}</td>
+                              <td className="px-3 py-2 text-right text-slate-400 text-xs">${fmt(p.costoTotal ?? 0)}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(p.subtotal ?? 0)}</td>
                               <td className="px-3 py-2 text-right font-medium text-emerald-600">${fmt(margen)}</td>
                               <td className="px-3 py-2 text-center">
                                 <Btn size="sm" variant="danger" onClick={() => removerParte(p.refaccionId)}>✕</Btn>
@@ -815,15 +865,26 @@ export function VistaTrabajo({
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-slate-900">${fmt(trabajo.total)}</td>
                     <td className="px-4 py-3 text-center">
-                      {isPendiente && (
-                        <button
-                          type="button"
-                          onClick={() => setFinalizandoId(trabajo.id)}
-                          className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap shadow-sm"
-                        >
-                          🏁 Finalizar
-                        </button>
-                      )}
+                      <div className="flex flex-col gap-1 items-center">
+                        {isPendiente && (
+                          <button
+                            type="button"
+                            onClick={() => setFinalizandoId(trabajo.id)}
+                            className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap shadow-sm"
+                          >
+                            🏁 Finalizar
+                          </button>
+                        )}
+                        {isPendiente && (
+                          <button
+                            type="button"
+                            onClick={() => iniciarEdicion(trabajo)}
+                            className="text-xs font-semibold bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                          >
+                            ✏️ Editar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
