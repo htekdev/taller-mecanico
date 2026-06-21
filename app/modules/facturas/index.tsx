@@ -86,7 +86,7 @@ export function VistaFacturas({
                     <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
                       <span>{new Date(factura.fecha).toLocaleDateString('es-MX')}</span>
                       {vehiculo && <span>· {[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>}
-                      <span>· {factura.conceptos.length} conceptos</span>
+                      <span>· {(factura.conceptos ?? []).length} conceptos</span>
                     </div>
                   </div>
                   <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Total</div><div className="font-semibold text-slate-800">${fmt(factura.total)}</div></div>
@@ -111,7 +111,7 @@ export function VistaFacturas({
                             {['Tipo','Descripción','Cant.','Precio','Subtotal'].map((h,i) => <th key={i} className={`px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide ${i >= 2 ? 'text-right' : 'text-left'}`}>{h}</th>)}
                           </tr></thead>
                           <tbody className="divide-y divide-slate-100">
-                            {factura.conceptos.map((c, ci) => (
+                            {(factura.conceptos ?? []).map((c, ci) => (
                               <tr key={ci} className="bg-white">
                                 <td className="px-3 py-2"><span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${c.tipo === 'parte' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{c.tipo === 'parte' ? '🔩 Parte' : '🔧 M.O.'}</span></td>
                                 <td className="px-3 py-2 text-slate-800">{c.descripcion}</td>
@@ -122,6 +122,12 @@ export function VistaFacturas({
                             ))}
                           </tbody>
                           <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                           {(factura.iva ?? 0) > 0 && <>
+                             <tr><td colSpan={4} className="px-3 py-2 text-sm text-slate-600 text-right">Subtotal:</td>
+                               <td className="px-3 py-2 text-right text-slate-700">${fmt(factura.subtotal)}</td></tr>
+                             <tr><td colSpan={4} className="px-3 py-2 text-sm text-slate-600 text-right">IVA (16%):</td>
+                               <td className="px-3 py-2 text-right text-slate-700">${fmt(factura.iva ?? 0)}</td></tr>
+                           </>}
                             <tr><td colSpan={4} className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total factura:</td>
                               <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(factura.total)}</td></tr>
                           </tfoot>
