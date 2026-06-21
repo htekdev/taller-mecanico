@@ -13,39 +13,41 @@ import {
   getVehiculos, insertVehiculo,
   getRefacciones, insertRefaccion, updateRefaccionStock, updateRefaccionCompatibilidad,
   getTrabajos, insertTrabajo, updateTrabajoPagos, updateTrabajoFactura,
-  getProveedores, insertProveedor,
-  getOrdenes, insertOrden, updateOrdenEstado, updateOrdenPagos,
-  getFacturas, insertFactura, updateFacturaPagos,
+  getOrdenes, updateOrdenEstado, updateOrdenPagos,
+  getFacturas, updateFacturaPagos,
 } from '@/app/lib/db';
 
 const mockFrom = vi.mocked(supabase.from);
 
 // ── Mock chain builders ─────────────────────────────────────────────────────
 
-/** Creates a SELECT chain: from → select → eq → order → Promise({ data, error }) */
+/** SELECT chain: from → select → eq → order → Promise({ data, error }) */
 function mockSelectChain(data: unknown, error: unknown = null) {
   const order = vi.fn().mockResolvedValue({ data, error });
   const single = vi.fn().mockResolvedValue({ data, error });
   const eq = vi.fn().mockReturnValue({ order, single });
   const select = vi.fn().mockReturnValue({ eq });
-  mockFrom.mockReturnValue({ select } as ReturnType<typeof supabase.from>);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mockFrom.mockReturnValue({ select } as any);
   return { select, eq, order, single };
 }
 
-/** Creates an INSERT chain: from → insert → select → single → Promise({ data, error }) */
+/** INSERT chain: from → insert → select → single → Promise({ data, error }) */
 function mockInsertChain(data: unknown, error: unknown = null) {
   const single = vi.fn().mockResolvedValue({ data, error });
   const selectAfter = vi.fn().mockReturnValue({ single });
   const insert = vi.fn().mockReturnValue({ select: selectAfter });
-  mockFrom.mockReturnValue({ insert } as ReturnType<typeof supabase.from>);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mockFrom.mockReturnValue({ insert } as any);
   return { insert, single };
 }
 
-/** Creates an UPDATE chain: from → update → eq → Promise({ error }) */
+/** UPDATE chain: from → update → eq → Promise({ error }) */
 function mockUpdateChain(error: unknown = null) {
   const eq = vi.fn().mockResolvedValue({ error });
   const update = vi.fn().mockReturnValue({ eq });
-  mockFrom.mockReturnValue({ update } as ReturnType<typeof supabase.from>);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mockFrom.mockReturnValue({ update } as any);
   return { update, eq };
 }
 
@@ -121,6 +123,28 @@ describe('insertCliente', () => {
   });
 });
 
+// ── getVehiculos ────────────────────────────────────────────────────────────
+
+describe('getVehiculos', () => {
+  it('maps vehiculo fields from snake_case', async () => {
+    const rawData = [{ id: 'v1', taller_id: 't1', cliente_id: 'c1', marca: 'Ford', modelo: 'F-150', anio: '2020', placa: 'ABC', created_at: '2026-01-01' }];
+    mockSelectChain(rawData);
+    const result = await getVehiculos('t1');
+    expect(result[0].clienteId).toBe('c1');
+    expect(result[0].marca).toBe('Ford');
+  });
+});
+
+// ── insertVehiculo ──────────────────────────────────────────────────────────
+
+describe('insertVehiculo', () => {
+  it('returns null on error', async () => {
+    mockInsertChain(null, { message: 'error' });
+    const result = await insertVehiculo('t1', { clienteId: 'c1', marca: 'Ford', modelo: 'F-150', anio: '2020', placa: '' });
+    expect(result).toBeNull();
+  });
+});
+
 // ── getRefacciones ──────────────────────────────────────────────────────────
 
 describe('getRefacciones', () => {
@@ -158,10 +182,20 @@ describe('getRefacciones', () => {
   });
 });
 
+// ── insertRefaccion ─────────────────────────────────────────────────────────
+
+describe('insertRefaccion', () => {
+  it('returns null on error', async () => {
+    mockInsertChain(null, { message: 'error' });
+    const result = await insertRefaccion('t1', { nombre: 'Filtro', codigo: 'F001', categoria: 'Filtros', unidad: 'pza', precioCompra: 100, stock: 5, stockMinimo: 1 });
+    expect(result).toBeNull();
+  });
+});
+
 // ── updateRefaccionStock ────────────────────────────────────────────────────
 
 describe('updateRefaccionStock', () => {
-  it('calls update on refacciones table', async () => {
+  it('calls update on refacciones table with correct stock', async () => {
     const { update, eq } = mockUpdateChain();
     await updateRefaccionStock('r1', 15);
     expect(mockFrom).toHaveBeenCalledWith('refacciones');
@@ -169,7 +203,7 @@ describe('updateRefaccionStock', () => {
     expect(eq).toHaveBeenCalledWith('id', 'r1');
   });
 
-  it('calls with correct new stock value', async () => {
+  it('works with stock of 0', async () => {
     const { update } = mockUpdateChain();
     await updateRefaccionStock('r1', 0);
     expect(update).toHaveBeenCalledWith({ stock: 0 });
@@ -250,6 +284,21 @@ describe('getTrabajos', () => {
   });
 });
 
+// ── insertTrabajo ───────────────────────────────────────────────────────────
+
+describe('insertTrabajo', () => {
+  it('returns null and logs error on failure', async () => {
+    mockInsertChain(null, { message: 'DB error' });
+    const result = await insertTrabajo('t1', {
+      clienteId: 'c1', vehiculoId: 'v1', fecha: '2026-06-01', descripcion: 'Test',
+      manoDeObra: 200, manoDeObraItems: [], refacciones: 0, costoRefacciones: 0,
+      requiereFactura: false, iva: 0, total: 200, partes: [], pagos: [],
+      estadoFacturacion: 'sin_facturar', estado: 'pendiente',
+    });
+    expect(result).toBeNull();
+  });
+});
+
 // ── updateTrabajoPagos ──────────────────────────────────────────────────────
 
 describe('updateTrabajoPagos', () => {
@@ -266,7 +315,7 @@ describe('updateTrabajoPagos', () => {
 // ── updateTrabajoFactura ────────────────────────────────────────────────────
 
 describe('updateTrabajoFactura', () => {
-  it('updates factura_id and estado_facturacion', async () => {
+  it('updates factura_id and estado_facturacion to facturado', async () => {
     const { update, eq } = mockUpdateChain();
     await updateTrabajoFactura('t1', 'f1');
     expect(update).toHaveBeenCalledWith({ factura_id: 'f1', estado_facturacion: 'facturado' });
@@ -310,6 +359,19 @@ describe('updateOrdenEstado', () => {
     const { update } = mockUpdateChain();
     await updateOrdenEstado('o1', 'recibida', '2026-06-05');
     expect(update).toHaveBeenCalledWith({ estado: 'recibida', fecha_recibida: '2026-06-05' });
+  });
+});
+
+// ── updateOrdenPagos ────────────────────────────────────────────────────────
+
+describe('updateOrdenPagos', () => {
+  it('updates pagos on ordenes_compra table', async () => {
+    const { update, eq } = mockUpdateChain();
+    const pagos = [{ id: 'pc1', fecha: '2026-06-01', monto: 750 }];
+    await updateOrdenPagos('o1', pagos);
+    expect(mockFrom).toHaveBeenCalledWith('ordenes_compra');
+    expect(update).toHaveBeenCalledWith({ pagos });
+    expect(eq).toHaveBeenCalledWith('id', 'o1');
   });
 });
 
