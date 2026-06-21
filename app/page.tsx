@@ -111,6 +111,17 @@ export default function TallerMecanico() {
       setInventario(nuevoInv);
     }
   };
+
+  const editarTrabajo = async (trabajoId: string, data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => {
+    const subtotal = data.manoDeObra + data.refacciones;
+    const iva = data.requiereFactura ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+    const total = subtotal + iva;
+    const existing = trabajos.find(t => t.id === trabajoId);
+    if (!existing) return;
+    const updated = { ...existing, ...data, iva, total };
+    await db.updateTrabajo(trabajoId, updated);
+    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, ...updated } : t));
+  };
   const registrarPago = async (trabajoId: string, pago: Omit<Pago, 'id'>) => {
     const trabajoActual = trabajos.find(t => t.id === trabajoId);
     if (!trabajoActual) return;
@@ -311,6 +322,7 @@ export default function TallerMecanico() {
           {vista === 'trabajos' && (
             <VistaTrabajo clientes={clientes} vehiculos={vehiculos} inventario={inventario}
               trabajos={trabajos} facturas={facturas} onGuardar={guardarTrabajo}
+              onEditar={editarTrabajo}
               onFinalizar={finalizarTrabajo}
               onIrAInventario={() => setVista('inventario')}
               onGenerarFactura={generarFactura}

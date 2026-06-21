@@ -226,6 +226,29 @@ export async function updateTrabajoFactura(trabajoId: string, facturaId: string)
   await supabase.from('trabajos').update({ factura_id: facturaId, estado_facturacion: 'facturado' }).eq('id', trabajoId);
 }
 
+/** Editar trabajo pendiente — actualiza todos los campos en la DB */
+export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<void> {
+  await supabase.from('trabajos').update({
+    cliente_id: data.clienteId || null,
+    vehiculo_id: data.vehiculoId || null,
+    fecha: data.fecha,
+    descripcion: data.descripcion,
+    mano_de_obra: data.manoDeObra,
+    mano_de_obra_items: data.manoDeObraItems,
+    refacciones_total: data.refacciones,
+    costo_refacciones: data.costoRefacciones,
+    requiere_factura: data.requiereFactura,
+    folio_fiscal: data.folioFiscal ?? null,
+    iva: data.iva,
+    total: data.total,
+    partes: data.partes,
+    pagos: data.pagos,
+    factura_id: data.facturaId ?? null,
+    estado_facturacion: data.estadoFacturacion,
+    estado: data.estado,
+  }).eq('id', trabajoId);
+}
+
 /** Finalizar trabajo — sets estado=completado, tipoDocumento, IVA, total, fechaFinalizacion */
 export async function updateTrabajoFinalizar(
   trabajoId: string,
