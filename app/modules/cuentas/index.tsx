@@ -433,18 +433,39 @@ export function VistaCuentas({
                       </Btn>
                     </div>
                   </div>
-                  {isExp && estado !== 'pagado' && (
-                    <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Registrar Pago</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                        <div><Label>Fecha</Label><Input type="date" value={pagoFormF.fecha} onChange={e => setPagoFormF(f => ({ ...f, fecha: e.target.value }))} /></div>
-                        <div><Label>Monto ($)</Label><Input type="number" placeholder="0.00" min="0.01" step="0.01" value={pagoFormF.monto || ''} onChange={e => setPagoFormF(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
-                        <div><Label>Método</Label>
-                          <Select value={pagoFormF.metodoPago} onChange={e => setPagoFormF(f => ({ ...f, metodoPago: e.target.value }))}>
-                            {['Efectivo','Transferencia','Tarjeta','Cheque','Otro'].map(m => <option key={m}>{m}</option>)}
-                          </Select></div>
-                        <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoFormF.monto <= 0} onClick={() => { onRegistrarPagoFactura(factura.id, { monto: Math.min(pagoFormF.monto, saldo), fecha: pagoFormF.fecha, metodoPago: pagoFormF.metodoPago }); setPagoFormF({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' }); setExpandidoF(null); }}>✓ Registrar</Btn></div>
-                      </div>
+                  {isExp && (
+                    <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200 space-y-3">
+                      {(factura.pagos ?? []).length > 0 && (
+                        <div>
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
+                          <div className="space-y-1">
+                            {(factura.pagos ?? []).map(p => (
+                              <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                <div className="flex gap-3">
+                                  <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
+                                  <span className="text-slate-500">{p.metodoPago}</span>
+                                </div>
+                                <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {estado !== 'pagado' && (
+                        <div>
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Registrar Pago</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <div><Label>Fecha</Label><Input type="date" value={pagoFormF.fecha} onChange={e => setPagoFormF(f => ({ ...f, fecha: e.target.value }))} /></div>
+                            <div><Label>Monto ($)</Label><Input type="number" placeholder="0.00" min="0.01" step="0.01" value={pagoFormF.monto || ''} onChange={e => setPagoFormF(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
+                            <div><Label>Método</Label>
+                              <Select value={pagoFormF.metodoPago} onChange={e => setPagoFormF(f => ({ ...f, metodoPago: e.target.value }))}>
+                                {['Efectivo','Transferencia','Tarjeta','Cheque','Otro'].map(m => <option key={m}>{m}</option>)}
+                              </Select></div>
+                            <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoFormF.monto <= 0} onClick={() => { onRegistrarPagoFactura(factura.id, { monto: Math.min(pagoFormF.monto, saldo), fecha: pagoFormF.fecha, metodoPago: pagoFormF.metodoPago }); setPagoFormF({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' }); setExpandidoF(null); }}>✓ Registrar</Btn></div>
+                          </div>
+                        </div>
+                      )}
+                      {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Esta factura está completamente pagada.</p>}
                     </div>
                   )}
                 </div>
@@ -485,17 +506,38 @@ export function VistaCuentas({
                     <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
                     <div className="flex items-center justify-between sm:justify-end gap-2">
                       <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
-                      {estado !== 'pagado' && <Btn size="sm" variant={isExp ? 'ghost' : 'success'} onClick={() => { setExpandidoT(isExp ? null : trabajo.id); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); }}>{isExp ? '✕' : '+ Pago'}</Btn>}
+                      <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'} onClick={() => { setExpandidoT(isExp ? null : trabajo.id); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); }}>
+                        {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
+                      </Btn>
                     </div>
                   </div>
-                  {isExp && estado !== 'pagado' && (
-                    <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200">
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                        <div><Label>Fecha</Label><Input type="date" value={pagoFormT.fecha} onChange={e => setPagoFormT(f => ({ ...f, fecha: e.target.value }))} /></div>
-                        <div><Label>Monto ($)</Label><Input type="number" placeholder="0.00" min="0.01" step="0.01" value={pagoFormT.monto || ''} onChange={e => setPagoFormT(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
-                        <div><Label>Nota</Label><Input type="text" placeholder="Efectivo, transferencia..." value={pagoFormT.nota} onChange={e => setPagoFormT(f => ({ ...f, nota: e.target.value }))} /></div>
-                        <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoFormT.monto <= 0} onClick={() => { onRegistrarPagoTrabajo(trabajo.id, { monto: Math.min(pagoFormT.monto, saldo), fecha: pagoFormT.fecha, nota: pagoFormT.nota || undefined }); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); setExpandidoT(null); }}>✓ Registrar</Btn></div>
-                      </div>
+                  {isExp && (
+                    <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200 space-y-3">
+                      {(trabajo.pagos ?? []).length > 0 && (
+                        <div>
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
+                          <div className="space-y-1">
+                            {(trabajo.pagos ?? []).map(p => (
+                              <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                <div className="flex gap-3">
+                                  <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
+                                  {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
+                                </div>
+                                <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {estado !== 'pagado' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div><Label>Fecha</Label><Input type="date" value={pagoFormT.fecha} onChange={e => setPagoFormT(f => ({ ...f, fecha: e.target.value }))} /></div>
+                          <div><Label>Monto ($)</Label><Input type="number" placeholder="0.00" min="0.01" step="0.01" value={pagoFormT.monto || ''} onChange={e => setPagoFormT(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
+                          <div><Label>Nota</Label><Input type="text" placeholder="Efectivo, transferencia..." value={pagoFormT.nota} onChange={e => setPagoFormT(f => ({ ...f, nota: e.target.value }))} /></div>
+                          <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoFormT.monto <= 0} onClick={() => { onRegistrarPagoTrabajo(trabajo.id, { monto: Math.min(pagoFormT.monto, saldo), fecha: pagoFormT.fecha, nota: pagoFormT.nota || undefined }); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); setExpandidoT(null); }}>✓ Registrar</Btn></div>
+                        </div>
+                      )}
+                      {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Completamente pagado.</p>}
                     </div>
                   )}
                 </div>
