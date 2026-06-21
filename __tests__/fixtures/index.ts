@@ -1,6 +1,6 @@
 import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor, OrdenCompra, Factura,
-  ManoDeObraItem, TrabajoRefaccion, Pago, PagoCompra, PagoFactura,
+  ManoDeObraItem, TrabajoRefaccion, Pago,
 } from '@/app/types';
 
 export const mockCliente: Cliente = {
