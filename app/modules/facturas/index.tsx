@@ -122,6 +122,12 @@ export function VistaFacturas({
                             ))}
                           </tbody>
                           <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                           {(factura.iva ?? 0) > 0 && <>
+                             <tr><td colSpan={4} className="px-3 py-2 text-sm text-slate-600 text-right">Subtotal:</td>
+                               <td className="px-3 py-2 text-right text-slate-700">${fmt(factura.subtotal)}</td></tr>
+                             <tr><td colSpan={4} className="px-3 py-2 text-sm text-slate-600 text-right">IVA (16%):</td>
+                               <td className="px-3 py-2 text-right text-slate-700">${fmt(factura.iva ?? 0)}</td></tr>
+                           </>}
                             <tr><td colSpan={4} className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total factura:</td>
                               <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(factura.total)}</td></tr>
                           </tfoot>
