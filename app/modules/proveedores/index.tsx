@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Proveedor, Refaccion } from '@/app/types';
-import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
+import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 
 export function VistaProveedores({
   proveedores,
@@ -14,6 +14,7 @@ export function VistaProveedores({
   onGuardarProveedor: (p: Omit<Proveedor, 'id'>) => void;
 }) {
   const [form, setForm] = useState({ nombre: '', telefono: '', contacto: '', notas: '' });
+  const [filtroProveedorId, setFiltroProveedorId] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,30 +65,52 @@ export function VistaProveedores({
           <p className="text-sm mt-1">Agrega el primero arriba. Después podrás vincularlo a tus refacciones.</p>
         </div>
       ) : (
+        <div>
+          <div className="mb-4 max-w-xs">
+            <Label>Proveedor</Label>
+            <Select value={filtroProveedorId} onChange={e => setFiltroProveedorId(e.target.value)}>
+              <option value="">Todos los proveedores</option>
+              {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </Select>
+          </div>
+          {(() => {
+            const filtrados = filtroProveedorId
+              ? proveedores.filter(p => p.id === filtroProveedorId)
+              : proveedores;
+
+            if (filtrados.length === 0) {
+              return (
+                <div className="text-center py-10 text-slate-400">
+                  <p className="font-medium">No se encontraron resultados.</p>
+                </div>
+              );
+            }
+
+          return (
         <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-800 text-white">
-                {['Proveedor','Teléfono','Contacto','Piezas en inventario'].map((h, i) => (
+                {['Proveedor','Teléfono','Contacto','Refacciones en inventario'].map((h, i) => (
                   <th key={h} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i === 3 ? 'text-right' : 'text-left'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {proveedores.map((p, i) => {
-                const piezas = inventario.filter(r => r.proveedorId === p.id);
+              {filtrados.map((p, i) => {
+                const refacciones = inventario.filter(r => r.proveedorId === p.id);
                 return (
                   <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                     <td className="px-4 py-3 font-semibold text-slate-800">{p.nombre}</td>
                     <td className="px-4 py-3 text-slate-600">{p.telefono || '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{p.contacto || '—'}</td>
                     <td className="px-4 py-3 text-right">
-                      {piezas.length > 0 ? (
+                      {refacciones.length > 0 ? (
                         <span className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded-full">
-                          {piezas.length} pieza{piezas.length !== 1 ? 's' : ''}
+                          {refacciones.length} refacción{refacciones.length !== 1 ? 'es' : ''}
                         </span>
                       ) : (
-                        <span className="text-slate-400 text-xs">Sin piezas</span>
+                        <span className="text-slate-400 text-xs">Sin refacciones</span>
                       )}
                     </td>
                   </tr>
@@ -95,6 +118,9 @@ export function VistaProveedores({
               })}
             </tbody>
           </table>
+        </div>
+          );
+          })()}
         </div>
       )}
     </div>

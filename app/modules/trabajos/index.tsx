@@ -148,6 +148,9 @@ export function VistaTrabajo({
   const [finalizandoId, setFinalizandoId] = useState<string | null>(null);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'completado'>('todos');
+  const [filtroFacturacion, setFiltroFacturacion] = useState<'todos' | 'con_factura' | 'sin_factura'>('todos');
+  const [filtroClienteId, setFiltroClienteId] = useState('');
+  const [filtroVehiculoId, setFiltroVehiculoId] = useState('');
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
   const totalManoDeObra       = laborItems.reduce((s, l) => s + l.precio, 0);
@@ -315,9 +318,14 @@ export function VistaTrabajo({
     : inventario.length;
 
   const trabajosPendientes = trabajos.filter(t => t.estado === 'pendiente');
-  const trabajosFiltrados = filtroEstado === 'todos'
-    ? trabajos
-    : trabajos.filter(t => t.estado === filtroEstado);
+  const trabajosFiltrados = trabajos.filter(t => {
+    if (filtroClienteId && t.clienteId !== filtroClienteId) return false;
+    if (filtroVehiculoId && t.vehiculoId !== filtroVehiculoId) return false;
+    if (filtroEstado !== 'todos' && t.estado !== filtroEstado) return false;
+    if (filtroFacturacion === 'con_factura' && t.estadoFacturacion !== 'facturado') return false;
+    if (filtroFacturacion === 'sin_factura' && t.estadoFacturacion === 'facturado') return false;
+    return true;
+  });
   const trabajoFinalizando = finalizandoId ? trabajos.find(t => t.id === finalizandoId) : null;
 
   return (
@@ -799,6 +807,57 @@ export function VistaTrabajo({
           )}
         </div>
 
+        {/* Filtros estructurados */}
+        {trabajos.length > 0 && (
+          <div className="mb-4 space-y-2">
+            <div className="flex gap-3 mb-4 flex-wrap items-end">
+              <div className="min-w-44">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Cliente</label>
+                <Select value={filtroClienteId} onChange={e => { setFiltroClienteId(e.target.value); setFiltroVehiculoId(''); }}>
+                  <option value="">Todos los clientes</option>
+                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </Select>
+              </div>
+              {filtroClienteId && (
+                <div className="min-w-44">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Unidad</label>
+                  <Select value={filtroVehiculoId} onChange={e => setFiltroVehiculoId(e.target.value)}>
+                    <option value="">Todas las unidades</option>
+                    {vehiculos.filter(v => v.clienteId === filtroClienteId).map(v => (
+                      <option key={v.id} value={v.id}>{[v.anio, v.marca, v.modelo].filter(Boolean).join(' ')}</option>
+                    ))}
+                  </Select>
+                </div>
+              )}
+              {(filtroClienteId || filtroVehiculoId) && (
+                <button
+                  type="button"
+                  onClick={() => { setFiltroClienteId(''); setFiltroVehiculoId(''); }}
+                  className="text-xs text-slate-500 hover:text-rose-600 font-medium self-end pb-2"
+                >
+                  ✕ Limpiar
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { key: 'todos',        label: 'Todos' },
+                { key: 'con_factura',  label: 'Con Factura' },
+                { key: 'sin_factura',  label: 'Sin Factura' },
+              ] as const).map(({ key, label }) => (
+                <Btn
+                  key={key}
+                  size="sm"
+                  variant={filtroFacturacion === key ? 'primary' : 'ghost'}
+                  onClick={() => setFiltroFacturacion(key)}
+                >
+                  {label}
+                </Btn>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full text-sm">
             <thead>
@@ -889,7 +948,7 @@ export function VistaTrabajo({
                   </tr>
                 );
               })}
-              {trabajosFiltrados.length === 0 && <EmptyRow cols={9} message={filtroEstado === 'todos' ? 'Sin trabajos registrados. Agrega el primero arriba.' : `Sin trabajos con estado "${filtroEstado}".`} />}
+              {trabajosFiltrados.length === 0 && <EmptyRow cols={9} message={filtroClienteId || filtroVehiculoId || filtroEstado !== 'todos' || filtroFacturacion !== 'todos' ? 'No se encontraron resultados.' : 'Sin trabajos registrados. Agrega el primero arriba.'} />}
             </tbody>
           </table>
         </div>
