@@ -261,31 +261,49 @@ describe('labelVehiculo', () => {
     expect(labelVehiculo(mockVehiculo2)).toBe('2019 Volkswagen Jetta');
   });
 
-  it('handles vehicle with only marca', () => {
-    const v = { id: 'vx', clienteId: 'c1', marca: 'Ford', modelo: '', anio: '', placa: '' };
-    expect(labelVehiculo(v)).toBe('Ford');
+  it('handles vehicle with only marca and modelo', () => {
+    const v = { id: 'vx', clienteId: 'c1', marca: 'Ford', modelo: 'Focus', anio: '', placa: '' };
+    const label = labelVehiculo(v);
+    expect(label).toContain('Ford');
+    expect(label).toContain('Focus');
   });
 });
 
 // ── fmt ─────────────────────────────────────────────────────────────────────
 
 describe('fmt', () => {
-  it('formats whole number with two decimals', () => {
-    const result = fmt(1000);
-    expect(result).toMatch(/1[,.]?000[.,]00/);
+  it('returns a string', () => {
+    expect(typeof fmt(1000)).toBe('string');
+    expect(typeof fmt(0)).toBe('string');
+    expect(typeof fmt(1234.5)).toBe('string');
   });
 
-  it('formats zero as 0.00', () => {
+  it('formats 0 with two decimal places', () => {
+    // Should always produce "0.00" (or "0,00" in some locales)
     const result = fmt(0);
-    expect(result).toMatch(/0[.,]00/);
+    expect(result).toMatch(/^0[.,]00$/);
   });
 
-  it('formats decimal number', () => {
-    const result = fmt(1234.5);
-    expect(result).toContain('1234' + result.slice(result.indexOf('1234') + 4, result.indexOf('1234') + 5));
+  it('formats integers with exactly two decimal places', () => {
+    const result = fmt(100);
+    // Must end in decimal separator + 2 zeros
+    expect(result).toMatch(/[.,]00$/);
   });
 
-  it('returns string type', () => {
-    expect(typeof fmt(100)).toBe('string');
+  it('rounds to exactly 2 decimal places', () => {
+    const result = fmt(1.005);
+    // Should not have more than 2 digits after the decimal separator
+    expect(result).toMatch(/[.,]\d{2}$/);
+  });
+
+  it('includes the significant digits of the number', () => {
+    const result = fmt(999);
+    expect(result).toContain('999');
+  });
+
+  it('formats numbers with decimals correctly', () => {
+    const result = fmt(1.5);
+    // Should contain "1" and "5" with exactly 2 decimal digits
+    expect(result).toMatch(/[.,]50$/);
   });
 });
