@@ -289,6 +289,21 @@ export function VistaOrdenesCompra({
                 )}
               </div>
             </div>
+            {/* ── Hints: what's still needed ── */}
+            {(!formProveedorId || itemsOrden.length === 0) && (
+              <div className="flex flex-wrap gap-2 text-xs">
+                {!formProveedorId && (
+                  <span className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 font-semibold px-3 py-1.5 rounded-lg">
+                    ⚠️ Falta seleccionar proveedor
+                  </span>
+                )}
+                {itemsOrden.length === 0 && (
+                  <span className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 font-semibold px-3 py-1.5 rounded-lg">
+                    ⚠️ Agrega al menos una pieza — llena el formulario y pulsa "+ Registrar y agregar a OC"
+                  </span>
+                )}
+              </div>
+            )}
             <Btn type="submit" variant="primary" fullWidth disabled={!formProveedorId || itemsOrden.length === 0}>+ Crear Orden de Compra</Btn>
           </form>
         )}
