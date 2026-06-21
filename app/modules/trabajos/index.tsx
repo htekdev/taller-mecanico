@@ -151,8 +151,8 @@ export function VistaTrabajo({
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
   const totalManoDeObra       = laborItems.reduce((s, l) => s + l.precio, 0);
-  const totalVentaRefacciones = partesSeleccionadas.reduce((s, p) => s + p.subtotal, 0);
-  const totalCostoRefacciones = partesSeleccionadas.reduce((s, p) => s + p.costoTotal, 0);
+  const totalVentaRefacciones = partesSeleccionadas.reduce((s, p) => s + (p.subtotal ?? 0), 0);
+  const totalCostoRefacciones = partesSeleccionadas.reduce((s, p) => s + (p.costoTotal ?? 0), 0);
   const utilidadRefacciones   = totalVentaRefacciones - totalCostoRefacciones;
   const subtotalSinIVA        = totalManoDeObra + totalVentaRefacciones;
   const ivaCalculado          = form.requiereFactura ? Math.round(subtotalSinIVA * 0.16 * 100) / 100 : 0;
@@ -695,7 +695,7 @@ export function VistaTrabajo({
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {partesSeleccionadas.map(p => {
-                          const margen = p.subtotal - p.costoTotal;
+                          const margen = (p.subtotal ?? 0) - (p.costoTotal ?? 0);
                           return (
                             <tr key={p.refaccionId} className="bg-white">
                               <td className="px-3 py-2 text-slate-800 font-medium">
@@ -703,8 +703,8 @@ export function VistaTrabajo({
                                 {p.codigo && <span className="ml-1.5 text-xs font-mono text-slate-400">{p.codigo}</span>}
                               </td>
                               <td className="px-3 py-2 text-right text-slate-700">{p.cantidad}</td>
-                              <td className="px-3 py-2 text-right text-slate-400 text-xs">${fmt(p.costoTotal)}</td>
-                              <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(p.subtotal)}</td>
+                              <td className="px-3 py-2 text-right text-slate-400 text-xs">${fmt(p.costoTotal ?? 0)}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(p.subtotal ?? 0)}</td>
                               <td className="px-3 py-2 text-right font-medium text-emerald-600">${fmt(margen)}</td>
                               <td className="px-3 py-2 text-center">
                                 <Btn size="sm" variant="danger" onClick={() => removerParte(p.refaccionId)}>✕</Btn>
