@@ -18,6 +18,7 @@ export function VistaClientes({
   const [formCliente, setFormCliente] = useState({ nombre: '', telefono: '' });
   const [clienteExpandido, setClienteExpandido] = useState<string | null>(null);
   const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: '', placa: '' });
+  const [busqueda, setBusqueda] = useState('');
 
   const handleSubmitCliente = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,8 +76,36 @@ export function VistaClientes({
           <p className="text-sm mt-1">Agrega el primer cliente arriba.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {clientes.map(cliente => {
+        <div>
+          {/* Búsqueda */}
+          <div className="mb-4">
+            <Input
+              type="text"
+              placeholder="🔍 Buscar cliente por nombre o teléfono..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+            />
+          </div>
+
+          {/* Lista filtrada */}
+          {(() => {
+            const q = busqueda.trim().toLowerCase();
+            const filtrados = q
+              ? clientes.filter(c =>
+                  c.nombre.toLowerCase().includes(q) ||
+                  c.telefono.toLowerCase().includes(q)
+                )
+              : clientes;
+            if (filtrados.length === 0) {
+              return (
+                <div className="text-center py-10 text-slate-400">
+                  <p className="font-medium">No se encontraron resultados.</p>
+                </div>
+              );
+            }
+            return (
+          <div className="space-y-2">
+          {filtrados.map(cliente => {
             const unidades = vehiculos.filter(v => v.clienteId === cliente.id);
             const expandido = clienteExpandido === cliente.id;
             return (
@@ -151,6 +180,9 @@ export function VistaClientes({
               </div>
             );
           })}
+        </div>
+            );
+          })()}
         </div>
       )}
     </div>

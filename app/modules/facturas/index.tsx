@@ -22,10 +22,15 @@ export function VistaFacturas({
   const [expandido, setExpandido] = useState<string | null>(null);
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
+  const [filtroClienteId, setFiltroClienteId] = useState('');
 
   const facturasFiltradas = [...facturas]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
-    .filter(f => filtro === 'todos' || getEstadoPagoFactura(f) === filtro);
+    .filter(f => {
+      if (filtro !== 'todos' && getEstadoPagoFactura(f) !== filtro) return false;
+      if (filtroClienteId && f.clienteId !== filtroClienteId) return false;
+      return true;
+    });
 
   const counts = { todos: facturas.length, pendiente: facturas.filter(f => getEstadoPagoFactura(f) === 'pendiente').length, parcial: facturas.filter(f => getEstadoPagoFactura(f) === 'parcial').length, pagado: facturas.filter(f => getEstadoPagoFactura(f) === 'pagado').length };
   const totalPendiente = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0);
@@ -55,6 +60,14 @@ export function VistaFacturas({
           </div>
         )}
 
+        <div className="mb-4 max-w-xs">
+          <Label>Cliente</Label>
+          <Select value={filtroClienteId} onChange={e => setFiltroClienteId(e.target.value)}>
+            <option value="">Todos los clientes</option>
+            {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </Select>
+        </div>
+
         <div className="flex gap-2 mb-5 flex-wrap">
           {(['todos','pendiente','parcial','pagado'] as const).map(f => (
             <button key={f} onClick={() => setFiltro(f)}
@@ -65,6 +78,11 @@ export function VistaFacturas({
         </div>
 
         <div className="space-y-2">
+          {facturasFiltradas.length === 0 && (
+            <div className="text-center py-10 text-slate-400">
+              <p className="font-medium">No se encontraron resultados.</p>
+            </div>
+          )}
           {facturasFiltradas.map(factura => {
             const cliente  = clientes.find(c => c.id === factura.clienteId);
             const vehiculo = vehiculos.find(v => v.id === factura.vehiculoId);

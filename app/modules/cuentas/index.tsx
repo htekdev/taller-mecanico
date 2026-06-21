@@ -538,16 +538,31 @@ export function VistaCuentasPorPagar({
   const [expandido, setExpandido] = useState<string | null>(null);
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo', nota: '' });
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
+  const [filtroProveedorId, setFiltroProveedorId] = useState('');
 
   // Only show received POs (they're the ones that create a payable)
   const ordenesPagables = ordenes.filter(o => o.estado === 'recibida');
 
   const ordenesFiltradas = [...ordenesPagables]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
-    .filter(o => filtro === 'todos' || getEstadoPagoOrden(o) === filtro);
+    .filter(o => {
+      if (filtro !== 'todos' && getEstadoPagoOrden(o) !== filtro) return false;
+      if (filtroProveedorId && o.proveedorId !== filtroProveedorId) return false;
+      return true;
+    });
 
   const counts = { todos: ordenesPagables.length, pendiente: ordenesPagables.filter(o => getEstadoPagoOrden(o) === 'pendiente').length, parcial: ordenesPagables.filter(o => getEstadoPagoOrden(o) === 'parcial').length, pagado: ordenesPagables.filter(o => getEstadoPagoOrden(o) === 'pagado').length };
   const totalPendiente = ordenesPagables.filter(o => getEstadoPagoOrden(o) !== 'pagado').reduce((s, o) => s + getSaldoOrden(o), 0);
+
+  // Total pagado por proveedor visible en la lista actual
+  const totalPagadoPorProveedor = (() => {
+    const map: Record<string, number> = {};
+    for (const o of ordenesFiltradas) {
+      const pagado = getMontoPagadoOrden(o);
+      map[o.proveedorId] = (map[o.proveedorId] ?? 0) + pagado;
+    }
+    return map;
+  })();
 
   const handlePago = (ordenId: string, saldo: number) => {
     if (pagoForm.monto <= 0) return;
@@ -582,6 +597,24 @@ export function VistaCuentasPorPagar({
           </div>
         )}
 
+        {/* Filtro por proveedor */}
+        {proveedores.length > 0 && (
+          <div className="mb-4">
+            <Select
+              value={filtroProveedorId}
+              onChange={e => setFiltroProveedorId(e.target.value)}
+            >
+              <option value="">Todos los proveedores</option>
+              {proveedores
+                .filter(p => ordenesPagables.some(o => o.proveedorId === p.id))
+                .map(p => (
+                  <option key={p.id} value={p.id}>{p.nombre}</option>
+                ))
+              }
+            </Select>
+          </div>
+        )}
+
         <div className="flex gap-2 mb-4 flex-wrap">
           {(['todos','pendiente','parcial','pagado'] as const).map(f => (
             <button key={f} onClick={() => setFiltro(f)}
@@ -591,6 +624,11 @@ export function VistaCuentasPorPagar({
           ))}
         </div>
 
+        {ordenesFiltradas.length === 0 ? (
+          <div className="text-center py-10 text-slate-400">
+            <p className="font-medium">No se encontraron resultados.</p>
+          </div>
+        ) : (
         <div className="space-y-2">
           {ordenesFiltradas.map(orden => {
             const prov    = proveedores.find(p => p.id === orden.proveedorId);
@@ -678,6 +716,28 @@ export function VistaCuentasPorPagar({
             );
           })}
         </div>
+        )}
+
+        {/* Total pagado por proveedor visible */}
+        {ordenesFiltradas.length > 0 && Object.entries(totalPagadoPorProveedor).filter(([, v]) => v > 0).length > 0 && (
+          <div className="mt-5 space-y-2">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Resumen de pagos — proveedores visibles</p>
+            {Object.entries(totalPagadoPorProveedor)
+              .filter(([, v]) => v > 0)
+              .map(([provId, total]) => {
+                const prov = proveedores.find(p => p.id === provId);
+                return (
+                  <div key={provId} className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2 text-sm">
+                    <span className="font-semibold text-slate-700">🏪 {prov?.nombre ?? '—'}</span>
+                    <span className="font-bold text-emerald-700">
+                      Total pagado: ${total.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                );
+              })
+            }
+          </div>
+        )}
       </>}
     </div>
   );

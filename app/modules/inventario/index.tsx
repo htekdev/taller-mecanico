@@ -31,6 +31,8 @@ export function VistaInventario({
   const [modeloInputs, setModeloInputs] = useState<Record<number, string>>({});
   const [expandido, setExpandido] = useState<string | null>(null);
   const [recibirCantidad, setRecibirCantidad] = useState<Record<string, number>>({});
+  const [filtroProveedor, setFiltroProveedor] = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState('');
 
   // ── Estado para edición de compatibilidad de piezas existentes ──
   // Modelo plano: cada entrada es un par (marca, modelo)
@@ -147,6 +149,12 @@ export function VistaInventario({
   };
   const proveedorNombre = (proveedorId?: string) =>
     proveedores.find(p => p.id === proveedorId)?.nombre ?? null;
+
+  const inventarioFiltrado = inventario.filter(r => {
+    if (filtroProveedor && r.proveedorId !== filtroProveedor) return false;
+    if (filtroCategoria && r.categoria !== filtroCategoria) return false;
+    return true;
+  });
 
   return (
     <div>
@@ -322,9 +330,41 @@ export function VistaInventario({
         </div>
       ) : (
         <div>
+          <div className="flex gap-3 mb-4 flex-wrap">
+            <div className="min-w-40">
+              <Select value={filtroProveedor} onChange={e => setFiltroProveedor(e.target.value)}>
+                <option value="">Todos los proveedores</option>
+                {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </Select>
+            </div>
+            <div className="min-w-40">
+              <Select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
+                <option value="">Todas las categorías</option>
+                {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+              </Select>
+            </div>
+            {(filtroProveedor || filtroCategoria) && (
+              <button
+                type="button"
+                onClick={() => { setFiltroProveedor(''); setFiltroCategoria(''); }}
+                className="text-xs text-slate-500 hover:text-rose-600 font-medium"
+              >
+                ✕ Limpiar filtros
+              </button>
+            )}
+          </div>
+          {(() => {
+          return (
+          <>
+          {inventarioFiltrado.length === 0 ? (
+            <div className="text-center py-10 text-slate-400">
+              <p className="font-medium">No se encontraron resultados.</p>
+            </div>
+          ) : (
+          <div>
           <h3 className="text-base font-bold text-slate-700 mb-3">
             Piezas en Inventario
-            <span className="ml-2 text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{inventario.length}</span>
+            <span className="ml-2 text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{inventarioFiltrado.length}</span>
           </h3>
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-sm">
@@ -336,7 +376,7 @@ export function VistaInventario({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {inventario.map((r, i) => {
+               {inventarioFiltrado.map((r, i) => {
                   const status      = stockStatus(r);
                   const isExp       = expandido === r.id;
                   const isEditCompat = editandoCompat === r.id;
@@ -494,6 +534,11 @@ export function VistaInventario({
               </tbody>
             </table>
           </div>
+          </div>
+          )}
+          </>
+          );
+          })()}
         </div>
       )}
     </div>

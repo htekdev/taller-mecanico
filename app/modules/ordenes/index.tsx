@@ -40,6 +40,7 @@ export function VistaOrdenesCompra({
   const [itemsOrden, setItemsOrden] = useState<CompraItem[]>([]);
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'recibida'|'cancelada'>('todos');
   const [expandido, setExpandido] = useState<string | null>(null);
+  const [filtroProveedorId, setFiltroProveedorId] = useState('');
 
   // ΓöÇΓöÇ Modo agregar pieza ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const [modoAgregar, setModoAgregar] = useState<'existente' | 'nueva'>('existente');
@@ -139,7 +140,11 @@ export function VistaOrdenesCompra({
 
   const ordenesFiltradas = [...ordenes]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
-    .filter(o => filtro === 'todos' || o.estado === filtro);
+    .filter(o => {
+      if (filtroProveedorId && o.proveedorId !== filtroProveedorId) return false;
+      if (filtro !== 'todos' && o.estado !== filtro) return false;
+      return true;
+    });
 
   const counts = { todos: ordenes.length, pendiente: ordenes.filter(o => o.estado === 'pendiente').length, recibida: ordenes.filter(o => o.estado === 'recibida').length, cancelada: ordenes.filter(o => o.estado === 'cancelada').length };
   const pendientesRecibir = counts.pendiente;
@@ -334,17 +339,35 @@ export function VistaOrdenesCompra({
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {(['todos','pendiente','recibida','cancelada'] as const).map(f => (
-          <button key={f} onClick={() => setFiltro(f)}
-            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${filtro === f ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'}`}>
-            {f === 'todos' ? 'Todas' : BADGE_ORDEN[f].label} ({counts[f]})
-          </button>
-        ))}
+      <div className="mb-4 space-y-3">
+        <div className="max-w-xs">
+          <Label>Proveedor</Label>
+          <Select value={filtroProveedorId} onChange={e => setFiltroProveedorId(e.target.value)}>
+            <option value="">Todos los proveedores</option>
+            {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+          </Select>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {([
+            { key: 'todos',     label: 'Todos' },
+            { key: 'pendiente', label: 'Pendientes de recibir' },
+            { key: 'recibida',  label: 'Recibidas' },
+            { key: 'cancelada', label: 'Canceladas' },
+          ] as const).map(({ key, label }) => (
+            <Btn
+              key={key}
+              size="sm"
+              variant={filtro === key ? 'primary' : 'ghost'}
+              onClick={() => setFiltro(key)}
+            >
+              {label} ({counts[key]})
+            </Btn>
+          ))}
+        </div>
       </div>
 
       {ordenesFiltradas.length === 0 ? (
-        <div className="text-center py-12 text-slate-400"><div className="text-5xl mb-3">📋</div><p className="font-medium text-slate-500">Sin órdenes registradas</p></div>
+        <div className="text-center py-12 text-slate-400"><div className="text-5xl mb-3">📋</div><p className="font-medium text-slate-500">No se encontraron resultados.</p></div>
       ) : (
         <div className="space-y-2">
           {ordenesFiltradas.map((orden, i) => {
