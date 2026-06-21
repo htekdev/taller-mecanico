@@ -536,7 +536,7 @@ export function VistaCuentasPorPagar({
 }) {
   const hoy = new Date().toISOString().split('T')[0];
   const [expandido, setExpandido] = useState<string | null>(null);
-  const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, nota: '' });
+  const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo', nota: '' });
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
 
   // Only show received POs (they're the ones that create a payable)
@@ -551,8 +551,13 @@ export function VistaCuentasPorPagar({
 
   const handlePago = (ordenId: string, saldo: number) => {
     if (pagoForm.monto <= 0) return;
-    onRegistrarPago(ordenId, { monto: Math.min(pagoForm.monto, saldo), fecha: pagoForm.fecha, nota: pagoForm.nota || undefined });
-    setPagoForm({ monto: 0, fecha: hoy, nota: '' });
+    onRegistrarPago(ordenId, {
+      monto: Math.min(pagoForm.monto, saldo),
+      fecha: pagoForm.fecha,
+      metodoPago: pagoForm.metodoPago,
+      nota: pagoForm.nota || undefined,
+    });
+    setPagoForm({ monto: 0, fecha: hoy, metodoPago: 'Efectivo', nota: '' });
     setExpandido(null);
   };
 
@@ -615,7 +620,7 @@ export function VistaCuentasPorPagar({
                   <div className="flex items-center justify-between sm:justify-end gap-2">
                     <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
                     <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'}
-                      onClick={() => { setExpandido(isExp ? null : orden.id); setPagoForm({ monto: 0, fecha: hoy, nota: '' }); }}>
+                      onClick={() => { setExpandido(isExp ? null : orden.id); setPagoForm({ monto: 0, fecha: hoy, metodoPago: 'Efectivo', nota: '' }); }}>
                       {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
                     </Btn>
                   </div>
@@ -642,7 +647,11 @@ export function VistaCuentasPorPagar({
                         <div className="space-y-1">
                           {orden.pagos.map(p => (
                             <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                              <div className="flex gap-3"><span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>{p.nota && <span className="text-slate-500 italic">{p.nota}</span>}</div>
+                              <div className="flex gap-3">
+                                <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
+                                {p.metodoPago && <span className="text-slate-500 font-medium">{p.metodoPago}</span>}
+                                {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
+                              </div>
                               <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
                             </div>
                           ))}
@@ -653,10 +662,11 @@ export function VistaCuentasPorPagar({
                     {estado !== 'pagado' && (
                       <div>
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Registrar Pago al Proveedor</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
                           <div><Label>Fecha</Label><Input type="date" value={pagoForm.fecha} onChange={e => setPagoForm(f => ({ ...f, fecha: e.target.value }))} /></div>
                           <div><Label>Monto ($) — saldo: ${fmt(saldo)}</Label><Input type="number" placeholder="0.00" min="0.01" step="0.01" value={pagoForm.monto || ''} onChange={e => setPagoForm(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
-                          <div><Label>Nota (opcional)</Label><Input type="text" placeholder="Efectivo, transferencia..." value={pagoForm.nota} onChange={e => setPagoForm(f => ({ ...f, nota: e.target.value }))} /></div>
+                          <div><Label>Método de pago</Label><Select value={pagoForm.metodoPago} onChange={e => setPagoForm(f => ({ ...f, metodoPago: e.target.value }))}>{['Efectivo','Transferencia','Tarjeta','Cheque','Otro'].map(m => <option key={m}>{m}</option>)}</Select></div>
+                          <div><Label>Nota (opcional)</Label><Input type="text" placeholder="Referencia o comentario" value={pagoForm.nota} onChange={e => setPagoForm(f => ({ ...f, nota: e.target.value }))} /></div>
                           <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoForm.monto <= 0} onClick={() => handlePago(orden.id, saldo)}>✓ Registrar</Btn></div>
                         </div>
                       </div>

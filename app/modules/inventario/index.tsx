@@ -361,15 +361,19 @@ export function VistaInventario({
                               </span>
                             </div>
                           )}
-                          {r.compatibilidad && r.compatibilidad.length > 0 && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {r.compatibilidad.map((c, ci) => (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {r.compatibilidad && r.compatibilidad.length > 0 ? (
+                              r.compatibilidad.map((c, ci) => (
                                 <span key={ci} className="text-xs bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded-full border border-emerald-200">
-                                  🚗 {c.marca}: {c.modelos.join(', ')}
+                                  🚗 {c.marca}
                                 </span>
-                              ))}
-                            </div>
-                          )}
+                              ))
+                            ) : (
+                              <span className="text-xs bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded-full border border-slate-200">
+                                🌐 Universal
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-xs bg-indigo-50 text-indigo-700 font-medium px-2 py-0.5 rounded-full">{r.categoria}</span>
