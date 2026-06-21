@@ -7,7 +7,7 @@ import type {
 } from '@/app/types';
 import {
   generarNumeroFactura, generarNumeroOrden,
-  getEstadoPagoFactura, getSaldoFactura,
+  getEstadoPagoFactura, getSaldoFactura, getSaldo,
   getEstadoPagoOrden,
 } from '@/app/lib/utils';
 import { Card } from '@/app/components/ui';
@@ -211,10 +211,16 @@ export default function TallerMecanico() {
     const ganancia           = totalManoObra + margenRef;
     const cobradoEnMes = facturas.reduce((s, f) =>
       s + (f.pagos ?? []).filter(p => p.fecha.startsWith(mesActual)).reduce((s2, p) => s2 + p.monto, 0), 0);
+    const pctCobrado = facturadoMes > 0 ? Math.min(cobradoEnMes / facturadoMes, 1) : 0;
+    const gananciaCobrada = Math.round(ganancia * pctCobrado * 100) / 100;
     const porCobrarDelMes = facturas.filter(f => {
       const t = trabajos.find(t => t.id === f.trabajoId);
       return t?.fecha.startsWith(mesActual);
     }).reduce((s, f) => s + getSaldoFactura(f), 0);
+    const pendientePorCobrar =
+      facturas.filter(f => { const t = trabajos.find(t => t.id === f.trabajoId); return t?.fecha.startsWith(mesActual); })
+        .reduce((s, f) => s + getSaldoFactura(f), 0)
+      + trabajos.filter(t => t.fecha.startsWith(mesActual) && !t.facturaId).reduce((s, t) => s + getSaldo(t), 0);
     const ordenesMes    = ordenes.filter(o => o.fecha.startsWith(mesActual) && o.estado !== 'cancelada');
     const totalOrdenes  = ordenesMes.reduce((s, o) => s + o.total, 0);
     const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0);
@@ -226,6 +232,7 @@ export default function TallerMecanico() {
     return {
       facturadoMes, totalVentaRef, totalCostoRef, margenRef, totalManoObra, ganancia,
       cantidad: mes.length, cobradoEnMes, porCobrarDelMes, totalOrdenes, porPagarOrdenes,
+      gananciaCobrada, pendientePorCobrar,
       totalIVA, ingresoConIVA, ingresoSinIVA,
       pagadoAProveedoresMes: ordenesMes.reduce((s, o) => s + (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0), 0),
       porPagarTotal: ordenes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0),
