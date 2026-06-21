@@ -343,13 +343,31 @@ function PantallaHistorial({
                           🔩 Mano de Obra
                         </p>
                         <div className="space-y-1">
-                          {(trabajo.manoDeObraItems ?? []).map(item => (
-                            <div key={item.id} className="flex justify-between items-center text-sm">
-                              <span className="text-slate-600">{item.concepto}</span>
-                              <span className="font-semibold text-slate-800">${fmt(item.precio)}</span>
-                            </div>
-                          ))}
+                          {(trabajo.manoDeObraItems ?? []).map((item, idx, arr) => {
+                            // Fallback: if single item has price 0 but aggregate > 0, use aggregate
+                            const displayPrecio = item.precio > 0
+                              ? item.precio
+                              : arr.length === 1 && trabajo.manoDeObra > 0
+                                ? trabajo.manoDeObra
+                                : null;
+                            return (
+                              <div key={item.id} className="flex justify-between items-center text-sm">
+                                <span className="text-slate-600">{item.concepto}</span>
+                                <span className={`font-semibold ${displayPrecio !== null ? 'text-slate-800' : 'text-slate-400'}`}>
+                                  {displayPrecio !== null ? `$${fmt(displayPrecio)}` : '—'}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
+                        {/* If all items show $0 but aggregate > 0, clarify total */}
+                        {(trabajo.manoDeObraItems ?? []).length > 1 &&
+                          (trabajo.manoDeObraItems ?? []).every(i => !i.precio) &&
+                          trabajo.manoDeObra > 0 && (
+                          <p className="text-xs text-slate-400 mt-1 text-right">
+                            Total: <strong className="text-slate-600">${fmt(trabajo.manoDeObra)}</strong>
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -360,15 +378,25 @@ function PantallaHistorial({
                           🔧 Refacciones
                         </p>
                         <div className="space-y-1">
-                          {(trabajo.partes ?? []).map((parte, i) => (
-                            <div key={i} className="flex justify-between items-center text-sm">
-                              <span className="text-slate-600 truncate mr-2">
-                                {parte.nombre}
-                                <span className="text-slate-400 text-xs ml-1">×{parte.cantidad}</span>
-                              </span>
-                              <span className="font-semibold text-slate-800 flex-shrink-0">${fmt(parte.subtotal)}</span>
-                            </div>
-                          ))}
+                          {(trabajo.partes ?? []).map((parte, i) => {
+                            // Fallback: subtotal → precioVenta×cantidad → null (show "—")
+                            const displaySub = parte.subtotal > 0
+                              ? parte.subtotal
+                              : (parte.precioVenta ?? 0) > 0
+                                ? parte.precioVenta * parte.cantidad
+                                : null;
+                            return (
+                              <div key={i} className="flex justify-between items-center text-sm">
+                                <span className="text-slate-600 truncate mr-2">
+                                  {parte.nombre}
+                                  <span className="text-slate-400 text-xs ml-1">×{parte.cantidad}</span>
+                                </span>
+                                <span className={`font-semibold flex-shrink-0 ${displaySub !== null ? 'text-slate-800' : 'text-slate-400'}`}>
+                                  {displaySub !== null ? `$${fmt(displaySub)}` : '—'}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
