@@ -102,10 +102,37 @@ export function VistaOrdenesCompra({
     setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // True when the nueva-refacción sub-form is ready to be auto-registered on submit
+  const nuevaRefaccionLista = modoAgregar === 'nueva' && newNombre.trim().length > 0 && newPrecio > 0 && newCantidad > 0;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formProveedorId || itemsOrden.length === 0) return;
-    onCrearOrden({ proveedorId: formProveedorId, fecha: formFecha, descripcion: formDesc, partes: itemsOrden, total: totalOrden, numeroOrden: formNumOrden || undefined });
+    // Auto-register nueva refacción if the sub-form is filled
+    let finalItems = [...itemsOrden];
+    if (nuevaRefaccionLista) {
+      const categoriaFinal = newCategoria === '__custom__' ? newCategoriaCustom.trim() : newCategoria;
+      const nuevaRef = await onCrearRefaccionNueva({
+        nombre:       newNombre.trim(),
+        codigo:       newCodigo.trim(),
+        categoria:    categoriaFinal,
+        unidad:       newUnidad || 'pza',
+        precioCompra: newPrecio,
+        stock:        0,
+        stockMinimo:  1,
+      });
+      if (!nuevaRef) return;
+      finalItems = [...finalItems, {
+        refaccionId:  nuevaRef.id,
+        nombre:       nuevaRef.nombre,
+        cantidad:     newCantidad,
+        precioCompra: newPrecio,
+        subtotal:     newCantidad * newPrecio,
+      }];
+      setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
+      setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
+    }
+    if (!formProveedorId || finalItems.length === 0) return;
+    onCrearOrden({ proveedorId: formProveedorId, fecha: formFecha, descripcion: formDesc, partes: finalItems, total: finalItems.reduce((s, i) => s + i.subtotal, 0), numeroOrden: formNumOrden || undefined });
     setFormProveedorId(''); setFormFecha(hoy); setFormDesc(''); setFormNumOrden(''); setItemsOrden([]);
   };
 
@@ -290,7 +317,17 @@ export function VistaOrdenesCompra({
                 )}
               </div>
             </div>
-            <Btn type="submit" variant="primary" fullWidth disabled={!formProveedorId || itemsOrden.length === 0}>+ Crear Orden de Compra</Btn>
+            {/* Hints de validación */}
+            {!formProveedorId && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">⚠️ Selecciona un proveedor para continuar.</p>
+            )}
+            {formProveedorId && itemsOrden.length === 0 && !nuevaRefaccionLista && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">⚠️ Agrega al menos una pieza a la orden.</p>
+            )}
+            <Btn type="submit" variant="primary" fullWidth
+              disabled={!formProveedorId || (itemsOrden.length === 0 && !nuevaRefaccionLista)}>
+              {nuevaRefaccionLista ? '+ Registrar pieza y crear orden' : '+ Crear Orden de Compra'}
+            </Btn>
           </form>
         )}
       </div>

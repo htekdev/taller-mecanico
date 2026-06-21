@@ -175,6 +175,8 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
     facturaId: r.factura_id ?? undefined,
     estadoFacturacion: r.estado_facturacion,
     estado: r.estado,
+    tipoDocumento: (r.tipo_documento as Trabajo['tipoDocumento']) ?? undefined,
+    fechaFinalizacion: r.fecha_finalizacion ?? undefined,
   }));
 }
 
@@ -222,6 +224,23 @@ export async function updateTrabajoPagos(trabajoId: string, pagos: Pago[]): Prom
 
 export async function updateTrabajoFactura(trabajoId: string, facturaId: string): Promise<void> {
   await supabase.from('trabajos').update({ factura_id: facturaId, estado_facturacion: 'facturado' }).eq('id', trabajoId);
+}
+
+/** Finalizar trabajo — sets estado=completado, tipoDocumento, IVA, total, fechaFinalizacion */
+export async function updateTrabajoFinalizar(
+  trabajoId: string,
+  tipo: 'factura' | 'nota',
+  iva: number,
+  total: number,
+): Promise<void> {
+  await supabase.from('trabajos').update({
+    estado: 'completado',
+    tipo_documento: tipo,
+    requiere_factura: tipo === 'factura',
+    iva,
+    total,
+    fecha_finalizacion: new Date().toISOString(),
+  }).eq('id', trabajoId);
 }
 
 // ── Órdenes de Compra ─────────────────────────────────────────

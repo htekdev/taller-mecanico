@@ -6,6 +6,103 @@ import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/compone
 import { labelVehiculo, fmt } from '@/app/lib/utils';
 import { getPricingIntel } from '@/app/lib/pricing';
 
+// ── Finalization Modal ──────────────────────────────────────────────────────
+function ModalFinalizacion({
+  trabajo,
+  cliente,
+  vehiculo,
+  onConfirmar,
+  onCancelar,
+}: {
+  trabajo: Trabajo;
+  cliente?: Cliente;
+  vehiculo?: Vehiculo;
+  onConfirmar: (tipo: 'factura' | 'nota') => void;
+  onCancelar: () => void;
+}) {
+  const subtotal = trabajo.manoDeObra + trabajo.refacciones;
+  const ivaFactura = Math.round(subtotal * 0.16 * 100) / 100;
+  const totalFactura = subtotal + ivaFactura;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={onCancelar}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 relative"
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          onClick={onCancelar}
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all text-lg font-bold"
+          aria-label="Cerrar"
+        >&#x2715;</button>
+
+        <div className="text-center space-y-1">
+          <div className="text-4xl mb-2">&#127937;</div>
+          <h2 className="text-xl font-bold text-slate-800">Finalizar Trabajo</h2>
+          <p className="text-sm text-slate-500">El camión ya salió del taller.</p>
+        </div>
+
+        <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 space-y-1 text-sm">
+          <div className="font-semibold text-slate-700 truncate">{trabajo.descripcion}</div>
+          {cliente && <div className="text-slate-500">Cliente: {cliente.nombre}</div>}
+          {vehiculo && (
+            <div className="text-slate-500">
+              Vehículo: {[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}
+              {vehiculo.placa && <span className="ml-1.5 text-xs font-mono bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">{vehiculo.placa}</span>}
+            </div>
+          )}
+          <div className="border-t border-slate-200 mt-2 pt-2 text-slate-700 font-medium">
+            Subtotal: <span className="font-bold text-slate-900">${fmt(subtotal)}</span>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest text-center">¿Cómo se va a cobrar?</p>
+          <button
+            onClick={() => onConfirmar('nota')}
+            className="w-full flex items-center gap-4 px-4 py-4 rounded-xl border-2 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left group"
+          >
+            <span className="text-3xl">&#128196;</span>
+            <div className="flex-1">
+              <div className="font-bold text-slate-800 group-hover:text-indigo-700">Nota</div>
+              <div className="text-xs text-slate-500">Sin IVA — pago en efectivo o informal</div>
+            </div>
+            <div className="text-right">
+              <div className="font-extrabold text-slate-900 text-lg">${fmt(subtotal)}</div>
+              <div className="text-xs text-slate-400">sin IVA</div>
+            </div>
+          </button>
+          <button
+            onClick={() => onConfirmar('factura')}
+            className="w-full flex items-center gap-4 px-4 py-4 rounded-xl border-2 border-slate-200 hover:border-amber-400 hover:bg-amber-50 transition-all text-left group"
+          >
+            <span className="text-3xl">&#129534;</span>
+            <div className="flex-1">
+              <div className="font-bold text-slate-800 group-hover:text-amber-700">Factura Fiscal</div>
+              <div className="text-xs text-slate-500">Con IVA 16% — factura oficial SAT</div>
+            </div>
+            <div className="text-right">
+              <div className="font-extrabold text-amber-700 text-lg">${fmt(totalFactura)}</div>
+              <div className="text-xs text-amber-600">+${fmt(ivaFactura)} IVA</div>
+            </div>
+          </button>
+        </div>
+
+        <button
+          onClick={onCancelar}
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400 transition-all text-slate-700 font-semibold text-sm"
+        >
+          &#8592; Regresar — el trabajo sigue en progreso
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ──────────────────────────────────────────────────────────
 export function VistaTrabajo({
   clientes,
   vehiculos,
@@ -13,6 +110,7 @@ export function VistaTrabajo({
   trabajos,
   facturas,
   onGuardar,
+  onFinalizar,
   onIrAInventario,
   onGenerarFactura,
   onIrAFacturas,
@@ -23,6 +121,7 @@ export function VistaTrabajo({
   trabajos: Trabajo[];
   facturas: Factura[];
   onGuardar: (t: Omit<Trabajo, 'id' | 'total' | 'iva'>) => void;
+  onFinalizar: (trabajoId: string, tipo: 'factura' | 'nota') => void;
   onIrAInventario: () => void;
   onGenerarFactura: (trabajoId: string) => void;
   onIrAFacturas: () => void;
@@ -44,6 +143,8 @@ export function VistaTrabajo({
   const [pickerRefId, setPickerRefId]         = useState('');
   const [pickerCantidad, setPickerCantidad]   = useState(1);
   const [pickerPrecioVenta, setPickerPrecioVenta] = useState(0);
+  const [finalizandoId, setFinalizandoId] = useState<string | null>(null);
+  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'completado'>('todos');
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
   const totalManoDeObra       = laborItems.reduce((s, l) => s + l.precio, 0);
@@ -129,8 +230,8 @@ export function VistaTrabajo({
       manoDeObraItems: laborItems,
       refacciones: totalVentaRefacciones,
       costoRefacciones: totalCostoRefacciones,
-      requiereFactura: form.requiereFactura,
-      folioFiscal: form.requiereFactura && form.folioFiscal ? form.folioFiscal : undefined,
+      requiereFactura: false,
+      folioFiscal: undefined,
       partes: partesSeleccionadas,
       pagos: [],
     });
@@ -178,8 +279,26 @@ export function VistaTrabajo({
     ? partesParaEstaUnidad.length + partesCompatibles.length + partesUniversales.length
     : inventario.length;
 
+  const trabajosPendientes = trabajos.filter(t => t.estado === 'pendiente');
+  const trabajosFiltrados = filtroEstado === 'todos'
+    ? trabajos
+    : trabajos.filter(t => t.estado === filtroEstado);
+  const trabajoFinalizando = finalizandoId ? trabajos.find(t => t.id === finalizandoId) : null;
+
   return (
     <div>
+      {trabajoFinalizando && (
+        <ModalFinalizacion
+          trabajo={trabajoFinalizando}
+          cliente={getCliente(trabajoFinalizando.clienteId)}
+          vehiculo={getVehiculo(trabajoFinalizando.vehiculoId)}
+          onConfirmar={(tipo) => {
+            onFinalizar(finalizandoId!, tipo);
+            setFinalizandoId(null);
+          }}
+          onCancelar={() => setFinalizandoId(null)}
+        />
+      )}
       <SectionTitle title="Registro de Trabajos" subtitle="Selecciona cliente, unidad y las refacciones usadas del inventario." />
 
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-8">
@@ -566,46 +685,12 @@ export function VistaTrabajo({
             )}
           </div>
 
-          {/* ── Factura Fiscal (IVA) ── */}
-          <div className={`border rounded-xl p-4 space-y-3 ${form.requiereFactura ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.requiereFactura}
-                onChange={e => setForm(f => ({ ...f, requiereFactura: e.target.checked, folioFiscal: '' }))}
-                className="w-4 h-4 accent-amber-500 cursor-pointer"
-              />
-              <div>
-                <span className={`font-semibold text-sm ${form.requiereFactura ? 'text-amber-800' : 'text-slate-700'}`}>
-                  🧾 ¿Requiere factura fiscal?
-                </span>
-                <span className="text-xs text-slate-400 ml-2">
-                  {form.requiereFactura ? 'Se agrega IVA 16% al total' : 'Sin IVA — pago sin factura fiscal'}
-                </span>
-              </div>
-            </label>
-
-            {form.requiereFactura && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div>
-                  <Label>Folio Fiscal (opcional)</Label>
-                  <Input type="text" placeholder="Ej. FAC-2026-0042"
-                    value={form.folioFiscal}
-                    onChange={e => setForm(f => ({ ...f, folioFiscal: e.target.value }))}
-                    className="font-mono" />
-                </div>
-                <div className="flex items-end">
-                  <div className="w-full bg-amber-100 border border-amber-200 rounded-lg px-4 py-2.5 text-sm">
-                    <div className="flex justify-between text-amber-700"><span>Subtotal sin IVA:</span><span className="font-semibold">${fmt(subtotalSinIVA)}</span></div>
-                    <div className="flex justify-between text-amber-700 mt-0.5"><span>IVA 16%:</span><span className="font-semibold">+ ${fmt(ivaCalculado)}</span></div>
-                    <div className="flex justify-between text-amber-900 font-bold border-t border-amber-300 mt-1.5 pt-1.5"><span>Total con IVA:</span><span>${fmt(totalConIVA)}</span></div>
-                  </div>
-                </div>
-              </div>
-            )}
+          {/* ── Nota: IVA se elige al finalizar ── */}
+          <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4 text-sm text-indigo-700 flex items-start gap-2">
+            <span className="text-lg mt-0.5">ℹ️</span>
+            <span>El IVA se elige cuando el trabajo se <strong>finaliza</strong> — al presionar el botón 🏁 Finalizar elegirás entre <strong>Nota</strong> (sin IVA) o <strong>Factura Fiscal</strong> (IVA 16%).</span>
           </div>
 
-          {/* Resumen del trabajo */}
           {(totalManoDeObra > 0 || totalVentaRefacciones > 0) && (
             <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-4 space-y-2 text-sm">
               <div className="flex flex-wrap gap-6">
@@ -615,14 +700,7 @@ export function VistaTrabajo({
                   {': '}<span className="font-bold text-slate-800">${fmt(totalManoDeObra)}</span>
                 </div>
                 <div><span className="text-indigo-500 font-semibold">Venta refacciones:</span> <span className="font-bold text-slate-800">${fmt(totalVentaRefacciones)}</span></div>
-                {form.requiereFactura ? (
-                  <>
-                    <div><span className="text-amber-600 font-semibold">IVA 16%:</span> <span className="font-bold text-amber-700">+ ${fmt(ivaCalculado)}</span></div>
-                    <div><span className="text-indigo-700 font-bold">Total con IVA: </span><span className="font-extrabold text-indigo-800 text-base">${fmt(totalConIVA)}</span></div>
-                  </>
-                ) : (
-                  <div><span className="text-indigo-700 font-bold">Total cobrado: </span><span className="font-extrabold text-indigo-800 text-base">${fmt(subtotalSinIVA)}</span></div>
-                )}
+                <div><span className="text-indigo-700 font-bold">Subtotal: </span><span className="font-extrabold text-indigo-800 text-base">${fmt(subtotalSinIVA)}</span></div>
               </div>
               {utilidadRefacciones !== 0 && (
                 <div className="text-xs text-slate-500 border-t border-indigo-100 pt-2 flex flex-wrap gap-4">
@@ -643,28 +721,61 @@ export function VistaTrabajo({
 
       {/* ── Historial ── */}
       <div>
-        <h3 className="text-base font-bold text-slate-700 mb-3">
-          Historial de Trabajos
-          {trabajos.length > 0 && <span className="ml-2 text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{trabajos.length}</span>}
-        </h3>
+        {/* Banner: trabajos pendientes */}
+        {trabajosPendientes.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-4 flex items-center gap-3 text-sm">
+            <span className="text-2xl">🚛</span>
+            <span className="text-amber-800 font-semibold">
+              {trabajosPendientes.length} trabajo{trabajosPendientes.length !== 1 ? 's' : ''} en el taller — pendiente{trabajosPendientes.length !== 1 ? 's' : ''} de finalizar
+            </span>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h3 className="text-base font-bold text-slate-700">
+            Historial de Trabajos
+            {trabajos.length > 0 && <span className="ml-2 text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{trabajos.length}</span>}
+          </h3>
+          {/* Filtro estado */}
+          {trabajos.length > 0 && (
+            <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+              {([['todos', 'Todos'], ['pendiente', '🕐 En progreso'], ['completado', '✓ Terminados']] as const).map(([val, label]) => (
+                <button key={val} onClick={() => setFiltroEstado(val)}
+                  className={`text-xs px-3 py-1.5 rounded-md font-semibold transition-all ${filtroEstado === val ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-800 text-white">
-                {['Fecha','Cliente','Unidad','Descripción','Refacciones','Mano de Obra','Total'].map((h, i) => (
-                  <th key={h} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 4 ? 'text-right' : 'text-left'}`}>{h}</th>
+                {['Fecha','Estado','Cliente','Unidad','Descripción','Refacciones','Mano de Obra','Total',''].map((h, i) => (
+                  <th key={i} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 5 && i <= 7 ? 'text-right' : 'text-left'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {trabajos.map((trabajo, i) => {
+              {trabajosFiltrados.map((trabajo, i) => {
                 const cliente  = getCliente(trabajo.clienteId);
                 const vehiculo = getVehiculo(trabajo.vehiculoId);
+                const isPendiente = trabajo.estado === 'pendiente';
+                const badgeEstado = trabajo.tipoDocumento === 'factura'
+                  ? <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">🧾 Factura</span>
+                  : trabajo.tipoDocumento === 'nota'
+                    ? <span className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded-full">📄 Nota</span>
+                    : isPendiente
+                      ? <span className="text-xs bg-amber-50 text-amber-600 font-semibold px-2 py-0.5 rounded-full border border-amber-200">🕐 En progreso</span>
+                      : <span className="text-xs bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">✓ Terminado</span>;
                 return (
                   <tr key={trabajo.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-700 font-medium">
                       {new Date(trabajo.fecha).toLocaleDateString('es-MX')}
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap">{badgeEstado}</td>
                     <td className="px-4 py-3 text-slate-800 font-medium">{cliente?.nombre ?? '—'}</td>
                     <td className="px-4 py-3">
                       {vehiculo ? (
@@ -679,11 +790,6 @@ export function VistaTrabajo({
                       {trabajo.partes?.length > 0 && (
                         <span className="ml-2 text-xs bg-indigo-100 text-indigo-700 font-semibold px-1.5 py-0.5 rounded-full">
                           {trabajo.partes.length} pieza{trabajo.partes.length !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                      {trabajo.requiereFactura && (
-                        <span className="ml-2 text-xs bg-amber-100 text-amber-700 font-semibold px-1.5 py-0.5 rounded-full">
-                          🧾 +IVA{trabajo.folioFiscal ? ` ${trabajo.folioFiscal}` : ''}
                         </span>
                       )}
                       {trabajo.estadoFacturacion === 'facturado' ? (
@@ -708,10 +814,21 @@ export function VistaTrabajo({
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-slate-900">${fmt(trabajo.total)}</td>
+                    <td className="px-4 py-3 text-center">
+                      {isPendiente && (
+                        <button
+                          type="button"
+                          onClick={() => setFinalizandoId(trabajo.id)}
+                          className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap shadow-sm"
+                        >
+                          🏁 Finalizar
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
-              {trabajos.length === 0 && <EmptyRow cols={7} message="Sin trabajos registrados. Agrega el primero arriba." />}
+              {trabajosFiltrados.length === 0 && <EmptyRow cols={9} message={filtroEstado === 'todos' ? 'Sin trabajos registrados. Agrega el primero arriba.' : `Sin trabajos con estado "${filtroEstado}".`} />}
             </tbody>
           </table>
         </div>

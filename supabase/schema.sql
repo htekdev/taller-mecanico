@@ -102,6 +102,8 @@ CREATE TABLE IF NOT EXISTS trabajos (
   factura_id          UUID,
   estado_facturacion  TEXT DEFAULT 'sin_facturar' CHECK (estado_facturacion IN ('sin_facturar', 'facturado')),
   estado              TEXT DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'completado', 'pagado')),
+  tipo_documento      TEXT CHECK (tipo_documento IN ('factura', 'nota')),
+  fecha_finalizacion  TIMESTAMPTZ,
   created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
