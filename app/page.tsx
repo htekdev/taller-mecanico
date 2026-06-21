@@ -1,10 +1,9 @@
-﻿'use client';
+'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor, OrdenCompra, Factura,
-  TrabajoRefaccion, Pago, PagoCompra, PagoFactura, FacturaConcepto, CompraItem,
-  CompatibilidadVehiculo,
+  Pago, PagoCompra, PagoFactura, FacturaConcepto, CompatibilidadVehiculo,
 } from '@/app/types';
 import {
   generarNumeroFactura, generarNumeroOrden,
@@ -21,8 +20,13 @@ import { VistaFacturas } from '@/app/modules/facturas';
 import { VistaCuentas, VistaCuentasPorPagar } from '@/app/modules/cuentas';
 import { VistaResumen } from '@/app/modules/resumen';
 import { VistaHistorial } from '@/app/modules/historial';
+import { useAuth }      from '@/app/context/auth';
+import * as db          from '@/app/lib/db';
+
+type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial';
 
 export default function TallerMecanico() {
+  const { taller, user, signOut } = useAuth();
   const [clientes,    setClientes]    = useState<Cliente[]>([]);
   const [vehiculos,   setVehiculos]   = useState<Vehiculo[]>([]);
   const [inventario,  setInventario]  = useState<Refaccion[]>([]);
@@ -30,213 +34,159 @@ export default function TallerMecanico() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [ordenes,     setOrdenes]     = useState<OrdenCompra[]>([]);
   const [facturas,    setFacturas]    = useState<Factura[]>([]);
-  const [vista, setVista] = useState<'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'>('clientes');
+  const [vista, setVista] = useState<Vista>('clientes');
   const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
+  const [cargando, setCargando] = useState(true);
 
-  // ── Cargar datos con migración de formatos anteriores ──
-  useEffect(() => {
-    const rawClientes    = localStorage.getItem('clientes');
-    const rawVehiculos   = localStorage.getItem('vehiculos');
-    const rawInventario  = localStorage.getItem('inventario');
-    const rawTrabajos    = localStorage.getItem('trabajos');
-    const rawProveedores = localStorage.getItem('proveedores');
-    const rawOrdenes     = localStorage.getItem('ordenes');
-    const rawCompras     = localStorage.getItem('compras');  // legacy key
-    const rawFacturas    = localStorage.getItem('facturas');
+  // ── Cargar datos desde Supabase ──
+  const cargarDatos = useCallback(async () => {
+    if (!taller) return;
+    setCargando(true);
+    const [c, v, r, t, p, o, f] = await Promise.all([
+      db.getClientes(taller.id),
+      db.getVehiculos(taller.id),
+      db.getRefacciones(taller.id),
+      db.getTrabajos(taller.id),
+      db.getProveedores(taller.id),
+      db.getOrdenes(taller.id),
+      db.getFacturas(taller.id),
+    ]);
+    setClientes(c); setVehiculos(v); setInventario(r); setTrabajos(t);
+    setProveedores(p); setOrdenes(o); setFacturas(f);
+    setCargando(false);
+  }, [taller]);
 
-    type ClienteViejo = Cliente & { vehiculo?: string };
-    let parsedClientes: ClienteViejo[]  = rawClientes  ? JSON.parse(rawClientes)  : [];
-    let parsedVehiculos: Vehiculo[]     = rawVehiculos  ? JSON.parse(rawVehiculos) : [];
-    const parsedInventario: Refaccion[] = rawInventario ? JSON.parse(rawInventario) : [];
-
-    if (parsedClientes.some(c => 'vehiculo' in c && c.vehiculo)) {
-      const migrados: Vehiculo[] = [];
-      parsedClientes = parsedClientes.map(({ vehiculo, ...c }) => {
-        if (vehiculo) migrados.push({ id: `mig_${c.id}`, clienteId: c.id, marca: vehiculo, modelo: '', anio: '', placa: '' });
-        return c;
-      });
-      parsedVehiculos = [...parsedVehiculos, ...migrados];
-      localStorage.setItem('clientes',  JSON.stringify(parsedClientes));
-      localStorage.setItem('vehiculos', JSON.stringify(parsedVehiculos));
-    }
-
-    const parsedTrabajos: Trabajo[] = (rawTrabajos ? JSON.parse(rawTrabajos) : [])
-      .map((t: Trabajo & { manoDeObra: number }) => {
-        const partes: TrabajoRefaccion[] = (t.partes ?? []).map(
-          (p: TrabajoRefaccion & { precioUnitario?: number }) => ({
-            ...p,
-            precioCompra: p.precioCompra ?? p.precioUnitario ?? 0,
-            precioVenta:  p.precioVenta  ?? p.precioUnitario ?? 0,
-            costoTotal:   p.costoTotal   ?? p.subtotal       ?? 0,
-          })
-        );
-        return {
-          ...t, partes,
-          manoDeObraItems: t.manoDeObraItems ?? (t.manoDeObra > 0 ? [{ id: `mig_${t.id}`, concepto: 'Mano de obra', precio: t.manoDeObra }] : []),
-          costoRefacciones: t.costoRefacciones ?? partes.reduce((s, p) => s + p.costoTotal, 0) ?? t.refacciones,
-          pagos: t.pagos ?? [],
-          estadoFacturacion: t.estadoFacturacion ?? 'sin_facturar',
-          requiereFactura: t.requiereFactura ?? false,
-          iva: t.iva ?? 0,
-        };
-      });
-
-    // Migrate legacy `compras` → `ordenes` (all treated as already-received POs)
-    let parsedOrdenes: OrdenCompra[] = rawOrdenes ? JSON.parse(rawOrdenes) : [];
-    if (!rawOrdenes && rawCompras) {
-      type CompraLegacy = { id: string; proveedorId: string; fecha: string; descripcion: string; items: CompraItem[]; total: number; pagos: PagoCompra[] };
-      const legacyCompras: CompraLegacy[] = JSON.parse(rawCompras);
-      parsedOrdenes = legacyCompras.map(c => ({
-        id: c.id, proveedorId: c.proveedorId, fecha: c.fecha,
-        descripcion: c.descripcion, partes: c.items, total: c.total,
-        estado: 'recibida' as const, fechaRecibida: c.fecha,
-        pagos: c.pagos ?? [],
-        numeroOrden: undefined,
-      }));
-      localStorage.setItem('ordenes', JSON.stringify(parsedOrdenes));
-    }
-
-    setClientes(parsedClientes);
-    setVehiculos(parsedVehiculos);
-    setInventario(parsedInventario);
-    setTrabajos(parsedTrabajos);
-    setProveedores(rawProveedores ? JSON.parse(rawProveedores) : []);
-    setOrdenes(parsedOrdenes);
-    setFacturas(rawFacturas ? JSON.parse(rawFacturas) : []);
-  }, []);
+  useEffect(() => { cargarDatos(); }, [cargarDatos]);
 
   // ── Handlers ──
 
-  const guardarCliente = (data: Omit<Cliente, 'id'>) => {
-    const nuevo: Cliente = { ...data, id: Date.now().toString() };
-    const nuevos = [...clientes, nuevo];
-    setClientes(nuevos); localStorage.setItem('clientes', JSON.stringify(nuevos));
+  const guardarCliente = async (data: Omit<Cliente, 'id'>) => {
+    if (!taller) return;
+    const nuevo = await db.insertCliente(taller.id, data);
+    if (nuevo) setClientes(prev => [...prev, nuevo]);
   };
-  const guardarVehiculo = (data: Omit<Vehiculo, 'id'>) => {
-    const nuevo: Vehiculo = { ...data, id: Date.now().toString() };
-    const nuevos = [...vehiculos, nuevo];
-    setVehiculos(nuevos); localStorage.setItem('vehiculos', JSON.stringify(nuevos));
+  const guardarVehiculo = async (data: Omit<Vehiculo, 'id'>) => {
+    if (!taller) return;
+    const nuevo = await db.insertVehiculo(taller.id, data);
+    if (nuevo) setVehiculos(prev => [...prev, nuevo]);
   };
-  const guardarRefaccion = (data: Omit<Refaccion, 'id'>) => {
-    const nuevo: Refaccion = { ...data, id: Date.now().toString() };
-    const nuevos = [...inventario, nuevo];
-    setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
+  const guardarRefaccion = async (data: Omit<Refaccion, 'id'>) => {
+    if (!taller) return;
+    const nuevo = await db.insertRefaccion(taller.id, data);
+    if (nuevo) setInventario(prev => [...prev, nuevo]);
   };
-  /** Crea una nueva refacción en el catálogo y la devuelve con ID asignado — usada desde OC */
-  const crearRefaccionDesdeOrden = (data: Omit<Refaccion, 'id'>): Refaccion => {
-    const nuevo: Refaccion = { ...data, id: Date.now().toString() };
-    const nuevos = [...inventario, nuevo];
-    setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
+  const recibirStock = async (refaccionId: string, cantidad: number) => {
+    const ref = inventario.find(r => r.id === refaccionId);
+    if (!ref) return;
+    const nuevoStock = ref.stock + cantidad;
+    await db.updateRefaccionStock(refaccionId, nuevoStock);
+    setInventario(prev => prev.map(r => r.id === refaccionId ? { ...r, stock: nuevoStock } : r));
+  };
+  /** Creates a new refaccion from within a PO form — used by VistaOrdenesCompra */
+  const crearRefaccionDesdeOrden = async (data: Omit<Refaccion, 'id'>): Promise<Refaccion | null> => {
+    if (!taller) return null;
+    const nuevo = await db.insertRefaccion(taller.id, data);
+    if (nuevo) setInventario(prev => [...prev, nuevo]);
     return nuevo;
   };
-  const recibirStock = (refaccionId: string, cantidad: number) => {
-    const nuevos = inventario.map(r => r.id === refaccionId ? { ...r, stock: r.stock + cantidad } : r);
-    setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
+  const actualizarCompatibilidad = async (refaccionId: string, compatibilidad: CompatibilidadVehiculo[]) => {
+    const compat = compatibilidad.length > 0 ? compatibilidad : undefined;
+    await db.updateRefaccionCompatibilidad(refaccionId, compat ?? null);
+    setInventario(prev => prev.map(r => r.id === refaccionId ? { ...r, compatibilidad: compat } : r));
   };
-  const actualizarCompatibilidad = (refaccionId: string, compatibilidad: CompatibilidadVehiculo[]) => {
-    const nuevos = inventario.map(r => r.id === refaccionId ? { ...r, compatibilidad: compatibilidad.length > 0 ? compatibilidad : undefined } : r);
-    setInventario(nuevos); localStorage.setItem('inventario', JSON.stringify(nuevos));
-  };
-  const guardarTrabajo = (data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => {
+  const guardarTrabajo = async (data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => {
+    if (!taller) return;
     const subtotal = data.manoDeObra + data.refacciones;
     const iva      = data.requiereFactura ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
     const total    = subtotal + iva;
-    const nuevo: Trabajo = { ...data, id: Date.now().toString(), iva, total, estadoFacturacion: 'sin_facturar' };
+    const nuevo = await db.insertTrabajo(taller.id, { ...data, iva, total, estadoFacturacion: 'sin_facturar' });
+    if (!nuevo) return;
+    setTrabajos(prev => [...prev, nuevo]);
     if (data.partes.length > 0) {
       const nuevoInv = inventario.map(r => {
         const usada = data.partes.find(p => p.refaccionId === r.id);
         return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
       });
-      setInventario(nuevoInv); localStorage.setItem('inventario', JSON.stringify(nuevoInv));
+      await db.updateRefacciones(nuevoInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
+      setInventario(nuevoInv);
     }
-    const nuevos = [...trabajos, nuevo];
-    setTrabajos(nuevos); localStorage.setItem('trabajos', JSON.stringify(nuevos));
   };
-  const registrarPago = (trabajoId: string, pago: Omit<Pago, 'id'>) => {
+  const registrarPago = async (trabajoId: string, pago: Omit<Pago, 'id'>) => {
+    const trabajoActual = trabajos.find(t => t.id === trabajoId);
+    if (!trabajoActual) return;
     const nuevoPago: Pago = { ...pago, id: Date.now().toString() };
-    const nuevos = trabajos.map(t => t.id === trabajoId ? { ...t, pagos: [...(t.pagos ?? []), nuevoPago] } : t);
-    setTrabajos(nuevos); localStorage.setItem('trabajos', JSON.stringify(nuevos));
+    const nuevos = [...(trabajoActual.pagos ?? []), nuevoPago];
+    await db.updateTrabajoPagos(trabajoId, nuevos);
+    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, pagos: nuevos } : t));
   };
-  const guardarProveedor = (data: Omit<Proveedor, 'id'>) => {
-    const nuevo: Proveedor = { ...data, id: Date.now().toString() };
-    const nuevos = [...proveedores, nuevo];
-    setProveedores(nuevos); localStorage.setItem('proveedores', JSON.stringify(nuevos));
+  const guardarProveedor = async (data: Omit<Proveedor, 'id'>) => {
+    if (!taller) return;
+    const nuevo = await db.insertProveedor(taller.id, data);
+    if (nuevo) setProveedores(prev => [...prev, nuevo]);
   };
 
   // ── Purchase Order handlers ──
-  const crearOrden = (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => {
-    const nueva: OrdenCompra = {
-      ...data, id: Date.now().toString(),
-      numeroOrden: data.numeroOrden || generarNumeroOrden(ordenes),
-      estado: 'pendiente', pagos: [],
-    };
-    const nuevas = [...ordenes, nueva];
-    setOrdenes(nuevas); localStorage.setItem('ordenes', JSON.stringify(nuevas));
+  const crearOrden = async (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => {
+    if (!taller) return;
+    const nueva = await db.insertOrden(taller.id, { ...data, numeroOrden: data.numeroOrden || generarNumeroOrden(ordenes) });
+    if (nueva) setOrdenes(prev => [...prev, nueva]);
   };
-  const recibirOrden = (ordenId: string) => {
+  const recibirOrden = async (ordenId: string) => {
     const orden = ordenes.find(o => o.id === ordenId);
     if (!orden || orden.estado !== 'pendiente') return;
-    const nuevasOrdenes = ordenes.map(o =>
-      o.id === ordenId ? { ...o, estado: 'recibida' as const, fechaRecibida: new Date().toISOString().split('T')[0] } : o
-    );
-    setOrdenes(nuevasOrdenes); localStorage.setItem('ordenes', JSON.stringify(nuevasOrdenes));
+    const hoy = new Date().toISOString().split('T')[0];
+    await db.updateOrdenEstado(ordenId, 'recibida', hoy);
+    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'recibida' as const, fechaRecibida: hoy } : o));
     if (orden.partes.length > 0) {
       const nuevoInv = inventario.map(r => {
         const item = orden.partes.find(p => p.refaccionId === r.id);
         return item ? { ...r, stock: r.stock + item.cantidad } : r;
       });
-      setInventario(nuevoInv); localStorage.setItem('inventario', JSON.stringify(nuevoInv));
+      await db.updateRefacciones(nuevoInv.filter(r => orden.partes.some(p => p.refaccionId === r.id)));
+      setInventario(nuevoInv);
     }
   };
-  const cancelarOrden = (ordenId: string) => {
-    const nuevas = ordenes.map(o => o.id === ordenId ? { ...o, estado: 'cancelada' as const } : o);
-    setOrdenes(nuevas); localStorage.setItem('ordenes', JSON.stringify(nuevas));
+  const cancelarOrden = async (ordenId: string) => {
+    await db.updateOrdenEstado(ordenId, 'cancelada');
+    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'cancelada' as const } : o));
   };
-  const registrarPagoOrden = (ordenId: string, pago: Omit<PagoCompra, 'id'>) => {
+  const registrarPagoOrden = async (ordenId: string, pago: Omit<PagoCompra, 'id'>) => {
+    const ordenActual = ordenes.find(o => o.id === ordenId);
+    if (!ordenActual) return;
     const nuevoPago: PagoCompra = { ...pago, id: Date.now().toString() };
-    const nuevas = ordenes.map(o => o.id === ordenId ? { ...o, pagos: [...(o.pagos ?? []), nuevoPago] } : o);
-    setOrdenes(nuevas); localStorage.setItem('ordenes', JSON.stringify(nuevas));
+    const nuevos = [...(ordenActual.pagos ?? []), nuevoPago];
+    await db.updateOrdenPagos(ordenId, nuevos);
+    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, pagos: nuevos } : o));
   };
 
   // ── Invoice (Factura) handlers ──
-  const generarFactura = (trabajoId: string) => {
+  const generarFactura = async (trabajoId: string) => {
+    if (!taller) return;
     const trabajo = trabajos.find(t => t.id === trabajoId);
     if (!trabajo || trabajo.facturaId) return;
     const conceptos: FacturaConcepto[] = [
-      ...trabajo.manoDeObraItems.map(m => ({
-        tipo: 'mano_de_obra' as const,
-        descripcion: m.concepto,
-        cantidad: 1,
-        precioUnitario: m.precio,
-        subtotal: m.precio,
-      })),
-      ...trabajo.partes.map(p => ({
-        tipo: 'parte' as const,
-        descripcion: p.nombre,
-        cantidad: p.cantidad,
-        precioUnitario: p.precioVenta,
-        subtotal: p.subtotal,
-      })),
+      ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
+      ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
     ];
     const subtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
-    const nuevaFactura: Factura = {
-      id: Date.now().toString(),
+    const nuevaFactura = await db.insertFactura(taller.id, {
       numeroFactura: generarNumeroFactura(facturas),
       trabajoId, clienteId: trabajo.clienteId, vehiculoId: trabajo.vehiculoId,
       fecha: new Date().toISOString().split('T')[0],
       conceptos, subtotal, total: subtotal, pagos: [],
-    };
-    const nuevasFacturas = [...facturas, nuevaFactura];
-    setFacturas(nuevasFacturas); localStorage.setItem('facturas', JSON.stringify(nuevasFacturas));
-    const nuevosTrabajos = trabajos.map(t =>
-      t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 'facturado' as const } : t
-    );
-    setTrabajos(nuevosTrabajos); localStorage.setItem('trabajos', JSON.stringify(nuevosTrabajos));
+    });
+    if (!nuevaFactura) return;
+    setFacturas(prev => [...prev, nuevaFactura]);
+    await db.updateTrabajoFactura(trabajoId, nuevaFactura.id);
+    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 'facturado' as const } : t));
   };
-  const registrarPagoFactura = (facturaId: string, pago: Omit<PagoFactura, 'id'>) => {
+  const registrarPagoFactura = async (facturaId: string, pago: Omit<PagoFactura, 'id'>) => {
+    const facturaActual = facturas.find(f => f.id === facturaId);
+    if (!facturaActual) return;
     const nuevoPago: PagoFactura = { ...pago, id: Date.now().toString() };
-    const nuevas = facturas.map(f => f.id === facturaId ? { ...f, pagos: [...(f.pagos ?? []), nuevoPago] } : f);
-    setFacturas(nuevas); localStorage.setItem('facturas', JSON.stringify(nuevas));
+    const nuevos = [...(facturaActual.pagos ?? []), nuevoPago];
+    await db.updateFacturaPagos(facturaId, nuevos);
+    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, pagos: nuevos } : f));
   };
 
   const calcularResumen = () => {
@@ -256,17 +206,6 @@ export default function TallerMecanico() {
     const ordenesMes    = ordenes.filter(o => o.fecha.startsWith(mesActual) && o.estado !== 'cancelada');
     const totalOrdenes  = ordenesMes.reduce((s, o) => s + o.total, 0);
     const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0);
-    // Payments actually made to suppliers during this month (cash flow view)
-    const pagadoAProveedoresMes = ordenes.flatMap(o => (o.pagos ?? []))
-      .filter(p => p.fecha.startsWith(mesActual))
-      .reduce((s, p) => s + p.monto, 0);
-    // Total outstanding balance across ALL received orders (all-time AP)
-    const porPagarTotal = ordenes
-      .filter(o => o.estado === 'recibida')
-      .reduce((s, o) => {
-        const pagado = (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0);
-        return s + Math.max(0, o.total - pagado);
-      }, 0);
     const mesConIVA    = mes.filter(t => t.requiereFactura);
     const mesSinIVA    = mes.filter(t => !t.requiereFactura);
     const totalIVA     = mesConIVA.reduce((s, t) => s + (t.iva ?? 0), 0);
@@ -275,9 +214,10 @@ export default function TallerMecanico() {
     return {
       facturadoMes, totalVentaRef, totalCostoRef, margenRef, totalManoObra, ganancia,
       cantidad: mes.length, cobradoEnMes, porCobrarDelMes, totalOrdenes, porPagarOrdenes,
-      pagadoAProveedoresMes, porPagarTotal,
       totalIVA, ingresoConIVA, ingresoSinIVA,
-    };
+      pagadoAProveedoresMes: ordenesMes.reduce((s, o) => s + (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0), 0),
+      porPagarTotal: ordenes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0),
+    }
   };
 
   const stockBajo              = inventario.filter(r => r.stock <= r.stockMinimo).length;
@@ -303,9 +243,16 @@ export default function TallerMecanico() {
       <header className="bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-4">
           <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center text-2xl shadow-inner flex-shrink-0">🔧</div>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold text-white tracking-tight">Taller Mecánico</h1>
-            <p className="text-slate-400 text-sm font-medium">Sistema de Gestión</p>
+            <p className="text-slate-400 text-sm font-medium truncate">{taller?.nombre ?? 'Sistema de Gestión'}</p>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className="text-slate-500 text-xs hidden sm:block truncate max-w-[8rem]">{user?.email}</span>
+            <button onClick={signOut}
+              className="text-xs text-slate-400 hover:text-white border border-slate-600 hover:border-slate-400 px-3 py-1.5 rounded-lg transition-colors">
+              Salir
+            </button>
           </div>
         </div>
       </header>
@@ -331,6 +278,11 @@ export default function TallerMecanico() {
           ))}
         </nav>
 
+        {cargando ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="text-slate-400 text-sm">Cargando datos del taller...</div>
+          </div>
+        ) : (
         <Card className="p-6 sm:p-8">
           {vista === 'clientes' && (
             <VistaClientes clientes={clientes} vehiculos={vehiculos}
@@ -383,6 +335,7 @@ export default function TallerMecanico() {
             <VistaHistorial clientes={clientes} vehiculos={vehiculos} trabajos={trabajos} />
           )}
         </Card>
+        )}
       </div>
     </div>
   );
