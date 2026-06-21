@@ -149,6 +149,10 @@ export interface Trabajo {
   facturaId?: string;
   estadoFacturacion?: 'sin_facturar' | 'facturado';
   estado: 'pendiente' | 'completado' | 'pagado';
+  /** Set at finalization: 'factura' = with IVA (16%), 'nota' = without IVA */
+  tipoDocumento?: 'factura' | 'nota';
+  /** ISO date-time when the job was finalized (truck left the shop) */
+  fechaFinalizacion?: string;
 }
 
 export interface PricingIntel {
