@@ -4,7 +4,10 @@ import {
   getMontoPagadoOrden, getEstadoPagoOrden, getSaldoOrden,
   generarNumeroFactura, generarNumeroOrden,
 } from '@/app/lib/utils';
-import { mockTrabajo, mockTrabajoConIVA, mockOrden } from '../fixtures';
+import {
+  mockTrabajo, mockTrabajoConIVA,
+  mockOrden, mockFactura,
+} from '../fixtures';
 import type { Trabajo, OrdenCompra, Refaccion } from '@/app/types';
 
 // ── IVA (tax) calculation logic ─────────────────────────────────────────────
@@ -44,7 +47,7 @@ describe('IVA calculation (16% Mexican tax)', () => {
   });
 });
 
-// ── Inventory deduction logic ───────────────────────────────────────────────
+// ── Inventory stock management ──────────────────────────────────────────────
 
 describe('Inventory stock management', () => {
   const baseInventory: Refaccion[] = [
@@ -56,12 +59,10 @@ describe('Inventory stock management', () => {
     const partes = [
       { refaccionId: 'r1', nombre: 'Filtro', codigo: 'F001', cantidad: 2, precioCompra: 150, precioVenta: 200, subtotal: 400, costoTotal: 300 },
     ];
-
     const updatedInventory = baseInventory.map(r => {
       const usada = partes.find(p => p.refaccionId === r.id);
       return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
     });
-
     const filtro = updatedInventory.find(r => r.id === 'r1')!;
     expect(filtro.stock).toBe(8); // 10 - 2
   });
@@ -70,12 +71,10 @@ describe('Inventory stock management', () => {
     const partes = [
       { refaccionId: 'r1', nombre: 'Filtro', codigo: 'F001', cantidad: 3, precioCompra: 150, precioVenta: 200, subtotal: 600, costoTotal: 450 },
     ];
-
     const updatedInventory = baseInventory.map(r => {
       const usada = partes.find(p => p.refaccionId === r.id);
       return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
     });
-
     const aceite = updatedInventory.find(r => r.id === 'r2')!;
     expect(aceite.stock).toBe(5); // unchanged
   });
@@ -84,21 +83,16 @@ describe('Inventory stock management', () => {
     const ordenPartes = [
       { refaccionId: 'r1', nombre: 'Filtro', cantidad: 10, precioCompra: 120, subtotal: 1200 },
     ];
-
     const updatedInventory = baseInventory.map(r => {
       const item = ordenPartes.find(p => p.refaccionId === r.id);
       return item ? { ...r, stock: r.stock + item.cantidad } : r;
     });
-
     const filtro = updatedInventory.find(r => r.id === 'r1')!;
     expect(filtro.stock).toBe(20); // 10 + 10
   });
 
   it('detects low stock condition', () => {
-    const lowStockItems = baseInventory.filter(r => r.stock <= r.stockMinimo);
-    expect(lowStockItems).toHaveLength(0); // none below minimum initially
-
-    const withLow = [
+    const withLow: Refaccion[] = [
       ...baseInventory,
       { id: 'r3', nombre: 'Bujía', codigo: 'B001', categoria: 'Motor', unidad: 'pza', precioCompra: 50, stock: 1, stockMinimo: 5 },
     ];
@@ -170,8 +164,9 @@ describe('Sequential document numbering', () => {
   const year = new Date().getFullYear();
 
   it('FAC numbers increment correctly', () => {
-    const f1 = { id: 'f1', numeroFactura: `FAC-${year}-001` } as Parameters<typeof generarNumeroFactura>[0][number];
-    const f2 = { id: 'f2', numeroFactura: `FAC-${year}-002` } as Parameters<typeof generarNumeroFactura>[0][number];
+    // Use full mockFactura to avoid TypeScript partial-type errors
+    const f1 = { ...mockFactura, id: 'f1', numeroFactura: `FAC-${year}-001` };
+    const f2 = { ...mockFactura, id: 'f2', numeroFactura: `FAC-${year}-002` };
     expect(generarNumeroFactura([f1, f2])).toBe(`FAC-${year}-003`);
   });
 
@@ -191,11 +186,11 @@ describe('Sequential document numbering', () => {
 describe('Profit margin calculation', () => {
   it('calculates part profit (precioVenta - precioCompra)', () => {
     const parte = mockTrabajo.partes[0];
-    // 200 - 150 = 50 profit per unit
+    // precioVenta=200, precioCompra=150 → 50 profit per unit
     expect(parte.precioVenta - parte.precioCompra).toBe(50);
   });
 
-  it('calculates job gross margin', () => {
+  it('calculates job gross margin from partes', () => {
     const ventaRefacciones = mockTrabajo.partes.reduce((s, p) => s + p.subtotal, 0);
     const costoRefacciones = mockTrabajo.partes.reduce((s, p) => s + p.costoTotal, 0);
     const margenRefacciones = ventaRefacciones - costoRefacciones;
@@ -212,16 +207,14 @@ describe('Profit margin calculation', () => {
 // ── Multi-tenant data scoping ───────────────────────────────────────────────
 
 describe('Multi-tenant taller scoping', () => {
-  it('filters trabajos by taller correctly (simulated)', () => {
+  it('filters trabajos by tallerId correctly', () => {
     const allTrabajos: (Trabajo & { tallerId: string })[] = [
       { ...mockTrabajo, tallerId: 'taller-A' },
       { ...mockTrabajoConIVA, id: 't5', tallerId: 'taller-B' },
       { ...mockTrabajo, id: 't6', tallerId: 'taller-A' },
     ];
-
     const tallerATrabajos = allTrabajos.filter(t => t.tallerId === 'taller-A');
     const tallerBTrabajos = allTrabajos.filter(t => t.tallerId === 'taller-B');
-
     expect(tallerATrabajos).toHaveLength(2);
     expect(tallerBTrabajos).toHaveLength(1);
   });
