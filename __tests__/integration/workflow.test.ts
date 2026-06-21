@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   getMontoPagado, getEstadoPago, getSaldo,
-  getMontoPagadoOrden, getEstadoPagoOrden, getSaldoOrden,
+  getEstadoPagoOrden, getSaldoOrden,
   generarNumeroFactura, generarNumeroOrden,
 } from '@/app/lib/utils';
 import {
@@ -29,19 +29,17 @@ describe('IVA calculation (16% Mexican tax)', () => {
   });
 
   it('total = manoDeObra + refacciones + iva', () => {
-    // mockTrabajoConIVA: 500 + 600 + 176 = 1276
     const expectedTotal = mockTrabajoConIVA.manoDeObra + mockTrabajoConIVA.refacciones + mockTrabajoConIVA.iva;
     expect(expectedTotal).toBe(mockTrabajoConIVA.total);
   });
 
   it('total without IVA = manoDeObra + refacciones', () => {
-    // mockTrabajo: 200 + 200 + 0 = 400
     const expectedTotal = mockTrabajo.manoDeObra + mockTrabajo.refacciones + mockTrabajo.iva;
     expect(expectedTotal).toBe(mockTrabajo.total);
   });
 
   it('IVA rounding is precise to 2 decimals', () => {
-    const subtotal = 333; // 333 * 0.16 = 53.28
+    const subtotal = 333;
     const iva = Math.round(subtotal * 0.16 * 100) / 100;
     expect(iva).toBe(53.28);
   });
@@ -63,8 +61,7 @@ describe('Inventory stock management', () => {
       const usada = partes.find(p => p.refaccionId === r.id);
       return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
     });
-    const filtro = updatedInventory.find(r => r.id === 'r1')!;
-    expect(filtro.stock).toBe(8); // 10 - 2
+    expect(updatedInventory.find(r => r.id === 'r1')!.stock).toBe(8);
   });
 
   it('only deducts parts used in the job', () => {
@@ -75,20 +72,16 @@ describe('Inventory stock management', () => {
       const usada = partes.find(p => p.refaccionId === r.id);
       return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
     });
-    const aceite = updatedInventory.find(r => r.id === 'r2')!;
-    expect(aceite.stock).toBe(5); // unchanged
+    expect(updatedInventory.find(r => r.id === 'r2')!.stock).toBe(5);
   });
 
   it('stock increases when PO is received', () => {
-    const ordenPartes = [
-      { refaccionId: 'r1', nombre: 'Filtro', cantidad: 10, precioCompra: 120, subtotal: 1200 },
-    ];
+    const ordenPartes = [{ refaccionId: 'r1', nombre: 'Filtro', cantidad: 10, precioCompra: 120, subtotal: 1200 }];
     const updatedInventory = baseInventory.map(r => {
       const item = ordenPartes.find(p => p.refaccionId === r.id);
       return item ? { ...r, stock: r.stock + item.cantidad } : r;
     });
-    const filtro = updatedInventory.find(r => r.id === 'r1')!;
-    expect(filtro.stock).toBe(20); // 10 + 10
+    expect(updatedInventory.find(r => r.id === 'r1')!.stock).toBe(20);
   });
 
   it('detects low stock condition', () => {
@@ -96,9 +89,9 @@ describe('Inventory stock management', () => {
       ...baseInventory,
       { id: 'r3', nombre: 'Bujía', codigo: 'B001', categoria: 'Motor', unidad: 'pza', precioCompra: 50, stock: 1, stockMinimo: 5 },
     ];
-    const lowAfter = withLow.filter(r => r.stock < r.stockMinimo);
-    expect(lowAfter).toHaveLength(1);
-    expect(lowAfter[0].id).toBe('r3');
+    const low = withLow.filter(r => r.stock < r.stockMinimo);
+    expect(low).toHaveLength(1);
+    expect(low[0].id).toBe('r3');
   });
 });
 
@@ -164,7 +157,6 @@ describe('Sequential document numbering', () => {
   const year = new Date().getFullYear();
 
   it('FAC numbers increment correctly', () => {
-    // Use full mockFactura to avoid TypeScript partial-type errors
     const f1 = { ...mockFactura, id: 'f1', numeroFactura: `FAC-${year}-001` };
     const f2 = { ...mockFactura, id: 'f2', numeroFactura: `FAC-${year}-002` };
     expect(generarNumeroFactura([f1, f2])).toBe(`FAC-${year}-003`);
@@ -184,23 +176,20 @@ describe('Sequential document numbering', () => {
 // ── Part cost vs sale price profit calculation ──────────────────────────────
 
 describe('Profit margin calculation', () => {
-  it('calculates part profit (precioVenta - precioCompra)', () => {
+  it('calculates part profit per unit', () => {
     const parte = mockTrabajo.partes[0];
-    // precioVenta=200, precioCompra=150 → 50 profit per unit
     expect(parte.precioVenta - parte.precioCompra).toBe(50);
   });
 
   it('calculates job gross margin from partes', () => {
     const ventaRefacciones = mockTrabajo.partes.reduce((s, p) => s + p.subtotal, 0);
     const costoRefacciones = mockTrabajo.partes.reduce((s, p) => s + p.costoTotal, 0);
-    const margenRefacciones = ventaRefacciones - costoRefacciones;
-    expect(margenRefacciones).toBe(50); // 200 - 150
+    expect(ventaRefacciones - costoRefacciones).toBe(50);
   });
 
   it('total revenue = mano de obra + venta refacciones', () => {
     const revenueFromParts = mockTrabajo.partes.reduce((s, p) => s + p.subtotal, 0);
-    const totalRevenue = mockTrabajo.manoDeObra + revenueFromParts;
-    expect(totalRevenue).toBe(mockTrabajo.total); // 200 + 200 = 400
+    expect(mockTrabajo.manoDeObra + revenueFromParts).toBe(mockTrabajo.total);
   });
 });
 
@@ -213,9 +202,7 @@ describe('Multi-tenant taller scoping', () => {
       { ...mockTrabajoConIVA, id: 't5', tallerId: 'taller-B' },
       { ...mockTrabajo, id: 't6', tallerId: 'taller-A' },
     ];
-    const tallerATrabajos = allTrabajos.filter(t => t.tallerId === 'taller-A');
-    const tallerBTrabajos = allTrabajos.filter(t => t.tallerId === 'taller-B');
-    expect(tallerATrabajos).toHaveLength(2);
-    expect(tallerBTrabajos).toHaveLength(1);
+    expect(allTrabajos.filter(t => t.tallerId === 'taller-A')).toHaveLength(2);
+    expect(allTrabajos.filter(t => t.tallerId === 'taller-B')).toHaveLength(1);
   });
 });
