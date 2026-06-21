@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel } from '@/app/types';
+import { useState } from 'react';
+import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt } from '@/app/lib/utils';
-import { getPricingIntel } from '@/app/lib/pricing';
+import { BuscadorRefacciones } from './BuscadorRefacciones';
 
 // ── Finalization Modal ──────────────────────────────────────────────────────
 function ModalFinalizacion({
@@ -140,9 +140,7 @@ export function VistaTrabajo({
   const [laborConcepto, setLaborConcepto] = useState('');
   const [laborPrecio, setLaborPrecio]     = useState(0);
   const [partesSeleccionadas, setPartesSeleccionadas] = useState<TrabajoRefaccion[]>([]);
-  const [pickerRefId, setPickerRefId]         = useState('');
-  const [pickerCantidad, setPickerCantidad]   = useState(1);
-  const [pickerPrecioVenta, setPickerPrecioVenta] = useState(0);
+  const [mostrarBuscador, setMostrarBuscador] = useState(false);
   const [finalizandoId, setFinalizandoId] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'completado'>('todos');
 
@@ -172,15 +170,14 @@ export function VistaTrabajo({
   const removerLabor = (id: string) =>
     setLaborItems(prev => prev.filter(l => l.id !== id));
 
-  const agregarParte = () => {
-    const ref = inventario.find(r => r.id === pickerRefId);
-    if (!ref || pickerCantidad <= 0) return;
-    const pVenta = pickerPrecioVenta > 0 ? pickerPrecioVenta : ref.precioCompra;
+  const agregarParteDesde = (refId: string, cant: number, pVenta: number) => {
+    const ref = inventario.find(r => r.id === refId);
+    if (!ref || cant <= 0) return;
+    const pv = pVenta > 0 ? pVenta : ref.precioCompra;
     setPartesSeleccionadas(prev => {
       const existente = prev.find(p => p.refaccionId === ref.id);
       if (existente) {
-        // Merge: update quantity keeping existing sale price
-        const nuevaCantidad = existente.cantidad + pickerCantidad;
+        const nuevaCantidad = existente.cantidad + cant;
         return prev.map(p => p.refaccionId === ref.id ? {
           ...p,
           cantidad: nuevaCantidad,
@@ -190,31 +187,13 @@ export function VistaTrabajo({
       }
       return [...prev, {
         refaccionId: ref.id, nombre: ref.nombre, codigo: ref.codigo,
-        cantidad: pickerCantidad,
+        cantidad: cant,
         precioCompra: ref.precioCompra,
-        precioVenta: pVenta,
-        subtotal:   pickerCantidad * pVenta,
-        costoTotal: pickerCantidad * ref.precioCompra,
+        precioVenta: pv,
+        subtotal:   cant * pv,
+        costoTotal: cant * ref.precioCompra,
       }];
     });
-    setPickerRefId('');
-    setPickerCantidad(1);
-    setPickerPrecioVenta(0);
-  };
-
-  // Auto-fill precio venta when part changes — prefer client's last price
-  const handlePickerRefChange = (id: string) => {
-    setPickerRefId(id);
-    const ref = inventario.find(r => r.id === id);
-    if (!ref) { setPickerPrecioVenta(0); return; }
-    // Look up client history — use highest price ever charged (never charge less)
-    if (form.clienteId) {
-      const prices = trabajos
-        .filter(t => t.clienteId === form.clienteId)
-        .flatMap(t => t.partes.filter(p => p.refaccionId === id && p.precioVenta > 0).map(p => p.precioVenta));
-      if (prices.length > 0) { setPickerPrecioVenta(Math.max(...prices)); return; }
-    }
-    setPickerPrecioVenta(ref.precioCompra);
   };
 
   const removerParte = (refaccionId: string) =>
@@ -240,21 +219,10 @@ export function VistaTrabajo({
     setLaborConcepto('');
     setLaborPrecio(0);
     setPartesSeleccionadas([]);
-    setPickerRefId('');
-    setPickerCantidad(1);
-    setPickerPrecioVenta(0);
   };
 
   const getCliente  = (id: string) => clientes.find(c => c.id === id);
   const getVehiculo = (id: string) => vehiculos.find(v => v.id === id);
-  const pickerRef   = inventario.find(r => r.id === pickerRefId);
-
-  const intel: PricingIntel | null = useMemo(() => {
-    if (!pickerRefId || !form.clienteId) return null;
-    const ref = inventario.find(r => r.id === pickerRefId);
-    if (!ref) return null;
-    return getPricingIntel(pickerRefId, form.clienteId, ref.precioCompra, trabajos);
-  }, [pickerRefId, form.clienteId, inventario, trabajos]);
 
   // ── Compatibility filtering ──
   const vehiculoDelTrabajo = vehiculos.find(v => v.id === form.vehiculoId);
@@ -443,191 +411,28 @@ export function VistaTrabajo({
               </div>
             ) : (
               <div className="p-4 space-y-4">
-                {/* Compatibility filter indicator */}
-                {form.vehiculoId && vehiculoDelTrabajo && (
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
-                    totalCompatibles > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                  }`}>
-                    <span>🚗</span>
-                    <span>
-                      {totalCompatibles > 0
-                        ? `Mostrando ${totalCompatibles} refacción${totalCompatibles !== 1 ? 'es' : ''} compatibles con ${vehiculoDelTrabajo.marca} ${vehiculoDelTrabajo.modelo}`
-                        : `Sin refacciones marcadas como compatibles con ${vehiculoDelTrabajo.marca} ${vehiculoDelTrabajo.modelo} — se muestran las universales`}
-                    </span>
-                  </div>
-                )}
-
-                {/* Picker: refacción + cantidad + precio venta */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-                  <div className="sm:col-span-2 lg:col-span-2">
-                    <Label>Refacción</Label>
-                    <Select value={pickerRefId} onChange={e => handlePickerRefChange(e.target.value)}>
-                      <option value="">Seleccionar pieza...</option>
-                      {/* 1. Parts bought specifically for this vehicle unit */}
-                      {partesParaEstaUnidad.length > 0 && (
-                        <optgroup label="🎯 Compradas para esta unidad">
-                          {partesParaEstaUnidad.map(r => (
-                            <option key={r.id} value={r.id}>
-                              {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                            </option>
-                          ))}
-                        </optgroup>
+                {/* Buscar refacción — abre el buscador modal */}
+                <button
+                  type="button"
+                  onClick={() => setMostrarBuscador(true)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-white border-2 border-dashed border-slate-300 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition-all group text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🔍</span>
+                    <div>
+                      <span className="font-semibold text-slate-700 group-hover:text-indigo-700">Buscar refacción...</span>
+                      {form.vehiculoId && vehiculoDelTrabajo && (
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {totalCompatibles} pieza{totalCompatibles !== 1 ? 's' : ''} compatible{totalCompatibles !== 1 ? 's' : ''} con {vehiculoDelTrabajo.marca} {vehiculoDelTrabajo.modelo}
+                        </p>
                       )}
-                      {/* 2. Parts with matching make/model compatibility */}
-                      {partesCompatibles.length > 0 && vehiculoDelTrabajo && (
-                        <optgroup label={`✅ Compatible con ${vehiculoDelTrabajo.marca} ${vehiculoDelTrabajo.modelo}`}>
-                          {partesCompatibles.map(r => (
-                            <option key={r.id} value={r.id}>
-                              {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {/* 3. Universal parts (no compatibility restrictions) */}
-                      {partesUniversales.length > 0 && (
-                        <optgroup label="🌐 Universales (todos los vehículos)">
-                          {partesUniversales.map(r => (
-                            <option key={r.id} value={r.id}>
-                              {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {/* When no vehicle selected: show all with old grouping */}
-                      {!form.vehiculoId && inventario.map(r => (
-                        <option key={r.id} value={r.id}>
-                          {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Cantidad</Label>
-                    <Input type="number" min="1" step="1" placeholder="1"
-                      value={pickerCantidad || ''}
-                      onChange={e => setPickerCantidad(Number(e.target.value))} />
-                  </div>
-                  <div>
-                    <Label>
-                      Precio venta ($)
-                      {intel?.clientLastSale && pickerPrecioVenta > 0 && pickerPrecioVenta < intel.clientLastSale.precio && (
-                        <span className="ml-2 text-amber-600 font-bold text-xs">⚠ menor que antes</span>
-                      )}
-                    </Label>
-                    <Input type="number" min="0" step="0.01" placeholder="0.00"
-                      value={pickerPrecioVenta || ''}
-                      onChange={e => setPickerPrecioVenta(Number(e.target.value))}
-                      className={
-                        intel?.clientLastSale && pickerPrecioVenta > 0 && pickerPrecioVenta < intel.clientLastSale.precio
-                          ? '!border-amber-400 !ring-amber-400'
-                          : ''
-                      }
-                    />
-                  </div>
-                </div>
-
-                {/* ── Pricing intelligence panel ── */}
-                {pickerRef && intel && (
-                  <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 text-sm">
-
-                    {/* Row 1: Cost + Markup buttons */}
-                    <div className="flex items-center flex-wrap gap-2">
-                      <span className="text-slate-500 text-xs">
-                        Costo: <strong className="text-slate-700">${fmt(pickerRef.precioCompra)}</strong>/{pickerRef.unidad}
-                      </span>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-xs text-slate-400 font-medium">Sugerencias:</span>
-                      {intel.markups.map(m => (
-                        <button key={m.pct} type="button"
-                          onClick={() => setPickerPrecioVenta(m.price)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                            pickerPrecioVenta === m.price
-                              ? 'bg-indigo-600 text-white border-indigo-600'
-                              : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50'
-                          }`}>
-                          {m.pct}% margen ${fmt(m.price)}
-                        </button>
-                      ))}
-                      {pickerRef.stock < pickerCantidad && (
-                        <span className="text-xs font-semibold text-amber-600 ml-auto">
-                          ⚠ solo {pickerRef.stock} en stock
-                        </span>
+                      {!form.vehiculoId && (
+                        <p className="text-xs text-slate-400 mt-0.5">{inventario.length} piezas disponibles</p>
                       )}
                     </div>
-
-                    {/* Row 2: Client history — most prominent */}
-                    {intel.clientLastSale && (() => {
-                      const isLower = pickerPrecioVenta > 0 && pickerPrecioVenta < intel.clientLastSale!.precio;
-                      const isSame  = pickerPrecioVenta === intel.clientLastSale!.precio;
-                      return (
-                        <div className={`flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 border ${
-                          isLower ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50 border-indigo-200'
-                        }`}>
-                          <div className="text-xs">
-                            <span className={`font-bold ${isLower ? 'text-amber-700' : 'text-indigo-700'}`}>
-                              {isLower ? '⚠️' : '📋'}
-                              {' '}
-                              {isLower
-                                ? `Estás cobrando menos que antes ($${fmt(pickerPrecioVenta)} vs $${fmt(intel.clientLastSale!.precio)})`
-                                : isSame
-                                  ? `Mismo precio que el máximo cobrado ($${fmt(intel.clientLastSale!.precio)})`
-                                  : `Mayor precio cobrado a este cliente: $${fmt(intel.clientLastSale!.precio)}`
-                              }
-                            </span>
-                            <span className="text-slate-400 ml-1">
-                              — {new Date(intel.clientLastSale!.fecha).toLocaleDateString('es-MX')}
-                              {intel.clientAllSales.length > 1 && ` · ${intel.clientAllSales.length} veces vendida`}
-                            </span>
-                          </div>
-                          {!isSame && (
-                            <button type="button"
-                              onClick={() => setPickerPrecioVenta(intel.clientLastSale!.precio)}
-                              className={`text-xs font-bold whitespace-nowrap px-2.5 py-1 rounded-lg border transition-all ${
-                                isLower
-                                  ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
-                                  : 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
-                              }`}>
-                              Usar ${fmt(intel.clientLastSale!.precio)}
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Row 3: Cross-client range */}
-                    {intel.otherMin !== null && (
-                      <div className="text-xs text-slate-400 flex items-center gap-1">
-                        <span>💬</span>
-                        <span>
-                          Otros clientes pagaron:{' '}
-                          <strong className="text-slate-600">
-                            {intel.otherMin === intel.otherMax
-                              ? `$${fmt(intel.otherMin!)}`
-                              : `$${fmt(intel.otherMin!)} – $${fmt(intel.otherMax!)}`}
-                          </strong>
-                        </span>
-                      </div>
-                    )}
                   </div>
-                )}
-
-                {/* Agregar button (always visible) */}
-                <div className="flex justify-between items-center gap-3 flex-wrap">
-                  {pickerPrecioVenta > 0 && pickerRef && (
-                    <span className="text-xs text-slate-500">
-                      Margen: <strong className={pickerPrecioVenta > pickerRef.precioCompra ? 'text-emerald-600' : 'text-slate-600'}>
-                        ${fmt((pickerPrecioVenta - pickerRef.precioCompra) * pickerCantidad)}
-                        {' '}({(((pickerPrecioVenta - pickerRef.precioCompra) / pickerRef.precioCompra) * 100).toFixed(0)}%)
-                      </strong>
-                      {pickerCantidad > 1 && ` · subtotal cobrado $${fmt(pickerPrecioVenta * pickerCantidad)}`}
-                    </span>
-                  )}
-                  <div className={!pickerRef ? 'ml-auto' : ''}>
-                    <Btn variant="primary" disabled={!pickerRefId || pickerCantidad <= 0} onClick={agregarParte}>
-                      + Agregar pieza
-                    </Btn>
-                  </div>
-                </div>
+                  <span className="text-slate-300 group-hover:text-indigo-400 text-xl">›</span>
+                </button>
 
                 {/* Lista de partes seleccionadas */}
                 {partesSeleccionadas.length > 0 && (
@@ -833,6 +638,16 @@ export function VistaTrabajo({
           </table>
         </div>
       </div>
+      {mostrarBuscador && (
+        <BuscadorRefacciones
+          inventario={inventario}
+          vehiculo={vehiculoDelTrabajo}
+          clienteId={form.clienteId}
+          trabajos={trabajos}
+          onAgregar={agregarParteDesde}
+          onCerrar={() => setMostrarBuscador(false)}
+        />
+      )}
     </div>
   );
 }
