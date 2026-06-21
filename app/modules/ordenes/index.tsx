@@ -39,7 +39,7 @@ export function VistaOrdenesCompra({
   const [formNumOrden, setFormNumOrden] = useState('');
   const [itemsOrden, setItemsOrden] = useState<CompraItem[]>([]);
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'recibida'|'cancelada'>('todos');
-  const [busqueda, setBusqueda] = useState('');
+  const [filtroProveedorId, setFiltroProveedorId] = useState('');
 
   // ΓöÇΓöÇ Modo agregar pieza ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const [modoAgregar, setModoAgregar] = useState<'existente' | 'nueva'>('existente');
@@ -113,15 +113,9 @@ export function VistaOrdenesCompra({
   const ordenesFiltradas = [...ordenes]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
     .filter(o => {
+      if (filtroProveedorId && o.proveedorId !== filtroProveedorId) return false;
       if (filtro !== 'todos' && o.estado !== filtro) return false;
-      const q = busqueda.trim().toLowerCase();
-      if (!q) return true;
-      const prov = proveedores.find(p => p.id === o.proveedorId);
-      return (
-        (prov?.nombre ?? '').toLowerCase().includes(q) ||
-        (o.descripcion ?? '').toLowerCase().includes(q) ||
-        (o.numeroOrden ?? '').toLowerCase().includes(q)
-      );
+      return true;
     });
 
   const counts = { todos: ordenes.length, pendiente: ordenes.filter(o => o.estado === 'pendiente').length, recibida: ordenes.filter(o => o.estado === 'recibida').length, cancelada: ordenes.filter(o => o.estado === 'cancelada').length };
@@ -306,14 +300,15 @@ export function VistaOrdenesCompra({
         )}
       </div>
 
-      {/* Búsqueda + Filtros */}
+      {/* Filtros */}
       <div className="mb-4 space-y-3">
-        <Input
-          type="text"
-          placeholder="🔍 Buscar por proveedor o descripción..."
-          value={busqueda}
-          onChange={e => setBusqueda(e.target.value)}
-        />
+        <div className="max-w-xs">
+          <Label>Proveedor</Label>
+          <Select value={filtroProveedorId} onChange={e => setFiltroProveedorId(e.target.value)}>
+            <option value="">Todos los proveedores</option>
+            {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+          </Select>
+        </div>
         <div className="flex gap-2 flex-wrap">
           {([
             { key: 'todos',     label: 'Todos' },

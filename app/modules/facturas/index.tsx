@@ -22,19 +22,14 @@ export function VistaFacturas({
   const [expandido, setExpandido] = useState<string | null>(null);
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
-  const [busqueda, setBusqueda] = useState('');
+  const [filtroClienteId, setFiltroClienteId] = useState('');
 
   const facturasFiltradas = [...facturas]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
     .filter(f => {
       if (filtro !== 'todos' && getEstadoPagoFactura(f) !== filtro) return false;
-      const q = busqueda.trim().toLowerCase();
-      if (!q) return true;
-      const cliente = clientes.find(c => c.id === f.clienteId);
-      return (
-        (cliente?.nombre ?? '').toLowerCase().includes(q) ||
-        f.numeroFactura.toLowerCase().includes(q)
-      );
+      if (filtroClienteId && f.clienteId !== filtroClienteId) return false;
+      return true;
     });
 
   const counts = { todos: facturas.length, pendiente: facturas.filter(f => getEstadoPagoFactura(f) === 'pendiente').length, parcial: facturas.filter(f => getEstadoPagoFactura(f) === 'parcial').length, pagado: facturas.filter(f => getEstadoPagoFactura(f) === 'pagado').length };
@@ -65,13 +60,12 @@ export function VistaFacturas({
           </div>
         )}
 
-        <div className="mb-4">
-          <Input
-            type="text"
-            placeholder="🔍 Buscar factura por cliente o número..."
-            value={busqueda}
-            onChange={e => setBusqueda(e.target.value)}
-          />
+        <div className="mb-4 max-w-xs">
+          <Label>Cliente</Label>
+          <Select value={filtroClienteId} onChange={e => setFiltroClienteId(e.target.value)}>
+            <option value="">Todos los clientes</option>
+            {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </Select>
         </div>
 
         <div className="flex gap-2 mb-5 flex-wrap">

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Proveedor, Refaccion } from '@/app/types';
-import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
+import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 
 export function VistaProveedores({
   proveedores,
@@ -14,7 +14,7 @@ export function VistaProveedores({
   onGuardarProveedor: (p: Omit<Proveedor, 'id'>) => void;
 }) {
   const [form, setForm] = useState({ nombre: '', telefono: '', contacto: '', notas: '' });
-  const [busqueda, setBusqueda] = useState('');
+  const [filtroProveedorId, setFiltroProveedorId] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,22 +66,16 @@ export function VistaProveedores({
         </div>
       ) : (
         <div>
-          {/* Búsqueda */}
-          <div className="mb-4">
-            <Input
-              type="text"
-              placeholder="🔍 Buscar proveedor..."
-              value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
-            />
+          <div className="mb-4 max-w-xs">
+            <Label>Proveedor</Label>
+            <Select value={filtroProveedorId} onChange={e => setFiltroProveedorId(e.target.value)}>
+              <option value="">Todos los proveedores</option>
+              {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </Select>
           </div>
           {(() => {
-            const q = busqueda.trim().toLowerCase();
-            const filtrados = q
-              ? proveedores.filter(p =>
-                  p.nombre.toLowerCase().includes(q) ||
-                  (p.contacto ?? '').toLowerCase().includes(q)
-                )
+            const filtrados = filtroProveedorId
+              ? proveedores.filter(p => p.id === filtroProveedorId)
               : proveedores;
 
             if (filtrados.length === 0) {
