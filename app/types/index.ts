@@ -80,6 +80,7 @@ export interface PagoCompra {
   id: string;
   fecha: string;
   monto: number;
+  metodoPago?: string;
   nota?: string;
 }
 

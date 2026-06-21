@@ -39,6 +39,7 @@ export function VistaOrdenesCompra({
   const [formNumOrden, setFormNumOrden] = useState('');
   const [itemsOrden, setItemsOrden] = useState<CompraItem[]>([]);
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'recibida'|'cancelada'>('todos');
+  const [expandido, setExpandido] = useState<string | null>(null);
 
   // ΓöÇΓöÇ Modo agregar pieza ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const [modoAgregar, setModoAgregar] = useState<'existente' | 'nueva'>('existente');
@@ -343,38 +344,60 @@ export function VistaOrdenesCompra({
       </div>
 
       {ordenesFiltradas.length === 0 ? (
-        <div className="text-center py-12 text-slate-400"><div className="text-5xl mb-3">≡ƒôï</div><p className="font-medium text-slate-500">Sin ├│rdenes registradas</p></div>
+        <div className="text-center py-12 text-slate-400"><div className="text-5xl mb-3">📋</div><p className="font-medium text-slate-500">Sin órdenes registradas</p></div>
       ) : (
         <div className="space-y-2">
           {ordenesFiltradas.map((orden, i) => {
             const prov = proveedores.find(p => p.id === orden.proveedorId);
             const badge = BADGE_ORDEN[orden.estado];
+            const isExpandida = expandido === orden.id;
             return (
               <div key={orden.id} className={`border border-slate-200 rounded-xl p-4 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-slate-800">≡ƒÅ¬ {prov?.nombre ?? 'ΓÇö'}</span>
+                      <span className="font-semibold text-slate-800">🏪 {prov?.nombre ?? '—'}</span>
                       {orden.numeroOrden && <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{orden.numeroOrden}</span>}
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
                     </div>
                     <div className="text-xs text-slate-500 mt-1 flex gap-2 flex-wrap">
                       <span>{new Date(orden.fecha).toLocaleDateString('es-MX')}</span>
-                      {orden.descripcion && <span>┬╖ {orden.descripcion}</span>}
-                      <span>┬╖ {orden.partes.length} pieza{orden.partes.length !== 1 ? 's' : ''}</span>
-                      <span>┬╖ Total: <strong className="text-slate-700">${fmt(orden.total)}</strong></span>
+                      {orden.descripcion && <span>· {orden.descripcion}</span>}
+                      <span>· {orden.partes.length} pieza{orden.partes.length !== 1 ? 's' : ''}</span>
+                      <span>· Total: <strong className="text-slate-700">${fmt(orden.total)}</strong></span>
                     </div>
                     {orden.estado === 'recibida' && orden.fechaRecibida && (
                       <div className="text-xs text-emerald-600 mt-0.5">Recibida: {new Date(orden.fechaRecibida).toLocaleDateString('es-MX')}</div>
                     )}
                   </div>
-                  {orden.estado === 'pendiente' && (
-                    <div className="flex gap-2">
-                      <Btn size="sm" variant="success" onClick={() => onRecibirOrden(orden.id)}>Γ£ô Marcar Recibida</Btn>
-                      <Btn size="sm" variant="danger" onClick={() => onCancelarOrden(orden.id)}>Cancelar</Btn>
-                    </div>
-                  )}
+                  <div className="flex gap-2 flex-wrap">
+                    <Btn size="sm" variant="ghost" onClick={() => setExpandido(isExpandida ? null : orden.id)}>
+                      {isExpandida ? '▲ Ocultar' : '▼ Ver piezas'}
+                    </Btn>
+                    {orden.estado === 'pendiente' && (
+                      <>
+                        <Btn size="sm" variant="success" onClick={() => onRecibirOrden(orden.id)}>✓ Marcar Recibida</Btn>
+                        <Btn size="sm" variant="danger" onClick={() => onCancelarOrden(orden.id)}>Cancelar</Btn>
+                      </>
+                    )}
+                  </div>
                 </div>
+                {isExpandida && (
+                  <div className="mt-3 pt-3 border-t border-slate-200">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Piezas en esta orden</p>
+                    <div className="space-y-1">
+                      {(orden.partes ?? []).map((it, index) => (
+                        <div key={`${orden.id}-${index}`} className="flex justify-between items-center bg-white border border-slate-200 rounded px-3 py-2 text-sm">
+                          <span className="text-slate-700">{it.nombre} × {it.cantidad}</span>
+                          <span className="font-semibold text-slate-800">${fmt(it.subtotal ?? 0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-slate-100 flex justify-end">
+                      <span className="text-sm font-bold text-slate-700">Total: ${fmt(orden.total)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
