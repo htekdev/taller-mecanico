@@ -90,9 +90,13 @@ export function VistaInventario({
   };
   const removePar = (i: number) => setPares(prev => prev.filter((_, idx) => idx !== i));
   const guardarCompatEdit = (id: string) => {
-    // Agrupar pares por marca → CompatibilidadVehiculo[]
+    let paresFinales = [...pares];
+    if (nuevoMarca.trim()) {
+      paresFinales = [...paresFinales, { marca: nuevoMarca.trim(), modelo: nuevoModelo.trim() }];
+    }
+
     const grouped: Record<string, string[]> = {};
-    for (const p of pares.filter(p => p.marca.trim())) {
+    for (const p of paresFinales.filter(p => p.marca.trim())) {
       const mk = p.marca.trim();
       if (!grouped[mk]) grouped[mk] = [];
       const md = p.modelo.trim();
@@ -401,19 +405,15 @@ export function VistaInventario({
                               </span>
                             </div>
                           )}
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {r.compatibilidad && r.compatibilidad.length > 0 ? (
-                              r.compatibilidad.map((c, ci) => (
+                          {r.compatibilidad && r.compatibilidad.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {r.compatibilidad.map((c, ci) => (
                                 <span key={ci} className="text-xs bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded-full border border-emerald-200">
-                                  🚗 {c.marca}
+                                  🚗 {c.marca}: {c.modelos.join(', ')}
                                 </span>
-                              ))
-                            ) : (
-                              <span className="text-xs bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded-full border border-slate-200">
-                                🌐 Universal
-                              </span>
-                            )}
-                          </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-xs bg-indigo-50 text-indigo-700 font-medium px-2 py-0.5 rounded-full">{r.categoria}</span>
