@@ -30,6 +30,7 @@ export function VistaTrabajo({
   const emptyForm = {
     clienteId: '', vehiculoId: '',
     fecha: new Date().toISOString().split('T')[0],
+    numeroOrden: '',
     descripcion: '',
     requiereFactura: false,
     folioFiscal: '',
@@ -123,6 +124,7 @@ export function VistaTrabajo({
     if (!form.clienteId || !form.vehiculoId || !form.descripcion) return;
     onGuardar({
       ...form,
+      numeroOrden: form.numeroOrden?.trim() || undefined,
       manoDeObra: totalManoDeObra,
       manoDeObraItems: laborItems,
       refacciones: totalVentaRefacciones,
@@ -210,11 +212,16 @@ export function VistaTrabajo({
             </div>
           )}
 
-          {/* Fecha + Descripción (2-col, mano de obra moved to its own section) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Fecha + Número de orden + Descripción */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <Label>Fecha</Label>
               <Input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} required />
+            </div>
+            <div>
+              <Label>Número de Orden</Label>
+              <Input type="text" placeholder="Ej. 001, OT-2026-45..." value={form.numeroOrden}
+                onChange={e => setForm(f => ({ ...f, numeroOrden: e.target.value }))} />
             </div>
             <div>
               <Label>Descripción general del trabajo</Label>

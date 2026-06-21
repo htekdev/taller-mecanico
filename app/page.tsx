@@ -20,6 +20,7 @@ import { VistaOrdenesCompra } from '@/app/modules/ordenes';
 import { VistaFacturas } from '@/app/modules/facturas';
 import { VistaCuentas, VistaCuentasPorPagar } from '@/app/modules/cuentas';
 import { VistaResumen } from '@/app/modules/resumen';
+import { VistaHistorial } from '@/app/modules/historial';
 
 export default function TallerMecanico() {
   const [clientes,    setClientes]    = useState<Cliente[]>([]);
@@ -29,7 +30,7 @@ export default function TallerMecanico() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [ordenes,     setOrdenes]     = useState<OrdenCompra[]>([]);
   const [facturas,    setFacturas]    = useState<Factura[]>([]);
-  const [vista, setVista] = useState<'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'>('clientes');
+  const [vista, setVista] = useState<'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'>('clientes');
   const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
 
   // ── Cargar datos con migración de formatos anteriores ──
@@ -294,6 +295,7 @@ export default function TallerMecanico() {
     { key: 'cuentas',     icon: '💰', label: 'Por Cobrar',        count: facturasPendientes > 0 ? facturasPendientes : null },
     { key: 'pagos',       icon: '🔴', label: 'Por Pagar',         count: ordenesPendientesPago > 0 ? ordenesPendientesPago : null },
     { key: 'resumen',     icon: '📊', label: 'Resumen',           count: null },
+    { key: 'historial',   icon: '📋', label: 'Historial',          count: null },
   ] as const;
 
   return (
@@ -376,6 +378,9 @@ export default function TallerMecanico() {
               resumen={calcularResumen()}
               trabajos={trabajos.filter(t => t.fecha.startsWith(mesActual))}
               clientes={clientes} vehiculos={vehiculos} />
+          )}
+          {vista === 'historial' && (
+            <VistaHistorial clientes={clientes} vehiculos={vehiculos} trabajos={trabajos} />
           )}
         </Card>
       </div>
