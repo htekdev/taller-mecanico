@@ -337,13 +337,13 @@ function PantallaHistorial({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Mano de obra */}
-                    {trabajo.manoDeObraItems && trabajo.manoDeObraItems.length > 0 && (
+                    {(trabajo.manoDeObraItems ?? []).length > 0 && (
                       <div>
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
                           🔩 Mano de Obra
                         </p>
                         <div className="space-y-1">
-                          {trabajo.manoDeObraItems.map(item => (
+                          {(trabajo.manoDeObraItems ?? []).map(item => (
                             <div key={item.id} className="flex justify-between items-center text-sm">
                               <span className="text-slate-600">{item.concepto}</span>
                               <span className="font-semibold text-slate-800">${fmt(item.precio)}</span>
@@ -354,13 +354,13 @@ function PantallaHistorial({
                     )}
 
                     {/* Refacciones */}
-                    {trabajo.partes && trabajo.partes.length > 0 && (
+                    {(trabajo.partes ?? []).length > 0 && (
                       <div>
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
                           🔧 Refacciones
                         </p>
                         <div className="space-y-1">
-                          {trabajo.partes.map((parte, i) => (
+                          {(trabajo.partes ?? []).map((parte, i) => (
                             <div key={i} className="flex justify-between items-center text-sm">
                               <span className="text-slate-600 truncate mr-2">
                                 {parte.nombre}

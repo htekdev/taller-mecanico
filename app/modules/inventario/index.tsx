@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo } from '@/app/types';
@@ -88,9 +88,13 @@ export function VistaInventario({
   };
   const removePar = (i: number) => setPares(prev => prev.filter((_, idx) => idx !== i));
   const guardarCompatEdit = (id: string) => {
-    // Agrupar pares por marca → CompatibilidadVehiculo[]
+    let paresFinales = [...pares];
+    if (nuevoMarca.trim()) {
+      paresFinales = [...paresFinales, { marca: nuevoMarca.trim(), modelo: nuevoModelo.trim() }];
+    }
+
     const grouped: Record<string, string[]> = {};
-    for (const p of pares.filter(p => p.marca.trim())) {
+    for (const p of paresFinales.filter(p => p.marca.trim())) {
       const mk = p.marca.trim();
       if (!grouped[mk]) grouped[mk] = [];
       const md = p.modelo.trim();

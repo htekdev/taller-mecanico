@@ -60,8 +60,10 @@ export function labelVehiculo(v: Vehiculo) {
   return v.placa ? `${base} — ${v.placa}` : base;
 }
 
-export function fmt(n: number) {
-  return n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export function fmt(n: number): string {
+  const safe = Number(n);
+  if (!isFinite(safe)) return '0.00';
+  return safe.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
