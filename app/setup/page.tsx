@@ -94,9 +94,11 @@ export default function SetupPage() {
                 <button key={t.id} onClick={() => handleSeleccionar(t.id)}
                   className="w-full flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all text-left group">
                   <span className="text-2xl">🔧</span>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="font-semibold text-slate-800 group-hover:text-indigo-700">{t.nombre}</div>
-                    <div className="text-xs text-slate-400">Entrar al sistema</div>
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      {t.role === 'owner' ? '🏠 Dueño' : '🔧 Mecánico'}
+                    </div>
                   </div>
                   <span className="ml-auto text-slate-300 group-hover:text-indigo-400">→</span>
                 </button>

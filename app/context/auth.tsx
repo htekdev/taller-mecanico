@@ -3,15 +3,15 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/app/lib/supabase';
-import type { TallerRow } from '@/app/lib/supabase';
+import type { TallerRow, TallerConRol } from '@/app/lib/supabase';
 
 // ── Types ────────────────────────────────────────────────────
 
 interface AuthContextValue {
   user:        User | null;
   session:     Session | null;
-  taller:      TallerRow | null;
-  talleres:    TallerRow[];
+  taller:      TallerConRol | null;
+  talleres:    TallerConRol[];
   loading:     boolean;
   authLoading: boolean;
   signIn:      (email: string, password: string) => Promise<string | null>;
@@ -19,7 +19,7 @@ interface AuthContextValue {
   signOut:     () => Promise<void>;
   selectTaller: (id: string) => void;
   crearTaller: (nombre: string) => Promise<TallerRow | { error: string } | null>;
-  recargarTalleres: () => Promise<TallerRow[]>;
+  recargarTalleres: () => Promise<TallerConRol[]>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -29,19 +29,25 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user,     setUser]     = useState<User | null>(null);
   const [session,  setSession]  = useState<Session | null>(null);
-  const [taller,   setTaller]   = useState<TallerRow | null>(null);
-  const [talleres, setTalleres] = useState<TallerRow[]>([]);
+  const [taller,   setTaller]   = useState<TallerConRol | null>(null);
+  const [talleres, setTalleres] = useState<TallerConRol[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // ── Load talleres for the current user ──
+  // ── Load talleres for the current user (via taller_members join for role info) ──
   const recargarTalleres = useCallback(async () => {
+    // Join through taller_members to get ALL talleres the user belongs to
+    // (both owned and member-invited) along with their role in each.
     const { data } = await supabase
-      .from('talleres')
-      .select('*')
+      .from('taller_members')
+      .select('role, talleres(*)')
       .order('created_at', { ascending: true });
 
-    const list = (data ?? []) as TallerRow[];
+    const list: TallerConRol[] = (data ?? []).map((item) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const t = (item as any).talleres as TallerRow;
+      return { ...t, role: item.role as 'owner' | 'mechanic' };
+    });
     setTalleres(list);
     return list;
   }, []);
@@ -143,8 +149,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role:      'owner',
     });
 
-    setTalleres(prev => [...prev, nuevoTaller]);
-    setTaller(nuevoTaller);
+    const nuevoConRol: TallerConRol = { ...nuevoTaller, role: 'owner' };
+    setTalleres(prev => [...prev, nuevoConRol]);
+    setTaller(nuevoConRol);
     localStorage.setItem('taller_id', nuevoTaller.id);
 
     return nuevoTaller;

@@ -27,7 +27,8 @@ import * as db          from '@/app/lib/db';
 type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion';
 
 export default function TallerMecanico() {
-  const { taller, user, signOut } = useAuth();
+  const { taller, talleres, selectTaller, user, signOut } = useAuth();
+  const [showTallerMenu, setShowTallerMenu] = useState(false);
   const [clientes,    setClientes]    = useState<Cliente[]>([]);
   const [vehiculos,   setVehiculos]   = useState<Vehiculo[]>([]);
   const [inventario,  setInventario]  = useState<Refaccion[]>([]);
@@ -278,7 +279,52 @@ export default function TallerMecanico() {
           <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center text-2xl shadow-inner flex-shrink-0">🔧</div>
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold text-white tracking-tight">Taller Mecánico</h1>
-            <p className="text-slate-400 text-sm font-medium truncate">{taller?.nombre ?? 'Sistema de Gestión'}</p>
+
+            {/* Taller name — clickable dropdown when user has multiple talleres */}
+            {talleres.length > 1 ? (
+              <div className="relative">
+                <button
+                  onClick={() => setShowTallerMenu(v => !v)}
+                  className="flex items-center gap-1.5 text-slate-300 text-sm font-medium hover:text-white transition-colors group"
+                >
+                  <span className="truncate max-w-[160px]">{taller?.nombre ?? 'Seleccionar taller'}</span>
+                  <span className="text-slate-500 group-hover:text-slate-300 text-xs">▼</span>
+                </button>
+
+                {showTallerMenu && (
+                  <>
+                    {/* Backdrop */}
+                    <div className="fixed inset-0 z-10" onClick={() => setShowTallerMenu(false)} />
+                    {/* Dropdown */}
+                    <div className="absolute left-0 top-full mt-2 z-20 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 min-w-[220px]">
+                      <p className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Cambiar taller</p>
+                      {talleres.map(t => (
+                        <button
+                          key={t.id}
+                          onClick={() => { selectTaller(t.id); setShowTallerMenu(false); }}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors ${
+                            t.id === taller?.id ? 'bg-indigo-50' : ''
+                          }`}
+                        >
+                          <span className="text-lg">🔧</span>
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-sm font-semibold truncate ${t.id === taller?.id ? 'text-indigo-700' : 'text-slate-800'}`}>
+                              {t.nombre}
+                            </div>
+                            <div className="text-xs text-slate-400">
+                              {t.role === 'owner' ? '🏠 Dueño' : '🔧 Mecánico'}
+                            </div>
+                          </div>
+                          {t.id === taller?.id && <span className="text-indigo-500 text-sm">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm font-medium truncate">{taller?.nombre ?? 'Sistema de Gestión'}</p>
+            )}
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             <span className="text-slate-500 text-xs hidden sm:block truncate max-w-[8rem]">{user?.email}</span>
