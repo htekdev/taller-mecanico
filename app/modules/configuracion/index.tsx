@@ -24,6 +24,10 @@ export function VistaConfiguracion() {
   const [enviando, setEnviando] = useState(false);
   const [mensaje,  setMensaje]  = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
 
+  // Track which member's role is being updated (memberId → loading state)
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+  const [roleMensaje, setRoleMensaje]   = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+
   // ── Load members & invites ──
 
   const cargar = useCallback(async () => {
@@ -49,13 +53,11 @@ export function VistaConfiguracion() {
     setEnviando(true);
     setMensaje(null);
 
-    // Check not already a member by email matching an existing invite that was used
     const trimmedEmail = email.trim().toLowerCase();
 
     const result = await db.sendInvite(taller.id, trimmedEmail, user.id);
 
     if (result === null) {
-      // null means either already invited or DB error
       setMensaje({
         tipo: 'error',
         texto: `⚠️ Ya existe una invitación pendiente para ${trimmedEmail}.`,
@@ -77,6 +79,37 @@ export function VistaConfiguracion() {
     setInvites(prev => prev.filter(i => i.id !== inviteId));
   };
 
+  // ── Role editing ──
+
+  // Determine if current user is an owner in this taller
+  const isOwner = members.some(m => m.userId === user?.id && m.role === 'owner');
+
+  const handleCambiarRol = async (member: TallerMember, newRole: 'owner' | 'mechanic') => {
+    if (!taller || newRole === member.role) return;
+
+    setUpdatingRole(member.id);
+    setRoleMensaje(null);
+
+    const ok = await db.updateMemberRole(member.id, taller.id, newRole);
+
+    if (ok) {
+      setMembers(prev => prev.map(m =>
+        m.id === member.id ? { ...m, role: newRole } : m,
+      ));
+      setRoleMensaje({
+        tipo: 'ok',
+        texto: `✅ Rol de ${displayEmail(member)} actualizado a ${ROLE_LABEL[newRole]}.`,
+      });
+    } else {
+      setRoleMensaje({
+        tipo: 'error',
+        texto: `⚠️ No se pudo cambiar el rol. Solo los dueños pueden editar roles.`,
+      });
+    }
+
+    setUpdatingRole(null);
+  };
+
   if (!taller) return null;
 
   return (
@@ -92,31 +125,77 @@ export function VistaConfiguracion() {
       <section className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
         <h3 className="text-base font-semibold text-slate-700 mb-4">👥 Miembros del Taller</h3>
 
+        {roleMensaje && (
+          <div className={`mb-3 px-4 py-3 rounded-xl text-sm ${
+            roleMensaje.tipo === 'ok'
+              ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+              : 'bg-rose-50 border border-rose-200 text-rose-700'
+          }`}>
+            {roleMensaje.texto}
+          </div>
+        )}
+
         {cargando ? (
           <p className="text-sm text-slate-400">Cargando miembros...</p>
         ) : members.length === 0 ? (
           <p className="text-sm text-slate-400">No hay miembros registrados.</p>
         ) : (
           <ul className="space-y-2">
-            {members.map(m => (
-              <li key={m.id}
-                className="flex items-center justify-between px-4 py-3 rounded-lg bg-slate-50 border border-slate-100">
-                <div>
-                  <p className="text-sm font-medium text-slate-800 font-mono">{m.userId}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Agregado: {new Date(m.createdAt).toLocaleDateString('es-MX')}
-                  </p>
-                </div>
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                  m.role === 'owner'
-                    ? 'bg-indigo-100 text-indigo-700'
-                    : 'bg-slate-100 text-slate-600'
-                }`}>
-                  {ROLE_LABEL[m.role] ?? m.role}
-                </span>
-              </li>
-            ))}
+            {members.map(m => {
+              const esYo = m.userId === user?.id;
+              const displayName = m.email
+                ?? (esYo ? user?.email : null)
+                ?? `usuario-${m.userId.slice(0, 8)}`;
+
+              return (
+                <li key={m.id}
+                  className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-slate-50 border border-slate-100">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">
+                      {displayName}
+                      {esYo && (
+                        <span className="ml-2 text-xs text-indigo-500 font-normal">(tú)</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Agregado: {new Date(m.createdAt).toLocaleDateString('es-MX')}
+                    </p>
+                  </div>
+
+                  {/* Role — dropdown for owners, badge for non-owners */}
+                  {isOwner ? (
+                    <select
+                      value={m.role}
+                      disabled={updatingRole === m.id}
+                      onChange={e => handleCambiarRol(m, e.target.value as 'owner' | 'mechanic')}
+                      className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors ${
+                        m.role === 'owner'
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                          : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                      } disabled:opacity-60 disabled:cursor-not-allowed`}
+                    >
+                      <option value="owner">👑 Dueño</option>
+                      <option value="mechanic">🔧 Mecánico</option>
+                    </select>
+                  ) : (
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      m.role === 'owner'
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {ROLE_LABEL[m.role] ?? m.role}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
+        )}
+
+        {isOwner && !cargando && members.length > 0 && (
+          <p className="mt-3 text-xs text-slate-400">
+            💡 Como dueño puedes cambiar el rol de cualquier miembro. Se permiten múltiples dueños.
+          </p>
         )}
       </section>
 
@@ -186,3 +265,10 @@ export function VistaConfiguracion() {
     </div>
   );
 }
+
+// ── Helpers ───────────────────────────────────────────────────
+
+function displayEmail(m: TallerMember): string {
+  return m.email ?? `usuario-${m.userId.slice(0, 8)}`;
+}
+

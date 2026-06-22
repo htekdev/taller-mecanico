@@ -411,8 +411,27 @@ export async function getMembers(tallerId: string): Promise<TallerMember[]> {
     tallerId: r.taller_id,
     userId: r.user_id,
     role: r.role,
+    email: r.email ?? undefined,
     createdAt: r.created_at,
   }));
+}
+
+export async function updateMemberRole(
+  memberId: string,
+  tallerId: string,
+  newRole: 'owner' | 'mechanic',
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('taller_members')
+    .update({ role: newRole })
+    .eq('id', memberId)
+    .eq('taller_id', tallerId);
+
+  if (error) {
+    console.warn('[updateMemberRole] failed:', error.code, error.message);
+    return false;
+  }
+  return true;
 }
 
 // ── Taller Invites ────────────────────────────────────────────
@@ -522,11 +541,12 @@ export async function redeemInvite(email: string, userId: string): Promise<strin
     .single();
 
   if (!existing) {
-    // Add as mechanic member
+    // Add as mechanic member — store email for readable display in Configuración
     const { error: memberErr } = await supabase.from('taller_members').insert({
       taller_id: invite.taller_id,
       user_id: userId,
       role: 'mechanic',
+      email: email.toLowerCase(),
     });
     if (memberErr) {
       console.warn('[redeemInvite] member insert failed:', memberErr.code, memberErr.message);
