@@ -154,11 +154,13 @@ export function VistaInventario({
   const proveedorNombre = (proveedorId?: string) =>
     proveedores.find(p => p.id === proveedorId)?.nombre ?? null;
 
-  const inventarioFiltrado = inventario.filter(r => {
-    if (filtroProveedor && r.proveedorId !== filtroProveedor) return false;
-    if (filtroCategoria && r.categoria !== filtroCategoria) return false;
-    return true;
-  });
+  const inventarioFiltrado = [...inventario]
+    .filter(r => {
+      if (filtroProveedor && r.proveedorId !== filtroProveedor) return false;
+      if (filtroCategoria && r.categoria !== filtroCategoria) return false;
+      return true;
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
   return (
     <div>

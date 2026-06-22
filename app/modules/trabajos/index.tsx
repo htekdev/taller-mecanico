@@ -318,14 +318,16 @@ export function VistaTrabajo({
     : inventario.length;
 
   const trabajosPendientes = trabajos.filter(t => t.estado === 'pendiente');
-  const trabajosFiltrados = trabajos.filter(t => {
-    if (filtroClienteId && t.clienteId !== filtroClienteId) return false;
-    if (filtroVehiculoId && t.vehiculoId !== filtroVehiculoId) return false;
-    if (filtroEstado !== 'todos' && t.estado !== filtroEstado) return false;
-    if (filtroFacturacion === 'con_factura' && t.estadoFacturacion !== 'facturado') return false;
-    if (filtroFacturacion === 'sin_factura' && t.estadoFacturacion === 'facturado') return false;
-    return true;
-  });
+  const trabajosFiltrados = [...trabajos]
+    .filter(t => {
+      if (filtroClienteId && t.clienteId !== filtroClienteId) return false;
+      if (filtroVehiculoId && t.vehiculoId !== filtroVehiculoId) return false;
+      if (filtroEstado !== 'todos' && t.estado !== filtroEstado) return false;
+      if (filtroFacturacion === 'con_factura' && t.estadoFacturacion !== 'facturado') return false;
+      if (filtroFacturacion === 'sin_factura' && t.estadoFacturacion === 'facturado') return false;
+      return true;
+    })
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
   const trabajoFinalizando = finalizandoId ? trabajos.find(t => t.id === finalizandoId) : null;
 
   return (

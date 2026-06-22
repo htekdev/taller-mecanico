@@ -74,9 +74,10 @@ export function VistaProveedores({
             </Select>
           </div>
           {(() => {
-            const filtrados = filtroProveedorId
+            const filtrados = (filtroProveedorId
               ? proveedores.filter(p => p.id === filtroProveedorId)
-              : proveedores;
+              : [...proveedores]
+            ).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
             if (filtrados.length === 0) {
               return (
