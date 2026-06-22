@@ -100,7 +100,8 @@ function ReporteCliente({
           {facsPend.length > 0 && (
             <div className="mb-6">
               <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">🧾 Facturas con saldo pendiente</h3>
-              <table className="w-full text-sm border-collapse">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse min-w-[500px]">
                 <thead>
                   <tr className="bg-slate-50">
                     <th className="text-left py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Folio</th>
@@ -128,6 +129,7 @@ function ReporteCliente({
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
@@ -135,7 +137,8 @@ function ReporteCliente({
           {trabsPend.length > 0 && (
             <div className="mb-6">
               <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">🔧 Trabajos con saldo pendiente</h3>
-              <table className="w-full text-sm border-collapse">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse min-w-[500px]">
                 <thead>
                   <tr className="bg-slate-50">
                     <th className="text-left py-2 px-3 text-xs text-slate-500 font-semibold border-b border-slate-200">Descripción</th>
@@ -166,8 +169,9 @@ function ReporteCliente({
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
-          )}
+          )} 
 
           {facsPend.length === 0 && trabsPend.length === 0 && (
             <div className="text-center py-8 text-slate-400">

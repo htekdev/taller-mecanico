@@ -441,8 +441,8 @@ export function VistaTrabajo({
 
               {/* Labor items table */}
               {laborItems.length > 0 && (
-                <div className="rounded-lg border border-slate-200 overflow-hidden">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="w-full text-sm min-w-[400px]">
                     <thead className="bg-slate-100">
                       <tr>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Concepto</th>
@@ -689,8 +689,8 @@ export function VistaTrabajo({
 
                 {/* Lista de partes seleccionadas */}
                 {partesSeleccionadas.length > 0 && (
-                  <div className="rounded-lg border border-slate-200 overflow-hidden">
-                    <table className="w-full text-sm">
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-sm min-w-[400px]">
                       <thead className="bg-slate-100">
                         <tr>
                           <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Refacción</th>
