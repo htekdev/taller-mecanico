@@ -20,10 +20,11 @@ import { VistaFacturas } from '@/app/modules/facturas';
 import { VistaCuentas, VistaCuentasPorPagar } from '@/app/modules/cuentas';
 import { VistaResumen } from '@/app/modules/resumen';
 import { VistaHistorial } from '@/app/modules/historial';
+import { VistaConfiguracion } from '@/app/modules/configuracion';
 import { useAuth }      from '@/app/context/auth';
 import * as db          from '@/app/lib/db';
 
-type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial';
+type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion';
 
 export default function TallerMecanico() {
   const { taller, user, signOut } = useAuth();
@@ -265,8 +266,9 @@ export default function TallerMecanico() {
     { key: 'facturas',    icon: '🧾', label: 'Facturas',          count: facturas.length > 0 ? facturas.length : null },
     { key: 'cuentas',     icon: '💰', label: 'Por Cobrar',        count: facturasPendientes > 0 ? facturasPendientes : null },
     { key: 'pagos',       icon: '🔴', label: 'Por Pagar',         count: ordenesPendientesPago > 0 ? ordenesPendientesPago : null },
-    { key: 'resumen',     icon: '📊', label: 'Resumen',           count: null },
-    { key: 'historial',   icon: '📋', label: 'Historial',          count: null },
+    { key: 'resumen',       icon: '📊', label: 'Resumen',           count: null },
+    { key: 'historial',     icon: '📋', label: 'Historial',          count: null },
+    { key: 'configuracion', icon: '⚙️', label: 'Configuración',     count: null },
   ] as const;
 
   return (
@@ -367,6 +369,9 @@ export default function TallerMecanico() {
           )}
           {vista === 'historial' && (
             <VistaHistorial clientes={clientes} vehiculos={vehiculos} trabajos={trabajos} />
+          )}
+          {vista === 'configuracion' && (
+            <VistaConfiguracion />
           )}
         </Card>
         )}

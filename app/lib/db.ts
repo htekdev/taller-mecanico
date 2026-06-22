@@ -387,3 +387,139 @@ export async function insertFactura(tallerId: string, data: Omit<Factura, 'id'>)
 export async function updateFacturaPagos(facturaId: string, pagos: PagoFactura[]): Promise<void> {
   await supabase.from('facturas').update({ pagos }).eq('id', facturaId);
 }
+
+// ── Taller Members ────────────────────────────────────────────
+
+export interface TallerMember {
+  id: string;
+  tallerId: string;
+  userId: string;
+  role: 'owner' | 'mechanic';
+  email?: string;
+  createdAt: string;
+}
+
+export async function getMembers(tallerId: string): Promise<TallerMember[]> {
+  const { data } = await supabase
+    .from('taller_members')
+    .select('*')
+    .eq('taller_id', tallerId)
+    .order('created_at', { ascending: true });
+
+  return (data ?? []).map(r => ({
+    id: r.id,
+    tallerId: r.taller_id,
+    userId: r.user_id,
+    role: r.role,
+    createdAt: r.created_at,
+  }));
+}
+
+// ── Taller Invites ────────────────────────────────────────────
+
+export interface TallerInvite {
+  id: string;
+  tallerId: string;
+  email: string;
+  token: string;
+  invitedBy: string | null;
+  usedAt: string | null;
+  createdAt: string;
+}
+
+export async function getInvites(tallerId: string): Promise<TallerInvite[]> {
+  const { data } = await supabase
+    .from('taller_invites')
+    .select('*')
+    .eq('taller_id', tallerId)
+    .is('used_at', null)
+    .order('created_at', { ascending: false });
+
+  return (data ?? []).map(r => ({
+    id: r.id,
+    tallerId: r.taller_id,
+    email: r.email,
+    token: r.token,
+    invitedBy: r.invited_by,
+    usedAt: r.used_at,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function sendInvite(tallerId: string, email: string, invitedBy: string): Promise<TallerInvite | null> {
+  // Check if invite already exists for this email + taller (unused)
+  const { data: existing } = await supabase
+    .from('taller_invites')
+    .select('id')
+    .eq('taller_id', tallerId)
+    .eq('email', email.toLowerCase())
+    .is('used_at', null)
+    .single();
+
+  if (existing) {
+    // Already has a pending invite — return it without creating duplicate
+    return null;
+  }
+
+  const { data: row, error } = await supabase
+    .from('taller_invites')
+    .insert({
+      taller_id: tallerId,
+      email: email.toLowerCase(),
+      invited_by: invitedBy,
+    })
+    .select()
+    .single();
+
+  if (error || !row) return null;
+  return {
+    id: row.id, tallerId: row.taller_id, email: row.email,
+    token: row.token, invitedBy: row.invited_by, usedAt: row.used_at,
+    createdAt: row.created_at,
+  };
+}
+
+export async function cancelInvite(inviteId: string): Promise<void> {
+  await supabase.from('taller_invites').delete().eq('id', inviteId);
+}
+
+/**
+ * Check if a user email has a pending invite and redeem it.
+ * Called during setup/onboarding when a new user signs in.
+ * Returns the taller_id if successfully redeemed, null otherwise.
+ */
+export async function redeemInvite(email: string, userId: string): Promise<string | null> {
+  // Find pending invite for this email (not yet used)
+  const { data: invite } = await supabase
+    .from('taller_invites')
+    .select('*')
+    .eq('email', email.toLowerCase())
+    .is('used_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!invite) return null;
+
+  // Check if already a member
+  const { data: existing } = await supabase
+    .from('taller_members')
+    .select('id')
+    .eq('taller_id', invite.taller_id)
+    .eq('user_id', userId)
+    .single();
+
+  if (!existing) {
+    // Add as member
+    await supabase.from('taller_members').insert({
+      taller_id: invite.taller_id,
+      user_id: userId,
+      role: 'mechanic',
+    });
+  }
+
+  // Mark invite as used
+  await supabase.from('taller_invites').update({ used_at: new Date().toISOString() }).eq('id', invite.id);
+
+  return invite.taller_id;
+}
