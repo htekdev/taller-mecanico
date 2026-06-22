@@ -18,6 +18,11 @@ export interface TallerRow {
   created_at: string;
 }
 
+/** TallerRow enriched with the current user's role in that taller */
+export interface TallerConRol extends TallerRow {
+  role: 'owner' | 'mechanic';
+}
+
 export interface TallerMemberRow {
   id: string;
   taller_id: string;
