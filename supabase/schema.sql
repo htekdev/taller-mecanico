@@ -186,9 +186,18 @@ CREATE POLICY "ver_mis_memberships" ON taller_members
 CREATE POLICY "insertar_membership" ON taller_members
   FOR INSERT WITH CHECK (auth.uid() = user_id OR is_taller_member(taller_id));
 
--- taller_invites: only taller members can manage invites
-CREATE POLICY "ver_invitaciones" ON taller_invites
+-- taller_invites: taller members can fully manage invites for their taller
+CREATE POLICY "miembros_gestionar_invitaciones" ON taller_invites
   FOR ALL USING (is_taller_member(taller_id));
+
+-- Invited users can SELECT their own pending invite before they are a member yet.
+-- This is required so redeemInvite() on /setup works for new users.
+CREATE POLICY "invitado_ver_su_invitacion" ON taller_invites
+  FOR SELECT USING (lower(email) = lower(auth.email()));
+
+-- Invited users can UPDATE their own invite row (to set used_at when redeeming).
+CREATE POLICY "invitado_redimir_invitacion" ON taller_invites
+  FOR UPDATE USING (lower(email) = lower(auth.email()));
 
 -- Business tables: full CRUD for taller members
 CREATE POLICY "crud_clientes"       ON clientes       FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
