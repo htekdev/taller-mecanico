@@ -142,11 +142,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const nuevoTaller = tallerData as TallerRow;
 
-    // 2. Add creator as owner member
+    // 2. Add creator as owner member — store email for readable display in Configuración
     await supabase.from('taller_members').insert({
       taller_id: nuevoTaller.id,
       user_id:   user.id,
       role:      'owner',
+      email:     user.email ?? null,
     });
 
     const nuevoConRol: TallerConRol = { ...nuevoTaller, role: 'owner' };
