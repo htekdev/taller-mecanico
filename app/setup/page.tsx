@@ -1,19 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/auth';
+import { redeemInvite } from '@/app/lib/db';
 
 export default function SetupPage() {
-  const { crearTaller, talleres, selectTaller, user, loading } = useAuth();
+  const { crearTaller, talleres, selectTaller, recargarTalleres, user, loading } = useAuth();
   const router = useRouter();
 
-  const [nombre,    setNombre]    = useState('');
-  const [creando,   setCreando]   = useState(false);
-  const [error,     setError]     = useState('');
-  const [modoCrear, setModoCrear] = useState(false);
+  const [nombre,       setNombre]       = useState('');
+  const [creando,      setCreando]      = useState(false);
+  const [error,        setError]        = useState('');
+  const [modoCrear,    setModoCrear]    = useState(false);
+  const [checkingInvite, setCheckingInvite] = useState(true);
 
-  if (loading) {
+  // ── Check for pending invite when user first lands on setup ──
+  useEffect(() => {
+    if (loading || !user) return;
+
+    (async () => {
+      setCheckingInvite(true);
+      const tallerId = await redeemInvite(user.email!, user.id);
+      if (tallerId) {
+        // Invite redeemed — reload talleres and redirect
+        const lista = await recargarTalleres();
+        const t = lista.find(t => t.id === tallerId);
+        if (t) {
+          selectTaller(t.id);
+          router.push('/');
+          return;
+        }
+      }
+      setCheckingInvite(false);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, loading]);
+
+  if (loading || checkingInvite) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-slate-400 text-sm">Cargando...</div>

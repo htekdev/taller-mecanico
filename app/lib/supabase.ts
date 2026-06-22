@@ -26,6 +26,16 @@ export interface TallerMemberRow {
   created_at: string;
 }
 
+export interface TallerInviteRow {
+  id: string;
+  taller_id: string;
+  email: string;
+  token: string;
+  invited_by: string | null;
+  used_at: string | null;
+  created_at: string;
+}
+
 export interface ClienteRow {
   id: string;
   taller_id: string;
