@@ -15,6 +15,7 @@ import {
   getTrabajos, insertTrabajo, updateTrabajoPagos, updateTrabajoFactura,
   getOrdenes, updateOrdenEstado, updateOrdenPagos,
   getFacturas, updateFacturaPagos,
+  getMembers, getInvites, sendInvite, cancelInvite, redeemInvite,
 } from '@/app/lib/db';
 
 const mockFrom = vi.mocked(supabase.from);
@@ -409,5 +410,255 @@ describe('updateFacturaPagos', () => {
     expect(mockFrom).toHaveBeenCalledWith('facturas');
     expect(update).toHaveBeenCalledWith({ pagos });
     expect(eq).toHaveBeenCalledWith('id', 'f1');
+  });
+});
+
+// ── Flexible chain helpers (for multi-step / filtered chains) ───────────────
+//
+// Uses a Proxy so any method call returns the same chain object.
+// The chain is a thenable that resolves to { data, error } when awaited.
+// This handles complex patterns like: .select().eq().is().order().limit().single()
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeFlexibleChain(data: unknown, error: unknown = null): any {
+  const resolved = Promise.resolve({ data, error });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chain: any = new Proxy({}, {
+    get(_: object, prop: string | symbol) {
+      if (prop === 'then') return resolved.then.bind(resolved);
+      if (prop === 'catch') return resolved.catch.bind(resolved);
+      if (prop === 'finally') return resolved.finally.bind(resolved);
+      return vi.fn().mockReturnValue(chain);
+    },
+  });
+  return chain;
+}
+
+/** Single-call mock: every chain method returns a flexible thenable. */
+function mockFlexibleChain(data: unknown, error: unknown = null) {
+  const chain = makeFlexibleChain(data, error);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mockFrom.mockReturnValue(chain as any);
+  return chain;
+}
+
+/**
+ * Multi-call mock: sets up sequential mockReturnValueOnce for functions
+ * that call supabase.from() more than once (e.g. sendInvite, redeemInvite).
+ */
+function mockFromSequence(...results: Array<{ data: unknown; error?: unknown }>) {
+  for (const r of results) {
+    const chain = makeFlexibleChain(r.data, r.error ?? null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockFrom.mockReturnValueOnce(chain as any);
+  }
+}
+
+// ── getMembers ──────────────────────────────────────────────────────────────
+
+describe('getMembers', () => {
+  it('queries taller_members table', async () => {
+    mockFlexibleChain([]);
+    await getMembers('t1');
+    expect(mockFrom).toHaveBeenCalledWith('taller_members');
+  });
+
+  it('maps snake_case row to TallerMember', async () => {
+    const rawData = [{
+      id: 'm1', taller_id: 't1', user_id: 'u1', role: 'owner',
+      created_at: '2026-06-22T00:00:00Z',
+    }];
+    mockFlexibleChain(rawData);
+    const result = await getMembers('t1');
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      id: 'm1', tallerId: 't1', userId: 'u1', role: 'owner', createdAt: '2026-06-22T00:00:00Z',
+    });
+  });
+
+  it('returns empty array when data is null', async () => {
+    mockFlexibleChain(null);
+    expect(await getMembers('t1')).toEqual([]);
+  });
+
+  it('maps mechanic role correctly', async () => {
+    const rawData = [{
+      id: 'm2', taller_id: 't1', user_id: 'u2', role: 'mechanic', created_at: '2026-06-22T00:00:00Z',
+    }];
+    mockFlexibleChain(rawData);
+    const result = await getMembers('t1');
+    expect(result[0].role).toBe('mechanic');
+  });
+});
+
+// ── getInvites ──────────────────────────────────────────────────────────────
+
+describe('getInvites', () => {
+  it('queries taller_invites table', async () => {
+    mockFlexibleChain([]);
+    await getInvites('t1');
+    expect(mockFrom).toHaveBeenCalledWith('taller_invites');
+  });
+
+  it('maps snake_case row to TallerInvite', async () => {
+    const rawData = [{
+      id: 'inv1', taller_id: 't1', email: 'test@example.com',
+      token: 'tok123', invited_by: 'u1', used_at: null, created_at: '2026-06-22T00:00:00Z',
+    }];
+    mockFlexibleChain(rawData);
+    const result = await getInvites('t1');
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      id: 'inv1', tallerId: 't1', email: 'test@example.com',
+      token: 'tok123', invitedBy: 'u1', usedAt: null, createdAt: '2026-06-22T00:00:00Z',
+    });
+  });
+
+  it('returns empty array when data is null', async () => {
+    mockFlexibleChain(null);
+    expect(await getInvites('t1')).toEqual([]);
+  });
+
+  it('maps invitedBy to null when invited_by is null', async () => {
+    const rawData = [{
+      id: 'inv2', taller_id: 't1', email: 'anon@example.com',
+      token: 'tokABC', invited_by: null, used_at: null, created_at: '2026-06-22T00:00:00Z',
+    }];
+    mockFlexibleChain(rawData);
+    const result = await getInvites('t1');
+    expect(result[0].invitedBy).toBeNull();
+  });
+});
+
+// ── sendInvite ──────────────────────────────────────────────────────────────
+
+describe('sendInvite', () => {
+  it('returns null when a pending invite already exists for that email', async () => {
+    // First from() call — check existing — finds one
+    mockFromSequence({ data: { id: 'inv1' } });
+    const result = await sendInvite('t1', 'test@example.com', 'u1');
+    expect(result).toBeNull();
+  });
+
+  it('inserts and returns a new invite when no existing pending invite', async () => {
+    const newRow = {
+      id: 'inv2', taller_id: 't1', email: 'new@example.com',
+      token: 'tok456', invited_by: 'u1', used_at: null, created_at: '2026-06-22T00:00:00Z',
+    };
+    mockFromSequence(
+      { data: null },     // check existing — none found
+      { data: newRow },   // insert — success
+    );
+    const result = await sendInvite('t1', 'new@example.com', 'u1');
+    expect(result).not.toBeNull();
+    expect(result!.email).toBe('new@example.com');
+    expect(result!.token).toBe('tok456');
+    expect(result!.invitedBy).toBe('u1');
+    expect(result!.tallerId).toBe('t1');
+  });
+
+  it('lowercases email before inserting', async () => {
+    const newRow = {
+      id: 'inv3', taller_id: 't1', email: 'upper@example.com',
+      token: 'tok789', invited_by: 'u1', used_at: null, created_at: '2026-06-22T00:00:00Z',
+    };
+    mockFromSequence({ data: null }, { data: newRow });
+    const result = await sendInvite('t1', 'UPPER@EXAMPLE.COM', 'u1');
+    expect(result).not.toBeNull();
+    expect(result!.email).toBe('upper@example.com');
+  });
+
+  it('returns null when insert fails with DB error', async () => {
+    mockFromSequence(
+      { data: null },
+      { data: null, error: { message: 'DB insert error' } },
+    );
+    const result = await sendInvite('t1', 'fail@example.com', 'u1');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when insert row is null without error', async () => {
+    mockFromSequence(
+      { data: null },
+      { data: null, error: null },
+    );
+    const result = await sendInvite('t1', 'null@example.com', 'u1');
+    expect(result).toBeNull();
+  });
+});
+
+// ── cancelInvite ────────────────────────────────────────────────────────────
+
+describe('cancelInvite', () => {
+  it('calls delete on taller_invites table', async () => {
+    mockFlexibleChain(null);
+    await cancelInvite('inv1');
+    expect(mockFrom).toHaveBeenCalledWith('taller_invites');
+  });
+
+  it('resolves without error for valid invite id', async () => {
+    mockFlexibleChain(null);
+    await expect(cancelInvite('inv99')).resolves.toBeUndefined();
+  });
+});
+
+// ── redeemInvite ────────────────────────────────────────────────────────────
+
+describe('redeemInvite', () => {
+  it('returns null when no pending invite exists for that email', async () => {
+    mockFromSequence({ data: null });
+    const result = await redeemInvite('noone@example.com', 'u1');
+    expect(result).toBeNull();
+  });
+
+  it('adds user as mechanic member and marks invite used', async () => {
+    const invite = {
+      id: 'inv1', taller_id: 't1', email: 'member@example.com',
+      token: 'tok1', invited_by: 'owner1', used_at: null, created_at: '2026-06-20T00:00:00Z',
+    };
+    mockFromSequence(
+      { data: invite },  // find invite
+      { data: null },    // check member → not yet a member
+      { data: null },    // insert member
+      { data: null },    // update invite used_at
+    );
+    const result = await redeemInvite('member@example.com', 'u2');
+    expect(result).toBe('t1');
+    expect(mockFrom).toHaveBeenCalledTimes(4);
+  });
+
+  it('skips member insert when user is already a member, still marks invite used', async () => {
+    const invite = {
+      id: 'inv2', taller_id: 't1', email: 'existing@example.com',
+      token: 'tok2', invited_by: 'owner1', used_at: null, created_at: '2026-06-20T00:00:00Z',
+    };
+    mockFromSequence(
+      { data: invite },           // find invite
+      { data: { id: 'mem1' } },   // check member → already exists
+      { data: null },             // update invite used_at (no insert)
+    );
+    const result = await redeemInvite('existing@example.com', 'u3');
+    expect(result).toBe('t1');
+    // Only 3 from() calls: find invite, check member, update invite (no insert)
+    expect(mockFrom).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns correct taller_id from redeemed invite', async () => {
+    const invite = {
+      id: 'inv3', taller_id: 'taller-xyz', email: 'shop@example.com',
+      token: 'tok3', invited_by: null, used_at: null, created_at: '2026-06-21T00:00:00Z',
+    };
+    mockFromSequence(
+      { data: invite }, { data: null }, { data: null }, { data: null },
+    );
+    const result = await redeemInvite('shop@example.com', 'u4');
+    expect(result).toBe('taller-xyz');
+  });
+
+  it('lowercases email when looking up invite', async () => {
+    mockFromSequence({ data: null });
+    const result = await redeemInvite('UPPER@EXAMPLE.COM', 'u5');
+    expect(result).toBeNull();
+    expect(mockFrom).toHaveBeenCalledTimes(1);
   });
 });
