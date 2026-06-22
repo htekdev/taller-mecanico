@@ -487,10 +487,16 @@ export async function cancelInvite(inviteId: string): Promise<void> {
  * Check if a user email has a pending invite and redeem it.
  * Called during setup/onboarding when a new user signs in.
  * Returns the taller_id if successfully redeemed, null otherwise.
+ *
+ * REQUIRES Supabase RLS policies (migration 001_fix_invite_rls.sql):
+ *   - "invitado_ver_su_invitacion": allows SELECT where lower(email) = lower(auth.email())
+ *   - "invitado_redimir_invitacion": allows UPDATE where lower(email) = lower(auth.email())
+ * Without these, a new user (not yet a taller member) cannot read their own invite.
  */
 export async function redeemInvite(email: string, userId: string): Promise<string | null> {
-  // Find pending invite for this email (not yet used)
-  const { data: invite } = await supabase
+  // Find pending invite for this email (not yet used).
+  // RLS policy "invitado_ver_su_invitacion" allows this even before the user is a member.
+  const { data: invite, error: inviteErr } = await supabase
     .from('taller_invites')
     .select('*')
     .eq('email', email.toLowerCase())
@@ -499,9 +505,15 @@ export async function redeemInvite(email: string, userId: string): Promise<strin
     .limit(1)
     .single();
 
-  if (!invite) return null;
+  if (inviteErr || !invite) {
+    if (inviteErr && inviteErr.code !== 'PGRST116') {
+      // PGRST116 = no rows found (normal case); any other error is unexpected
+      console.warn('[redeemInvite] invite lookup failed:', inviteErr.code, inviteErr.message);
+    }
+    return null;
+  }
 
-  // Check if already a member
+  // Check if already a member (idempotent — safe to call multiple times)
   const { data: existing } = await supabase
     .from('taller_members')
     .select('id')
@@ -510,16 +522,23 @@ export async function redeemInvite(email: string, userId: string): Promise<strin
     .single();
 
   if (!existing) {
-    // Add as member
-    await supabase.from('taller_members').insert({
+    // Add as mechanic member
+    const { error: memberErr } = await supabase.from('taller_members').insert({
       taller_id: invite.taller_id,
       user_id: userId,
       role: 'mechanic',
     });
+    if (memberErr) {
+      console.warn('[redeemInvite] member insert failed:', memberErr.code, memberErr.message);
+      return null;
+    }
   }
 
-  // Mark invite as used
-  await supabase.from('taller_invites').update({ used_at: new Date().toISOString() }).eq('id', invite.id);
+  // Mark invite as used (RLS "invitado_redimir_invitacion" allows this)
+  await supabase
+    .from('taller_invites')
+    .update({ used_at: new Date().toISOString() })
+    .eq('id', invite.id);
 
   return invite.taller_id;
 }

@@ -14,6 +14,7 @@ export default function SetupPage() {
   const [error,        setError]        = useState('');
   const [modoCrear,    setModoCrear]    = useState(false);
   const [checkingInvite, setCheckingInvite] = useState(true);
+  const [inviteChecked,  setInviteChecked]  = useState(false);
 
   // ── Check for pending invite when user first lands on setup ──
   useEffect(() => {
@@ -31,7 +32,12 @@ export default function SetupPage() {
           router.push('/');
           return;
         }
+        // Edge case: member row inserted but taller not returned yet (RLS lag).
+        // Redirect anyway — AuthGate will re-evaluate and cargarDatos will load.
+        router.push('/');
+        return;
       }
+      setInviteChecked(true);
       setCheckingInvite(false);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,6 +138,14 @@ export default function SetupPage() {
                     ? 'Bienvenido. Registra tu taller para comenzar:'
                     : 'Nombre del nuevo taller:'}
                 </p>
+
+                {/* Hint for users who expected an invite */}
+                {inviteChecked && talleres.length === 0 && (
+                  <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-4 py-3 text-sm mb-4">
+                    ¿Te invitaron a un taller existente? Verifica que iniciaste sesión con el correo al que te enviaron la invitación (<span className="font-medium">{user?.email}</span>), o pide al dueño del taller que te reenvíe la invitación.
+                  </div>
+                )}
+
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
                   Nombre del taller
                 </label>
