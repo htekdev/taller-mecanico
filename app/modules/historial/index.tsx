@@ -28,9 +28,10 @@ function PantallaClientes({
 }) {
   const [busqueda, setBusqueda] = useState('');
 
-  const clientesFiltrados = busqueda.trim()
+  const clientesFiltrados = (busqueda.trim()
     ? clientes.filter(c => c.nombre.toLowerCase().includes(busqueda.toLowerCase().trim()))
-    : clientes;
+    : [...clientes]
+  ).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
   return (
     <div>

@@ -90,12 +90,13 @@ export function VistaClientes({
           {/* Lista filtrada */}
           {(() => {
             const q = busqueda.trim().toLowerCase();
-            const filtrados = q
+            const filtrados = (q
               ? clientes.filter(c =>
                   c.nombre.toLowerCase().includes(q) ||
                   c.telefono.toLowerCase().includes(q)
                 )
-              : clientes;
+              : [...clientes]
+            ).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
             if (filtrados.length === 0) {
               return (
                 <div className="text-center py-10 text-slate-400">
