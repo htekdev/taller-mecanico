@@ -34,8 +34,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'POSTGRES_URL_NON_POOLING not available' }, { status: 500 });
   }
 
+  // pg v8.13 treats sslmode=require as verify-full — strip it and use ssl object instead
+  const cleanUrl = pgUrl.replace(/[?&]sslmode=[^&]*/g, '').replace(/[?&]$/, '');
+
   const client = new Client({
-    connectionString: pgUrl,
+    connectionString: cleanUrl,
     ssl: { rejectUnauthorized: false },
   });
 
