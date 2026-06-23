@@ -44,11 +44,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .select('role, talleres(*)')
       .order('created_at', { ascending: true });
 
-    const list: TallerConRol[] = (data ?? []).map((item) => {
+    const allRows: TallerConRol[] = (data ?? []).map((item) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const t = (item as any).talleres as TallerRow;
       return { ...t, role: item.role as 'owner' | 'mechanic' };
     });
+
+    // Deduplicate by taller_id — if multiple membership rows exist for the same
+    // taller (e.g., owner + redeemed invite), keep the first (highest-privilege) one.
+    // Sort owners first so we keep the owner role when deduplicating.
+    const sorted = [...allRows].sort((a, b) =>
+      a.role === 'owner' ? -1 : b.role === 'owner' ? 1 : 0,
+    );
+    const seen = new Set<string>();
+    const list: TallerConRol[] = [];
+    for (const t of sorted) {
+      if (!seen.has(t.id)) {
+        seen.add(t.id);
+        list.push(t);
+      }
+    }
+
     setTalleres(list);
     return list;
   }, []);
@@ -86,6 +102,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (redeemed) {
           console.log('[Auth] Invite redeemed — new taller:', redeemed);
         }
+
+        // Backfill email on membership rows created before migration 002.
+        // This ensures the current user's email displays correctly in Configuración.
+        await supabase
+          .from('taller_members')
+          .update({ email: user.email.toLowerCase() })
+          .eq('user_id', user.id)
+          .is('email', null);
       }
 
       const list = await recargarTalleres();
