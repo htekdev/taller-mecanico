@@ -619,12 +619,13 @@ describe('redeemInvite', () => {
     mockFromSequence(
       { data: [invite] }, // find invites — array
       { data: null },     // check member → not yet a member
-      { data: null },     // insert member
+      { data: null },     // insert member (core fields)
+      { data: null },     // update member email (best-effort)
       { data: null },     // update invite used_at
     );
     const result = await redeemInvite('member@example.com', 'u2');
     expect(result).toBe('t1');
-    expect(mockFrom).toHaveBeenCalledTimes(4);
+    expect(mockFrom).toHaveBeenCalledTimes(5);
   });
 
   it('skips member insert when user is already a member, still marks invite used', async () => {

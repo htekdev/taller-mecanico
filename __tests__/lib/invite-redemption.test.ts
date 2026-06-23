@@ -150,7 +150,8 @@ describe('redeemInvite — email case insensitivity', () => {
     setupSequence(
       { data: [invite] },      // SELECT invites (user signed in as mixed-case) — array
       { data: null },         // check member → not yet a member
-      { data: null },         // INSERT member
+      { data: null },         // INSERT member (core fields)
+      { data: null },         // UPDATE member email (best-effort)
       { data: null },         // UPDATE invite used_at
     );
 
@@ -158,7 +159,7 @@ describe('redeemInvite — email case insensitivity', () => {
     const result = await redeemInvite('Invitado@Diesel.COM', 'new-user-uid');
 
     expect(result).toBe('taller-abc');
-    expect(mockFrom).toHaveBeenCalledTimes(4);
+    expect(mockFrom).toHaveBeenCalledTimes(5);
   });
 
   it('stores invite email as lowercase regardless of input casing in sendInvite', async () => {
@@ -185,6 +186,7 @@ describe('redeemInvite — email case insensitivity', () => {
       { data: null },
       { data: null },
       { data: null },
+      { data: null },
     );
 
     const result = await redeemInvite('invitado@diesel.com', 'u-ws');
@@ -197,29 +199,32 @@ describe('redeemInvite — email case insensitivity', () => {
 // ===========================================================================
 
 describe('redeemInvite — full happy path', () => {
-  it('completes the full 4-step flow: find invite → check member → insert member → mark used', async () => {
+  it('completes the full 5-step flow: find invite → check member → insert member → update email → mark used', async () => {
     setupSequence(
       { data: [BASE_INVITE] }, // 1. SELECT invites — found (array)
       { data: null },          // 2. SELECT member — not yet a member
-      { data: null },          // 3. INSERT member — success
-      { data: null },          // 4. UPDATE invite used_at — success
+      { data: null },          // 3. INSERT member (core fields) — success
+      { data: null },          // 4. UPDATE member email (best-effort) — success
+      { data: null },          // 5. UPDATE invite used_at — success
     );
 
     const result = await redeemInvite('invitado@diesel.com', 'new-user-uid');
 
     expect(result).toBe('taller-abc');
-    // Verify all 4 tables were touched in order
-    expect(mockFrom).toHaveBeenCalledTimes(4);
+    // Verify all 5 DB calls in order
+    expect(mockFrom).toHaveBeenCalledTimes(5);
     expect(mockFrom).toHaveBeenNthCalledWith(1, 'taller_invites');   // find invites
     expect(mockFrom).toHaveBeenNthCalledWith(2, 'taller_members');   // check membership
     expect(mockFrom).toHaveBeenNthCalledWith(3, 'taller_members');   // insert member
-    expect(mockFrom).toHaveBeenNthCalledWith(4, 'taller_invites');   // mark used
+    expect(mockFrom).toHaveBeenNthCalledWith(4, 'taller_members');   // update email
+    expect(mockFrom).toHaveBeenNthCalledWith(5, 'taller_invites');   // mark used
   });
 
   it('returns the correct taller_id from the redeemed invite', async () => {
     const invite = { ...BASE_INVITE, taller_id: 'taller-diesel-merida' };
     setupSequence(
       { data: [invite] },
+      { data: null },
       { data: null },
       { data: null },
       { data: null },
@@ -234,8 +239,9 @@ describe('redeemInvite — full happy path', () => {
     setupSequence(
       { data: [BASE_INVITE] },
       { data: null },          // not yet a member
-      { data: null },          // insert — we can't inspect the call args directly here
-      { data: null },
+      { data: null },          // insert
+      { data: null },          // update email
+      { data: null },          // mark used
     );
 
     await redeemInvite('invitado@diesel.com', 'mechanic-uid');
@@ -350,6 +356,7 @@ describe('redeemInvite — edge cases', () => {
       { data: null },
       { data: null },
       { data: null },
+      { data: null },
     );
 
     const result = await redeemInvite('invitado@diesel.com', 'u-open');
@@ -371,9 +378,11 @@ describe('redeemInvite — multiple pending invites', () => {
       { data: [invite1, invite2] }, // SELECT — two pending invites
       { data: null },               // check member for invite1 → not a member
       { data: null },               // INSERT member for invite1
+      { data: null },               // UPDATE email for invite1
       { data: null },               // UPDATE invite1 used_at
       { data: null },               // check member for invite2 → not a member
       { data: null },               // INSERT member for invite2
+      { data: null },               // UPDATE email for invite2
       { data: null },               // UPDATE invite2 used_at
     );
 
@@ -381,8 +390,8 @@ describe('redeemInvite — multiple pending invites', () => {
 
     // Returns the FIRST taller_id redeemed
     expect(result).toBe('taller-a');
-    // 7 from() calls: 1 SELECT + (2 member check + 1 INSERT + 1 UPDATE) × 2
-    expect(mockFrom).toHaveBeenCalledTimes(7);
+    // 9 from() calls: 1 SELECT + (check + INSERT + email UPDATE + invite UPDATE) × 2
+    expect(mockFrom).toHaveBeenCalledTimes(9);
   });
 
   it('returns null only if ALL invites fail to insert membership', async () => {
@@ -393,9 +402,9 @@ describe('redeemInvite — multiple pending invites', () => {
     setupSequence(
       { data: [invite1, invite2] }, // SELECT — two pending invites
       { data: null },               // check member invite1 → not a member
-      { data: null, error: insertErr }, // INSERT fails for invite1
+      { data: null, error: insertErr }, // INSERT fails for invite1 → continue
       { data: null },               // check member invite2 → not a member
-      { data: null, error: insertErr }, // INSERT fails for invite2
+      { data: null, error: insertErr }, // INSERT fails for invite2 → continue
     );
 
     const result = await redeemInvite('invitado@diesel.com', 'u-allFail');
@@ -445,6 +454,7 @@ describe('RLS policy contract — taller_invites', () => {
   it('redeemInvite calls UPDATE on taller_invites to mark invite used (the UPDATE policy guards this)', async () => {
     setupSequence(
       { data: [BASE_INVITE] }, // array — one pending invite
+      { data: null },
       { data: null },
       { data: null },
       { data: null },
