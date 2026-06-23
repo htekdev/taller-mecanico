@@ -1,0 +1,32 @@
+# Supabase local dev config — Taller Mecánico
+# Project ref: fzondawpxhkojszrwgck
+# Supabase branching: preview branches get isolated DBs per PR
+
+project_id = "fzondawpxhkojszrwgck"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+
+[storage]
+enabled = false
