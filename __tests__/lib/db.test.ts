@@ -636,12 +636,13 @@ describe('redeemInvite', () => {
     mockFromSequence(
       { data: [invite] },         // find invites — array
       { data: { id: 'mem1' } },   // check member → already exists
-      { data: null },             // update invite used_at (no insert)
+      { data: null },             // backfill email on existing member
+      { data: null },             // update invite used_at
     );
     const result = await redeemInvite('existing@example.com', 'u3');
     expect(result).toBe('t1');
-    // Only 3 from() calls: find invites, check member, update invite (no insert)
-    expect(mockFrom).toHaveBeenCalledTimes(3);
+    // 4 from() calls: find invites, check member, backfill email, update invite
+    expect(mockFrom).toHaveBeenCalledTimes(4);
   });
 
   it('returns correct taller_id from redeemed invite', async () => {
@@ -650,7 +651,7 @@ describe('redeemInvite', () => {
       token: 'tok3', invited_by: null, used_at: null, created_at: '2026-06-21T00:00:00Z',
     };
     mockFromSequence(
-      { data: [invite] }, { data: null }, { data: null }, { data: null },
+      { data: [invite] }, { data: null }, { data: null }, { data: null }, { data: null },
     );
     const result = await redeemInvite('shop@example.com', 'u4');
     expect(result).toBe('taller-xyz');

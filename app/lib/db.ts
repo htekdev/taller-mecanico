@@ -563,6 +563,14 @@ export async function redeemInvite(email: string, userId: string): Promise<strin
         .update({ email: email.toLowerCase() })
         .eq('taller_id', invite.taller_id)
         .eq('user_id', userId);
+    } else {
+      // Member already exists — backfill email if missing (pre-migration 002 rows).
+      await supabase
+        .from('taller_members')
+        .update({ email: email.toLowerCase() })
+        .eq('taller_id', invite.taller_id)
+        .eq('user_id', userId)
+        .is('email', null);
     }
 
     // Mark invite as used (RLS "invitado_redimir_invitacion" allows this)
