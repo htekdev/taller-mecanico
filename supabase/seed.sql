@@ -86,7 +86,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- ── Invitación pendiente (invitado@test.com) ──────────────────
 INSERT INTO taller_invites (id, taller_id, email, token, invited_by, used_at, created_at) VALUES (
-  'ci000000-0000-0000-0000-000000000001',
+  'c1000000-0000-0000-0000-000000000001',
   'b0000000-0000-0000-0000-000000000001',
   'invitado@test.com',
   'preview-seed-token-invitado-2026',
@@ -158,7 +158,7 @@ INSERT INTO trabajos (
   partes, pagos,
   estado_facturacion, estado, tipo_documento, fecha_finalizacion, created_at
 ) VALUES (
-  'g0000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-000000000001',
   'b0000000-0000-0000-0000-000000000001',
   'd0000000-0000-0000-0000-000000000001',
   'e0000000-0000-0000-0000-000000000001',
@@ -183,7 +183,7 @@ INSERT INTO trabajos (
   partes, pagos,
   estado_facturacion, estado, tipo_documento, fecha_finalizacion, created_at
 ) VALUES (
-  'g0000000-0000-0000-0000-000000000002',
+  '10000000-0000-0000-0000-000000000002',
   'b0000000-0000-0000-0000-000000000001',
   'd0000000-0000-0000-0000-000000000002',
   'e0000000-0000-0000-0000-000000000003',
@@ -208,7 +208,7 @@ INSERT INTO trabajos (
   partes, pagos,
   estado_facturacion, estado, created_at
 ) VALUES (
-  'g0000000-0000-0000-0000-000000000003',
+  '10000000-0000-0000-0000-000000000003',
   'b0000000-0000-0000-0000-000000000001',
   'd0000000-0000-0000-0000-000000000003',
   'e0000000-0000-0000-0000-000000000004',
@@ -232,7 +232,7 @@ INSERT INTO trabajos (
   partes, pagos,
   estado_facturacion, estado, created_at
 ) VALUES (
-  'g0000000-0000-0000-0000-000000000004',
+  '10000000-0000-0000-0000-000000000004',
   'b0000000-0000-0000-0000-000000000001',
   'd0000000-0000-0000-0000-000000000004',
   'e0000000-0000-0000-0000-000000000005',
@@ -256,7 +256,7 @@ INSERT INTO trabajos (
   partes, pagos,
   estado_facturacion, estado, tipo_documento, fecha_finalizacion, created_at
 ) VALUES (
-  'g0000000-0000-0000-0000-000000000005',
+  '10000000-0000-0000-0000-000000000005',
   'b0000000-0000-0000-0000-000000000001',
   'd0000000-0000-0000-0000-000000000001',
   'e0000000-0000-0000-0000-000000000002',
@@ -279,7 +279,7 @@ INSERT INTO ordenes_compra (
   id, taller_id, proveedor_id, fecha, numero_orden, descripcion,
   partes, total, estado, fecha_recibida, pagos, created_at
 ) VALUES (
-  'h0000000-0000-0000-0000-000000000001',
+  '20000000-0000-0000-0000-000000000001',
   'b0000000-0000-0000-0000-000000000001',
   '90000000-0000-0000-0000-000000000001',
   (NOW() - interval '18 days')::DATE,
@@ -297,7 +297,7 @@ INSERT INTO ordenes_compra (
   id, taller_id, proveedor_id, fecha, numero_orden, descripcion,
   partes, total, estado, fecha_recibida, pagos, created_at
 ) VALUES (
-  'h0000000-0000-0000-0000-000000000002',
+  '20000000-0000-0000-0000-000000000002',
   'b0000000-0000-0000-0000-000000000001',
   '90000000-0000-0000-0000-000000000002',
   NOW()::DATE,
@@ -317,7 +317,7 @@ INSERT INTO facturas (
   id, taller_id, numero_factura, trabajo_id, cliente_id, vehiculo_id,
   fecha, fecha_vencimiento, conceptos, subtotal, iva, total, pagos, notas, created_at
 ) VALUES (
-  'i0000000-0000-0000-0000-000000000001',
+  '30000000-0000-0000-0000-000000000001',
   'b0000000-0000-0000-0000-000000000001',
   'FAC-2026-001', NULL,
   'd0000000-0000-0000-0000-000000000001',
@@ -336,7 +336,7 @@ INSERT INTO facturas (
   id, taller_id, numero_factura, trabajo_id, cliente_id, vehiculo_id,
   fecha, fecha_vencimiento, conceptos, subtotal, iva, total, pagos, notas, created_at
 ) VALUES (
-  'i0000000-0000-0000-0000-000000000002',
+  '30000000-0000-0000-0000-000000000002',
   'b0000000-0000-0000-0000-000000000001',
   'FAC-2026-002', NULL,
   'd0000000-0000-0000-0000-000000000002',
@@ -349,3 +349,4 @@ INSERT INTO facturas (
   'Pendiente de pago. Vence en 4 días.',
   NOW() - interval '11 days'
 ) ON CONFLICT (id) DO NOTHING;
+
