@@ -26,6 +26,13 @@ export default defineConfig({
         'app/page.tsx',
         'app/context/**',
         'src/db/**',
+        'scripts/**',
+        'drizzle.config.ts',
+        'drizzle/**',
+        'next.config.ts',
+        'postcss.config.mjs',
+        'eslint.config.mjs',
+        'app/api/**',
       ],
       thresholds: {
         lines: 60,
