@@ -503,9 +503,12 @@ export async function cancelInvite(inviteId: string): Promise<void> {
 }
 
 /**
- * Check if a user email has a pending invite and redeem it.
- * Called during setup/onboarding when a new user signs in.
- * Returns the taller_id if successfully redeemed, null otherwise.
+ * Check if a user email has pending invites and redeem ALL of them.
+ * Called on every login (auth context) AND during setup for new users.
+ * Returns the first redeemed taller_id, or null if no invites found.
+ *
+ * Handles multiple simultaneous invites (e.g. invited to 2 talleres before signing up).
+ * Idempotent — safe to call multiple times; skips talleres the user already belongs to.
  *
  * REQUIRES Supabase RLS policies (migration 001_fix_invite_rls.sql):
  *   - "invitado_ver_su_invitacion": allows SELECT where lower(email) = lower(auth.email())
@@ -513,52 +516,63 @@ export async function cancelInvite(inviteId: string): Promise<void> {
  * Without these, a new user (not yet a taller member) cannot read their own invite.
  */
 export async function redeemInvite(email: string, userId: string): Promise<string | null> {
-  // Find pending invite for this email (not yet used).
+  // Find ALL pending invites for this email (not yet used).
   // RLS policy "invitado_ver_su_invitacion" allows this even before the user is a member.
-  const { data: invite, error: inviteErr } = await supabase
+  const { data: invites, error: inviteErr } = await supabase
     .from('taller_invites')
     .select('*')
     .eq('email', email.toLowerCase())
     .is('used_at', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+    .order('created_at', { ascending: false });
 
-  if (inviteErr || !invite) {
-    if (inviteErr && inviteErr.code !== 'PGRST116') {
-      // PGRST116 = no rows found (normal case); any other error is unexpected
-      console.warn('[redeemInvite] invite lookup failed:', inviteErr.code, inviteErr.message);
-    }
+  if (inviteErr) {
+    console.warn('[redeemInvite] invite lookup failed:', inviteErr.code, inviteErr.message);
     return null;
   }
+  if (!invites || invites.length === 0) return null;
 
-  // Check if already a member (idempotent — safe to call multiple times)
-  const { data: existing } = await supabase
-    .from('taller_members')
-    .select('id')
-    .eq('taller_id', invite.taller_id)
-    .eq('user_id', userId)
-    .single();
+  let firstTallerId: string | null = null;
+  const usedAt = new Date().toISOString();
 
-  if (!existing) {
-    // Add as mechanic member — store email for readable display in Configuración
-    const { error: memberErr } = await supabase.from('taller_members').insert({
-      taller_id: invite.taller_id,
-      user_id: userId,
-      role: 'mechanic',
-      email: email.toLowerCase(),
-    });
-    if (memberErr) {
-      console.warn('[redeemInvite] member insert failed:', memberErr.code, memberErr.message);
-      return null;
+  for (const invite of invites) {
+    // Check if already a member (idempotent — safe to call multiple times)
+    const { data: existing } = await supabase
+      .from('taller_members')
+      .select('id')
+      .eq('taller_id', invite.taller_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (!existing) {
+      // Add as mechanic member — core fields only (email column may not exist yet
+      // if migration 002 hasn't been applied; we add it separately below)
+      const { error: memberErr } = await supabase.from('taller_members').insert({
+        taller_id: invite.taller_id,
+        user_id: userId,
+        role: 'mechanic',
+      });
+      if (memberErr) {
+        console.warn('[redeemInvite] member insert failed:', memberErr.code, memberErr.message);
+        continue; // skip this invite, try next
+      }
+
+      // Best-effort: store email for readable display (requires migration 002).
+      // If column doesn't exist yet, this silently fails — no harm done.
+      await supabase
+        .from('taller_members')
+        .update({ email: email.toLowerCase() })
+        .eq('taller_id', invite.taller_id)
+        .eq('user_id', userId);
     }
+
+    // Mark invite as used (RLS "invitado_redimir_invitacion" allows this)
+    await supabase
+      .from('taller_invites')
+      .update({ used_at: usedAt })
+      .eq('id', invite.id);
+
+    if (!firstTallerId) firstTallerId = invite.taller_id;
   }
 
-  // Mark invite as used (RLS "invitado_redimir_invitacion" allows this)
-  await supabase
-    .from('taller_invites')
-    .update({ used_at: new Date().toISOString() })
-    .eq('id', invite.id);
-
-  return invite.taller_id;
+  return firstTallerId;
 }

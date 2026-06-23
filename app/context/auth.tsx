@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/app/lib/supabase';
 import type { TallerRow, TallerConRol } from '@/app/lib/supabase';
+import { redeemInvite } from '@/app/lib/db';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -74,9 +75,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── Load talleres when user logs in ──
+  // Also redeems any pending invites — handles existing users who bypass /setup.
   useEffect(() => {
     if (!user) return;
-    recargarTalleres().then((list) => {
+    (async () => {
+      // Redeem pending invites first — existing users skip /setup so this is the
+      // only place invite redemption is guaranteed to run on every login.
+      if (user.email) {
+        const redeemed = await redeemInvite(user.email, user.id);
+        if (redeemed) {
+          console.log('[Auth] Invite redeemed — new taller:', redeemed);
+        }
+      }
+
+      const list = await recargarTalleres();
       const saved = localStorage.getItem('taller_id');
       if (saved) {
         const found = list.find(t => t.id === saved);
@@ -85,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setTaller(list[0]);
         localStorage.setItem('taller_id', list[0].id);
       }
-    });
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -142,13 +154,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const nuevoTaller = tallerData as TallerRow;
 
-    // 2. Add creator as owner member — store email for readable display in Configuración
+    // 2. Add creator as owner member — core fields first (email requires migration 002)
     await supabase.from('taller_members').insert({
       taller_id: nuevoTaller.id,
       user_id:   user.id,
       role:      'owner',
-      email:     user.email ?? null,
     });
+
+    // Best-effort: store email for readable display (requires migration 002 email column).
+    if (user.email) {
+      await supabase
+        .from('taller_members')
+        .update({ email: user.email })
+        .eq('taller_id', nuevoTaller.id)
+        .eq('user_id', user.id);
+    }
 
     const nuevoConRol: TallerConRol = { ...nuevoTaller, role: 'owner' };
     setTalleres(prev => [...prev, nuevoConRol]);
