@@ -99,11 +99,11 @@ describe('redeemInvite — RLS regression (bug from PR #26 → fixed in PR #29)'
     );
   });
 
-  it('treats PGRST116 (no rows) as a normal "no pending invite" — does NOT log a warning', async () => {
-    // PGRST116 is the normal case when a user has no invite.
+  it('returns null (and no warning) when no pending invites exist for the email', async () => {
+    // With array queries there is no PGRST116 — an empty result is { data: [], error: null }.
     // We should NOT warn about it — it would fill logs with noise for every
     // new user who creates their own taller.
-    setupSequence({ data: null, error: NOROW_ERROR });
+    setupSequence({ data: [] });
 
     const result = await redeemInvite('noinvite@example.com', 'u-fresh');
 
@@ -148,7 +148,7 @@ describe('redeemInvite — email case insensitivity', () => {
     const invite = { ...BASE_INVITE, email: 'invitado@diesel.com' };
 
     setupSequence(
-      { data: invite },       // SELECT invite (user signed in as mixed-case)
+      { data: [invite] },      // SELECT invites (user signed in as mixed-case) — array
       { data: null },         // check member → not yet a member
       { data: null },         // INSERT member
       { data: null },         // UPDATE invite used_at
@@ -181,7 +181,7 @@ describe('redeemInvite — email case insensitivity', () => {
     // passing a properly formed email (no whitespace) should work.
     const invite = { ...BASE_INVITE };
     setupSequence(
-      { data: invite },
+      { data: [invite] },
       { data: null },
       { data: null },
       { data: null },
@@ -199,7 +199,7 @@ describe('redeemInvite — email case insensitivity', () => {
 describe('redeemInvite — full happy path', () => {
   it('completes the full 4-step flow: find invite → check member → insert member → mark used', async () => {
     setupSequence(
-      { data: BASE_INVITE },   // 1. SELECT invite — found
+      { data: [BASE_INVITE] }, // 1. SELECT invites — found (array)
       { data: null },          // 2. SELECT member — not yet a member
       { data: null },          // 3. INSERT member — success
       { data: null },          // 4. UPDATE invite used_at — success
@@ -210,7 +210,7 @@ describe('redeemInvite — full happy path', () => {
     expect(result).toBe('taller-abc');
     // Verify all 4 tables were touched in order
     expect(mockFrom).toHaveBeenCalledTimes(4);
-    expect(mockFrom).toHaveBeenNthCalledWith(1, 'taller_invites');   // find invite
+    expect(mockFrom).toHaveBeenNthCalledWith(1, 'taller_invites');   // find invites
     expect(mockFrom).toHaveBeenNthCalledWith(2, 'taller_members');   // check membership
     expect(mockFrom).toHaveBeenNthCalledWith(3, 'taller_members');   // insert member
     expect(mockFrom).toHaveBeenNthCalledWith(4, 'taller_invites');   // mark used
@@ -219,7 +219,7 @@ describe('redeemInvite — full happy path', () => {
   it('returns the correct taller_id from the redeemed invite', async () => {
     const invite = { ...BASE_INVITE, taller_id: 'taller-diesel-merida' };
     setupSequence(
-      { data: invite },
+      { data: [invite] },
       { data: null },
       { data: null },
       { data: null },
@@ -232,7 +232,7 @@ describe('redeemInvite — full happy path', () => {
 
   it('assigns the mechanic role (not owner) to the invited user', async () => {
     setupSequence(
-      { data: BASE_INVITE },
+      { data: [BASE_INVITE] },
       { data: null },          // not yet a member
       { data: null },          // insert — we can't inspect the call args directly here
       { data: null },
@@ -253,7 +253,7 @@ describe('redeemInvite — full happy path', () => {
 describe('redeemInvite — idempotency (already a member)', () => {
   it('skips the member INSERT when user is already a member', async () => {
     setupSequence(
-      { data: BASE_INVITE },             // find invite
+      { data: [BASE_INVITE] },           // find invites
       { data: { id: 'existing-mem' } },  // check member → ALREADY EXISTS
       { data: null },                    // update invite (3 calls, no insert)
     );
@@ -261,14 +261,14 @@ describe('redeemInvite — idempotency (already a member)', () => {
     const result = await redeemInvite('invitado@diesel.com', 'already-member-uid');
 
     expect(result).toBe('taller-abc');
-    // Only 3 from() calls: find invite, check member, update invite
+    // Only 3 from() calls: find invites, check member, update invite
     expect(mockFrom).toHaveBeenCalledTimes(3);
     expect(mockFrom).not.toHaveBeenNthCalledWith(3, 'taller_members'); // no 3rd call to taller_members
   });
 
   it('still marks the invite as used even when the user was already a member', async () => {
     setupSequence(
-      { data: BASE_INVITE },
+      { data: [BASE_INVITE] },
       { data: { id: 'existing-mem' } },
       { data: null },  // update invite
     );
@@ -276,7 +276,7 @@ describe('redeemInvite — idempotency (already a member)', () => {
     const result = await redeemInvite('invitado@diesel.com', 'already-member-uid');
 
     expect(result).toBe('taller-abc');
-    // 4th call (index 3) goes to taller_invites for the update
+    // Last call goes to taller_invites for the update
     expect(mockFrom).toHaveBeenLastCalledWith('taller_invites');
   });
 });
@@ -290,14 +290,14 @@ describe('redeemInvite — member insert failure', () => {
     const memberInsertError = { code: '23505', message: 'duplicate key value violates unique constraint' };
 
     setupSequence(
-      { data: BASE_INVITE },        // find invite — success
+      { data: [BASE_INVITE] },      // find invites — success (array)
       { data: null },               // check member — not a member yet
       { data: null, error: memberInsertError }, // INSERT fails
     );
 
     const result = await redeemInvite('invitado@diesel.com', 'u-dup');
 
-    // Should NOT return taller_id if the membership couldn't be established
+    // Should NOT return taller_id if the only invite's membership couldn't be established
     expect(result).toBeNull();
   });
 
@@ -305,7 +305,7 @@ describe('redeemInvite — member insert failure', () => {
     const memberInsertError = { code: '23505', message: 'duplicate key value' };
 
     setupSequence(
-      { data: BASE_INVITE },
+      { data: [BASE_INVITE] },
       { data: null },
       { data: null, error: memberInsertError },
     );
@@ -326,19 +326,19 @@ describe('redeemInvite — member insert failure', () => {
 
 describe('redeemInvite — edge cases', () => {
   it('returns null when no invite exists for that email', async () => {
-    setupSequence({ data: null, error: NOROW_ERROR });
+    setupSequence({ data: [] }); // array query returns empty array, not PGRST116
 
     const result = await redeemInvite('nobody@example.com', 'u-nobody');
 
     expect(result).toBeNull();
   });
 
-  it('only queries taller_invites for the invite lookup (no extra DB calls on failure)', async () => {
-    setupSequence({ data: null, error: NOROW_ERROR });
+  it('only queries taller_invites for the invite lookup (no extra DB calls on empty result)', async () => {
+    setupSequence({ data: [] }); // empty result — no invites to process
 
     await redeemInvite('nobody@example.com', 'u-nobody');
 
-    // Should stop after the first failed SELECT — no member insert, no update
+    // Should stop after the first SELECT returns empty — no member insert, no update
     expect(mockFrom).toHaveBeenCalledTimes(1);
     expect(mockFrom).toHaveBeenCalledWith('taller_invites');
   });
@@ -346,7 +346,7 @@ describe('redeemInvite — edge cases', () => {
   it('handles an invite with a null invited_by (open invite without specific sender)', async () => {
     const openInvite = { ...BASE_INVITE, invited_by: null };
     setupSequence(
-      { data: openInvite },
+      { data: [openInvite] },
       { data: null },
       { data: null },
       { data: null },
@@ -355,6 +355,53 @@ describe('redeemInvite — edge cases', () => {
     const result = await redeemInvite('invitado@diesel.com', 'u-open');
 
     expect(result).toBe('taller-abc');
+  });
+});
+
+// ===========================================================================
+// 8. MULTIPLE INVITES — the core fix for existing-user invite flow
+// ===========================================================================
+
+describe('redeemInvite — multiple pending invites', () => {
+  it('redeems ALL pending invites and returns the first taller_id', async () => {
+    const invite1 = { ...BASE_INVITE, id: 'inv-1', taller_id: 'taller-a' };
+    const invite2 = { ...BASE_INVITE, id: 'inv-2', taller_id: 'taller-b' };
+
+    setupSequence(
+      { data: [invite1, invite2] }, // SELECT — two pending invites
+      { data: null },               // check member for invite1 → not a member
+      { data: null },               // INSERT member for invite1
+      { data: null },               // UPDATE invite1 used_at
+      { data: null },               // check member for invite2 → not a member
+      { data: null },               // INSERT member for invite2
+      { data: null },               // UPDATE invite2 used_at
+    );
+
+    const result = await redeemInvite('invitado@diesel.com', 'u-multi');
+
+    // Returns the FIRST taller_id redeemed
+    expect(result).toBe('taller-a');
+    // 7 from() calls: 1 SELECT + (2 member check + 1 INSERT + 1 UPDATE) × 2
+    expect(mockFrom).toHaveBeenCalledTimes(7);
+  });
+
+  it('returns null only if ALL invites fail to insert membership', async () => {
+    const invite1 = { ...BASE_INVITE, id: 'inv-1', taller_id: 'taller-a' };
+    const invite2 = { ...BASE_INVITE, id: 'inv-2', taller_id: 'taller-b' };
+    const insertErr = { code: '23505', message: 'duplicate key' };
+
+    setupSequence(
+      { data: [invite1, invite2] }, // SELECT — two pending invites
+      { data: null },               // check member invite1 → not a member
+      { data: null, error: insertErr }, // INSERT fails for invite1
+      { data: null },               // check member invite2 → not a member
+      { data: null, error: insertErr }, // INSERT fails for invite2
+    );
+
+    const result = await redeemInvite('invitado@diesel.com', 'u-allFail');
+
+    // All failed → return null
+    expect(result).toBeNull();
   });
 });
 
@@ -386,7 +433,7 @@ describe('RLS policy contract — taller_invites', () => {
    */
 
   it('redeemInvite queries taller_invites by email match (the column the RLS policies protect)', async () => {
-    setupSequence({ data: null, error: NOROW_ERROR });
+    setupSequence({ data: [] }); // empty array = no pending invites
 
     await redeemInvite('invitado@diesel.com', 'u1');
 
@@ -397,7 +444,7 @@ describe('RLS policy contract — taller_invites', () => {
 
   it('redeemInvite calls UPDATE on taller_invites to mark invite used (the UPDATE policy guards this)', async () => {
     setupSequence(
-      { data: BASE_INVITE },
+      { data: [BASE_INVITE] }, // array — one pending invite
       { data: null },
       { data: null },
       { data: null },

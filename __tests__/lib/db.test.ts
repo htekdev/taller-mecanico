@@ -606,7 +606,7 @@ describe('cancelInvite', () => {
 
 describe('redeemInvite', () => {
   it('returns null when no pending invite exists for that email', async () => {
-    mockFromSequence({ data: null });
+    mockFromSequence({ data: [] }); // empty array = no invites
     const result = await redeemInvite('noone@example.com', 'u1');
     expect(result).toBeNull();
   });
@@ -617,10 +617,10 @@ describe('redeemInvite', () => {
       token: 'tok1', invited_by: 'owner1', used_at: null, created_at: '2026-06-20T00:00:00Z',
     };
     mockFromSequence(
-      { data: invite },  // find invite
-      { data: null },    // check member → not yet a member
-      { data: null },    // insert member
-      { data: null },    // update invite used_at
+      { data: [invite] }, // find invites — array
+      { data: null },     // check member → not yet a member
+      { data: null },     // insert member
+      { data: null },     // update invite used_at
     );
     const result = await redeemInvite('member@example.com', 'u2');
     expect(result).toBe('t1');
@@ -633,13 +633,13 @@ describe('redeemInvite', () => {
       token: 'tok2', invited_by: 'owner1', used_at: null, created_at: '2026-06-20T00:00:00Z',
     };
     mockFromSequence(
-      { data: invite },           // find invite
+      { data: [invite] },         // find invites — array
       { data: { id: 'mem1' } },   // check member → already exists
       { data: null },             // update invite used_at (no insert)
     );
     const result = await redeemInvite('existing@example.com', 'u3');
     expect(result).toBe('t1');
-    // Only 3 from() calls: find invite, check member, update invite (no insert)
+    // Only 3 from() calls: find invites, check member, update invite (no insert)
     expect(mockFrom).toHaveBeenCalledTimes(3);
   });
 
@@ -649,14 +649,14 @@ describe('redeemInvite', () => {
       token: 'tok3', invited_by: null, used_at: null, created_at: '2026-06-21T00:00:00Z',
     };
     mockFromSequence(
-      { data: invite }, { data: null }, { data: null }, { data: null },
+      { data: [invite] }, { data: null }, { data: null }, { data: null },
     );
     const result = await redeemInvite('shop@example.com', 'u4');
     expect(result).toBe('taller-xyz');
   });
 
   it('lowercases email when looking up invite', async () => {
-    mockFromSequence({ data: null });
+    mockFromSequence({ data: [] }); // empty array = no invites
     const result = await redeemInvite('UPPER@EXAMPLE.COM', 'u5');
     expect(result).toBeNull();
     expect(mockFrom).toHaveBeenCalledTimes(1);
