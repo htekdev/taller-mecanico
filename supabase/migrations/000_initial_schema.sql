@@ -146,6 +146,10 @@ CREATE TABLE IF NOT EXISTS facturas (
 -- ============================================================
 -- Row-Level Security (RLS)
 -- All tables: user must be a member of the taller
+--
+-- DROP POLICY IF EXISTS before every CREATE POLICY makes this
+-- migration idempotent — safe whether the DB is fresh or
+-- already has policies from a prior manual SQL editor run.
 -- ============================================================
 
 ALTER TABLE talleres       ENABLE ROW LEVEL SECURITY;
@@ -168,34 +172,51 @@ RETURNS BOOLEAN AS $$
   );
 $$ LANGUAGE sql SECURITY DEFINER;
 
--- talleres: creator can always see their own taller; members can see talleres they belong to
+-- ── talleres ──────────────────────────────────────────────────
+DROP POLICY IF EXISTS "ver_mis_talleres" ON talleres;
 CREATE POLICY "ver_mis_talleres" ON talleres
   FOR SELECT USING (created_by = auth.uid() OR is_taller_member(id));
 
--- Any authenticated user can create a new taller
+DROP POLICY IF EXISTS "crear_taller" ON talleres;
 CREATE POLICY "crear_taller" ON talleres
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
+DROP POLICY IF EXISTS "editar_mi_taller" ON talleres;
 CREATE POLICY "editar_mi_taller" ON talleres
   FOR UPDATE USING (is_taller_member(id));
 
--- taller_members: see your own memberships + your taller's members
+-- ── taller_members ────────────────────────────────────────────
+DROP POLICY IF EXISTS "ver_mis_memberships" ON taller_members;
 CREATE POLICY "ver_mis_memberships" ON taller_members
   FOR SELECT USING (user_id = auth.uid() OR is_taller_member(taller_id));
 
--- Users can add themselves; existing members can add others (invite flow)
+DROP POLICY IF EXISTS "insertar_membership" ON taller_members;
 CREATE POLICY "insertar_membership" ON taller_members
   FOR INSERT WITH CHECK (auth.uid() = user_id OR is_taller_member(taller_id));
 
--- taller_invites: only taller members can manage invites
+-- ── taller_invites (base policy — 001 refines this) ───────────
+DROP POLICY IF EXISTS "ver_invitaciones" ON taller_invites;
 CREATE POLICY "ver_invitaciones" ON taller_invites
   FOR ALL USING (is_taller_member(taller_id));
 
--- Business tables: full CRUD for taller members
+-- ── business tables ───────────────────────────────────────────
+DROP POLICY IF EXISTS "crud_clientes" ON clientes;
 CREATE POLICY "crud_clientes"       ON clientes       FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
+
+DROP POLICY IF EXISTS "crud_vehiculos" ON vehiculos;
 CREATE POLICY "crud_vehiculos"      ON vehiculos      FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
+
+DROP POLICY IF EXISTS "crud_refacciones" ON refacciones;
 CREATE POLICY "crud_refacciones"    ON refacciones    FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
+
+DROP POLICY IF EXISTS "crud_proveedores" ON proveedores;
 CREATE POLICY "crud_proveedores"    ON proveedores    FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
+
+DROP POLICY IF EXISTS "crud_trabajos" ON trabajos;
 CREATE POLICY "crud_trabajos"       ON trabajos       FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
+
+DROP POLICY IF EXISTS "crud_ordenes_compra" ON ordenes_compra;
 CREATE POLICY "crud_ordenes_compra" ON ordenes_compra FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
+
+DROP POLICY IF EXISTS "crud_facturas" ON facturas;
 CREATE POLICY "crud_facturas"       ON facturas       FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
