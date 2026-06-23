@@ -82,7 +82,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Redeem pending invites first — existing users skip /setup so this is the
       // only place invite redemption is guaranteed to run on every login.
       if (user.email) {
-        await redeemInvite(user.email, user.id);
+        const redeemed = await redeemInvite(user.email, user.id);
+        if (redeemed) {
+          console.log('[Auth] Invite redeemed — new taller:', redeemed);
+        }
       }
 
       const list = await recargarTalleres();
@@ -151,13 +154,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const nuevoTaller = tallerData as TallerRow;
 
-    // 2. Add creator as owner member — store email for readable display in Configuración
+    // 2. Add creator as owner member — core fields first (email requires migration 002)
     await supabase.from('taller_members').insert({
       taller_id: nuevoTaller.id,
       user_id:   user.id,
       role:      'owner',
-      email:     user.email ?? null,
     });
+
+    // Best-effort: store email for readable display (requires migration 002 email column).
+    if (user.email) {
+      await supabase
+        .from('taller_members')
+        .update({ email: user.email })
+        .eq('taller_id', nuevoTaller.id)
+        .eq('user_id', user.id);
+    }
 
     const nuevoConRol: TallerConRol = { ...nuevoTaller, role: 'owner' };
     setTalleres(prev => [...prev, nuevoConRol]);

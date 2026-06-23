@@ -544,17 +544,25 @@ export async function redeemInvite(email: string, userId: string): Promise<strin
       .single();
 
     if (!existing) {
-      // Add as mechanic member — store email for readable display in Configuración
+      // Add as mechanic member — core fields only (email column may not exist yet
+      // if migration 002 hasn't been applied; we add it separately below)
       const { error: memberErr } = await supabase.from('taller_members').insert({
         taller_id: invite.taller_id,
         user_id: userId,
         role: 'mechanic',
-        email: email.toLowerCase(),
       });
       if (memberErr) {
         console.warn('[redeemInvite] member insert failed:', memberErr.code, memberErr.message);
         continue; // skip this invite, try next
       }
+
+      // Best-effort: store email for readable display (requires migration 002).
+      // If column doesn't exist yet, this silently fails — no harm done.
+      await supabase
+        .from('taller_members')
+        .update({ email: email.toLowerCase() })
+        .eq('taller_id', invite.taller_id)
+        .eq('user_id', userId);
     }
 
     // Mark invite as used (RLS "invitado_redimir_invitacion" allows this)
