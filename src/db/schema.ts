@@ -39,6 +39,7 @@ export const tallerMembers = pgTable('taller_members', {
   tallerId: uuid('taller_id').notNull().references(() => talleres.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull(),
   role: text('role').default('mechanic'),
+  email: text('email'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 }, (table) => [
   unique('taller_members_taller_id_user_id_key').on(table.tallerId, table.userId),
