@@ -2,7 +2,9 @@
 -- Taller Mecánico — Supabase Multi-Tenant Schema
 -- REFERENCE ONLY — kept for manual SQL editor use.
 -- Native migrations live in: supabase/migrations/
---   - 20260619000000_initial_schema.sql  (full schema + RLS)
+--   - 000_initial_schema.sql            (full schema + RLS)
+--   - 001_fix_invite_rls.sql            (invite redemption RLS fix)
+--   - 002_member_email_role_update.sql  (email column + owner role policy)
 -- Supabase branching runs migrations automatically per PR.
 -- ============================================================
 
