@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/app/lib/supabase';
 import type { TallerRow, TallerConRol } from '@/app/lib/supabase';
+import { redeemInvite } from '@/app/lib/db';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -74,9 +75,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── Load talleres when user logs in ──
+  // Also redeems any pending invites — handles existing users who bypass /setup.
   useEffect(() => {
     if (!user) return;
-    recargarTalleres().then((list) => {
+    (async () => {
+      // Redeem pending invites first — existing users skip /setup so this is the
+      // only place invite redemption is guaranteed to run on every login.
+      if (user.email) {
+        await redeemInvite(user.email, user.id);
+      }
+
+      const list = await recargarTalleres();
       const saved = localStorage.getItem('taller_id');
       if (saved) {
         const found = list.find(t => t.id === saved);
@@ -85,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setTaller(list[0]);
         localStorage.setItem('taller_id', list[0].id);
       }
-    });
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
