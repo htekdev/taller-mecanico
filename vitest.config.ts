@@ -25,6 +25,7 @@ export default defineConfig({
         'app/components/**',
         'app/page.tsx',
         'app/context/**',
+        'src/db/**',
       ],
       thresholds: {
         lines: 60,
