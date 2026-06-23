@@ -261,21 +261,22 @@ describe('redeemInvite — idempotency (already a member)', () => {
     setupSequence(
       { data: [BASE_INVITE] },           // find invites
       { data: { id: 'existing-mem' } },  // check member → ALREADY EXISTS
-      { data: null },                    // update invite (3 calls, no insert)
+      { data: null },                    // backfill email on existing member
+      { data: null },                    // update invite (mark used)
     );
 
     const result = await redeemInvite('invitado@diesel.com', 'already-member-uid');
 
     expect(result).toBe('taller-abc');
-    // Only 3 from() calls: find invites, check member, update invite
-    expect(mockFrom).toHaveBeenCalledTimes(3);
-    expect(mockFrom).not.toHaveBeenNthCalledWith(3, 'taller_members'); // no 3rd call to taller_members
+    // 4 from() calls: find invites, check member, backfill email, update invite
+    expect(mockFrom).toHaveBeenCalledTimes(4);
   });
 
   it('still marks the invite as used even when the user was already a member', async () => {
     setupSequence(
       { data: [BASE_INVITE] },
       { data: { id: 'existing-mem' } },
+      { data: null },  // backfill email
       { data: null },  // update invite
     );
 
