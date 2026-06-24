@@ -140,7 +140,7 @@ const hoy = () => new Date().toISOString().split('T')[0];
 
 // ─── PDF Generator ────────────────────────────────────────────────────────────
 
-async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) {
+async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion, filename?: string) {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
 
@@ -254,11 +254,11 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
         ty += rh; doc.setDrawColor(230, 235, 245); doc.line(ml, ty, ml + cw, ty);
       });
     }
-    // Section subtotal row (inside each table)
+    // Section subtotal row — just "Subtotal:" without the section name
     doc.setFillColor(245, 247, 250); doc.rect(ml, ty, cw, rh, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
     const lx = ml + cols.no + cols.qty + cols.desc;
-    doc.text('Subtotal ' + title + ':', lx + 1, ty + 4.2);
+    doc.text('Subtotal:', lx + 1, ty + 4.2);
     doc.text('$' + fmtPeso(items.reduce((s, i) => s + calcItem(i), 0)), ml + cols.no + cols.qty + cols.desc + cols.price + 1, ty + 4.2);
     ty += rh; doc.setDrawColor(180, 190, 210); doc.line(ml, ty, ml + cw, ty); ty += 3;
     return ty;
@@ -309,7 +309,7 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
   const autoLabel = form.autorizadoPor ? form.autorizadoPor : 'Autorizado por';
   doc.text(autoLabel, ml + 3, y + 4);
 
-  doc.save(`${form.numeroCotizacion || 'Cotizacion'}.pdf`);
+  doc.save(`${filename || form.numeroCotizacion || 'Cotizacion'}.pdf`);
 }
 
 // ─── Template definitions ─────────────────────────────────────────────────────
@@ -385,6 +385,7 @@ function VistaPreviaContenido({ plantilla, form, entry, onEditar, onNueva }: {
   plantilla: Plantilla; form: FormCotizacion; entry: CotizacionGuardada | null; onEditar: () => void; onNueva: () => void;
 }) {
   const [generando, setGenerando] = useState(false);
+  const [nombreArchivo, setNombreArchivo] = useState(form.numeroCotizacion || 'Cotizacion');
   const { subtotalRef, subtotalMO, subtotal, iva, total } = calcTotales(form);
   const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de Mérida'
     : plantilla === 'red_ambiental' ? 'Red Ambiental' : form.cliente;
@@ -401,12 +402,26 @@ function VistaPreviaContenido({ plantilla, form, entry, onEditar, onNueva }: {
         )}
       </div>
 
-      <div className="flex gap-3 mb-6 flex-wrap">
+      <div className="flex gap-3 mb-6 flex-wrap items-end">
         <Btn variant="ghost" onClick={onNueva}>← Inicio</Btn>
         {!entry?.cancelada && <Btn variant="ghost" onClick={onEditar}>✏️ Editar</Btn>}
-        <Btn variant="success" onClick={async () => { setGenerando(true); try { await generarYDescargarPDF(plantilla, form); } finally { setGenerando(false); } }} disabled={generando}>
-          {generando ? '⏳ Generando...' : '⬇️ Descargar PDF'}
-        </Btn>
+        {/* Editable filename + download */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+            <span className="px-3 py-1.5 text-xs text-slate-400 bg-slate-50 border-r border-slate-200 select-none">📄</span>
+            <input
+              type="text"
+              value={nombreArchivo}
+              onChange={e => setNombreArchivo(e.target.value.replace(/[/\\?%*:|"<>]/g, '-'))}
+              className="px-3 py-1.5 text-sm text-slate-700 w-48 outline-none"
+              placeholder="nombre-del-archivo"
+            />
+            <span className="px-2 py-1.5 text-xs text-slate-400 bg-slate-50 border-l border-slate-200 select-none">.pdf</span>
+          </div>
+          <Btn variant="success" onClick={async () => { setGenerando(true); try { await generarYDescargarPDF(plantilla, form, nombreArchivo || form.numeroCotizacion); } finally { setGenerando(false); } }} disabled={generando}>
+            {generando ? '⏳ Generando...' : '⬇️ Descargar PDF'}
+          </Btn>
+        </div>
       </div>
 
       <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
@@ -499,7 +514,7 @@ function TablaPreview({ titulo, colorHeader, items, subtotal }: { titulo: string
             ))}
           </tbody>
           <tfoot className="bg-slate-50 border-t border-slate-200"><tr>
-            <td colSpan={4} className="px-3 py-2 text-right text-sm font-bold text-slate-600">Subtotal {titulo}:</td>
+            <td colSpan={4} className="px-3 py-2 text-right text-sm font-bold text-slate-600">Subtotal:</td>
             <td className="px-3 py-2 text-right font-bold text-slate-900">${fmtPeso(subtotal)}</td>
           </tr></tfoot>
         </table>

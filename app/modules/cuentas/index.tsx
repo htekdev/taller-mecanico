@@ -222,7 +222,13 @@ export function VistaCuentas({
   const [pagoFormT, setPagoFormT] = useState({ monto: 0, fecha: hoy, nota: '' });
 
   // Legacy: trabajos without a facturaId — notas never get invoiced
-  const legacyTrabajos = trabajos.filter(t => !t.facturaId && t.tipoDocumento !== 'nota');
+  // Also exclude trabajos that have a matching Factura record (by trabajoId) even if facturaId is not set in DB,
+  // preventing the same service from appearing twice (once as "factura emitida" and once as "trabajo sin factura").
+  const legacyTrabajos = trabajos.filter(t =>
+    !t.facturaId &&
+    t.tipoDocumento !== 'nota' &&
+    !facturas.some(f => f.trabajoId === t.id)
+  );
 
   // Clients that actually have records in AR
   const clientesConRegistros = clientes.filter(c =>
