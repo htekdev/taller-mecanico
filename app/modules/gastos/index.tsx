@@ -28,6 +28,10 @@ const emptyForm = (fecha: string): GastoFormData => ({
   notas: '',
 });
 
+// Helper: detect if a subcategoria value is a custom "otros" entry
+const esPredefinida = (cat: GastoCategoria, sub: string) =>
+  GASTO_SUBCATEGORIAS[cat].includes(sub);
+
 // ─── Gasto Form ───────────────────────────────────────────────────────────────
 
 function GastoForm({
@@ -41,18 +45,49 @@ function GastoForm({
 }) {
   const [form, setForm] = useState<GastoFormData>(initial);
   const [saving, setSaving] = useState(false);
+  // Track whether "Otros" is selected so we can show a free-text input
+  const [otroSubcat, setOtroSubcat] = useState(() => {
+    const predefined = GASTO_SUBCATEGORIAS[initial.categoria];
+    return !predefined.includes(initial.subcategoria) && initial.subcategoria !== '';
+  });
+  const [otroSubcatTexto, setOtroSubcatTexto] = useState(() => {
+    const predefined = GASTO_SUBCATEGORIAS[initial.categoria];
+    return !predefined.includes(initial.subcategoria) ? initial.subcategoria : '';
+  });
 
   const upd = <K extends keyof GastoFormData>(k: K, v: GastoFormData[K]) => {
     setForm(prev => {
       const next = { ...prev, [k]: v };
       if (k === 'categoria') {
+        // Reset subcategory selection when category changes
         next.subcategoria = GASTO_SUBCATEGORIAS[v as GastoCategoria][0];
+        setOtroSubcat(false);
+        setOtroSubcatTexto('');
       }
       return next;
     });
   };
 
-  const valid = form.concepto.trim() && Number(form.monto) > 0 && form.fecha;
+  const handleSubcatChange = (value: string) => {
+    if (value === '__otros__') {
+      setOtroSubcat(true);
+      setOtroSubcatTexto('');
+      setForm(prev => ({ ...prev, subcategoria: '' }));
+    } else {
+      setOtroSubcat(false);
+      setOtroSubcatTexto('');
+      upd('subcategoria', value);
+    }
+  };
+
+  const handleOtroTexto = (texto: string) => {
+    setOtroSubcatTexto(texto);
+    setForm(prev => ({ ...prev, subcategoria: texto.trim() }));
+  };
+
+  // valid: when "Otros" is selected, also require otroSubcatTexto
+  const subcatOk = otroSubcat ? otroSubcatTexto.trim().length > 0 : true;
+  const valid = form.concepto.trim() && Number(form.monto) > 0 && form.fecha && subcatOk;
 
   const handleSubmit = async () => {
     if (!valid) return;
@@ -77,11 +112,24 @@ function GastoForm({
         </div>
         <div>
           <Label>Subcategoría</Label>
-          <Select value={form.subcategoria} onChange={e => upd('subcategoria', e.target.value)}>
+          <Select
+            value={otroSubcat ? '__otros__' : form.subcategoria}
+            onChange={e => handleSubcatChange(e.target.value)}
+          >
             {GASTO_SUBCATEGORIAS[form.categoria].map(s => (
               <option key={s} value={s}>{s}</option>
             ))}
+            <option value="__otros__">✏️ Otros (escribir...)</option>
           </Select>
+          {otroSubcat && (
+            <Input
+              className="mt-2"
+              value={otroSubcatTexto}
+              onChange={e => handleOtroTexto(e.target.value)}
+              placeholder="Describe el tipo de gasto..."
+              autoFocus
+            />
+          )}
         </div>
       </div>
 
