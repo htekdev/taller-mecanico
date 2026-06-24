@@ -9,11 +9,13 @@ import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
 const COT_COUNTER_KEY = 'taller_cot_counter';
 const NUM_PROVEEDOR_RED_AMBIENTAL = 'P004093';
 
-// PENDIENTE: actualizar con la lista oficial de Sofia (Ayuntamiento de Mérida)
-// TODO: replace with Sofia's official department list
+// Lista de departamentos del Ayuntamiento de Mérida — confirmada por Sofia.
+// Para agregar nuevos departamentos, añadir una entrada a este arreglo.
 const DEPARTAMENTOS_AYUNTAMIENTO: string[] = [
   '— Seleccionar departamento —',
-  'PENDIENTE: Sofia proporcionará la lista',
+  'Obras públicas mantenimiento vial',
+  'Servicios públicos aseo urbano poniente',
+  'Servicios públicos aseo urbano oriente',
 ];
 
 function nextCotizacionNumber(): string {
@@ -788,7 +790,7 @@ export function VistaCotizaciones({
     form.marca.trim() !== '' &&
     form.modelo.trim() !== '' &&
     (plantillaActual !== 'ayuntamiento' || form.inventario.trim() !== '') &&
-    (plantillaActual !== 'ayuntamiento' || (form.departamento !== '' && form.departamento !== '— Seleccionar departamento —' && !form.departamento.startsWith('PENDIENTE')));
+    (plantillaActual !== 'ayuntamiento' || (form.departamento !== '' && !form.departamento.startsWith('—')));
 
   // ─── Selector ───────────────────────────────────────────────────────────────
   if (pantalla === 'selector') {
@@ -912,14 +914,11 @@ export function VistaCotizaciones({
                 className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
               >
                 {DEPARTAMENTOS_AYUNTAMIENTO.map(d => (
-                  <option key={d} value={d} disabled={d.startsWith('—') || d.startsWith('PENDIENTE')}>
+                  <option key={d} value={d} disabled={d.startsWith('—')}>
                     {d}
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-amber-600 mt-1">
-                ⏳ Lista de departamentos pendiente — se actualizará en breve
-              </p>
             </div>
           </div>
         )}
