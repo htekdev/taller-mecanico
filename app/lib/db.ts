@@ -336,6 +336,7 @@ export async function getOrdenes(tallerId: string): Promise<OrdenCompra[]> {
 }
 
 export async function insertOrden(tallerId: string, data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>): Promise<OrdenCompra | null> {
+  // First attempt: insert with IVA columns (requires migration 20260624_email_clientes_iva_ordenes)
   const { data: row, error } = await supabase
     .from('ordenes_compra')
     .insert({
@@ -355,7 +356,47 @@ export async function insertOrden(tallerId: string, data: Omit<OrdenCompra, 'id'
     .select()
     .single();
 
-  if (error || !row) return null;
+  // Fallback: if IVA columns don't exist yet (column not found error), retry without them
+  if (error) {
+    const isColumnMissing = error.message?.includes('subtotal_sin_iva') ||
+      error.message?.includes('iva_amount') || error.message?.includes('con_iva') ||
+      error.code === '42703'; // PostgreSQL: undefined_column
+    if (isColumnMissing) {
+      const { data: fallbackRow, error: fallbackError } = await supabase
+        .from('ordenes_compra')
+        .insert({
+          taller_id: tallerId,
+          proveedor_id: data.proveedorId || null,
+          fecha: data.fecha,
+          numero_orden: data.numeroOrden ?? null,
+          descripcion: data.descripcion,
+          partes: data.partes,
+          total: data.total,
+          estado: 'pendiente',
+          pagos: [],
+        })
+        .select()
+        .single();
+      if (fallbackError || !fallbackRow) return null;
+      return {
+        id: fallbackRow.id,
+        proveedorId: fallbackRow.proveedor_id ?? '',
+        fecha: fallbackRow.fecha,
+        numeroOrden: fallbackRow.numero_orden ?? undefined,
+        descripcion: fallbackRow.descripcion,
+        partes: (fallbackRow.partes as CompraItem[]) ?? [],
+        subtotalSinIVA: data.subtotalSinIVA,
+        ivaAmount: data.ivaAmount,
+        total: Number(fallbackRow.total),
+        conIVA: data.conIVA,
+        estado: fallbackRow.estado,
+        pagos: [],
+      };
+    }
+    return null;
+  }
+
+  if (!row) return null;
   return {
     id: row.id,
     proveedorId: row.proveedor_id ?? '',
