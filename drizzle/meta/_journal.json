@@ -15,6 +15,13 @@
       "when": 1782178800000,
       "tag": "0001_member_email_role_update",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782317611318,
+      "tag": "0002_foamy_hairball",
+      "breakpoints": true
     }
   ]
 }

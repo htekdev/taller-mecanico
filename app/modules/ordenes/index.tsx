@@ -32,17 +32,18 @@ export function VistaOrdenesCompra({
 }) {
   const hoy = new Date().toISOString().split('T')[0];
 
-  // ΓöÇΓöÇ Form principal OC ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Form principal OC ─────────────────────────────────────────────────────────
   const [formProveedorId, setFormProveedorId] = useState('');
   const [formFecha, setFormFecha] = useState(hoy);
   const [formDesc, setFormDesc] = useState('');
   const [formNumOrden, setFormNumOrden] = useState('');
+  const [formConIVA, setFormConIVA] = useState(false);  // ¿la factura del proveedor incluye IVA?
   const [itemsOrden, setItemsOrden] = useState<CompraItem[]>([]);
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'recibida'|'cancelada'>('todos');
   const [expandido, setExpandido] = useState<string | null>(null);
   const [filtroProveedorId, setFiltroProveedorId] = useState('');
 
-  // ΓöÇΓöÇ Modo agregar pieza ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Modo agregar pieza ────────────────────────────────────────────────────────
   const [modoAgregar, setModoAgregar] = useState<'existente' | 'nueva'>('existente');
 
   // Pieza existente
@@ -50,7 +51,7 @@ export function VistaOrdenesCompra({
   const [pickerCantidad, setPickerCantidad] = useState(1);
   const [pickerPrecio, setPickerPrecio] = useState(0);
 
-  // Nueva refacci├│n
+  // Nueva refacción
   const [newNombre, setNewNombre]         = useState('');
   const [newCodigo, setNewCodigo]         = useState('');
   const [newCategoria, setNewCategoria]   = useState('');
@@ -59,8 +60,11 @@ export function VistaOrdenesCompra({
   const [newPrecio, setNewPrecio]         = useState(0);
   const [newCantidad, setNewCantidad]     = useState(1);
 
-  const totalOrden = itemsOrden.reduce((s, i) => s + i.subtotal, 0);
-  const pickerRef  = inventario.find(r => r.id === pickerRefId);
+  // ── IVA calculations ──────────────────────────────────────────────────────────
+  const subtotalPiezas = itemsOrden.reduce((s, i) => s + i.subtotal, 0);
+  const ivaCalculado   = formConIVA ? Math.round(subtotalPiezas * 0.16 * 100) / 100 : 0;
+  const totalOrden     = subtotalPiezas + ivaCalculado;
+  const pickerRef      = inventario.find(r => r.id === pickerRefId);
 
   // ΓöÇΓöÇ Agregar pieza existente ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const agregarItem = () => {
@@ -134,8 +138,20 @@ export function VistaOrdenesCompra({
       setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
     }
     if (!formProveedorId || finalItems.length === 0) return;
-    onCrearOrden({ proveedorId: formProveedorId, fecha: formFecha, descripcion: formDesc, partes: finalItems, total: finalItems.reduce((s, i) => s + i.subtotal, 0), numeroOrden: formNumOrden || undefined });
-    setFormProveedorId(''); setFormFecha(hoy); setFormDesc(''); setFormNumOrden(''); setItemsOrden([]);
+    const piezasSubtotal = finalItems.reduce((s, i) => s + i.subtotal, 0);
+    const ivaAmt = formConIVA ? Math.round(piezasSubtotal * 0.16 * 100) / 100 : 0;
+    onCrearOrden({
+      proveedorId: formProveedorId,
+      fecha: formFecha,
+      descripcion: formDesc,
+      partes: finalItems,
+      subtotalSinIVA: piezasSubtotal,
+      ivaAmount: ivaAmt,
+      total: piezasSubtotal + ivaAmt,
+      conIVA: formConIVA,
+      numeroOrden: formNumOrden || undefined,
+    });
+    setFormProveedorId(''); setFormFecha(hoy); setFormDesc(''); setFormNumOrden(''); setFormConIVA(false); setItemsOrden([]);
   };
 
   const ordenesFiltradas = [...ordenes]
@@ -315,13 +331,45 @@ export function VistaOrdenesCompra({
                         ))}
                       </tbody>
                       <tfoot className="bg-slate-50 border-t-2 border-slate-200">
-                        <tr><td colSpan={3} className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total OC:</td>
-                          <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(totalOrden)}</td><td></td></tr>
+                        {formConIVA && (
+                          <>
+                            <tr>
+                              <td colSpan={3} className="px-3 py-1.5 text-xs text-slate-600 text-right">Subtotal (sin IVA):</td>
+                              <td className="px-3 py-1.5 text-right text-slate-700">${fmt(subtotalPiezas)}</td><td></td>
+                            </tr>
+                            <tr>
+                              <td colSpan={3} className="px-3 py-1.5 text-xs text-amber-700 text-right">IVA (16%):</td>
+                              <td className="px-3 py-1.5 text-right text-amber-700 font-semibold">+${fmt(ivaCalculado)}</td><td></td>
+                            </tr>
+                          </>
+                        )}
+                        <tr>
+                          <td colSpan={3} className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total OC:</td>
+                          <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(totalOrden)}</td><td></td>
+                        </tr>
                       </tfoot>
                     </table>
                   </div>
                 )}
               </div>
+            </div>
+            {/* IVA Toggle */}
+            <div className={`flex items-center justify-between rounded-xl border px-4 py-3 ${formConIVA ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+              <div>
+                <p className="text-sm font-semibold text-slate-800">¿La factura del proveedor incluye IVA?</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {formConIVA
+                    ? `Sí — se agregará IVA (16%): $${fmt(ivaCalculado)} → Total: $${fmt(totalOrden)}`
+                    : 'No — el total no incluye IVA (precio de contado sin factura fiscal)'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormConIVA(v => !v)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formConIVA ? 'bg-amber-500' : 'bg-slate-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${formConIVA ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
             </div>
             {/* Hints de validación */}
             {!formProveedorId && (
@@ -387,7 +435,12 @@ export function VistaOrdenesCompra({
                       <span>{new Date(orden.fecha).toLocaleDateString('es-MX')}</span>
                       {orden.descripcion && <span>· {orden.descripcion}</span>}
                       <span>· {orden.partes.length} pieza{orden.partes.length !== 1 ? 's' : ''}</span>
-                      <span>· Total: <strong className="text-slate-700">${fmt(orden.total)}</strong></span>
+                      {orden.conIVA ? (
+                        <span>· <strong className="text-slate-700">${fmt(orden.subtotalSinIVA)}</strong> + IVA <span className="text-amber-600">($${fmt(orden.ivaAmount)})</span> = <strong className="text-slate-900">${fmt(orden.total)}</strong></span>
+                      ) : (
+                        <span>· Total: <strong className="text-slate-700">${fmt(orden.total)}</strong></span>
+                      )}
+                      {orden.conIVA && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">IVA incluido</span>}
                     </div>
                     {orden.estado === 'recibida' && orden.fechaRecibida && (
                       <div className="text-xs text-emerald-600 mt-0.5">Recibida: {new Date(orden.fechaRecibida).toLocaleDateString('es-MX')}</div>
@@ -416,8 +469,20 @@ export function VistaOrdenesCompra({
                         </div>
                       ))}
                     </div>
-                    <div className="mt-2 pt-2 border-t border-slate-100 flex justify-end">
-                      <span className="text-sm font-bold text-slate-700">Total: ${fmt(orden.total)}</span>
+                    <div className="mt-2 pt-2 border-t border-slate-100 space-y-0.5">
+                      {orden.conIVA && (
+                        <>
+                          <div className="flex justify-end text-xs text-slate-500">
+                            <span>Subtotal piezas: ${fmt(orden.subtotalSinIVA)}</span>
+                          </div>
+                          <div className="flex justify-end text-xs text-amber-700">
+                            <span>IVA (16%): +${fmt(orden.ivaAmount)}</span>
+                          </div>
+                        </>
+                      )}
+                      <div className="flex justify-end">
+                        <span className="text-sm font-bold text-slate-700">Total: ${fmt(orden.total)}</span>
+                      </div>
                     </div>
                   </div>
                 )}

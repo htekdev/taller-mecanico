@@ -103,6 +103,7 @@ export default function TallerMecanico() {
     // Create a "received" purchase order if any PO data provided
     if (input.ordenCompra) {
       const hoy = new Date().toISOString().split('T')[0];
+      const piezasSubtotal = nueva.precioCompra * input.ordenCompra.cantidad;
       const orden = await db.insertOrden(taller.id, {
         proveedorId:  input.ordenCompra.proveedorId || '',
         fecha:        hoy,
@@ -113,9 +114,12 @@ export default function TallerMecanico() {
           nombre:       nueva.nombre,
           cantidad:     input.ordenCompra.cantidad,
           precioCompra: nueva.precioCompra,
-          subtotal:     nueva.precioCompra * input.ordenCompra.cantidad,
+          subtotal:     piezasSubtotal,
         }],
-        total: nueva.precioCompra * input.ordenCompra.cantidad,
+        subtotalSinIVA: piezasSubtotal,
+        ivaAmount: 0,
+        total: piezasSubtotal,
+        conIVA: false,
       });
       if (orden) {
         await db.updateOrdenEstado(orden.id, 'recibida', hoy);

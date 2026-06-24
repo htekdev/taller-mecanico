@@ -148,7 +148,10 @@ export const mockOrden: OrdenCompra = {
   fecha: '2026-06-01',
   numeroOrden: 'OC-2026-001',
   descripcion: 'Reposición filtros',
+  subtotalSinIVA: 1500,
+  ivaAmount: 0,
   total: 1500,
+  conIVA: false,
   estado: 'pendiente',
   partes: [{
     refaccionId: 'r1',

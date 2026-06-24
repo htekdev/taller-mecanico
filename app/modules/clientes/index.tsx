@@ -15,16 +15,21 @@ export function VistaClientes({
   onGuardarCliente: (c: Omit<Cliente, 'id'>) => void;
   onGuardarVehiculo: (v: Omit<Vehiculo, 'id'>) => void;
 }) {
-  const [formCliente, setFormCliente] = useState({ nombre: '', telefono: '' });
+  const [formCliente, setFormCliente] = useState({ nombre: '', telefono: '', email: '', email2: '' });
   const [clienteExpandido, setClienteExpandido] = useState<string | null>(null);
   const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: '', placa: '' });
   const [busqueda, setBusqueda] = useState('');
 
   const handleSubmitCliente = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formCliente.nombre && formCliente.telefono) {
-      onGuardarCliente(formCliente);
-      setFormCliente({ nombre: '', telefono: '' });
+    if (formCliente.nombre) {
+      onGuardarCliente({
+        nombre: formCliente.nombre,
+        telefono: formCliente.telefono || undefined,
+        email: formCliente.email || undefined,
+        email2: formCliente.email2 || undefined,
+      });
+      setFormCliente({ nombre: '', telefono: '', email: '', email2: '' });
     }
   };
 
@@ -51,19 +56,29 @@ export function VistaClientes({
       {/* ── Formulario nuevo cliente ── */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-6">
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Nuevo Cliente</h3>
-        <form onSubmit={handleSubmitCliente} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <form onSubmit={handleSubmitCliente} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <Label>Nombre</Label>
+            <Label>Nombre *</Label>
             <Input type="text" placeholder="Nombre completo" value={formCliente.nombre}
               onChange={e => setFormCliente({ ...formCliente, nombre: e.target.value })} required />
           </div>
           <div>
-            <Label>Teléfono</Label>
+            <Label>Teléfono <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
             <Input type="tel" placeholder="Ej. 555-123-4567" value={formCliente.telefono}
-              onChange={e => setFormCliente({ ...formCliente, telefono: e.target.value })} required />
+              onChange={e => setFormCliente({ ...formCliente, telefono: e.target.value })} />
           </div>
-          <div className="flex items-end">
-            <Btn type="submit" variant="primary" fullWidth>+ Agregar Cliente</Btn>
+          <div>
+            <Label>Correo 1 <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
+            <Input type="email" placeholder="correo@ejemplo.com" value={formCliente.email}
+              onChange={e => setFormCliente({ ...formCliente, email: e.target.value })} />
+          </div>
+          <div>
+            <Label>Correo 2 <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
+            <Input type="email" placeholder="correo2@ejemplo.com" value={formCliente.email2}
+              onChange={e => setFormCliente({ ...formCliente, email2: e.target.value })} />
+          </div>
+          <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
+            <Btn type="submit" variant="primary">+ Agregar Cliente</Btn>
           </div>
         </form>
       </div>
@@ -81,7 +96,7 @@ export function VistaClientes({
           <div className="mb-4">
             <Input
               type="text"
-              placeholder="🔍 Buscar cliente por nombre o teléfono..."
+              placeholder="🔍 Buscar cliente por nombre, teléfono o correo..."
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
             />
@@ -93,7 +108,9 @@ export function VistaClientes({
             const filtrados = (q
               ? clientes.filter(c =>
                   c.nombre.toLowerCase().includes(q) ||
-                  c.telefono.toLowerCase().includes(q)
+                  (c.telefono ?? '').toLowerCase().includes(q) ||
+                  (c.email ?? '').toLowerCase().includes(q) ||
+                  (c.email2 ?? '').toLowerCase().includes(q)
                 )
               : [...clientes]
             ).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
@@ -119,7 +136,12 @@ export function VistaClientes({
                     </div>
                     <div className="min-w-0">
                       <div className="font-semibold text-slate-800 text-sm">{cliente.nombre}</div>
-                      <div className="text-slate-500 text-xs">{cliente.telefono}</div>
+                      <div className="text-slate-500 text-xs flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                        {cliente.telefono && <span>📞 {cliente.telefono}</span>}
+                        {cliente.email && <span>✉️ {cliente.email}</span>}
+                        {cliente.email2 && <span>✉️ {cliente.email2}</span>}
+                        {!cliente.telefono && !cliente.email && <span className="text-slate-400">Sin contacto registrado</span>}
+                      </div>
                     </div>
                     <span className={`ml-2 text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${
                       unidades.length > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'
