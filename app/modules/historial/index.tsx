@@ -238,10 +238,15 @@ function PantallaHistorial({
   onVolverAUnidades: () => void;
   onVolverAClientes: () => void;
 }) {
+  const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
+
   const trabajosVehiculo = trabajos
     .filter(t => t.vehiculoId === vehiculo.id)
     .slice()
-    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+    .sort((a, b) => ordenHistorial === 'desc'
+      ? b.fecha.localeCompare(a.fecha)
+      : a.fecha.localeCompare(b.fecha)
+    );
 
   const totalGastado = trabajosVehiculo.reduce((s, t) => s + t.total, 0);
 
@@ -299,7 +304,21 @@ function PantallaHistorial({
           <p className="text-sm mt-1">Los trabajos aparecerán aquí una vez que se registren.</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <>
+          {/* Ordenamiento */}
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+              {trabajosVehiculo.length} trabajo{trabajosVehiculo.length !== 1 ? 's' : ''}
+            </p>
+            <button
+              type="button"
+              onClick={() => setOrdenHistorial(o => o === 'desc' ? 'asc' : 'desc')}
+              className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-700 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 px-3 py-1.5 rounded-lg transition-all"
+            >
+              {ordenHistorial === 'desc' ? '↓ Más reciente primero' : '↑ Más antiguo primero'}
+            </button>
+          </div>
+          <div className="space-y-4">
           {trabajosVehiculo.map((trabajo, idx) => {
             const estadoPago = getEstadoPago(trabajo);
             const badge = BADGE_ESTADO[estadoPago];
@@ -435,7 +454,8 @@ function PantallaHistorial({
               </div>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
