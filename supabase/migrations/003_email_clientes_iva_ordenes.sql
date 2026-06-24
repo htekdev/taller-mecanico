@@ -1,6 +1,7 @@
--- Migration: email en clientes + IVA en órdenes de compra
+-- Migration 003: email en clientes + IVA en órdenes de compra
+-- Follows sequential naming (003_) to avoid version conflicts with
+-- date-prefixed migrations (e.g. 20260624_add_kilometraje...).
 -- Applied by Supabase branching on PR preview branches.
--- Also applied on production via Drizzle (0002_foamy_hairball.sql).
 
 -- 1. Clientes: correo electrónico (2 campos opcionales)
 ALTER TABLE clientes

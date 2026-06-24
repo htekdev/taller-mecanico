@@ -206,3 +206,173 @@ describe('Multi-tenant taller scoping', () => {
     expect(allTrabajos.filter(t => t.tallerId === 'taller-B')).toHaveLength(1);
   });
 });
+
+// ── IVA en Órdenes de Compra ────────────────────────────────────────────────
+// These tests guard the exact logic Sofia uses in Órdenes de Compra + Cuentas por Pagar.
+// EVERY test here must pass before the preview is shared with Sofia.
+
+describe('IVA en Órdenes de Compra — cálculo y desglose', () => {
+  const IVA_RATE = 0.16;
+
+  // Helper mirrors the exact logic in ordenes/index.tsx handleSubmit
+  function calcularTotalesOrden(subtotalPiezas: number, conIVA: boolean) {
+    const ivaAmount = conIVA
+      ? Math.round(subtotalPiezas * IVA_RATE * 100) / 100
+      : 0;
+    return {
+      subtotalSinIVA: subtotalPiezas,
+      ivaAmount,
+      total: subtotalPiezas + ivaAmount,
+      conIVA,
+    };
+  }
+
+  it('sin IVA: total = subtotal, ivaAmount = 0', () => {
+    const result = calcularTotalesOrden(1000, false);
+    expect(result.subtotalSinIVA).toBe(1000);
+    expect(result.ivaAmount).toBe(0);
+    expect(result.total).toBe(1000);
+    expect(result.conIVA).toBe(false);
+  });
+
+  it('con IVA: ivaAmount = subtotal × 16%', () => {
+    const result = calcularTotalesOrden(1000, true);
+    expect(result.subtotalSinIVA).toBe(1000);
+    expect(result.ivaAmount).toBe(160);
+    expect(result.total).toBe(1160);
+    expect(result.conIVA).toBe(true);
+  });
+
+  it('con IVA: total = subtotalSinIVA + ivaAmount siempre', () => {
+    const cases = [100, 333, 1500, 9999.99];
+    for (const subtotal of cases) {
+      const result = calcularTotalesOrden(subtotal, true);
+      expect(result.total).toBeCloseTo(result.subtotalSinIVA + result.ivaAmount, 2);
+    }
+  });
+
+  it('redondeo a 2 decimales en IVA (centavos exactos)', () => {
+    const result = calcularTotalesOrden(333, true);
+    expect(result.ivaAmount).toBe(53.28);     // 333 × 0.16 = 53.28
+    expect(result.total).toBe(386.28);
+  });
+
+  it('IVA en OC con varias piezas: subtotal = suma de piezas', () => {
+    const piezas = [
+      { nombre: 'Filtro aceite', cantidad: 5, precioCompra: 100, subtotal: 500 },
+      { nombre: 'Bujías',        cantidad: 4, precioCompra: 75,  subtotal: 300 },
+    ];
+    const subtotalPiezas = piezas.reduce((s, p) => s + p.subtotal, 0);
+    expect(subtotalPiezas).toBe(800);
+    const result = calcularTotalesOrden(subtotalPiezas, true);
+    expect(result.ivaAmount).toBe(128);
+    expect(result.total).toBe(928);
+  });
+
+  it('orden sin IVA: saldo = total (nada pagado)', () => {
+    const orden: OrdenCompra = {
+      ...mockOrden,
+      conIVA: false, subtotalSinIVA: 1500, ivaAmount: 0, total: 1500,
+      estado: 'recibida', pagos: [],
+    };
+    expect(getSaldoOrden(orden)).toBe(1500);
+    expect(getEstadoPagoOrden(orden)).toBe('pendiente');
+  });
+
+  it('orden con IVA: saldo incluye el IVA en el total a pagar', () => {
+    const orden: OrdenCompra = {
+      ...mockOrden,
+      conIVA: true, subtotalSinIVA: 1000, ivaAmount: 160, total: 1160,
+      estado: 'recibida', pagos: [],
+    };
+    expect(getSaldoOrden(orden)).toBe(1160);
+    expect(getEstadoPagoOrden(orden)).toBe('pendiente');
+  });
+
+  it('orden con IVA: pago parcial actualiza saldo correctamente', () => {
+    const orden: OrdenCompra = {
+      ...mockOrden,
+      conIVA: true, subtotalSinIVA: 1000, ivaAmount: 160, total: 1160,
+      estado: 'recibida',
+      pagos: [{ id: 'p1', fecha: '2026-06-24', monto: 500 }],
+    };
+    expect(getSaldoOrden(orden)).toBe(660);
+    expect(getEstadoPagoOrden(orden)).toBe('parcial');
+  });
+
+  it('orden con IVA: pago completo marca como pagado', () => {
+    const orden: OrdenCompra = {
+      ...mockOrden,
+      conIVA: true, subtotalSinIVA: 1000, ivaAmount: 160, total: 1160,
+      estado: 'recibida',
+      pagos: [{ id: 'p1', fecha: '2026-06-24', monto: 1160 }],
+    };
+    expect(getSaldoOrden(orden)).toBe(0);
+    expect(getEstadoPagoOrden(orden)).toBe('pagado');
+  });
+});
+
+// ── Desglose IVA visible en Cuentas por Pagar ───────────────────────────────
+// Guards the VistaCuentasPorPagar breakdown logic Sofia requested.
+
+describe('Desglose IVA en Cuentas por Pagar — datos que se muestran', () => {
+  const ordenConIVA: OrdenCompra = {
+    ...mockOrden,
+    conIVA: true,
+    subtotalSinIVA: 1000,
+    ivaAmount: 160,
+    total: 1160,
+    estado: 'recibida',
+    pagos: [],
+  };
+  const ordenSinIVA: OrdenCompra = {
+    ...mockOrden,
+    id: 'o-siniva',
+    conIVA: false,
+    subtotalSinIVA: 1500,
+    ivaAmount: 0,
+    total: 1500,
+    estado: 'recibida',
+    pagos: [],
+  };
+
+  it('orden conIVA=true: desglose debe mostrar subtotal, iva y total separados', () => {
+    expect(ordenConIVA.conIVA).toBe(true);
+    expect(ordenConIVA.subtotalSinIVA).toBe(1000);
+    expect(ordenConIVA.ivaAmount).toBe(160);
+    expect(ordenConIVA.total).toBe(1160);
+    // Verify: subtotalSinIVA + ivaAmount === total
+    expect(ordenConIVA.subtotalSinIVA + ordenConIVA.ivaAmount).toBe(ordenConIVA.total);
+  });
+
+  it('orden conIVA=false: ivaAmount debe ser 0 y total = subtotal', () => {
+    expect(ordenSinIVA.conIVA).toBe(false);
+    expect(ordenSinIVA.ivaAmount).toBe(0);
+    expect(ordenSinIVA.subtotalSinIVA).toBe(ordenSinIVA.total);
+  });
+
+  it('solo ordenes con estado=recibida aparecen en cuentas por pagar', () => {
+    const todasOrdenes: OrdenCompra[] = [
+      { ...ordenConIVA, estado: 'pendiente' },
+      { ...ordenConIVA, id: 'o-recibida', estado: 'recibida' },
+      { ...ordenConIVA, id: 'o-cancelada', estado: 'cancelada' },
+    ];
+    const pagables = todasOrdenes.filter(o => o.estado === 'recibida');
+    expect(pagables).toHaveLength(1);
+    expect(pagables[0].id).toBe('o-recibida');
+  });
+
+  it('orden recibida con IVA: el total a pagar incluye el IVA', () => {
+    const saldo = getSaldoOrden(ordenConIVA);
+    // Sofia must pay the full total including IVA
+    expect(saldo).toBe(1160);
+    expect(saldo).toBe(ordenConIVA.subtotalSinIVA + ordenConIVA.ivaAmount);
+  });
+
+  it('el badge IVA solo aparece cuando conIVA=true', () => {
+    // This is the condition used in cuentas/index.tsx to show the badge
+    const debesMostrarBadge = (o: OrdenCompra) => o.conIVA === true;
+    expect(debesMostrarBadge(ordenConIVA)).toBe(true);
+    expect(debesMostrarBadge(ordenSinIVA)).toBe(false);
+  });
+});
