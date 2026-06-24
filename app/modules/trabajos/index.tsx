@@ -133,6 +133,7 @@ export function VistaTrabajo({
     fecha: new Date().toISOString().split('T')[0],
     numeroOrden: '',
     descripcion: '',
+    kilometraje: '' as string | number,
     requiereFactura: false,
     folioFiscal: '',
     estado: 'pendiente' as Trabajo['estado'],
@@ -245,6 +246,7 @@ export function VistaTrabajo({
       fecha: trabajo.fecha,
       numeroOrden: trabajo.numeroOrden ?? '',
       descripcion: trabajo.descripcion,
+      kilometraje: trabajo.kilometraje ?? '',
       requiereFactura: trabajo.requiereFactura,
       folioFiscal: trabajo.folioFiscal ?? '',
       estado: trabajo.estado,
@@ -263,9 +265,11 @@ export function VistaTrabajo({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.clienteId || !form.vehiculoId || !form.descripcion) return;
+    const kmVal = typeof form.kilometraje === 'string' ? (form.kilometraje.trim() !== '' ? Number(form.kilometraje) : undefined) : (form.kilometraje || undefined);
     const trabajoData = {
       ...form,
       numeroOrden: form.numeroOrden?.trim() || undefined,
+      kilometraje: kmVal,
       manoDeObra: totalManoDeObra,
       manoDeObraItems: laborItems,
       refacciones: totalVentaRefacciones,
@@ -318,6 +322,7 @@ export function VistaTrabajo({
     : inventario.length;
 
   const trabajosPendientes = trabajos.filter(t => t.estado === 'pendiente');
+  const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
   const trabajosFiltrados = [...trabajos]
     .filter(t => {
       if (filtroClienteId && t.clienteId !== filtroClienteId) return false;
@@ -327,7 +332,10 @@ export function VistaTrabajo({
       if (filtroFacturacion === 'sin_factura' && t.estadoFacturacion === 'facturado') return false;
       return true;
     })
-    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+    .sort((a, b) => ordenHistorial === 'desc'
+      ? b.fecha.localeCompare(a.fecha)
+      : a.fecha.localeCompare(b.fecha)
+    );
   const trabajoFinalizando = finalizandoId ? trabajos.find(t => t.id === finalizandoId) : null;
 
   return (
@@ -391,8 +399,8 @@ export function VistaTrabajo({
             </div>
           )}
 
-          {/* Fecha + Número de orden + Descripción */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Fecha + Número de orden + Kilometraje + Descripción */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
               <Label>Fecha</Label>
               <Input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} required />
@@ -401,6 +409,12 @@ export function VistaTrabajo({
               <Label>Número de Orden</Label>
               <Input type="text" placeholder="Ej. 001, OT-2026-45..." value={form.numeroOrden}
                 onChange={e => setForm(f => ({ ...f, numeroOrden: e.target.value }))} />
+            </div>
+            <div>
+              <Label>🛣 Kilometraje</Label>
+              <Input type="number" placeholder="Ej. 85000" min="0" step="1"
+                value={form.kilometraje === '' ? '' : form.kilometraje}
+                onChange={e => setForm(f => ({ ...f, kilometraje: e.target.value }))} />
             </div>
             <div>
               <Label>Descripción general del trabajo</Label>
@@ -796,17 +810,28 @@ export function VistaTrabajo({
             Historial de Trabajos
             {trabajos.length > 0 && <span className="ml-2 text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{trabajos.length}</span>}
           </h3>
-          {/* Filtro estado */}
-          {trabajos.length > 0 && (
-            <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
-              {([['todos', 'Todos'], ['pendiente', '🕐 En progreso'], ['completado', '✓ Terminados']] as const).map(([val, label]) => (
-                <button key={val} onClick={() => setFiltroEstado(val)}
-                  className={`text-xs px-3 py-1.5 rounded-md font-semibold transition-all ${filtroEstado === val ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Ordenamiento */}
+            {trabajos.length > 0 && (
+              <button
+                onClick={() => setOrdenHistorial(o => o === 'desc' ? 'asc' : 'desc')}
+                className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-700 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 px-3 py-1.5 rounded-lg transition-all"
+              >
+                {ordenHistorial === 'desc' ? '↓ Más reciente' : '↑ Más antiguo'}
+              </button>
+            )}
+            {/* Filtro estado */}
+            {trabajos.length > 0 && (
+              <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+                {([['todos', 'Todos'], ['pendiente', '🕐 En progreso'], ['completado', '✓ Terminados']] as const).map(([val, label]) => (
+                  <button key={val} onClick={() => setFiltroEstado(val)}
+                    className={`text-xs px-3 py-1.5 rounded-md font-semibold transition-all ${filtroEstado === val ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Filtros estructurados */}
@@ -864,8 +889,8 @@ export function VistaTrabajo({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-800 text-white">
-                {['Fecha','Estado','Cliente','Unidad','Descripción','Refacciones','Mano de Obra','Total',''].map((h, i) => (
-                  <th key={i} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 5 && i <= 7 ? 'text-right' : 'text-left'}`}>{h}</th>
+                {['Fecha','Estado','Cliente','Unidad','Placas','Km','Descripción','Refacciones','Mano de Obra','Total',''].map((h, i) => (
+                  <th key={i} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 7 && i <= 9 ? 'text-right' : 'text-left'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -888,13 +913,21 @@ export function VistaTrabajo({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">{badgeEstado}</td>
                     <td className="px-4 py-3 text-slate-800 font-medium">{cliente?.nombre ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      {vehiculo ? (
-                        <span>
-                          <span className="text-slate-700 font-medium">{[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>
-                          {vehiculo.placa && <span className="ml-1.5 text-xs bg-slate-200 text-slate-600 font-mono font-semibold px-1.5 py-0.5 rounded">{vehiculo.placa}</span>}
-                        </span>
-                      ) : <span className="text-slate-400">—</span>}
+                    {/* Unidad */}
+                    <td className="px-4 py-3 text-slate-700 font-medium whitespace-nowrap">
+                      {vehiculo ? [vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ') : <span className="text-slate-400">—</span>}
+                    </td>
+                    {/* Placas */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {vehiculo?.placa
+                        ? <span className="text-xs bg-slate-200 text-slate-700 font-mono font-semibold px-2 py-0.5 rounded">{vehiculo.placa}</span>
+                        : <span className="text-slate-300">—</span>}
+                    </td>
+                    {/* Km */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {trabajo.kilometraje != null
+                        ? <span className="text-xs font-semibold text-slate-700">{trabajo.kilometraje.toLocaleString('es-MX')} km</span>
+                        : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-slate-700">
                       {trabajo.descripcion}
@@ -950,7 +983,7 @@ export function VistaTrabajo({
                   </tr>
                 );
               })}
-              {trabajosFiltrados.length === 0 && <EmptyRow cols={9} message={filtroClienteId || filtroVehiculoId || filtroEstado !== 'todos' || filtroFacturacion !== 'todos' ? 'No se encontraron resultados.' : 'Sin trabajos registrados. Agrega el primero arriba.'} />}
+              {trabajosFiltrados.length === 0 && <EmptyRow cols={11} message={filtroClienteId || filtroVehiculoId || filtroEstado !== 'todos' || filtroFacturacion !== 'todos' ? 'No se encontraron resultados.' : 'Sin trabajos registrados. Agrega el primero arriba.'} />}
             </tbody>
           </table>
         </div>

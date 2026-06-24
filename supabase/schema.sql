@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS trabajos (
   estado              TEXT DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'completado', 'pagado')),
   tipo_documento      TEXT CHECK (tipo_documento IN ('factura', 'nota')),
   fecha_finalizacion  TIMESTAMPTZ,
+  kilometraje         INTEGER,
   created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
