@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
       mano_de_obra_items: [{"id":"mo-001","concepto":"Cambio de aceite y filtros","precio":150},{"id":"mo-002","concepto":"Revisión general","precio":50}],
       partes: [{"refaccionId":"f0000000-0000-0000-0000-000000000001","nombre":"Filtro de aceite","cantidad":1,"precioVenta":80.00,"precioCompra":45.00},{"refaccionId":"f0000000-0000-0000-0000-000000000002","nombre":"Aceite 5W-30 1L","cantidad":4,"precioVenta":115.00,"precioCompra":85.00},{"refaccionId":"f0000000-0000-0000-0000-000000000003","nombre":"Filtro de aire","cantidad":1,"precioVenta":155.00,"precioCompra":95.00}],
       pagos: [{"id":"pago-g1-001","fecha":"2026-06-05","monto":775.00,"metodo":"efectivo"}],
-      estado_facturacion: 'sin_facturar', estado: 'pagado', tipo_documento: 'nota',
+      estado_facturacion: 'sin_facturar', estado: 'pagado',
     },
     {
       id: '10000000-0000-0000-0000-000000000002', taller_id: TALLER_ID,
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
       mano_de_obra_items: [{"id":"mo-003","concepto":"Cambio pastillas freno delanteras","precio":350}],
       partes: [{"refaccionId":"f0000000-0000-0000-0000-000000000004","nombre":"Pastillas de freno del.","cantidad":2,"precioVenta":280.00,"precioCompra":280.00}],
       pagos: [],
-      estado_facturacion: 'sin_facturar', estado: 'completado', tipo_documento: 'nota',
+      estado_facturacion: 'sin_facturar', estado: 'completado',
     },
     {
       id: '10000000-0000-0000-0000-000000000003', taller_id: TALLER_ID,
@@ -129,7 +129,7 @@ export async function GET(req: NextRequest) {
       mano_de_obra_items: [{"id":"mo-008","concepto":"Cambio aceite motor","precio":150},{"id":"mo-009","concepto":"Cambio aceite transmisión","precio":100}],
       partes: [{"refaccionId":"f0000000-0000-0000-0000-000000000002","nombre":"Aceite 5W-30 1L","cantidad":3,"precioVenta":115.00,"precioCompra":85.00},{"refaccionId":"f0000000-0000-0000-0000-000000000006","nombre":"Aceite de transmisión 1L","cantidad":2,"precioVenta":115.00,"precioCompra":95.00}],
       pagos: [{"id":"pago-g5-001","fecha":"2026-06-10","monto":710.00,"metodo":"transferencia"}],
-      estado_facturacion: 'sin_facturar', estado: 'pagado', tipo_documento: 'nota',
+      estado_facturacion: 'sin_facturar', estado: 'pagado',
     },
   ], { onConflict: 'id' });
   r.trabajos = e5 ? `error: ${e5.message}` : 'ok';
@@ -140,6 +140,7 @@ export async function GET(req: NextRequest) {
       id: '20000000-0000-0000-0000-000000000001', taller_id: TALLER_ID,
       proveedor_id: '90000000-0000-0000-0000-000000000001',
       numero_orden: 'OC-2026-001', descripcion: 'Reabasto mensual de filtros y aceites.',
+      fecha: '2026-06-07',
       partes: [{"nombre":"Filtro de aceite","cantidad":10,"precioUnitario":45.00},{"nombre":"Aceite 5W-30 1L","cantidad":20,"precioUnitario":85.00},{"nombre":"Filtro de aire","cantidad":5,"precioUnitario":95.00}],
       total: 2625.00, estado: 'recibida',
       pagos: [{"id":"pc-001","fecha":"2026-06-07","monto":2625.00,"metodo":"transferencia"}],
@@ -148,6 +149,7 @@ export async function GET(req: NextRequest) {
       id: '20000000-0000-0000-0000-000000000002', taller_id: TALLER_ID,
       proveedor_id: '90000000-0000-0000-0000-000000000002',
       numero_orden: 'OC-2026-002', descripcion: 'Pastillas de freno y correas de distribución.',
+      fecha: '2026-06-15',
       partes: [{"nombre":"Pastillas de freno del.","cantidad":4,"precioUnitario":280.00},{"nombre":"Correa de distribución","cantidad":2,"precioUnitario":450.00}],
       total: 2020.00, estado: 'pendiente',
       pagos: [],
@@ -160,6 +162,7 @@ export async function GET(req: NextRequest) {
     {
       id: '30000000-0000-0000-0000-000000000001', taller_id: TALLER_ID,
       numero_factura: 'FAC-2026-001', trabajo_id: null,
+      fecha: '2026-06-05',
       cliente_id: 'd0000000-0000-0000-0000-000000000001', vehiculo_id: 'e0000000-0000-0000-0000-000000000001',
       conceptos: [{"descripcion":"Cambio de aceite 5W-30 y filtros. Revisión general.","cantidad":1,"precioUnitario":775.00,"subtotal":775.00}],
       subtotal: 668.10, iva: 106.90, total: 775.00,
@@ -169,6 +172,7 @@ export async function GET(req: NextRequest) {
     {
       id: '30000000-0000-0000-0000-000000000002', taller_id: TALLER_ID,
       numero_factura: 'FAC-2026-002', trabajo_id: null,
+      fecha: '2026-06-10',
       cliente_id: 'd0000000-0000-0000-0000-000000000002', vehiculo_id: 'e0000000-0000-0000-0000-000000000003',
       conceptos: [{"descripcion":"Cambio de pastillas de freno delanteras (2 juegos). Ajuste y prueba.","cantidad":1,"precioUnitario":910.00,"subtotal":910.00}],
       subtotal: 784.48, iva: 125.52, total: 910.00,
