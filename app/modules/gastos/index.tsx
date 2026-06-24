@@ -365,7 +365,7 @@ export function VistaGastos({
                   if (confirmDelete === g.id) {
                     return (
                       <div key={g.id} className="flex items-center justify-between py-3 px-2 bg-rose-50 rounded-lg my-1">
-                        <span className="text-sm text-rose-700 font-medium">¿Eliminar "{g.concepto}"?</span>
+                        <span className="text-sm text-rose-700 font-medium">¿Eliminar &quot;{g.concepto}&quot;?</span>
                         <div className="flex gap-2">
                           <Btn size="sm" variant="danger" onClick={() => handleDelete(g.id)}>Sí, eliminar</Btn>
                           <Btn size="sm" variant="ghost" onClick={() => setConfirmDelete(null)}>Cancelar</Btn>
