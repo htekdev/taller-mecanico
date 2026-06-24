@@ -545,25 +545,6 @@ export default function TallerMecanico() {
           ))}
         </nav>
 
-        {/* ── Banner: Pendientes de facturar ── */}
-        {!cargando && trabajosPendientesFacturar > 0 && (
-          <div className="mb-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-            <span className="text-xl flex-shrink-0">🧾</span>
-            <div className="flex-1 min-w-0">
-              <span className="text-sm font-semibold text-amber-800">
-                {trabajosPendientesFacturar} trabajo{trabajosPendientesFacturar !== 1 ? 's' : ''} pendiente{trabajosPendientesFacturar !== 1 ? 's' : ''} de facturar
-              </span>
-              <span className="text-xs text-amber-600 ml-1.5 hidden sm:inline">— Ve a Trabajos y emite la factura en la columna Descripción</span>
-            </div>
-            <button
-              onClick={() => setVista('trabajos')}
-              className="flex-shrink-0 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
-            >
-              Ver trabajos →
-            </button>
-          </div>
-        )}
-
         {cargando ? (
           <div className="flex items-center justify-center py-24">
             <div className="text-slate-400 text-sm">Cargando datos del taller...</div>

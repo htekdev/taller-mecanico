@@ -357,6 +357,7 @@ export function VistaTrabajo({
     : inventario.length;
 
   const trabajosPendientes = trabajos.filter(t => t.estado === 'pendiente');
+  const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
   const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
   const trabajosFiltrados = [...trabajos]
     .filter(t => {
@@ -990,6 +991,16 @@ export function VistaTrabajo({
             <span className="text-2xl">🚛</span>
             <span className="text-amber-800 font-semibold">
               {trabajosPendientes.length} trabajo{trabajosPendientes.length !== 1 ? 's' : ''} en el taller — pendiente{trabajosPendientes.length !== 1 ? 's' : ''} de finalizar
+            </span>
+          </div>
+        )}
+
+        {/* Banner: trabajos pendientes de facturar */}
+        {trabajosPendientesFacturar > 0 && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-3 mb-4 flex items-center gap-3 text-sm">
+            <span className="text-2xl">🧾</span>
+            <span className="text-indigo-800 font-semibold">
+              {trabajosPendientesFacturar} trabajo{trabajosPendientesFacturar !== 1 ? 's' : ''} pendiente{trabajosPendientesFacturar !== 1 ? 's' : ''} de facturar — usa el botón 🧾 en la columna Descripción
             </span>
           </div>
         )}
