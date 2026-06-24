@@ -4,21 +4,146 @@ import { useState } from 'react';
 import type { Cliente, Vehiculo } from '@/app/types';
 import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
 
+// ── Modal de edición de cliente ────────────────────────────────────────────────
+function ModalEditarCliente({
+  cliente,
+  onGuardar,
+  onCerrar,
+}: {
+  cliente: Cliente;
+  onGuardar: (id: string, datos: Omit<Cliente, 'id'>) => void;
+  onCerrar: () => void;
+}) {
+  const [form, setForm] = useState({
+    nombre: cliente.nombre,
+    telefono: cliente.telefono ?? '',
+    email: cliente.email ?? '',
+    email2: cliente.email2 ?? '',
+  });
+  const [guardando, setGuardando] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.nombre.trim()) return;
+    setGuardando(true);
+    await onGuardar(cliente.id, {
+      nombre: form.nombre.trim(),
+      telefono: form.telefono.trim() || undefined,
+      email: form.email.trim() || undefined,
+      email2: form.email2.trim() || undefined,
+    });
+    setGuardando(false);
+    onCerrar();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      onClick={onCerrar}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Editar Cliente</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Actualiza los datos de contacto.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="text-slate-400 hover:text-slate-600 text-xl leading-none"
+            aria-label="Cerrar"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label>Nombre *</Label>
+            <Input
+              type="text"
+              placeholder="Nombre completo"
+              value={form.nombre}
+              onChange={e => setForm({ ...form, nombre: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <Label>
+              Teléfono{' '}
+              <span className="text-slate-400 font-normal text-xs">(opcional)</span>
+            </Label>
+            <Input
+              type="tel"
+              placeholder="Ej. 555-123-4567"
+              value={form.telefono}
+              onChange={e => setForm({ ...form, telefono: e.target.value })}
+            />
+          </div>
+          <div>
+            <Label>
+              Correo 1{' '}
+              <span className="text-slate-400 font-normal text-xs">(opcional)</span>
+            </Label>
+            <Input
+              type="email"
+              placeholder="correo@ejemplo.com"
+              value={form.email}
+              onChange={e => setForm({ ...form, email: e.target.value })}
+            />
+          </div>
+          <div>
+            <Label>
+              Correo 2{' '}
+              <span className="text-slate-400 font-normal text-xs">(opcional)</span>
+            </Label>
+            <Input
+              type="email"
+              placeholder="correo2@ejemplo.com"
+              value={form.email2}
+              onChange={e => setForm({ ...form, email2: e.target.value })}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-1">
+            <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>
+              Cancelar
+            </Btn>
+            <Btn type="submit" variant="primary" fullWidth disabled={guardando}>
+              {guardando ? 'Guardando...' : '✓ Guardar cambios'}
+            </Btn>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Vista principal ────────────────────────────────────────────────────────────
 export function VistaClientes({
   clientes,
   vehiculos,
   onGuardarCliente,
   onGuardarVehiculo,
+  onActualizarCliente,
 }: {
   clientes: Cliente[];
   vehiculos: Vehiculo[];
   onGuardarCliente: (c: Omit<Cliente, 'id'>) => void;
   onGuardarVehiculo: (v: Omit<Vehiculo, 'id'>) => void;
+  onActualizarCliente: (id: string, datos: Omit<Cliente, 'id'>) => void;
 }) {
   const [formCliente, setFormCliente] = useState({ nombre: '', telefono: '', email: '', email2: '' });
   const [clienteExpandido, setClienteExpandido] = useState<string | null>(null);
   const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: '', placa: '' });
   const [busqueda, setBusqueda] = useState('');
+  const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
 
   const handleSubmitCliente = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +177,15 @@ export function VistaClientes({
         title="Registro de Clientes"
         subtitle="Registra al cliente y toca su nombre para gestionar sus unidades (vehículos)."
       />
+
+      {/* ── Modal de edición ── */}
+      {clienteEditando && (
+        <ModalEditarCliente
+          cliente={clienteEditando}
+          onGuardar={onActualizarCliente}
+          onCerrar={() => setClienteEditando(null)}
+        />
+      )}
 
       {/* ── Formulario nuevo cliente ── */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-6">
@@ -128,9 +262,10 @@ export function VistaClientes({
             const expandido = clienteExpandido === cliente.id;
             return (
               <div key={cliente.id} className="border border-slate-200 rounded-xl overflow-hidden">
-                <button type="button" onClick={() => toggleCliente(cliente.id)}
-                  className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-slate-50 transition-colors text-left">
-                  <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center bg-white hover:bg-slate-50 transition-colors">
+                  {/* Clickable area (expand units) */}
+                  <button type="button" onClick={() => toggleCliente(cliente.id)}
+                    className="flex-1 flex items-center gap-3 px-5 py-4 text-left min-w-0">
                     <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
                       {cliente.nombre.charAt(0).toUpperCase()}
                     </div>
@@ -148,11 +283,22 @@ export function VistaClientes({
                     }`}>
                       {unidades.length > 0 ? `${unidades.length} unidad${unidades.length !== 1 ? 'es' : ''}` : '⚠ Sin unidades'}
                     </span>
+                  </button>
+
+                  {/* Editar button */}
+                  <div className="flex items-center gap-2 pr-4 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); setClienteEditando(cliente); }}
+                      className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors border border-indigo-200 hover:border-indigo-300"
+                    >
+                      ✏️ Editar
+                    </button>
+                    <span className="text-slate-400 text-xs font-medium hidden sm:inline">
+                      {expandido ? '▲' : '▼'}
+                    </span>
                   </div>
-                  <span className="text-slate-400 text-xs font-medium ml-4 flex-shrink-0">
-                    {expandido ? '▲ Cerrar' : '▼ Gestionar unidades'}
-                  </span>
-                </button>
+                </div>
 
                 {expandido && (
                   <div className="px-5 pb-5 pt-4 bg-slate-50 border-t border-slate-200">

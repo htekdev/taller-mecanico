@@ -74,6 +74,10 @@ export default function TallerMecanico() {
     const nuevo = await db.insertCliente(taller.id, data);
     if (nuevo) setClientes(prev => [...prev, nuevo]);
   };
+  const actualizarCliente = async (id: string, data: Omit<Cliente, 'id'>) => {
+    const actualizado = await db.updateCliente(id, data);
+    if (actualizado) setClientes(prev => prev.map(c => c.id === id ? actualizado : c));
+  };
   const guardarVehiculo = async (data: Omit<Vehiculo, 'id'>) => {
     if (!taller) return;
     const nuevo = await db.insertVehiculo(taller.id, data);
@@ -553,7 +557,8 @@ export default function TallerMecanico() {
         <Card className="p-6 sm:p-8">
           {vista === 'clientes' && (
             <VistaClientes clientes={clientes} vehiculos={vehiculos}
-              onGuardarCliente={guardarCliente} onGuardarVehiculo={guardarVehiculo} />
+              onGuardarCliente={guardarCliente} onGuardarVehiculo={guardarVehiculo}
+              onActualizarCliente={actualizarCliente} />
           )}
           {vista === 'inventario' && (
             <VistaInventario inventario={inventario} clientes={clientes} vehiculos={vehiculos}
