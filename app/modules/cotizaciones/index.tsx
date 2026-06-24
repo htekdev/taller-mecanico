@@ -739,6 +739,7 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
   const [addingItem, setAddingItem] = useState<ItemLinea | null>(null);
   const [creando, setCreando] = useState(false);
   const [exito, setExito] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const refacciones = cotizacion.form.refacciones.filter(i => i.descripcion.trim() !== '');
   const manoDeObraItems = cotizacion.form.manoDeObra.filter(i => i.descripcion.trim() !== '');
@@ -764,6 +765,7 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
 
   const handleCrearTrabajo = async () => {
     setCreando(true);
+    setErrorMsg(null);
     try {
       const partes: TrabajoRefaccion[] = refacciones
         .filter(i => resolvedMap[i.id])
@@ -788,6 +790,10 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
 
       await onCrearTrabajo(partes, manoDeObra);
       setExito(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(msg);
+      console.error('[handleCrearTrabajo] error:', msg);
     } finally {
       setCreando(false);
     }
@@ -885,6 +891,13 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
               ? '✅ Todas las piezas están en inventario. ¡Listo para crear el trabajo!'
               : `⚠️ ${pendientes.length} pieza(s) sin registrar en inventario.`}
           </div>
+
+          {/* Error banner — shown if insertTrabajo throws */}
+          {errorMsg && (
+            <div className="px-4 py-3 rounded-xl text-sm font-medium border bg-rose-50 border-rose-200 text-rose-700">
+              ❌ Error al crear el trabajo: <span className="font-mono text-xs break-all">{errorMsg}</span>
+            </div>
+          )}
 
           <div className="flex gap-3">
             <Btn variant="ghost" onClick={onCerrar}>Cancelar</Btn>

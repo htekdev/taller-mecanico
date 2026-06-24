@@ -126,15 +126,17 @@ export default function TallerMecanico() {
   };
 
   /** Converts an approved cotización to a trabajo.
-   *  Navigation to Trabajos tab is driven by the success screen button (onNavToTrabajos),
-   *  not here — to avoid racing with the success modal. */
+   *  Throws on failure — the modal catches this and shows an error state.
+   *  Navigation to Trabajos tab is driven by the success screen button (onNavToTrabajos). */
   const convertirCotizacionATrabajo = async (data: ConversionTrabajo): Promise<void> => {
-    if (!taller) return;
+    if (!taller) throw new Error('Sin sesión activa');
     const totalManoDeObra = data.manoDeObraItems.reduce((s, l) => s + l.precio, 0);
     const totalVentaRef   = data.partes.reduce((s, p) => s + p.subtotal, 0);
     const totalCostoRef   = data.partes.reduce((s, p) => s + p.costoTotal, 0);
     const subtotal        = totalManoDeObra + totalVentaRef;
-    const nuevo = await db.insertTrabajo(taller.id, {
+
+    // insertTrabajo throws on failure (see db.ts) — error bubbles to modal's catch
+    await db.insertTrabajo(taller.id, {
       clienteId:         data.clienteId,
       vehiculoId:        data.vehiculoId,
       fecha:             data.fecha,
@@ -152,15 +154,8 @@ export default function TallerMecanico() {
       estado:            'pendiente',
       estadoFacturacion: 'sin_facturar',
     });
-    if (nuevo) {
-      // Fast path: append directly without a full reload
-      setTrabajos(prev => [...prev, nuevo]);
-    } else {
-      // Fallback: DB insert may have succeeded but SELECT failed (RLS timing) — reload
-      const fresh = await db.getTrabajos(taller.id);
-      setTrabajos(fresh);
-    }
-    // Deduct stock for used parts
+
+    // Deduct stock for used parts (best-effort — non-fatal)
     if (data.partes.length > 0) {
       const updatedInv = inventario.map(r => {
         const usada = data.partes.find(p => p.refaccionId === r.id);
@@ -169,10 +164,10 @@ export default function TallerMecanico() {
       await db.updateRefacciones(updatedInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
       setInventario(updatedInv);
     }
-    // NOTE: setVista('trabajos') is NOT called here.
-    // Navigation is triggered by the success modal's "Ir a Trabajos →" button
-    // via the onNavToTrabajos prop — this prevents the modal from being
-    // unmounted before the success screen can display.
+
+    // Full authoritative reload — guarantees UI matches DB regardless of
+    // whether insertTrabajo's RETURNING clause succeeded or not
+    await cargarDatos();
   };
   const actualizarCompatibilidad = async (refaccionId: string, compatibilidad: CompatibilidadVehiculo[]) => {
     const compat = compatibilidad.length > 0 ? compatibilidad : undefined;

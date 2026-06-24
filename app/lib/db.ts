@@ -208,7 +208,11 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
     .select()
     .single();
 
-  if (error || !row) { console.error('insertTrabajo error:', error); return null; }
+  if (error || !row) {
+    const msg = error?.message ?? error?.details ?? 'Unknown Supabase error';
+    console.error('[insertTrabajo] FAILED:', msg, error);
+    throw new Error(`insertTrabajo: ${msg}`);
+  }
   return {
     id: row.id, clienteId: row.cliente_id ?? '', vehiculoId: row.vehiculo_id ?? '',
     fecha: row.fecha, descripcion: row.descripcion,
