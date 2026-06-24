@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel } from '@/app/types';
+import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel, Proveedor } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt } from '@/app/lib/utils';
 import { getPricingIntel } from '@/app/lib/pricing';
@@ -109,6 +109,7 @@ export function VistaTrabajo({
   inventario,
   trabajos,
   facturas,
+  proveedores,
   onGuardar,
   onEditar,
   onFinalizar,
@@ -121,6 +122,7 @@ export function VistaTrabajo({
   inventario: Refaccion[];
   trabajos: Trabajo[];
   facturas: Factura[];
+  proveedores: Proveedor[];
   onGuardar: (t: Omit<Trabajo, 'id' | 'total' | 'iva'>) => void;
   onEditar: (trabajoId: string, data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => void;
   onFinalizar: (trabajoId: string, tipo: 'factura' | 'nota') => void;
@@ -142,6 +144,13 @@ export function VistaTrabajo({
   const [laborItems, setLaborItems] = useState<ManoDeObraItem[]>([]);
   const [laborConcepto, setLaborConcepto] = useState('');
   const [laborPrecio, setLaborPrecio]     = useState(0);
+
+  // ── Servicios externos ──────────────────────────────────────
+  const [showExtForm, setShowExtForm]       = useState(false);
+  const [extProveedorId, setExtProveedorId] = useState('');
+  const [extConcepto, setExtConcepto]       = useState('');
+  const [extCostoTaller, setExtCostoTaller] = useState(0);
+  const [extPrecioCliente, setExtPrecioCliente] = useState(0);
   const [partesSeleccionadas, setPartesSeleccionadas] = useState<TrabajoRefaccion[]>([]);
   const [pickerRefId, setPickerRefId]         = useState('');
   const [pickerCantidad, setPickerCantidad]   = useState(1);
@@ -171,6 +180,7 @@ export function VistaTrabajo({
       id: `${Date.now()}-${Math.random()}`,
       concepto: laborConcepto.trim(),
       precio: laborPrecio,
+      tipo: 'interno' as const,
     }]);
     setLaborConcepto('');
     setLaborPrecio(0);
@@ -178,6 +188,26 @@ export function VistaTrabajo({
 
   const removerLabor = (id: string) =>
     setLaborItems(prev => prev.filter(l => l.id !== id));
+
+  const agregarServicioExterno = () => {
+    if (!extConcepto.trim() || extPrecioCliente <= 0) return;
+    const prov = proveedores.find(p => p.id === extProveedorId);
+    setLaborItems(prev => [...prev, {
+      id: `${Date.now()}-ext-${Math.random()}`,
+      concepto: extConcepto.trim(),
+      precio: extPrecioCliente,
+      tipo: 'externo' as const,
+      proveedorId: extProveedorId || undefined,
+      proveedorNombre: prov?.nombre ?? undefined,
+      costoTaller: extCostoTaller > 0 ? extCostoTaller : undefined,
+      pagosServicio: [],
+    }]);
+    setExtConcepto('');
+    setExtCostoTaller(0);
+    setExtPrecioCliente(0);
+    setExtProveedorId('');
+    setShowExtForm(false);
+  };
 
   const agregarParte = () => {
     const ref = inventario.find(r => r.id === pickerRefId);
@@ -237,6 +267,11 @@ export function VistaTrabajo({
     setPickerCantidad(1);
     setPickerPrecioVenta(0);
     setEditandoId(null);
+    setShowExtForm(false);
+    setExtConcepto('');
+    setExtCostoTaller(0);
+    setExtPrecioCliente(0);
+    setExtProveedorId('');
   };
 
   const iniciarEdicion = (trabajo: Trabajo) => {
@@ -468,8 +503,25 @@ export function VistaTrabajo({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {laborItems.map(l => (
-                        <tr key={l.id} className="bg-white">
-                          <td className="px-3 py-2 text-slate-800 font-medium">{l.concepto}</td>
+                        <tr key={l.id} className={l.tipo === 'externo' ? 'bg-orange-50' : 'bg-white'}>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {l.tipo === 'externo' && (
+                                <span className="text-xs font-bold bg-orange-100 text-orange-700 border border-orange-200 px-1.5 py-0.5 rounded">
+                                  🏭 Externo
+                                </span>
+                              )}
+                              <span className="font-medium text-slate-800">{l.concepto}</span>
+                              {l.tipo === 'externo' && l.proveedorNombre && (
+                                <span className="text-xs text-orange-600">{l.proveedorNombre}</span>
+                              )}
+                              {l.tipo === 'externo' && l.costoTaller != null && (
+                                <span className="text-xs text-slate-400">
+                                  Costo: ${fmt(l.costoTaller)} · Ganancia: ${fmt(l.precio - l.costoTaller)}
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(l.precio)}</td>
                           <td className="px-3 py-2 text-center">
                             <Btn size="sm" variant="danger" onClick={() => removerLabor(l.id)}>✕</Btn>
@@ -491,6 +543,143 @@ export function VistaTrabajo({
                 <p className="text-xs text-slate-400 text-center py-2">
                   Sin conceptos de mano de obra. El trabajo se registra con mano de obra = $0.00
                 </p>
+              )}
+            </div>
+          </div>
+
+          {/* ② Servicios Externos — subcontratados a otros talleres/laboratorios */}
+          <div className="border border-orange-200 rounded-xl bg-white overflow-hidden">
+            <div className="px-4 py-3 bg-orange-700 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-white uppercase tracking-widest">🏭 Servicios Externos</span>
+                <span className="ml-3 text-orange-200 text-xs">Lab. inyectores, rectificación, etc.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExtForm(v => !v)}
+                className="text-xs font-bold text-orange-100 hover:text-white border border-orange-400 hover:border-white px-3 py-1 rounded-lg transition-colors"
+              >
+                {showExtForm ? '✕ Cancelar' : '+ Agregar'}
+              </button>
+            </div>
+
+            <div className="p-4">
+              {/* External service form */}
+              {showExtForm && (
+                <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-3">
+                  <p className="text-xs font-bold text-orange-700 uppercase tracking-wider">Nuevo Servicio Externo</p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Proveedor / Laboratorio</Label>
+                      <select
+                        value={extProveedorId}
+                        onChange={e => setExtProveedorId(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      >
+                        <option value="">Sin proveedor registrado</option>
+                        {proveedores.map(p => (
+                          <option key={p.id} value={p.id}>{p.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Concepto del servicio</Label>
+                      <Input
+                        type="text"
+                        placeholder="Ej. Laboratorio de inyectores, Rectificación..."
+                        value={extConcepto}
+                        onChange={e => setExtConcepto(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                    <div>
+                      <Label>Costo al taller ($)</Label>
+                      <Input
+                        type="number" placeholder="0.00" min="0" step="0.01"
+                        value={extCostoTaller || ''}
+                        onChange={e => setExtCostoTaller(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Precio al cliente ($)</Label>
+                      <Input
+                        type="number" placeholder="0.00" min="0.01" step="0.01"
+                        value={extPrecioCliente || ''}
+                        onChange={e => setExtPrecioCliente(Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="flex items-end gap-2">
+                      {extCostoTaller > 0 && extPrecioCliente > 0 && (
+                        <div className={`flex-1 text-center text-xs font-bold px-3 py-2 rounded-lg ${
+                          extPrecioCliente > extCostoTaller
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                        }`}>
+                          Ganancia: ${fmt(extPrecioCliente - extCostoTaller)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Btn
+                      variant="primary"
+                      disabled={!extConcepto.trim() || extPrecioCliente <= 0}
+                      onClick={agregarServicioExterno}
+                    >
+                      ✓ Agregar Servicio
+                    </Btn>
+                    <Btn variant="ghost" onClick={() => setShowExtForm(false)}>Cancelar</Btn>
+                  </div>
+                </div>
+              )}
+
+              {/* External items list */}
+              {laborItems.filter(l => l.tipo === 'externo').length > 0 ? (
+                <div className="rounded-lg border border-orange-200 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-orange-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-orange-700 uppercase tracking-wide">Servicio</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-orange-700 uppercase tracking-wide">Costo</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-orange-700 uppercase tracking-wide">Cliente</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-emerald-700 uppercase tracking-wide">Ganancia</th>
+                        <th className="px-3 py-2 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-orange-100">
+                      {laborItems.filter(l => l.tipo === 'externo').map(l => (
+                        <tr key={l.id} className="bg-orange-50/50">
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-slate-800">{l.concepto}</div>
+                            {l.proveedorNombre && (
+                              <div className="text-xs text-orange-600 mt-0.5">🏭 {l.proveedorNombre}</div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right text-rose-600 font-semibold">
+                            ${fmt(l.costoTaller ?? 0)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(l.precio)}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-emerald-600">
+                            ${fmt(l.precio - (l.costoTaller ?? 0))}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <Btn size="sm" variant="danger" onClick={() => removerLabor(l.id)}>✕</Btn>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                !showExtForm && (
+                  <p className="text-xs text-slate-400 text-center py-2">
+                    Sin servicios externos. Toca &quot;+ Agregar&quot; para registrar laboratorio, rectificación, etc.
+                  </p>
+                )
               )}
             </div>
           </div>

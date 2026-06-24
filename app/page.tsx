@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor, OrdenCompra, Factura,
-  Pago, PagoCompra, PagoFactura, FacturaConcepto, CompatibilidadVehiculo,
+  Pago, PagoCompra, PagoFactura, FacturaConcepto, CompatibilidadVehiculo, PagoServicioExterno,
 } from '@/app/types';
 import {
   generarNumeroFactura, generarNumeroOrden,
@@ -209,6 +209,24 @@ export default function TallerMecanico() {
     const nuevos = [...(trabajoActual.pagos ?? []), nuevoPago];
     await db.updateTrabajoPagos(trabajoId, nuevos);
     setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, pagos: nuevos } : t));
+  };
+
+  /** Registrar pago a proveedor externo — updates the ManoDeObraItem's pagosServicio array */
+  const registrarPagoServicioExterno = async (
+    trabajoId: string,
+    itemId: string,
+    pago: Omit<PagoServicioExterno, 'id'>,
+  ) => {
+    const trabajo = trabajos.find(t => t.id === trabajoId);
+    if (!trabajo) return;
+    const nuevoPago: PagoServicioExterno = { ...pago, id: Date.now().toString() };
+    const updatedItems = (trabajo.manoDeObraItems ?? []).map(item =>
+      item.id === itemId
+        ? { ...item, pagosServicio: [...(item.pagosServicio ?? []), nuevoPago] }
+        : item
+    );
+    await db.updateTrabajoManoDeObraItems(trabajoId, updatedItems);
+    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, manoDeObraItems: updatedItems } : t));
   };
   const finalizarTrabajo = async (trabajoId: string, tipo: 'factura' | 'nota') => {
     const trabajo = trabajos.find(t => t.id === trabajoId);
@@ -455,7 +473,8 @@ export default function TallerMecanico() {
           )}
           {vista === 'trabajos' && (
             <VistaTrabajo clientes={clientes} vehiculos={vehiculos} inventario={inventario}
-              trabajos={trabajos} facturas={facturas} onGuardar={guardarTrabajo}
+              trabajos={trabajos} facturas={facturas} proveedores={proveedores}
+              onGuardar={guardarTrabajo}
               onEditar={editarTrabajo}
               onFinalizar={finalizarTrabajo}
               onIrAInventario={() => setVista('inventario')}
@@ -483,8 +502,10 @@ export default function TallerMecanico() {
           )}
           {vista === 'pagos' && (
             <VistaCuentasPorPagar ordenes={ordenes} proveedores={proveedores}
+              trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
               onRegistrarPago={registrarPagoOrden}
-              onIrAOrdenes={() => setVista('ordenes')} />
+              onIrAOrdenes={() => setVista('ordenes')}
+              onPagarServicioExterno={registrarPagoServicioExterno} />
           )}
           {vista === 'resumen' && (
             <VistaResumen mesActual={mesActual} setMesActual={setMesActual}
