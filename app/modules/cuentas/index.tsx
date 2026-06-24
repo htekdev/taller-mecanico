@@ -174,7 +174,8 @@ async function generarPDFReporte(
   }
 
   // ═══ TRABAJOS SIN FACTURA ═════════════════════════════════════════════════
-  const trabsPend = trabajos.filter(t => t.tipoDocumento !== 'nota' && getEstadoPago(t) !== 'pagado');
+  // trabajos ya viene pre-filtrado (solo completados) — notas completadas incluidas
+  const trabsPend = trabajos.filter(t => getEstadoPago(t) !== 'pagado');
   if (trabsPend.length > 0) {
     sectionLabel('Servicios sin factura');
     const wDesc = 60, wVeh = 42, wFecha = 24, wTotal = 24, wPag = 24, wSal = cw - 174;
@@ -264,8 +265,8 @@ function ReporteCliente({
   const [generandoPDF, setGenerandoPDF] = useState(false);
 
   const facsPend = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado');
-  // Notas no son facturables — excluir del resumen de cuentas por cobrar
-  const trabsPend = trabajos.filter(t => t.tipoDocumento !== 'nota' && getEstadoPago(t) !== 'pagado');
+  // trabajos ya viene filtrado (solo completados, desde legacyPorCliente) — notas incluidas
+  const trabsPend = trabajos.filter(t => getEstadoPago(t) !== 'pagado');
   const totalPendiente = facsPend.reduce((s, f) => s + getSaldoFactura(f), 0)
     + trabsPend.reduce((s, t) => s + getSaldo(t), 0);
 
@@ -466,12 +467,13 @@ export function VistaCuentas({
   const [pagoFormF, setPagoFormF] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
   const [pagoFormT, setPagoFormT] = useState({ monto: 0, fecha: hoy, nota: '' });
 
-  // Legacy: trabajos without a facturaId — notas never get invoiced
-  // Also exclude trabajos that have a matching Factura record (by trabajoId) even if facturaId is not set in DB,
-  // preventing the same service from appearing twice (once as "factura emitida" and once as "trabajo sin factura").
+  // Por cobrar: solo trabajos COMPLETADOS (no en progreso) sin factura formal.
+  // Regla de negocio: (1) terminado, (2) facturado o nota completa → aparece en por cobrar.
+  // Notas completadas SÍ aparecen (son recibos simples con saldo pendiente).
+  // Se excluyen trabajos que ya tienen una Factura formal asociada (evita duplicados).
   const legacyTrabajos = trabajos.filter(t =>
+    t.estado === 'completado' &&
     !t.facturaId &&
-    t.tipoDocumento !== 'nota' &&
     !facturas.some(f => f.trabajoId === t.id)
   );
 
