@@ -44,6 +44,7 @@ export default function TallerMecanico() {
   const [vista, setVista] = useState<Vista>('clientes');
   const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
   const [cargando, setCargando] = useState(true);
+  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string } | null>(null);
 
   // ── Cargar datos desde Supabase ──
   const cargarDatos = useCallback(async () => {
@@ -292,7 +293,7 @@ export default function TallerMecanico() {
   };
 
   // ── Invoice (Factura) handlers ──
-  const generarFactura = async (trabajoId: string) => {
+  const generarFactura = async (trabajoId: string, numeroFactura: string) => {
     if (!taller) return;
     const trabajo = trabajos.find(t => t.id === trabajoId);
     if (!trabajo || trabajo.facturaId) return;
@@ -302,7 +303,7 @@ export default function TallerMecanico() {
     ];
     const subtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
     const nuevaFactura = await db.insertFactura(taller.id, {
-      numeroFactura: generarNumeroFactura(facturas),
+      numeroFactura,
       trabajoId, clienteId: trabajo.clienteId, vehiculoId: trabajo.vehiculoId,
       fecha: new Date().toISOString().split('T')[0],
       conceptos, subtotal, total: subtotal, pagos: [],
@@ -311,6 +312,18 @@ export default function TallerMecanico() {
     setFacturas(prev => [...prev, nuevaFactura]);
     await db.updateTrabajoFactura(trabajoId, nuevaFactura.id);
     setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 'facturado' as const } : t));
+  };
+
+  const abrirModalFactura = (trabajoId: string) => {
+    const sugerido = generarNumeroFactura(facturas);
+    setPendingFactura({ trabajoId, numero: sugerido });
+  };
+
+  const confirmarFactura = async () => {
+    if (!pendingFactura || !pendingFactura.numero.trim()) return;
+    await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim());
+    setPendingFactura(null);
+    setVista('facturas');
   };
   const registrarPagoFactura = async (facturaId: string, pago: Omit<PagoFactura, 'id'>) => {
     const facturaActual = facturas.find(f => f.id === facturaId);
@@ -554,7 +567,7 @@ export default function TallerMecanico() {
               onEditar={editarTrabajo}
               onFinalizar={finalizarTrabajo}
               onIrAInventario={() => setVista('inventario')}
-              onGenerarFactura={generarFactura}
+              onGenerarFactura={abrirModalFactura}
               onIrAFacturas={() => setVista('facturas')} />
           )}
           {vista === 'proveedores' && (
@@ -618,6 +631,43 @@ export default function TallerMecanico() {
         </Card>
         )}
       </div>
+
+      {/* ── Modal: Número de Factura ── */}
+      {pendingFactura && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-bold text-slate-800 mb-1">🧾 Número de Factura</h2>
+            <p className="text-sm text-slate-500 mb-4">
+              Escribe el número de factura que manejan en el taller. Puedes usar la sugerencia o escribir el tuyo propio.
+            </p>
+            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+              Número de factura
+            </label>
+            <input
+              type="text"
+              autoFocus
+              value={pendingFactura.numero}
+              onChange={e => setPendingFactura(prev => prev ? { ...prev, numero: e.target.value } : null)}
+              onKeyDown={e => { if (e.key === 'Enter') confirmarFactura(); if (e.key === 'Escape') setPendingFactura(null); }}
+              placeholder="Ej. FAC-2026-001 o F-001"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-5"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setPendingFactura(null)}
+                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarFactura}
+                disabled={!pendingFactura.numero.trim()}
+                className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                ✓ Crear Factura
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

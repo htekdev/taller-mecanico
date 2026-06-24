@@ -1130,7 +1130,7 @@ export function VistaTrabajo({
                           <span className="ml-2 text-xs bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">✓ Facturado</span>
                         ) : (
                           <button type="button"
-                            onClick={() => { onGenerarFactura(trabajo.id); onIrAFacturas(); }}
+                            onClick={() => onGenerarFactura(trabajo.id)}
                             className="ml-2 text-xs bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.5 rounded-full hover:bg-amber-100 hover:text-amber-700 transition-colors">
                             + Factura
                           </button>
