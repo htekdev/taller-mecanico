@@ -9,7 +9,7 @@ vi.mock('@/app/lib/supabase', () => ({
 }));
 
 import {
-  getClientes, insertCliente,
+  getClientes, insertCliente, updateCliente,
   getVehiculos, insertVehiculo,
   getRefacciones, insertRefaccion, updateRefaccionStock, updateRefaccionCompatibilidad,
   getTrabajos, insertTrabajo, updateTrabajoPagos, updateTrabajoFactura,
@@ -41,6 +41,17 @@ function mockInsertChain(data: unknown, error: unknown = null) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mockFrom.mockReturnValue({ insert } as any);
   return { insert, single };
+}
+
+/** UPDATE+SELECT chain: from → update → eq → select → single → Promise({ data, error }) */
+function mockUpdateSelectChain(data: unknown, error: unknown = null) {
+  const single = vi.fn().mockResolvedValue({ data, error });
+  const selectAfter = vi.fn().mockReturnValue({ single });
+  const eq = vi.fn().mockReturnValue({ select: selectAfter });
+  const update = vi.fn().mockReturnValue({ eq });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mockFrom.mockReturnValue({ update } as any);
+  return { update, eq, single };
 }
 
 /** UPDATE chain: from → update → eq → Promise({ error }) */
@@ -120,6 +131,38 @@ describe('insertCliente', () => {
     const rawRow = { id: 'cx', nombre: 'X', telefono: 'Y', taller_id: 't1' };
     mockInsertChain(rawRow);
     await insertCliente('t1', { nombre: 'X', telefono: 'Y' });
+    expect(mockFrom).toHaveBeenCalledWith('clientes');
+  });
+});
+
+// ── updateCliente ───────────────────────────────────────────────────────────
+
+describe('updateCliente', () => {
+  it('returns updated Cliente on success', async () => {
+    const rawRow = { id: 'c1', nombre: 'Pedro Actualizado', telefono: '555-9999', email: 'pedro@test.com', email2: null };
+    mockUpdateSelectChain(rawRow);
+
+    const result = await updateCliente('c1', { nombre: 'Pedro Actualizado', telefono: '555-9999', email: 'pedro@test.com' });
+
+    expect(result).toEqual({ id: 'c1', nombre: 'Pedro Actualizado', telefono: '555-9999', email: 'pedro@test.com' });
+  });
+
+  it('returns null when error occurs', async () => {
+    mockUpdateSelectChain(null, { message: 'DB error', code: 'PGRST' });
+    const result = await updateCliente('c1', { nombre: 'X', telefono: '555' });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when row is null', async () => {
+    mockUpdateSelectChain(null, null);
+    const result = await updateCliente('c1', { nombre: 'X', telefono: '555' });
+    expect(result).toBeNull();
+  });
+
+  it('queries the clientes table', async () => {
+    const rawRow = { id: 'c1', nombre: 'X', telefono: 'Y', email: null, email2: null };
+    mockUpdateSelectChain(rawRow);
+    await updateCliente('c1', { nombre: 'X', telefono: 'Y' });
     expect(mockFrom).toHaveBeenCalledWith('clientes');
   });
 });
