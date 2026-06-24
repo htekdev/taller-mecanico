@@ -54,6 +54,29 @@ export async function insertCliente(tallerId: string, data: Omit<Cliente, 'id'>)
   };
 }
 
+export async function updateCliente(clienteId: string, data: Omit<Cliente, 'id'>): Promise<Cliente | null> {
+  const { data: row, error } = await supabase
+    .from('clientes')
+    .update({
+      nombre: data.nombre,
+      telefono: data.telefono ?? '',
+      email: data.email ?? null,
+      email2: data.email2 ?? null,
+    })
+    .eq('id', clienteId)
+    .select()
+    .single();
+
+  if (error || !row) return null;
+  return {
+    id: row.id,
+    nombre: row.nombre,
+    telefono: row.telefono ?? undefined,
+    email: row.email ?? undefined,
+    email2: row.email2 ?? undefined,
+  };
+}
+
 // ── Vehículos ────────────────────────────────────────────────
 
 export async function getVehiculos(tallerId: string): Promise<Vehiculo[]> {
