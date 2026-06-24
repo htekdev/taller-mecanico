@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import type { Cliente, Vehiculo } from '@/app/types';
+import type { Cliente, Vehiculo, Refaccion, Proveedor, TrabajoRefaccion, ManoDeObraItem } from '@/app/types';
 import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
+import { CATEGORIAS, UNIDADES } from '@/app/lib/utils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,31 @@ interface CotizacionGuardada {
   savedAt: string;
   cancelada?: boolean;         // soft-cancel: stays in history with badge
   editada?: boolean;           // set to true after first edit
+  convertida?: boolean;        // set to true after conversion to trabajo
   form: FormCotizacion;
+}
+
+// Payload sent to page.tsx when converting a cotización to a trabajo
+export interface ConversionTrabajo {
+  cotizacionId: string;
+  cotizacionNumero: string;
+  clienteId: string;
+  vehiculoId: string;
+  descripcion: string;
+  fecha: string;
+  manoDeObraItems: ManoDeObraItem[];
+  partes: TrabajoRefaccion[];
+}
+
+// Input to onAgregarRefaccion — refaccion data + optional purchase order info
+export interface AgregarRefaccionInput {
+  refaccion: Omit<Refaccion, 'id'>;
+  ordenCompra?: {
+    proveedorId?: string;
+    numeroOrden?: string;
+    descripcion?: string;
+    cantidad: number;
+  };
 }
 
 type Pantalla = 'inicio' | 'formulario' | 'preview';
@@ -496,10 +521,419 @@ function FilaTotal({ label, value, bold = false, highlight }: { label: string; v
 
 // ─── History list ─────────────────────────────────────────────────────────────
 
-function HistorialCotizaciones({ history, onVer, onCancelar }: {
+
+// ── ModalAgregarInventario ────────────────────────────────────────────────────
+// Full inventory registration popup + automatic purchase order creation
+
+function ModalAgregarInventario({ item, proveedores, onGuardar, onCerrar }: {
+  item: ItemLinea;
+  proveedores: Proveedor[];
+  onGuardar: (data: AgregarRefaccionInput) => Promise<void>;
+  onCerrar: () => void;
+}) {
+  const [costoCompra, setCostoCompra] = useState('');
+  const [stock, setStock]             = useState(item.cantidad || '1');
+  const [categoria, setCategoria]     = useState(CATEGORIAS[0]);
+  const [unidad, setUnidad]           = useState(UNIDADES[0]);
+  const [proveedorId, setProveedorId] = useState('');
+  const [numeroOrden, setNumeroOrden] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [guardando, setGuardando]     = useState(false);
+  const precioVenta = parseNum(item.precioUnitario);
+  const cantNum     = Math.max(1, parseNum(stock) || 1);
+
+  const handleGuardar = async () => {
+    const costo = parseNum(costoCompra);
+    if (costo <= 0) return;
+    setGuardando(true);
+    try {
+      await onGuardar({
+        refaccion: {
+          nombre:      item.descripcion,
+          codigo:      '',
+          categoria,
+          unidad,
+          precioCompra: costo,
+          stock:        cantNum,
+          stockMinimo:  1,
+          proveedorId:  proveedorId || undefined,
+        },
+        ordenCompra: {
+          proveedorId:  proveedorId || undefined,
+          numeroOrden:  numeroOrden.trim() || undefined,
+          descripcion:  descripcion.trim() || undefined,
+          cantidad:     cantNum,
+        },
+      });
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onCerrar}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 relative overflow-y-auto max-h-[92vh]"
+        onClick={e => e.stopPropagation()}>
+        <button onClick={onCerrar} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all text-lg font-bold">✕</button>
+
+        <div>
+          <div className="text-2xl mb-1">📦</div>
+          <h3 className="font-bold text-slate-800 text-lg">Dar de Alta en Inventario</h3>
+          <p className="text-sm text-slate-500 mt-1">
+            Registra la pieza y se creará una orden de compra recibida automáticamente.
+          </p>
+        </div>
+
+        {/* Piece info — readonly summary */}
+        <div className="bg-slate-50 rounded-xl p-3 text-sm border border-slate-200">
+          <div className="font-semibold text-slate-700">{item.descripcion}</div>
+          <div className="text-slate-500 text-xs mt-0.5">
+            Precio de venta: <span className="font-medium text-slate-700">${fmtPeso(precioVenta)}</span>
+          </div>
+        </div>
+
+        {/* Required fields */}
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Costo de compra <span className="text-rose-500">*</span></Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                <Input type="number" min="0" step="0.01"
+                  className="pl-6"
+                  value={costoCompra}
+                  onChange={e => setCostoCompra(e.target.value)}
+                  placeholder="0.00" />
+              </div>
+            </div>
+            <div>
+              <Label>Cantidad recibida</Label>
+              <Input type="number" min="1"
+                value={stock}
+                onChange={e => setStock(e.target.value)}
+                placeholder="1" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Categoría</Label>
+              <select value={categoria} onChange={e => setCategoria(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Unidad</Label>
+              <select value={unidad} onChange={e => setUnidad(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-slate-200 pt-1">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Orden de Compra (opcional)</p>
+          <div className="space-y-3">
+            <div>
+              <Label>Proveedor</Label>
+              <select value={proveedorId} onChange={e => setProveedorId(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">— Sin proveedor —</option>
+                {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <Label>Número de orden</Label>
+              <Input
+                value={numeroOrden}
+                onChange={e => setNumeroOrden(e.target.value)}
+                placeholder="Ej. OC-2026-001 (opcional)" />
+            </div>
+
+            <div>
+              <Label>Descripción</Label>
+              <Input
+                value={descripcion}
+                onChange={e => setDescripcion(e.target.value)}
+                placeholder="Notas adicionales (opcional)" />
+            </div>
+          </div>
+        </div>
+
+        {/* Totals preview */}
+        {parseNum(costoCompra) > 0 && (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 text-sm">
+            <div className="flex justify-between text-slate-600">
+              <span>Costo total:</span>
+              <span className="font-bold text-slate-800">${fmtPeso(parseNum(costoCompra) * cantNum)}</span>
+            </div>
+            {parseNum(costoCompra) > 0 && precioVenta > 0 && (
+              <div className="flex justify-between text-slate-500 text-xs mt-1">
+                <span>Utilidad estimada por pieza:</span>
+                <span className="text-emerald-600 font-medium">
+                  ${fmtPeso(precioVenta - parseNum(costoCompra))}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-1">
+          <Btn variant="ghost" onClick={onCerrar}>Cancelar</Btn>
+          <Btn variant="success" onClick={handleGuardar}
+            disabled={guardando || parseNum(costoCompra) <= 0}>
+            {guardando ? 'Guardando...' : '✅ Agregar al inventario'}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ModalReconciliacion ───────────────────────────────────────────────────────
+// Full-screen overlay: checks inventory for each refacción, prompts to add missing ones
+
+interface PartResuelta {
+  refaccionId: string;
+  nombre: string;
+  codigo: string;
+  precioCompra: number;
+  precioVenta: number;
+  cantidad: number;
+}
+
+function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRefaccion, onCrearTrabajo, onCerrar, onNavegar }: {
+  cotizacion: CotizacionGuardada;
+  inventario: Refaccion[];
+  proveedores: Proveedor[];
+  onAgregarRefaccion: (data: AgregarRefaccionInput) => Promise<Refaccion | null>;
+  onCrearTrabajo: (partes: TrabajoRefaccion[], manoDeObra: ManoDeObraItem[]) => Promise<void>;
+  onCerrar: () => void;
+  onNavegar: () => void;
+}) {
+  // Auto-match refacciones by name on mount
+  const [resolvedMap, setResolvedMap] = useState<Record<string, PartResuelta>>(() => {
+    const map: Record<string, PartResuelta> = {};
+    for (const item of cotizacion.form.refacciones) {
+      if (!item.descripcion.trim()) continue;
+      const match = inventario.find(r =>
+        r.nombre.toLowerCase().trim() === item.descripcion.toLowerCase().trim()
+      );
+      if (match) {
+        map[item.id] = {
+          refaccionId: match.id, nombre: match.nombre, codigo: match.codigo,
+          precioCompra: match.precioCompra,
+          precioVenta: parseNum(item.precioUnitario),
+          cantidad: parseNum(item.cantidad),
+        };
+      }
+    }
+    return map;
+  });
+
+  const [addingItem, setAddingItem] = useState<ItemLinea | null>(null);
+  const [creando, setCreando] = useState(false);
+  const [exito, setExito] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const refacciones = cotizacion.form.refacciones.filter(i => i.descripcion.trim() !== '');
+  const manoDeObraItems = cotizacion.form.manoDeObra.filter(i => i.descripcion.trim() !== '');
+  const pendientes = refacciones.filter(i => !resolvedMap[i.id]);
+  const allResolved = refacciones.length === 0 || pendientes.length === 0;
+
+  const handleAgregarInventario = async (data: AgregarRefaccionInput) => {
+    if (!addingItem) return;
+    const nueva = await onAgregarRefaccion(data);
+    if (nueva) {
+      setResolvedMap(prev => ({
+        ...prev,
+        [addingItem.id]: {
+          refaccionId: nueva.id, nombre: nueva.nombre, codigo: nueva.codigo,
+          precioCompra: nueva.precioCompra,
+          precioVenta: parseNum(addingItem.precioUnitario),
+          cantidad: parseNum(addingItem.cantidad),
+        },
+      }));
+    }
+    setAddingItem(null);
+  };
+
+  const handleCrearTrabajo = async () => {
+    setCreando(true);
+    setErrorMsg(null);
+    try {
+      const partes: TrabajoRefaccion[] = refacciones
+        .filter(i => resolvedMap[i.id])
+        .map(i => {
+          const r = resolvedMap[i.id];
+          const cant = Math.max(1, parseNum(i.cantidad));
+          return {
+            refaccionId: r.refaccionId, nombre: r.nombre, codigo: r.codigo,
+            cantidad: cant,
+            precioCompra: r.precioCompra,
+            precioVenta: r.precioVenta,
+            subtotal: cant * r.precioVenta,
+            costoTotal: cant * r.precioCompra,
+          };
+        });
+
+      const manoDeObra: ManoDeObraItem[] = manoDeObraItems.map(i => ({
+        id: `cot-${cotizacion.id}-${i.id}`,
+        concepto: i.descripcion,
+        precio: parseNum(i.precioUnitario) * Math.max(1, parseNum(i.cantidad)),
+      }));
+
+      await onCrearTrabajo(partes, manoDeObra);
+      setExito(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(msg);
+      console.error('[handleCrearTrabajo] error:', msg);
+    } finally {
+      setCreando(false);
+    }
+  };
+
+  // ── Pantalla de éxito ──────────────────────────────────────────────────────
+  if (exito) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center space-y-4">
+          <div className="text-5xl">✅</div>
+          <h2 className="text-xl font-bold text-slate-800">¡Trabajo Creado!</h2>
+          <p className="text-sm text-slate-500">
+            El trabajo fue creado a partir de <strong>{cotizacion.numeroCotizacion}</strong>.
+            Puedes verlo en la pestaña de Trabajos.
+          </p>
+          <Btn variant="success" onClick={() => { onCerrar(); onNavegar(); }}>Ir a Trabajos →</Btn>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Vista principal de reconciliación ─────────────────────────────────────
+  return (
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        onClick={addingItem ? undefined : onCerrar}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5 relative overflow-y-auto max-h-[92vh]"
+          onClick={e => e.stopPropagation()}>
+          <button onClick={onCerrar} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all text-lg font-bold">✕</button>
+
+          <div>
+            <div className="text-2xl mb-1">🔧</div>
+            <h2 className="text-xl font-bold text-slate-800">Convertir a Trabajo</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Verificando refacciones de <strong>{cotizacion.numeroCotizacion}</strong> contra el inventario.
+            </p>
+          </div>
+
+          {/* Refacciones */}
+          {refacciones.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Refacciones</p>
+              {refacciones.map(item => {
+                const resolved = resolvedMap[item.id];
+                return (
+                  <div key={item.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${resolved ? 'bg-emerald-50 border-emerald-200' : 'bg-orange-50 border-orange-200'}`}>
+                    <span className="text-xl flex-shrink-0">{resolved ? '✅' : '⚠️'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-slate-800 text-sm truncate">{item.descripcion}</div>
+                      <div className="text-xs text-slate-500">
+                        Cant: {item.cantidad} · ${fmtPeso(parseNum(item.precioUnitario))}
+                        {resolved && <span className="ml-2 text-emerald-600 font-medium">✓ En inventario</span>}
+                      </div>
+                    </div>
+                    {!resolved && (
+                      <button
+                        onClick={() => setAddingItem(item)}
+                        className="flex-shrink-0 text-xs font-bold px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors whitespace-nowrap">
+                        + Agregar
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Mano de obra — passes through automatically */}
+          {manoDeObraItems.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Mano de Obra</p>
+              {manoDeObraItems.map(item => (
+                <div key={item.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border bg-emerald-50 border-emerald-200">
+                  <span className="text-xl flex-shrink-0">✅</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-800 text-sm truncate">{item.descripcion}</div>
+                    <div className="text-xs text-slate-500">${fmtPeso(parseNum(item.precioUnitario))}</div>
+                  </div>
+                  <span className="text-xs text-emerald-600 font-medium whitespace-nowrap">Mano de obra</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {refacciones.length === 0 && manoDeObraItems.length === 0 && (
+            <div className="text-sm text-slate-500 italic text-center py-4">
+              Sin partidas en esta cotización.
+            </div>
+          )}
+
+          {/* Barra de estado */}
+          <div className={`px-4 py-3 rounded-xl text-sm font-medium border ${allResolved ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-orange-50 border-orange-200 text-orange-700'}`}>
+            {allResolved
+              ? '✅ Todas las piezas están en inventario. ¡Listo para crear el trabajo!'
+              : `⚠️ ${pendientes.length} pieza(s) sin registrar en inventario.`}
+          </div>
+
+          {/* Error banner — shown if insertTrabajo throws */}
+          {errorMsg && (
+            <div className="px-4 py-3 rounded-xl text-sm font-medium border bg-rose-50 border-rose-200 text-rose-700">
+              ❌ Error al crear el trabajo: <span className="font-mono text-xs break-all">{errorMsg}</span>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <Btn variant="ghost" onClick={onCerrar}>Cancelar</Btn>
+            <button
+              onClick={handleCrearTrabajo}
+              disabled={!allResolved || creando}
+              className={`flex-1 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${allResolved && !creando ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+              {creando ? '⏳ Creando trabajo...' : '🔧 Crear Trabajo'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mini popup de inventario — z-[70] para quedar sobre el modal principal */}
+      {addingItem && (
+        <ModalAgregarInventario
+          item={addingItem}
+          proveedores={proveedores}
+          onGuardar={handleAgregarInventario}
+          onCerrar={() => setAddingItem(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function HistorialCotizaciones({
+  history,
+  onVer,
+  onCancelar,
+  onConvertir,
+}: {
   history: CotizacionGuardada[];
   onVer: (entry: CotizacionGuardada) => void;
   onCancelar: (id: string) => void;
+  onConvertir?: (entry: CotizacionGuardada) => void;
 }) {
   const [filtroCliente, setFiltroCliente] = useState('');
   const [confirmando, setConfirmando] = useState<string | null>(null);
@@ -557,6 +991,7 @@ function HistorialCotizaciones({ history, onVer, onCancelar }: {
                 <div className="flex gap-1 flex-wrap">
                   {entry.editada && <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">Editada</span>}
                   {entry.cancelada && <span className="text-xs px-1.5 py-0.5 bg-rose-100 text-rose-700 rounded-full font-medium">Cancelada</span>}
+                  {entry.convertida && <span className="text-xs px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">✅ Convertida</span>}
                 </div>
               </div>
 
@@ -580,11 +1015,17 @@ function HistorialCotizaciones({ history, onVer, onCancelar }: {
               </div>
 
               {/* Actions */}
-              <div className="col-span-3 flex justify-end gap-2">
+              <div className="col-span-3 flex justify-end gap-1.5 flex-wrap">
                 <button onClick={() => onVer(entry)}
-                  className="text-xs font-semibold px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+                  className="text-xs font-semibold px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors whitespace-nowrap">
                   Ver →
                 </button>
+                {!entry.cancelada && !entry.convertida && onConvertir && (
+                  <button onClick={() => onConvertir(entry)}
+                    className="text-xs font-semibold px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors whitespace-nowrap">
+                    🔧 Convertir
+                  </button>
+                )}
                 {!entry.cancelada && (
                   <button onClick={() => handleCancelar(entry.id)}
                     className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors border ${
@@ -609,16 +1050,28 @@ function HistorialCotizaciones({ history, onVer, onCancelar }: {
 export function VistaCotizaciones({
   clientes = [],
   vehiculos = [],
+  inventario = [],
+  proveedores = [],
+  onConvertirATrabajo,
+  onAgregarRefaccion,
+  onNavToTrabajos,
 }: {
   clientes?: Cliente[];
   vehiculos?: Vehiculo[];
+  inventario?: Refaccion[];
+  proveedores?: Proveedor[];
+  onConvertirATrabajo?: (data: ConversionTrabajo) => Promise<void>;
+  onAgregarRefaccion?: (data: AgregarRefaccionInput) => Promise<Refaccion | null>;
+  onNavToTrabajos?: () => void;
 }) {
   const [pantalla, setPantalla]     = useState<Pantalla>('inicio');
   const [plantilla, setPlantilla]   = useState<Plantilla>('general');
   const [history, setHistory]       = useState<CotizacionGuardada[]>([]);
   // When editing an existing entry, track its id so we reuse its number
-  const [editingId, setEditingId]   = useState<string | null>(null);
-  const [viewEntry, setViewEntry]   = useState<CotizacionGuardada | null>(null);
+  const [editingId, setEditingId]       = useState<string | null>(null);
+  const [viewEntry, setViewEntry]       = useState<CotizacionGuardada | null>(null);
+  // Conversion modal: tracks which cotización is being reconciled
+  const [reconciliandoId, setReconciliandoId] = useState<string | null>(null);
 
   useEffect(() => { setHistory(loadHistory()); }, []);
 
@@ -699,8 +1152,32 @@ export function VistaCotizaciones({
     const list = loadHistory().map(e => e.id === id ? { ...e, cancelada: true } : e);
     persistHistory(list);
     setHistory(list);
-    // If currently viewing this entry, update viewEntry too
     if (viewEntry?.id === id) setViewEntry(v => v ? { ...v, cancelada: true } : v);
+  };
+
+  // ── Conversion handlers ──────────────────────────────────────────────────
+  const handleConvertir = (entry: CotizacionGuardada) => {
+    setReconciliandoId(entry.id);
+  };
+
+  const handleCrearTrabajo = async (partes: TrabajoRefaccion[], manoDeObra: ManoDeObraItem[]) => {
+    const cot = history.find(e => e.id === reconciliandoId);
+    if (!cot || !onConvertirATrabajo) return;
+    const descripcionBase = cot.form.trabajo?.trim() || 'Trabajo';
+    await onConvertirATrabajo({
+      cotizacionId:      cot.id,
+      cotizacionNumero:  cot.numeroCotizacion,
+      clienteId:         cot.form.clienteId,
+      vehiculoId:        cot.form.vehiculoId,
+      descripcion:       `${descripcionBase} (Desde ${cot.numeroCotizacion})`,
+      fecha:             cot.form.fecha || hoy(),
+      manoDeObraItems:   manoDeObra,
+      partes,
+    });
+    // Mark cotización as convertida in localStorage
+    const list = loadHistory().map(e => e.id === cot.id ? { ...e, convertida: true } : e);
+    persistHistory(list);
+    setHistory(list);
   };
 
   // ── Open saved entry for viewing ──────────────────────────────────────────
@@ -725,6 +1202,7 @@ export function VistaCotizaciones({
   // Pantalla: INICIO
   // ══════════════════════════════════════════════════════════════════════════
   if (pantalla === 'inicio') {
+    const cotizacionReconciliando = reconciliandoId ? history.find(e => e.id === reconciliandoId) ?? null : null;
     return (
       <div>
         <SectionTitle title="Cotizaciones" subtitle="Crea y guarda cotizaciones para tus clientes"/>
@@ -741,7 +1219,23 @@ export function VistaCotizaciones({
             </button>
           ))}
         </div>
-        <HistorialCotizaciones history={history} onVer={handleVerEntry} onCancelar={handleCancelar}/>
+        <HistorialCotizaciones
+          history={history}
+          onVer={handleVerEntry}
+          onCancelar={handleCancelar}
+          onConvertir={onConvertirATrabajo ? handleConvertir : undefined}
+        />
+        {cotizacionReconciliando && onAgregarRefaccion && (
+          <ModalReconciliacion
+            cotizacion={cotizacionReconciliando}
+            inventario={inventario}
+            proveedores={proveedores}
+            onAgregarRefaccion={onAgregarRefaccion}
+            onCrearTrabajo={handleCrearTrabajo}
+            onCerrar={() => setReconciliandoId(null)}
+            onNavegar={() => { setReconciliandoId(null); onNavToTrabajos?.(); }}
+          />
+        )}
       </div>
     );
   }

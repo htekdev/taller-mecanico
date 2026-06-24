@@ -288,15 +288,14 @@ describe('getTrabajos', () => {
 // ── insertTrabajo ───────────────────────────────────────────────────────────
 
 describe('insertTrabajo', () => {
-  it('returns null and logs error on failure', async () => {
+  it('throws with Supabase error message on failure', async () => {
     mockInsertChain(null, { message: 'DB error' });
-    const result = await insertTrabajo('t1', {
+    await expect(insertTrabajo('t1', {
       clienteId: 'c1', vehiculoId: 'v1', fecha: '2026-06-01', descripcion: 'Test',
       manoDeObra: 200, manoDeObraItems: [], refacciones: 0, costoRefacciones: 0,
       requiereFactura: false, iva: 0, total: 200, partes: [], pagos: [],
       estadoFacturacion: 'sin_facturar', estado: 'pendiente',
-    });
-    expect(result).toBeNull();
+    })).rejects.toThrow('insertTrabajo: DB error');
   });
 });
 

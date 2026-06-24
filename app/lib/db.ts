@@ -190,7 +190,9 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
       vehiculo_id: data.vehiculoId || null,
       fecha: data.fecha,
       descripcion: data.descripcion,
-      kilometraje: data.kilometraje ?? null,
+      // Only include kilometraje if it has a value — omitting it lets the DB
+      // column default to NULL, and avoids "column not found" on older branches
+      ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
       mano_de_obra: data.manoDeObra,
       mano_de_obra_items: data.manoDeObraItems,
       refacciones_total: data.refacciones,
@@ -208,7 +210,11 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
     .select()
     .single();
 
-  if (error || !row) { console.error('insertTrabajo error:', error); return null; }
+  if (error || !row) {
+    const msg = error?.message ?? error?.details ?? 'Unknown Supabase error';
+    console.error('[insertTrabajo] FAILED:', msg, error);
+    throw new Error(`insertTrabajo: ${msg}`);
+  }
   return {
     id: row.id, clienteId: row.cliente_id ?? '', vehiculoId: row.vehiculo_id ?? '',
     fecha: row.fecha, descripcion: row.descripcion,

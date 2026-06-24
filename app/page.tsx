@@ -22,6 +22,7 @@ import { VistaResumen } from '@/app/modules/resumen';
 import { VistaHistorial } from '@/app/modules/historial';
 import { VistaConfiguracion } from '@/app/modules/configuracion';
 import { VistaCotizaciones } from '@/app/modules/cotizaciones';
+import type { ConversionTrabajo } from '@/app/modules/cotizaciones';
 import { useAuth }      from '@/app/context/auth';
 import * as db          from '@/app/lib/db';
 
@@ -91,6 +92,82 @@ export default function TallerMecanico() {
     const nuevo = await db.insertRefaccion(taller.id, data);
     if (nuevo) setInventario(prev => [...prev, nuevo]);
     return nuevo;
+  };
+
+  /** Adds a refaccion + optional PO from cotización reconciliation */
+  const agregarRefaccionDesdeCotizacion = async (input: import('@/app/modules/cotizaciones').AgregarRefaccionInput): Promise<Refaccion | null> => {
+    if (!taller) return null;
+    const nueva = await db.insertRefaccion(taller.id, input.refaccion);
+    if (!nueva) return null;
+    setInventario(prev => [...prev, nueva]);
+    // Create a "received" purchase order if any PO data provided
+    if (input.ordenCompra) {
+      const hoy = new Date().toISOString().split('T')[0];
+      const orden = await db.insertOrden(taller.id, {
+        proveedorId:  input.ordenCompra.proveedorId || '',
+        fecha:        hoy,
+        numeroOrden:  input.ordenCompra.numeroOrden,
+        descripcion:  input.ordenCompra.descripcion || `Alta desde cotización — ${input.refaccion.nombre}`,
+        partes: [{
+          refaccionId:  nueva.id,
+          nombre:       nueva.nombre,
+          cantidad:     input.ordenCompra.cantidad,
+          precioCompra: nueva.precioCompra,
+          subtotal:     nueva.precioCompra * input.ordenCompra.cantidad,
+        }],
+        total: nueva.precioCompra * input.ordenCompra.cantidad,
+      });
+      if (orden) {
+        await db.updateOrdenEstado(orden.id, 'recibida', hoy);
+        setOrdenes(prev => [...prev, { ...orden, estado: 'recibida', fechaRecibida: hoy }]);
+      }
+    }
+    return nueva;
+  };
+
+  /** Converts an approved cotización to a trabajo.
+   *  Throws on failure — the modal catches this and shows an error state.
+   *  Navigation to Trabajos tab is driven by the success screen button (onNavToTrabajos). */
+  const convertirCotizacionATrabajo = async (data: ConversionTrabajo): Promise<void> => {
+    if (!taller) throw new Error('Sin sesión activa');
+    const totalManoDeObra = data.manoDeObraItems.reduce((s, l) => s + l.precio, 0);
+    const totalVentaRef   = data.partes.reduce((s, p) => s + p.subtotal, 0);
+    const totalCostoRef   = data.partes.reduce((s, p) => s + p.costoTotal, 0);
+    const subtotal        = totalManoDeObra + totalVentaRef;
+
+    // insertTrabajo throws on failure (see db.ts) — error bubbles to modal's catch
+    await db.insertTrabajo(taller.id, {
+      clienteId:         data.clienteId,
+      vehiculoId:        data.vehiculoId,
+      fecha:             data.fecha,
+      numeroOrden:       data.cotizacionNumero,
+      descripcion:       data.descripcion,
+      manoDeObra:        totalManoDeObra,
+      manoDeObraItems:   data.manoDeObraItems,
+      refacciones:       totalVentaRef,
+      costoRefacciones:  totalCostoRef,
+      requiereFactura:   false,
+      iva:               0,
+      total:             subtotal,
+      partes:            data.partes,
+      pagos:             [],
+      estado:            'pendiente',
+      estadoFacturacion: 'sin_facturar',
+    });
+
+    // Deduct stock for used parts (best-effort — non-fatal)
+    if (data.partes.length > 0) {
+      const updatedInv = inventario.map(r => {
+        const usada = data.partes.find(p => p.refaccionId === r.id);
+        return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
+      });
+      await db.updateRefacciones(updatedInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
+      setInventario(updatedInv);
+    }
+
+    // Full authoritative reload — guarantees UI matches DB regardless of
+    // whether insertTrabajo's RETURNING clause succeeded or not
+    await cargarDatos();
   };
   const actualizarCompatibilidad = async (refaccionId: string, compatibilidad: CompatibilidadVehiculo[]) => {
     const compat = compatibilidad.length > 0 ? compatibilidad : undefined;
@@ -189,8 +266,7 @@ export default function TallerMecanico() {
   const generarFactura = async (trabajoId: string) => {
     if (!taller) return;
     const trabajo = trabajos.find(t => t.id === trabajoId);
-    // Notas (sin IVA, sin factura fiscal) never generate invoices
-    if (!trabajo || trabajo.facturaId || trabajo.tipoDocumento === 'nota') return;
+    if (!trabajo || trabajo.facturaId) return;
     const conceptos: FacturaConcepto[] = [
       ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
       ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
@@ -420,7 +496,15 @@ export default function TallerMecanico() {
             <VistaHistorial clientes={clientes} vehiculos={vehiculos} trabajos={trabajos} />
           )}
           {vista === 'cotizaciones' && (
-            <VistaCotizaciones clientes={clientes} vehiculos={vehiculos} />
+            <VistaCotizaciones
+              clientes={clientes}
+              vehiculos={vehiculos}
+              inventario={inventario}
+              proveedores={proveedores}
+              onConvertirATrabajo={convertirCotizacionATrabajo}
+              onAgregarRefaccion={agregarRefaccionDesdeCotizacion}
+              onNavToTrabajos={() => setVista('trabajos')}
+            />
           )}
           {vista === 'configuracion' && (
             <VistaConfiguracion />
