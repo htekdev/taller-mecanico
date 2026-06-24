@@ -188,7 +188,8 @@ export default function TallerMecanico() {
   const generarFactura = async (trabajoId: string) => {
     if (!taller) return;
     const trabajo = trabajos.find(t => t.id === trabajoId);
-    if (!trabajo || trabajo.facturaId) return;
+    // Notas (sin IVA, sin factura fiscal) never generate invoices
+    if (!trabajo || trabajo.facturaId || trabajo.tipoDocumento === 'nota') return;
     const conceptos: FacturaConcepto[] = [
       ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
       ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),

@@ -30,7 +30,8 @@ function ReporteCliente({
   const reporteRef = useRef<HTMLDivElement>(null);
 
   const facsPend = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado');
-  const trabsPend = trabajos.filter(t => getEstadoPago(t) !== 'pagado');
+  // Notas no son facturables — excluir del resumen de cuentas por cobrar
+  const trabsPend = trabajos.filter(t => t.tipoDocumento !== 'nota' && getEstadoPago(t) !== 'pagado');
   const totalPendiente = facsPend.reduce((s, f) => s + getSaldoFactura(f), 0)
     + trabsPend.reduce((s, t) => s + getSaldo(t), 0);
 
@@ -219,8 +220,8 @@ export function VistaCuentas({
   const [pagoFormF, setPagoFormF] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
   const [pagoFormT, setPagoFormT] = useState({ monto: 0, fecha: hoy, nota: '' });
 
-  // Legacy: trabajos without a facturaId
-  const legacyTrabajos = trabajos.filter(t => !t.facturaId);
+  // Legacy: trabajos without a facturaId — notas never get invoiced
+  const legacyTrabajos = trabajos.filter(t => !t.facturaId && t.tipoDocumento !== 'nota');
 
   // Clients that actually have records in AR
   const clientesConRegistros = clientes.filter(c =>
