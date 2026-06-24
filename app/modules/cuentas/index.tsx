@@ -29,7 +29,7 @@ async function loadLogoBase64(): Promise<string | null> {
   } catch { return null; }
 }
 
-// ─── PDF Generator — Reporte Cuentas por Cobrar ───────────────────────────────
+// ─── PDF Generator — Estado de Cuenta (professional) ─────────────────────────
 
 async function generarPDFReporte(
   cliente: Cliente,
@@ -40,174 +40,208 @@ async function generarPDFReporte(
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
 
-  const pw = 215.9, ml = 14, mr = 14, cw = pw - ml - mr;
+  const pw = 215.9, ml = 18, mr = 18, cw = pw - ml - mr;
+  const DARK   = [15,  23,  42]  as [number, number, number]; // slate-900
+  const MID    = [71,  85, 105]  as [number, number, number]; // slate-500
+  const LIGHT  = [203,213,225]  as [number, number, number]; // slate-300
+  const XLIGHT = [248,250,252]  as [number, number, number]; // slate-50
+  const WHITE  = [255,255,255]  as [number, number, number];
 
-  // ── Logo ──
+  const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  let y = 16;
+
+  // ═══ HEADER ═══════════════════════════════════════════════════════════════
+  // Logo
   const logoB64 = await loadLogoBase64();
-  let y = 14;
   if (logoB64) {
-    doc.addImage(logoB64, 'JPEG', ml, y, 18, 18);
+    doc.addImage(logoB64, 'JPEG', ml, y, 16, 16);
   }
 
-  // ── Header ──
-  const hx = ml + 22;
-  doc.setFillColor(30, 41, 59); doc.rect(hx, y, cw - 22, 18, 'F');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(255, 255, 255);
-  doc.text('MICRO DIESEL DE MERIDA', hx + 3, y + 6);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(200, 210, 225);
-  doc.text('Héctor Armando Rocha Sepúlveda', hx + 3, y + 11);
-  doc.text('Circuito Colonias No. 752 x 64j y 64k, Col. Castilla Cámara, CP 97278, Mérida, Yucatán', hx + 3, y + 15);
-  doc.text('Tel (999) 317.22.46  ·  Cel. 999 3597970', hx + 3, y + 18.5);
-  doc.setTextColor(0, 0, 0);
-  y += 24;
+  // Company name + details (right of logo)
+  const cx = ml + 20;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...DARK);
+  doc.text('MICRO DIESEL DE MÉRIDA', cx, y + 5);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MID);
+  doc.text('Héctor Armando Rocha Sepúlveda', cx, y + 10);
+  doc.text('Circuito Colonias No. 752, Col. Castilla Cámara, CP 97278  ·  Mérida, Yucatán', cx, y + 14.5);
+  doc.text('Tel. (999) 317.22.46  ·  Cel. 999 359.79.70', cx, y + 18.5);
 
-  // ── Document title ──
-  const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
-  doc.setFillColor(71, 85, 105); doc.rect(ml, y, cw, 8, 'F');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
-  doc.text('ESTADO DE CUENTA — CUENTAS POR COBRAR', ml + 3, y + 5.5);
-  doc.setFontSize(8); doc.setFont('helvetica', 'normal');
-  doc.text(fechaHoy, ml + cw - 3, y + 5.5, { align: 'right' });
-  doc.setTextColor(0, 0, 0);
-  y += 12;
+  // Thin rule under header
+  y += 22;
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.4); doc.line(ml, y, ml + cw, y);
+  y += 6;
 
-  // ── Client info box ──
-  doc.setFillColor(241, 245, 249); doc.rect(ml, y, cw, 12, 'F');
-  doc.setDrawColor(203, 213, 225); doc.rect(ml, y, cw, 12, 'S');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(30, 41, 59);
-  doc.text(cliente.nombre.toUpperCase(), ml + 3, y + 5);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(100, 116, 139);
-  const contactLine: string[] = [];
-  if (cliente.telefono) contactLine.push(`Tel: ${cliente.telefono}`);
-  if ((cliente as Cliente & { email?: string }).email) contactLine.push(`Email: ${(cliente as Cliente & { email?: string }).email}`);
-  if (contactLine.length) doc.text(contactLine.join('  ·  '), ml + 3, y + 10);
-  doc.setTextColor(0, 0, 0);
-  y += 16;
+  // ═══ DOCUMENT TITLE + DATE ════════════════════════════════════════════════
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...DARK);
+  doc.text('ESTADO DE CUENTA', ml, y + 4);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...MID);
+  doc.text(fechaHoy, ml + cw, y + 4, { align: 'right' });
+  y += 10;
 
-  // ── Table drawing helper ──
-  const rh = 6.5;
-  const drawTableHeader = (headers: { label: string; w: number; align?: 'left' | 'right' | 'center' }[]) => {
-    doc.setFillColor(30, 64, 175); doc.rect(ml, y, cw, rh, 'F');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(255, 255, 255);
-    let cx = ml;
-    headers.forEach(h => {
-      const tx = h.align === 'right' ? cx + h.w - 2 : h.align === 'center' ? cx + h.w / 2 : cx + 2;
-      doc.text(h.label, tx, y + 4.3, { align: h.align ?? 'left' });
-      cx += h.w;
+  // ═══ CLIENT BLOCK ═════════════════════════════════════════════════════════
+  doc.setFillColor(...XLIGHT);
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3);
+  doc.roundedRect(ml, y, cw, 14, 1.5, 1.5, 'FD');
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...MID);
+  doc.text('CLIENTE', ml + 4, y + 5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+  doc.text(cliente.nombre.toUpperCase(), ml + 4, y + 10.5);
+
+  const contactParts: string[] = [];
+  if (cliente.telefono) contactParts.push(`Tel. ${cliente.telefono}`);
+  const clienteExt = cliente as Cliente & { email?: string; email2?: string };
+  if (clienteExt.email)  contactParts.push(clienteExt.email);
+  if (contactParts.length) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MID);
+    doc.text(contactParts.join('   ·   '), ml + cw - 4, y + 10.5, { align: 'right' });
+  }
+  y += 20;
+
+  // ═══ TABLE HELPERS ════════════════════════════════════════════════════════
+  const rh = 6;
+
+  const thead = (cols: { label: string; w: number; align?: 'left' | 'right' | 'center' }[]) => {
+    doc.setFillColor(...DARK); doc.rect(ml, y, cw, rh, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...WHITE);
+    let x = ml;
+    cols.forEach(c => {
+      const tx = c.align === 'right' ? x + c.w - 2.5 : c.align === 'center' ? x + c.w / 2 : x + 2.5;
+      doc.text(c.label, tx, y + 4, { align: c.align ?? 'left' });
+      x += c.w;
     });
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(...DARK);
     y += rh;
   };
-  const drawTableRow = (cells: { text: string; w: number; align?: 'left' | 'right' | 'center'; bold?: boolean }[], idx: number) => {
-    const bg: [number, number, number] = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
-    doc.setFillColor(...bg); doc.rect(ml, y, cw, rh, 'F');
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(30, 41, 59);
-    let cx = ml;
+
+  const trow = (cells: { text: string; w: number; align?: 'left' | 'right' | 'center'; bold?: boolean }[], idx: number) => {
+    if (idx % 2 === 1) { doc.setFillColor(...XLIGHT); doc.rect(ml, y, cw, rh, 'F'); }
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...DARK);
+    let x = ml;
     cells.forEach(c => {
       if (c.bold) doc.setFont('helvetica', 'bold');
-      const tx = c.align === 'right' ? cx + c.w - 2 : c.align === 'center' ? cx + c.w / 2 : cx + 2;
-      const txt = (doc.splitTextToSize(c.text, c.w - 4))[0] ?? '';
-      doc.text(txt, tx, y + 4.3, { align: c.align ?? 'left' });
+      const tx = c.align === 'right' ? x + c.w - 2.5 : c.align === 'center' ? x + c.w / 2 : x + 2.5;
+      const txt = (doc.splitTextToSize(c.text, c.w - 5))[0] ?? '';
+      doc.text(txt, tx, y + 4, { align: c.align ?? 'left' });
       if (c.bold) doc.setFont('helvetica', 'normal');
-      cx += c.w;
+      x += c.w;
     });
-    doc.setDrawColor(226, 232, 240); doc.line(ml, y + rh, ml + cw, y + rh);
+    doc.setDrawColor(...LIGHT); doc.setLineWidth(0.2); doc.line(ml, y + rh, ml + cw, y + rh);
     y += rh;
   };
 
-  // ── Facturas pendientes ──
-  const facsPend = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado');
-  if (facsPend.length > 0) {
-    // Section label
-    doc.setFillColor(239, 246, 255); doc.rect(ml, y, cw, 6, 'F');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(29, 78, 216);
-    doc.text('FACTURAS EMITIDAS', ml + 2, y + 4.2);
-    doc.setTextColor(0, 0, 0);
-    y += 7;
+  const sectionLabel = (label: string) => {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...MID);
+    doc.text(label.toUpperCase(), ml, y + 4);
+    doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3);
+    const textW = doc.getTextWidth(label.toUpperCase()) + 3;
+    doc.line(ml + textW, y + 2, ml + cw, y + 2);
+    y += 8;
+  };
 
-    const colsFac = [
-      { label: 'FOLIO',  w: 30, align: 'left'  as const },
-      { label: 'FECHA',  w: 28, align: 'left'  as const },
-      { label: 'TOTAL',  w: 33, align: 'right' as const },
-      { label: 'PAGADO', w: 33, align: 'right' as const },
-      { label: 'SALDO',  w: 33, align: 'right' as const },
-      { label: 'ESTADO', w: cw - 157, align: 'center' as const },
-    ];
-    drawTableHeader(colsFac);
-    facsPend.forEach((f, i) => {
-      const estado = getEstadoPagoFactura(f);
-      const badge = BADGE_ESTADO[estado];
-      drawTableRow([
-        { text: f.numeroFactura,                                                w: 30 },
-        { text: new Date(f.fecha).toLocaleDateString('es-MX'),                  w: 28 },
-        { text: '$' + fmtPeso(f.total),                                         w: 33, align: 'right' },
-        { text: '$' + fmtPeso(getMontoPagadoFactura(f)),                        w: 33, align: 'right' },
-        { text: '$' + fmtPeso(getSaldoFactura(f)),                              w: 33, align: 'right', bold: true },
-        { text: badge.label,                                                    w: cw - 157, align: 'center' },
+  // ═══ FACTURAS ═════════════════════════════════════════════════════════════
+  const facsPend  = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado');
+  const facsAll   = facturas;
+  const showFacs  = facsAll.length > 0;
+
+  if (showFacs) {
+    sectionLabel('Facturas emitidas');
+    const wFolio = 32, wFecha = 28, wTotal = 34, wPagado = 34, wSaldo = 34, wEst = cw - 162;
+    thead([
+      { label: 'FOLIO',     w: wFolio,  align: 'left'   },
+      { label: 'FECHA',     w: wFecha,  align: 'left'   },
+      { label: 'TOTAL',     w: wTotal,  align: 'right'  },
+      { label: 'ABONADO',   w: wPagado, align: 'right'  },
+      { label: 'SALDO',     w: wSaldo,  align: 'right'  },
+      { label: 'ESTATUS',   w: wEst,    align: 'center' },
+    ]);
+    facsAll.forEach((f, i) => {
+      const estado  = getEstadoPagoFactura(f);
+      const pagado  = getMontoPagadoFactura(f);
+      const saldo   = getSaldoFactura(f);
+      const estLabel = estado === 'pagado' ? 'Pagado' : estado === 'parcial' ? 'Parcial' : 'Pendiente';
+      trow([
+        { text: f.numeroFactura,                                     w: wFolio  },
+        { text: new Date(f.fecha).toLocaleDateString('es-MX'),       w: wFecha  },
+        { text: '$' + fmtPeso(f.total),                              w: wTotal,  align: 'right' },
+        { text: '$' + fmtPeso(pagado),                               w: wPagado, align: 'right' },
+        { text: '$' + fmtPeso(saldo),                                w: wSaldo,  align: 'right', bold: saldo > 0 },
+        { text: estLabel,                                             w: wEst,    align: 'center' },
       ], i);
     });
-    y += 3;
+    y += 4;
   }
 
-  // ── Trabajos sin factura pendientes ──
+  // ═══ TRABAJOS SIN FACTURA ═════════════════════════════════════════════════
   const trabsPend = trabajos.filter(t => t.tipoDocumento !== 'nota' && getEstadoPago(t) !== 'pagado');
   if (trabsPend.length > 0) {
-    doc.setFillColor(240, 253, 244); doc.rect(ml, y, cw, 6, 'F');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(21, 128, 61);
-    doc.text('TRABAJOS SIN FACTURA', ml + 2, y + 4.2);
-    doc.setTextColor(0, 0, 0);
-    y += 7;
-
-    const wDesc = 55, wVeh = 45, wFech = 25, wMon = 25, wSal = 25, wEst = cw - 175;
-    drawTableHeader([
-      { label: 'DESCRIPCIÓN', w: wDesc, align: 'left'  },
-      { label: 'UNIDAD',      w: wVeh,  align: 'left'  },
-      { label: 'FECHA',       w: wFech, align: 'left'  },
-      { label: 'TOTAL',       w: wMon,  align: 'right' },
-      { label: 'PAGADO',      w: wMon,  align: 'right' },
-      { label: 'SALDO',       w: wSal,  align: 'right' },
-      { label: 'ESTADO',      w: wEst,  align: 'center'},
+    sectionLabel('Servicios sin factura');
+    const wDesc = 60, wVeh = 42, wFecha = 24, wTotal = 24, wPag = 24, wSal = cw - 174;
+    thead([
+      { label: 'DESCRIPCIÓN', w: wDesc,  align: 'left'  },
+      { label: 'UNIDAD',      w: wVeh,   align: 'left'  },
+      { label: 'FECHA',       w: wFecha, align: 'left'  },
+      { label: 'TOTAL',       w: wTotal, align: 'right' },
+      { label: 'ABONADO',     w: wPag,   align: 'right' },
+      { label: 'SALDO',       w: wSal,   align: 'right' },
     ]);
     trabsPend.forEach((t, i) => {
       const veh = vehiculos.find(v => v.id === t.vehiculoId);
-      const vehLabel = veh ? `${veh.anio} ${veh.marca} ${veh.modelo}`.trim() : '—';
-      const badge = BADGE_ESTADO[getEstadoPago(t)];
-      drawTableRow([
-        { text: t.descripcion,                                  w: wDesc },
-        { text: vehLabel,                                       w: wVeh  },
-        { text: new Date(t.fecha).toLocaleDateString('es-MX'), w: wFech },
-        { text: '$' + fmtPeso(t.total),                        w: wMon,  align: 'right' },
-        { text: '$' + fmtPeso(getMontoPagado(t)),              w: wMon,  align: 'right' },
-        { text: '$' + fmtPeso(getSaldo(t)),                    w: wSal,  align: 'right', bold: true },
-        { text: badge.label,                                    w: wEst,  align: 'center' },
+      const vLabel = veh ? `${veh.anio} ${veh.marca} ${veh.modelo}`.trim() : '—';
+      trow([
+        { text: t.descripcion,                                       w: wDesc  },
+        { text: vLabel,                                              w: wVeh   },
+        { text: new Date(t.fecha).toLocaleDateString('es-MX'),       w: wFecha },
+        { text: '$' + fmtPeso(t.total),                              w: wTotal, align: 'right' },
+        { text: '$' + fmtPeso(getMontoPagado(t)),                    w: wPag,   align: 'right' },
+        { text: '$' + fmtPeso(getSaldo(t)),                          w: wSal,   align: 'right', bold: true },
       ], i);
     });
-    y += 3;
+    y += 4;
   }
 
-  // ── Total box ──
+  // ═══ SALDO TOTAL ══════════════════════════════════════════════════════════
   const totalPend = facsPend.reduce((s, f) => s + getSaldoFactura(f), 0)
     + trabsPend.reduce((s, t) => s + getSaldo(t), 0);
-  if (totalPend > 0) {
-    const bw = 80, bx = ml + cw - bw;
-    y += 2;
-    doc.setFillColor(254, 242, 242); doc.rect(bx, y, bw, 14, 'F');
-    doc.setDrawColor(254, 202, 202); doc.rect(bx, y, bw, 14, 'S');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(185, 28, 28);
-    doc.text('TOTAL POR COBRAR', bx + 3, y + 5.5);
-    doc.setFontSize(13); doc.setTextColor(153, 27, 27);
-    doc.text('$' + fmtPeso(totalPend), bx + bw - 3, y + 11.5, { align: 'right' });
-    doc.setTextColor(0, 0, 0);
-    y += 18;
-  }
+  const totalGen  = facsAll.reduce((s, f) => s + f.total, 0)
+    + trabsPend.reduce((s, t) => s + t.total, 0);
 
-  // ── Footer ──
+  y += 2;
+  // Summary lines — right-aligned, clean
+  const sumX = ml + cw - 85, sumW = 85;
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3); doc.line(sumX, y, ml + cw, y);
   y += 4;
-  doc.setDrawColor(203, 213, 225); doc.line(ml, y, ml + cw, y); y += 4;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(148, 163, 184);
-  doc.text(`Generado: ${fechaHoy}  ·  MICRO DIESEL DE MÉRIDA`, ml, y);
 
-  const filename = `CxC_${cliente.nombre.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}`;
+  const sumRow = (label: string, value: string, bold = false) => {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(bold ? 9 : 8);
+    doc.setTextColor(...(bold ? DARK : MID));
+    doc.text(label, sumX + 2, y);
+    doc.text(value, ml + cw, y, { align: 'right' });
+    y += 5.5;
+  };
+
+  sumRow('Total facturado:', '$' + fmtPeso(totalGen));
+  sumRow('Total abonado:',   '$' + fmtPeso(totalGen - totalPend));
+
+  // Double rule before grand total
+  doc.setDrawColor(...DARK); doc.setLineWidth(0.4);
+  doc.line(sumX, y, ml + cw, y); y += 0.8;
+  doc.line(sumX, y, ml + cw, y); y += 5;
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+  doc.text('SALDO PENDIENTE', sumX + 2, y);
+  doc.text('$' + fmtPeso(totalPend), ml + cw, y, { align: 'right' });
+  y += 10;
+
+  // ═══ FOOTER ═══════════════════════════════════════════════════════════════
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3); doc.line(ml, y, ml + cw, y); y += 5;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...MID);
+  doc.text(`Documento generado el ${fechaHoy}  ·  Este documento no tiene validez fiscal.`, ml, y);
+  doc.text('MICRO DIESEL DE MÉRIDA', ml + cw, y, { align: 'right' });
+
+  const filename = `EstadoCuenta_${cliente.nombre.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}`;
   doc.save(`${filename}.pdf`);
 }
 
