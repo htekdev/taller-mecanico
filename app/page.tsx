@@ -325,8 +325,31 @@ export default function TallerMecanico() {
     const totalManoObra      = mes.reduce((s, t) => s + t.manoDeObra, 0);
     const margenRef          = totalVentaRef - totalCostoRef;
     const ganancia           = totalManoObra + margenRef;
+
+    // ── Servicios externos — costo real al taller (mano de obra externa) ──
+    const costoServiciosExternos = mes.reduce((s, t) =>
+      s + (t.manoDeObraItems ?? [])
+        .filter(m => m.tipo === 'externo')
+        .reduce((s2, m) => s2 + (m.costoTaller ?? 0), 0), 0);
+
+    // ── P&L: Estado de Resultados ──
+    // Ingresos = lo facturado al cliente (sin IVA for P&L purposes)
+    const totalIVA      = mes.filter(t => t.requiereFactura).reduce((s, t) => s + (t.iva ?? 0), 0);
+    const ingresoNeto   = facturadoMes - totalIVA;  // revenue ex-IVA
+    const totalCostos   = totalCostoRef + costoServiciosExternos;
+    const utilidadBruta = ingresoNeto - totalCostos;
+    const pctUtilidadBruta = ingresoNeto > 0 ? Math.round((utilidadBruta / ingresoNeto) * 100) : 0;
+    // Gastos operativos: placeholder until Gastos module is built
+    const gastosOperativos = 0;
+    const utilidadNeta   = utilidadBruta - gastosOperativos;
+    const pctUtilidadNeta = ingresoNeto > 0 ? Math.round((utilidadNeta / ingresoNeto) * 100) : 0;
+
     const cobradoEnMes = facturas.reduce((s, f) =>
-      s + (f.pagos ?? []).filter(p => p.fecha.startsWith(mesActual)).reduce((s2, p) => s2 + p.monto, 0), 0);
+      s + (f.pagos ?? []).filter(p => p.fecha.startsWith(mesActual)).reduce((s2, p) => s2 + p.monto, 0), 0)
+      // also count direct payments on legacy trabajos
+      + trabajos.filter(t => !t.facturaId).reduce((s, t) =>
+          s + (t.pagos ?? []).filter(p => p.fecha.startsWith(mesActual)).reduce((s2, p) => s2 + p.monto, 0), 0);
+
     const pctCobrado = facturadoMes > 0 ? Math.min(cobradoEnMes / facturadoMes, 1) : 0;
     const gananciaCobrada = Math.round(ganancia * pctCobrado * 100) / 100;
     const porCobrarDelMes = facturas.filter(f => {
@@ -340,19 +363,34 @@ export default function TallerMecanico() {
     const ordenesMes    = ordenes.filter(o => o.fecha.startsWith(mesActual) && o.estado !== 'cancelada');
     const totalOrdenes  = ordenesMes.reduce((s, o) => s + o.total, 0);
     const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0);
+    const pagadoAProveedoresMes = ordenesMes.reduce((s, o) => s + (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0), 0);
+    const porPagarTotal = ordenes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0);
     const mesConIVA    = mes.filter(t => t.requiereFactura);
     const mesSinIVA    = mes.filter(t => !t.requiereFactura);
-    const totalIVA     = mesConIVA.reduce((s, t) => s + (t.iva ?? 0), 0);
     const ingresoConIVA = mesConIVA.reduce((s, t) => s + t.total, 0);
     const ingresoSinIVA = mesSinIVA.reduce((s, t) => s + t.total, 0);
+
+    // ── Top Clientes del mes ──
+    const revenueMap = new Map<string, number>();
+    mes.forEach(t => revenueMap.set(t.clienteId, (revenueMap.get(t.clienteId) ?? 0) + t.total));
+    const topClientes = [...revenueMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([clienteId, total]) => ({
+        nombre: clientes.find(c => c.id === clienteId)?.nombre ?? '—',
+        total,
+      }));
+
     return {
-      facturadoMes, totalVentaRef, totalCostoRef, margenRef, totalManoObra, ganancia,
-      cantidad: mes.length, cobradoEnMes, porCobrarDelMes, totalOrdenes, porPagarOrdenes,
-      gananciaCobrada, pendientePorCobrar,
+      facturadoMes, ingresoNeto, totalVentaRef, totalCostoRef, margenRef, totalManoObra,
+      costoServiciosExternos, totalCostos,
+      utilidadBruta, pctUtilidadBruta,
+      gastosOperativos, utilidadNeta, pctUtilidadNeta,
+      ganancia, cantidad: mes.length, cobradoEnMes, porCobrarDelMes,
+      totalOrdenes, porPagarOrdenes, gananciaCobrada, pendientePorCobrar,
       totalIVA, ingresoConIVA, ingresoSinIVA,
-      pagadoAProveedoresMes: ordenesMes.reduce((s, o) => s + (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0), 0),
-      porPagarTotal: ordenes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0),
-    }
+      pagadoAProveedoresMes, porPagarTotal, topClientes,
+    };
   };
 
   const stockBajo              = inventario.filter(r => r.stock <= r.stockMinimo).length;
