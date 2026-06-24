@@ -460,7 +460,7 @@ function TablaItems({
 
         {items.length === 0 && (
           <div className="px-4 py-4 text-center text-slate-400 text-sm italic">
-            Sin partidas — haz clic en "+ Agregar"
+            Sin partidas — haz clic en &quot;+ Agregar&quot;
           </div>
         )}
 
