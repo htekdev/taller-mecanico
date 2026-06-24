@@ -1,4 +1,4 @@
-import type { Trabajo, OrdenCompra, Factura, Vehiculo } from '../types';
+import type { Trabajo, OrdenCompra, Factura, Vehiculo, ManoDeObraItem } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,3 +84,21 @@ export const BADGE_ORDEN: Record<string, { label: string; cls: string }> = {
 };
 
 export type FiltroCuenta = 'todos' | 'pendiente' | 'parcial' | 'pagado';
+
+// ─── Servicios Externos — helpers ─────────────────────────────────────────────
+
+export function getMontoPagadoServicio(item: ManoDeObraItem): number {
+  return (item.pagosServicio ?? []).reduce((s, p) => s + p.monto, 0);
+}
+
+export function getSaldoServicio(item: ManoDeObraItem): number {
+  return Math.max(0, (item.costoTaller ?? 0) - getMontoPagadoServicio(item));
+}
+
+export function getEstadoServicio(item: ManoDeObraItem): 'pendiente' | 'parcial' | 'pagado' {
+  const costo  = item.costoTaller ?? 0;
+  const pagado = getMontoPagadoServicio(item);
+  if (costo <= 0 || pagado >= costo) return 'pagado';
+  if (pagado > 0)                    return 'parcial';
+  return 'pendiente';
+}

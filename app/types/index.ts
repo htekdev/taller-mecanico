@@ -45,10 +45,25 @@ export interface TrabajoRefaccion {
   costoTotal: number;     // cantidad × precioCompra — lo que pagaste
 }
 
+// Pago individual al proveedor de un servicio externo
+export interface PagoServicioExterno {
+  id: string;
+  fecha: string;
+  monto: number;
+  metodoPago?: string;
+  nota?: string;
+}
+
 export interface ManoDeObraItem {
   id: string;
   concepto: string;
-  precio: number;
+  precio: number;       // precio cobrado al cliente
+  // ── Servicios externos (Opción 4) ─────────────────────────
+  tipo?: 'interno' | 'externo';
+  proveedorId?: string;       // FK a Proveedor
+  proveedorNombre?: string;   // snapshot del nombre
+  costoTaller?: number;       // lo que le cobran al taller
+  pagosServicio?: PagoServicioExterno[]; // pagos al proveedor externo
 }
 
 export interface Pago {

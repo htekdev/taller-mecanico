@@ -232,6 +232,15 @@ export async function updateTrabajoPagos(trabajoId: string, pagos: Pago[]): Prom
   await supabase.from('trabajos').update({ pagos }).eq('id', trabajoId);
 }
 
+/** Update mano_de_obra_items JSONB — used when registering payments to external service providers */
+export async function updateTrabajoManoDeObraItems(trabajoId: string, items: ManoDeObraItem[]): Promise<void> {
+  const manoDeObra = items.reduce((s, i) => s + i.precio, 0);
+  await supabase.from('trabajos').update({
+    mano_de_obra_items: items,
+    mano_de_obra: manoDeObra,
+  }).eq('id', trabajoId);
+}
+
 export async function updateTrabajoFactura(trabajoId: string, facturaId: string): Promise<void> {
   await supabase.from('trabajos').update({ factura_id: facturaId, estado_facturacion: 'facturado' }).eq('id', trabajoId);
 }
