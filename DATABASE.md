@@ -19,7 +19,8 @@ supabase/migrations/
   001_fix_invite_rls.sql
   002_member_email_role_update.sql
   003_email_clientes_iva_ordenes.sql
-  004_...
+  004_gastos_table.sql
+  005_...
 ```
 
 ⚠️ **Never use date-based prefixes** (e.g. `20260624_...`) — they can conflict if two migrations share the same date.
