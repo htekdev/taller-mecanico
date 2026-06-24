@@ -125,7 +125,9 @@ export default function TallerMecanico() {
     return nueva;
   };
 
-  /** Converts an approved cotización to a trabajo */
+  /** Converts an approved cotización to a trabajo.
+   *  Navigation to Trabajos tab is driven by the success screen button (onNavToTrabajos),
+   *  not here — to avoid racing with the success modal. */
   const convertirCotizacionATrabajo = async (data: ConversionTrabajo): Promise<void> => {
     if (!taller) return;
     const totalManoDeObra = data.manoDeObraItems.reduce((s, l) => s + l.precio, 0);
@@ -151,17 +153,26 @@ export default function TallerMecanico() {
       estadoFacturacion: 'sin_facturar',
     });
     if (nuevo) {
+      // Fast path: append directly without a full reload
       setTrabajos(prev => [...prev, nuevo]);
-      if (data.partes.length > 0) {
-        const updatedInv = inventario.map(r => {
-          const usada = data.partes.find(p => p.refaccionId === r.id);
-          return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
-        });
-        await db.updateRefacciones(updatedInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
-        setInventario(updatedInv);
-      }
-      setVista('trabajos');
+    } else {
+      // Fallback: DB insert may have succeeded but SELECT failed (RLS timing) — reload
+      const fresh = await db.getTrabajos(taller.id);
+      setTrabajos(fresh);
     }
+    // Deduct stock for used parts
+    if (data.partes.length > 0) {
+      const updatedInv = inventario.map(r => {
+        const usada = data.partes.find(p => p.refaccionId === r.id);
+        return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
+      });
+      await db.updateRefacciones(updatedInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
+      setInventario(updatedInv);
+    }
+    // NOTE: setVista('trabajos') is NOT called here.
+    // Navigation is triggered by the success modal's "Ir a Trabajos →" button
+    // via the onNavToTrabajos prop — this prevents the modal from being
+    // unmounted before the success screen can display.
   };
   const actualizarCompatibilidad = async (refaccionId: string, compatibilidad: CompatibilidadVehiculo[]) => {
     const compat = compatibilidad.length > 0 ? compatibilidad : undefined;
@@ -497,6 +508,7 @@ export default function TallerMecanico() {
               proveedores={proveedores}
               onConvertirATrabajo={convertirCotizacionATrabajo}
               onAgregarRefaccion={agregarRefaccionDesdeCotizacion}
+              onNavToTrabajos={() => setVista('trabajos')}
             />
           )}
           {vista === 'configuracion' && (

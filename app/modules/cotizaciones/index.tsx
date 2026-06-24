@@ -707,13 +707,14 @@ interface PartResuelta {
   cantidad: number;
 }
 
-function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRefaccion, onCrearTrabajo, onCerrar }: {
+function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRefaccion, onCrearTrabajo, onCerrar, onNavegar }: {
   cotizacion: CotizacionGuardada;
   inventario: Refaccion[];
   proveedores: Proveedor[];
   onAgregarRefaccion: (data: AgregarRefaccionInput) => Promise<Refaccion | null>;
   onCrearTrabajo: (partes: TrabajoRefaccion[], manoDeObra: ManoDeObraItem[]) => Promise<void>;
   onCerrar: () => void;
+  onNavegar: () => void;
 }) {
   // Auto-match refacciones by name on mount
   const [resolvedMap, setResolvedMap] = useState<Record<string, PartResuelta>>(() => {
@@ -803,7 +804,7 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
             El trabajo fue creado a partir de <strong>{cotizacion.numeroCotizacion}</strong>.
             Puedes verlo en la pestaña de Trabajos.
           </p>
-          <Btn variant="success" onClick={onCerrar}>Ir a Trabajos →</Btn>
+          <Btn variant="success" onClick={() => { onCerrar(); onNavegar(); }}>Ir a Trabajos →</Btn>
         </div>
       </div>
     );
@@ -1040,6 +1041,7 @@ export function VistaCotizaciones({
   proveedores = [],
   onConvertirATrabajo,
   onAgregarRefaccion,
+  onNavToTrabajos,
 }: {
   clientes?: Cliente[];
   vehiculos?: Vehiculo[];
@@ -1047,6 +1049,7 @@ export function VistaCotizaciones({
   proveedores?: Proveedor[];
   onConvertirATrabajo?: (data: ConversionTrabajo) => Promise<void>;
   onAgregarRefaccion?: (data: AgregarRefaccionInput) => Promise<Refaccion | null>;
+  onNavToTrabajos?: () => void;
 }) {
   const [pantalla, setPantalla]     = useState<Pantalla>('inicio');
   const [plantilla, setPlantilla]   = useState<Plantilla>('general');
@@ -1217,6 +1220,7 @@ export function VistaCotizaciones({
             onAgregarRefaccion={onAgregarRefaccion}
             onCrearTrabajo={handleCrearTrabajo}
             onCerrar={() => setReconciliandoId(null)}
+            onNavegar={() => { setReconciliandoId(null); onNavToTrabajos?.(); }}
           />
         )}
       </div>
