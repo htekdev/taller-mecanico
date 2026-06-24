@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import type { Cliente, Vehiculo, Refaccion, TrabajoRefaccion, ManoDeObraItem } from '@/app/types';
+import type { Cliente, Vehiculo, Refaccion, Proveedor, TrabajoRefaccion, ManoDeObraItem } from '@/app/types';
 import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
+import { CATEGORIAS, UNIDADES } from '@/app/lib/utils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,17 @@ export interface ConversionTrabajo {
   fecha: string;
   manoDeObraItems: ManoDeObraItem[];
   partes: TrabajoRefaccion[];
+}
+
+// Input to onAgregarRefaccion — refaccion data + optional purchase order info
+export interface AgregarRefaccionInput {
+  refaccion: Omit<Refaccion, 'id'>;
+  ordenCompra?: {
+    proveedorId?: string;
+    numeroOrden?: string;
+    descripcion?: string;
+    cantidad: number;
+  };
 }
 
 type Pantalla = 'inicio' | 'formulario' | 'preview';
@@ -511,70 +523,171 @@ function FilaTotal({ label, value, bold = false, highlight }: { label: string; v
 
 
 // ── ModalAgregarInventario ────────────────────────────────────────────────────
-// Mini popup to register a missing part in inventory before conversion
+// Full inventory registration popup + automatic purchase order creation
 
-function ModalAgregarInventario({ item, onGuardar, onCerrar }: {
+function ModalAgregarInventario({ item, proveedores, onGuardar, onCerrar }: {
   item: ItemLinea;
-  onGuardar: (costoCompra: number, stock: number) => Promise<void>;
+  proveedores: Proveedor[];
+  onGuardar: (data: AgregarRefaccionInput) => Promise<void>;
   onCerrar: () => void;
 }) {
   const [costoCompra, setCostoCompra] = useState('');
-  const [stock, setStock] = useState('1');
-  const [guardando, setGuardando] = useState(false);
+  const [stock, setStock]             = useState(item.cantidad || '1');
+  const [categoria, setCategoria]     = useState(CATEGORIAS[0]);
+  const [unidad, setUnidad]           = useState(UNIDADES[0]);
+  const [proveedorId, setProveedorId] = useState('');
+  const [numeroOrden, setNumeroOrden] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [guardando, setGuardando]     = useState(false);
   const precioVenta = parseNum(item.precioUnitario);
+  const cantNum     = Math.max(1, parseNum(stock) || 1);
 
   const handleGuardar = async () => {
     const costo = parseNum(costoCompra);
     if (costo <= 0) return;
     setGuardando(true);
-    try { await onGuardar(costo, Math.max(1, parseInt(stock) || 1)); }
-    finally { setGuardando(false); }
+    try {
+      await onGuardar({
+        refaccion: {
+          nombre:      item.descripcion,
+          codigo:      '',
+          categoria,
+          unidad,
+          precioCompra: costo,
+          stock:        cantNum,
+          stockMinimo:  1,
+          proveedorId:  proveedorId || undefined,
+        },
+        ordenCompra: {
+          proveedorId:  proveedorId || undefined,
+          numeroOrden:  numeroOrden.trim() || undefined,
+          descripcion:  descripcion.trim() || undefined,
+          cantidad:     cantNum,
+        },
+      });
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onCerrar}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 relative"
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 relative overflow-y-auto max-h-[92vh]"
         onClick={e => e.stopPropagation()}>
         <button onClick={onCerrar} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all text-lg font-bold">✕</button>
 
         <div>
           <div className="text-2xl mb-1">📦</div>
-          <h3 className="font-bold text-slate-800 text-lg">Agregar al Inventario</h3>
-          <p className="text-sm text-slate-500 mt-1">Registra esta pieza antes de convertir la cotización.</p>
+          <h3 className="font-bold text-slate-800 text-lg">Dar de Alta en Inventario</h3>
+          <p className="text-sm text-slate-500 mt-1">
+            Registra la pieza y se creará una orden de compra recibida automáticamente.
+          </p>
         </div>
 
+        {/* Piece info — readonly summary */}
         <div className="bg-slate-50 rounded-xl p-3 text-sm border border-slate-200">
           <div className="font-semibold text-slate-700">{item.descripcion}</div>
-          <div className="text-slate-500 text-xs mt-0.5">Cant: {item.cantidad} · Precio venta: ${fmtPeso(precioVenta)}</div>
+          <div className="text-slate-500 text-xs mt-0.5">
+            Precio de venta: <span className="font-medium text-slate-700">${fmtPeso(precioVenta)}</span>
+          </div>
         </div>
 
+        {/* Required fields */}
         <div className="space-y-3">
-          <div>
-            <Label>Costo de compra <span className="text-rose-500">*</span></Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
-              <Input type="number" min="0" step="0.01"
-                className="pl-6"
-                value={costoCompra}
-                onChange={e => setCostoCompra(e.target.value)}
-                placeholder="¿Cuánto pagaste al proveedor?" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Costo de compra <span className="text-rose-500">*</span></Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                <Input type="number" min="0" step="0.01"
+                  className="pl-6"
+                  value={costoCompra}
+                  onChange={e => setCostoCompra(e.target.value)}
+                  placeholder="0.00" />
+              </div>
+            </div>
+            <div>
+              <Label>Cantidad recibida</Label>
+              <Input type="number" min="1"
+                value={stock}
+                onChange={e => setStock(e.target.value)}
+                placeholder="1" />
             </div>
           </div>
-          <div>
-            <Label>Cantidad en stock</Label>
-            <Input type="number" min="1"
-              value={stock}
-              onChange={e => setStock(e.target.value)}
-              placeholder="1" />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Categoría</Label>
+              <select value={categoria} onChange={e => setCategoria(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Unidad</Label>
+              <select value={unidad} onChange={e => setUnidad(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
           </div>
         </div>
+
+        {/* Divider */}
+        <div className="border-t border-slate-200 pt-1">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Orden de Compra (opcional)</p>
+          <div className="space-y-3">
+            <div>
+              <Label>Proveedor</Label>
+              <select value={proveedorId} onChange={e => setProveedorId(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">— Sin proveedor —</option>
+                {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <Label>Número de orden</Label>
+              <Input
+                value={numeroOrden}
+                onChange={e => setNumeroOrden(e.target.value)}
+                placeholder="Ej. OC-2026-001 (opcional)" />
+            </div>
+
+            <div>
+              <Label>Descripción</Label>
+              <Input
+                value={descripcion}
+                onChange={e => setDescripcion(e.target.value)}
+                placeholder="Notas adicionales (opcional)" />
+            </div>
+          </div>
+        </div>
+
+        {/* Totals preview */}
+        {parseNum(costoCompra) > 0 && (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 text-sm">
+            <div className="flex justify-between text-slate-600">
+              <span>Costo total:</span>
+              <span className="font-bold text-slate-800">${fmtPeso(parseNum(costoCompra) * cantNum)}</span>
+            </div>
+            {parseNum(costoCompra) > 0 && precioVenta > 0 && (
+              <div className="flex justify-between text-slate-500 text-xs mt-1">
+                <span>Utilidad estimada por pieza:</span>
+                <span className="text-emerald-600 font-medium">
+                  ${fmtPeso(precioVenta - parseNum(costoCompra))}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-3 pt-1">
           <Btn variant="ghost" onClick={onCerrar}>Cancelar</Btn>
           <Btn variant="success" onClick={handleGuardar}
             disabled={guardando || parseNum(costoCompra) <= 0}>
-            {guardando ? 'Guardando...' : '✅ Guardar pieza'}
+            {guardando ? 'Guardando...' : '✅ Agregar al inventario'}
           </Btn>
         </div>
       </div>
@@ -594,10 +707,11 @@ interface PartResuelta {
   cantidad: number;
 }
 
-function ModalReconciliacion({ cotizacion, inventario, onAgregarRefaccion, onCrearTrabajo, onCerrar }: {
+function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRefaccion, onCrearTrabajo, onCerrar }: {
   cotizacion: CotizacionGuardada;
   inventario: Refaccion[];
-  onAgregarRefaccion: (data: Omit<Refaccion, 'id'>) => Promise<Refaccion | null>;
+  proveedores: Proveedor[];
+  onAgregarRefaccion: (data: AgregarRefaccionInput) => Promise<Refaccion | null>;
   onCrearTrabajo: (partes: TrabajoRefaccion[], manoDeObra: ManoDeObraItem[]) => Promise<void>;
   onCerrar: () => void;
 }) {
@@ -630,17 +744,9 @@ function ModalReconciliacion({ cotizacion, inventario, onAgregarRefaccion, onCre
   const pendientes = refacciones.filter(i => !resolvedMap[i.id]);
   const allResolved = refacciones.length === 0 || pendientes.length === 0;
 
-  const handleAgregarInventario = async (costoCompra: number, stock: number) => {
+  const handleAgregarInventario = async (data: AgregarRefaccionInput) => {
     if (!addingItem) return;
-    const nueva = await onAgregarRefaccion({
-      nombre: addingItem.descripcion,
-      codigo: '',
-      categoria: 'General',
-      unidad: 'pza',
-      precioCompra: costoCompra,
-      stock,
-      stockMinimo: 1,
-    });
+    const nueva = await onAgregarRefaccion(data);
     if (nueva) {
       setResolvedMap(prev => ({
         ...prev,
@@ -795,6 +901,7 @@ function ModalReconciliacion({ cotizacion, inventario, onAgregarRefaccion, onCre
       {addingItem && (
         <ModalAgregarInventario
           item={addingItem}
+          proveedores={proveedores}
           onGuardar={handleAgregarInventario}
           onCerrar={() => setAddingItem(null)}
         />
@@ -930,14 +1037,16 @@ export function VistaCotizaciones({
   clientes = [],
   vehiculos = [],
   inventario = [],
+  proveedores = [],
   onConvertirATrabajo,
   onAgregarRefaccion,
 }: {
   clientes?: Cliente[];
   vehiculos?: Vehiculo[];
   inventario?: Refaccion[];
+  proveedores?: Proveedor[];
   onConvertirATrabajo?: (data: ConversionTrabajo) => Promise<void>;
-  onAgregarRefaccion?: (data: Omit<Refaccion, 'id'>) => Promise<Refaccion | null>;
+  onAgregarRefaccion?: (data: AgregarRefaccionInput) => Promise<Refaccion | null>;
 }) {
   const [pantalla, setPantalla]     = useState<Pantalla>('inicio');
   const [plantilla, setPlantilla]   = useState<Plantilla>('general');
@@ -1104,6 +1213,7 @@ export function VistaCotizaciones({
           <ModalReconciliacion
             cotizacion={cotizacionReconciliando}
             inventario={inventario}
+            proveedores={proveedores}
             onAgregarRefaccion={onAgregarRefaccion}
             onCrearTrabajo={handleCrearTrabajo}
             onCerrar={() => setReconciliandoId(null)}

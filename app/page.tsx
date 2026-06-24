@@ -94,12 +94,35 @@ export default function TallerMecanico() {
     return nuevo;
   };
 
-  /** Adds a refaccion from cotización reconciliation */
-  const agregarRefaccionDesdeCotizacion = async (data: Omit<Refaccion, 'id'>): Promise<Refaccion | null> => {
+  /** Adds a refaccion + optional PO from cotización reconciliation */
+  const agregarRefaccionDesdeCotizacion = async (input: import('@/app/modules/cotizaciones').AgregarRefaccionInput): Promise<Refaccion | null> => {
     if (!taller) return null;
-    const nuevo = await db.insertRefaccion(taller.id, data);
-    if (nuevo) setInventario(prev => [...prev, nuevo]);
-    return nuevo;
+    const nueva = await db.insertRefaccion(taller.id, input.refaccion);
+    if (!nueva) return null;
+    setInventario(prev => [...prev, nueva]);
+    // Create a "received" purchase order if any PO data provided
+    if (input.ordenCompra) {
+      const hoy = new Date().toISOString().split('T')[0];
+      const orden = await db.insertOrden(taller.id, {
+        proveedorId:  input.ordenCompra.proveedorId || '',
+        fecha:        hoy,
+        numeroOrden:  input.ordenCompra.numeroOrden,
+        descripcion:  input.ordenCompra.descripcion || `Alta desde cotización — ${input.refaccion.nombre}`,
+        partes: [{
+          refaccionId:  nueva.id,
+          nombre:       nueva.nombre,
+          cantidad:     input.ordenCompra.cantidad,
+          precioCompra: nueva.precioCompra,
+          subtotal:     nueva.precioCompra * input.ordenCompra.cantidad,
+        }],
+        total: nueva.precioCompra * input.ordenCompra.cantidad,
+      });
+      if (orden) {
+        await db.updateOrdenEstado(orden.id, 'recibida', hoy);
+        setOrdenes(prev => [...prev, { ...orden, estado: 'recibida', fechaRecibida: hoy }]);
+      }
+    }
+    return nueva;
   };
 
   /** Converts an approved cotización to a trabajo */
@@ -471,6 +494,7 @@ export default function TallerMecanico() {
               clientes={clientes}
               vehiculos={vehiculos}
               inventario={inventario}
+              proveedores={proveedores}
               onConvertirATrabajo={convertirCotizacionATrabajo}
               onAgregarRefaccion={agregarRefaccionDesdeCotizacion}
             />
