@@ -419,7 +419,7 @@ export default function TallerMecanico() {
             <VistaHistorial clientes={clientes} vehiculos={vehiculos} trabajos={trabajos} />
           )}
           {vista === 'cotizaciones' && (
-            <VistaCotizaciones />
+            <VistaCotizaciones clientes={clientes} vehiculos={vehiculos} />
           )}
           {vista === 'configuracion' && (
             <VistaConfiguracion />

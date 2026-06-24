@@ -1,7 +1,28 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import type { Cliente, Vehiculo } from '@/app/types';
 import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const COT_COUNTER_KEY = 'taller_cot_counter';
+const NUM_PROVEEDOR_RED_AMBIENTAL = 'P004093';
+
+// PENDIENTE: actualizar con la lista oficial de Sofia (Ayuntamiento de Mérida)
+// TODO: replace with Sofia's official department list
+const DEPARTAMENTOS_AYUNTAMIENTO: string[] = [
+  '— Seleccionar departamento —',
+  'PENDIENTE: Sofia proporcionará la lista',
+];
+
+function nextCotizacionNumber(): string {
+  if (typeof window === 'undefined') return 'COT-001';
+  const current = parseInt(localStorage.getItem(COT_COUNTER_KEY) ?? '0', 10);
+  const next = current + 1;
+  localStorage.setItem(COT_COUNTER_KEY, String(next));
+  return `COT-${String(next).padStart(3, '0')}`;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,8 +36,10 @@ interface ItemLinea {
 }
 
 interface FormCotizacion {
-  numeroCotizacion: string;
-  cliente: string;
+  numeroCotizacion: string;    // auto-generated, read-only display
+  clienteId: string;           // general template: selected client id
+  cliente: string;             // display name
+  vehiculoId: string;          // general template: selected vehicle id
   marca: string;
   modelo: string;
   anio: string;
@@ -27,11 +50,9 @@ interface FormCotizacion {
   observaciones: string;
   incluirIVA: boolean;
   // Ayuntamiento
-  inventario: string;
+  inventario: string;          // REQUIRED for Ayuntamiento
   ordenServicio: string;
-  departamento: string;
-  // Red Ambiental
-  numProveedor: string;
+  departamento: string;        // dropdown
   // Line items
   refacciones: ItemLinea[];
   manoDeObra: ItemLinea[];
@@ -79,9 +100,9 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
 
   const pw = 215.9;
   const ph = 279.4;
-  const ml = 14; // margin left
-  const mr = 14; // margin right
-  const cw = pw - ml - mr; // content width
+  const ml = 14;
+  const mr = 14;
+  const cw = pw - ml - mr;
   void ph;
 
   // Load logo
@@ -101,10 +122,17 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
     ctx.drawImage(img, 0, 0);
     logoData = canvas.toDataURL('image/jpeg', 0.92);
   } catch {
-    // logo fails silently — use placeholder box
+    // logo fails silently
   }
 
   const { subtotalRef, subtotalMO, subtotal, iva, total } = calcTotales(form);
+
+  // Resolved values
+  const numProveedor = plantilla === 'red_ambiental' ? NUM_PROVEEDOR_RED_AMBIENTAL : '';
+  const clienteNombre =
+    plantilla === 'ayuntamiento' ? 'Ayuntamiento de Mérida' :
+    plantilla === 'red_ambiental' ? 'Red Ambiental' :
+    form.cliente;
 
   let y = 14;
 
@@ -121,7 +149,6 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
     doc.setTextColor(0, 0, 0);
   }
 
-  // Company name + address
   const hx = ml + 26;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -145,47 +172,38 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
 
   y += 12;
 
-  // ── Client / vehicle info block ──
+  // ── Info block ──
   const col1 = ml;
   const col2 = ml + cw / 2 + 2;
   const colW = cw / 2 - 2;
 
-  const infoRow = (label: string, value: string, x: number, cy: number, w = colW) => {
+  const infoRow = (label: string, value: string, x: number, cy: number, _w = colW) => {
+    void _w;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
     doc.text(label + ':', x, cy);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    const maxW = w - doc.getTextWidth(label + ': ') - 2;
-    const lines = doc.splitTextToSize(value || '—', maxW + 30);
-    doc.text(lines[0] || '—', x + doc.getTextWidth(label + ': ') + 0.5, cy);
+    doc.text(value || '—', x + doc.getTextWidth(label + ': ') + 0.5, cy);
   };
 
-  // Row 1
   infoRow('No. Cotización', form.numeroCotizacion, col1, y);
   infoRow('Fecha', form.fecha ? new Date(form.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—', col2, y);
   y += 5;
 
-  // Row 2
-  const clienteNombre =
-    plantilla === 'ayuntamiento' ? 'Ayuntamiento de Mérida' :
-    plantilla === 'red_ambiental' ? 'Red Ambiental' :
-    form.cliente;
   infoRow('Cliente', clienteNombre, col1, y);
   if (plantilla === 'ayuntamiento') {
     infoRow('Departamento', form.departamento, col2, y);
   } else if (plantilla === 'red_ambiental') {
-    infoRow('Núm. Proveedor', form.numProveedor, col2, y);
+    infoRow('Núm. Proveedor', numProveedor, col2, y);
   }
   y += 5;
 
-  // Row 3 — vehicle
   infoRow('Marca', form.marca, col1, y);
   infoRow('Modelo', form.modelo, col2, y);
   y += 5;
 
-  // Row 4
-  infoRow('Año', form.anio, col1, y);
+  infoRow('Año', form.anio || '—', col1, y);
   if (form.placas) infoRow('Placas', form.placas, col2, y);
   y += 5;
 
@@ -194,13 +212,12 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
     y += 5;
   }
 
-  // Ayuntamiento extra fields
   if (plantilla === 'ayuntamiento') {
-    if (form.inventario) { infoRow('No. Inventario', form.inventario, col1, y); y += 5; }
-    if (form.ordenServicio) { infoRow('O.S.', form.ordenServicio, col2, y - 5); }
+    if (form.inventario) { infoRow('No. Inventario', form.inventario, col1, y); }
+    if (form.ordenServicio) { infoRow('O.S.', form.ordenServicio, col2, y); }
+    if (form.inventario || form.ordenServicio) y += 5;
   }
 
-  // Trabajo / description
   if (form.trabajo) {
     y += 2;
     doc.setDrawColor(200, 200, 200);
@@ -231,7 +248,6 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
     const rowH = 6;
     const hRowH = 7;
 
-    // Section title
     doc.setFillColor(...headerColor);
     doc.rect(ml, ty, cw, hRowH, 'F');
     doc.setTextColor(255, 255, 255);
@@ -241,7 +257,6 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
     doc.setTextColor(0, 0, 0);
     ty += hRowH;
 
-    // Column headers
     doc.setFillColor(240, 244, 255);
     doc.rect(ml, ty, cw, rowH, 'F');
     doc.setFont('helvetica', 'bold');
@@ -254,11 +269,9 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
     doc.text('TOTAL', cx + 1, ty + 4.2);
     ty += rowH;
 
-    // Draw header border
     doc.setDrawColor(200, 210, 230);
     doc.line(ml, ty, ml + cw, ty);
 
-    // Rows
     if (items.length === 0) {
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
@@ -289,7 +302,6 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
       });
     }
 
-    // Subtotal row for this section
     doc.setFillColor(245, 247, 250);
     doc.rect(ml, ty, cw, rowH, 'F');
     doc.setFont('helvetica', 'bold');
@@ -306,21 +318,16 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
     return ty;
   };
 
-  // ── REFACCIONES table ──
   y = drawTable('REFACCIONES', form.refacciones, [30, 100, 180], y);
-
-  // Page break if needed
-  if (y > ph - 60) {
-    doc.addPage();
-    y = 14;
-  }
-
-  // ── MANO DE OBRA table ──
   y = drawTable('MANO DE OBRA', form.manoDeObra, [22, 120, 70], y);
 
-  // ── Totals block ──
+  // ── Totals ──
   const totalsX = ml + cw - 65;
   const totalsW = 65;
+  const numTotRows = form.incluirIVA ? 4 : 3;
+
+  doc.setDrawColor(180, 190, 210);
+  doc.rect(totalsX, y, totalsW, 6 * numTotRows + 2, 'S');
 
   const totRow = (label: string, value: string, bold = false, bgColor?: [number, number, number]) => {
     if (bgColor) {
@@ -338,19 +345,14 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
     doc.line(totalsX, y, totalsX + totalsW, y);
   };
 
-  doc.setDrawColor(180, 190, 210);
-  doc.rect(totalsX, y, totalsW, 6 * (form.incluirIVA ? 4 : 3) + 2, 'S');
-
   totRow('Subtotal Refacciones:', '$' + fmtPeso(subtotalRef));
   totRow('Subtotal M. de Obra:', '$' + fmtPeso(subtotalMO));
   totRow('SUBTOTAL:', '$' + fmtPeso(subtotal), true, [245, 247, 250]);
   if (form.incluirIVA) {
     totRow('IVA (16%):', '$' + fmtPeso(iva), false, [255, 251, 235]);
   }
-  totRow('TOTAL:', '$' + fmtPeso(total), true, [30, 64, 175]);
-  // Fix text color for dark background total row
-  // (re-draw the TOTAL row with white text)
-  y -= 6;
+
+  // TOTAL row with dark blue background + white text
   doc.setFillColor(30, 64, 175);
   doc.rect(totalsX, y, totalsW, 6, 'F');
   doc.setFont('helvetica', 'bold');
@@ -359,11 +361,11 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
   doc.text('TOTAL:', totalsX + 2, y + 4.3);
   doc.text('$' + fmtPeso(total), totalsX + totalsW - 2, y + 4.3, { align: 'right' });
   doc.setTextColor(0, 0, 0);
-  y += 7;
+  y += 8;
 
   // ── Observaciones ──
-  y += 5;
   if (form.observaciones) {
+    y += 4;
     doc.setDrawColor(200, 200, 200);
     doc.line(ml, y, ml + cw, y);
     y += 5;
@@ -378,7 +380,7 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
     y += obsLines.length * 4 + 3;
   }
 
-  // ── Signature line ──
+  // ── Signature ──
   y += 10;
   doc.setDrawColor(100, 100, 100);
   doc.line(ml, y, ml + 60, y);
@@ -386,12 +388,11 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
   doc.setFontSize(7);
   doc.text('Autorizado por', ml + 15, y + 4);
 
-  // Save
   const nombre = form.numeroCotizacion ? `Cotizacion-${form.numeroCotizacion}` : 'Cotizacion';
   doc.save(`${nombre}.pdf`);
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Template cards ───────────────────────────────────────────────────────────
 
 const PLANTILLAS: { key: Plantilla; emoji: string; label: string; desc: string }[] = [
   {
@@ -404,15 +405,17 @@ const PLANTILLAS: { key: Plantilla; emoji: string; label: string; desc: string }
     key: 'red_ambiental',
     emoji: '♻️',
     label: 'Red Ambiental',
-    desc: 'Incluye Núm. Proveedor',
+    desc: 'Núm. Proveedor fijo P004093',
   },
   {
     key: 'general',
     emoji: '🔧',
     label: 'DIMMSA / General',
-    desc: 'Para cualquier cliente — nombre libre',
+    desc: 'Selecciona cliente y vehículo registrado',
   },
 ];
+
+// ─── Items table (editable) ───────────────────────────────────────────────────
 
 function TablaItems({
   titulo,
@@ -425,18 +428,14 @@ function TablaItems({
   items: ItemLinea[];
   onChange: (items: ItemLinea[]) => void;
 }) {
-  const headerCls =
-    color === 'blue'
-      ? 'bg-blue-700 text-white'
-      : 'bg-emerald-700 text-white';
+  const headerCls = color === 'blue' ? 'bg-blue-700 text-white' : 'bg-emerald-700 text-white';
   const addBtnCls =
     color === 'blue'
       ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
       : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100';
 
-  const update = (id: string, field: keyof ItemLinea, value: string) => {
+  const update = (id: string, field: keyof ItemLinea, value: string) =>
     onChange(items.map(i => (i.id === id ? { ...i, [field]: value } : i)));
-  };
   const remove = (id: string) => onChange(items.filter(i => i.id !== id));
   const add = () => onChange([...items, newItem()]);
 
@@ -444,11 +443,8 @@ function TablaItems({
 
   return (
     <div className="mb-5">
-      <div className={`px-4 py-2.5 rounded-t-xl font-bold text-sm ${headerCls}`}>
-        {titulo}
-      </div>
+      <div className={`px-4 py-2.5 rounded-t-xl font-bold text-sm ${headerCls}`}>{titulo}</div>
       <div className="border border-slate-200 rounded-b-xl overflow-hidden">
-        {/* Header row */}
         <div className="hidden sm:grid grid-cols-12 gap-1 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
           <div className="col-span-1">No.</div>
           <div className="col-span-1">Cant.</div>
@@ -520,7 +516,6 @@ function TablaItems({
           </div>
         ))}
 
-        {/* Subtotal */}
         <div className="border-t-2 border-slate-200 px-3 py-2 flex items-center justify-between bg-slate-50">
           <button
             onClick={add}
@@ -537,7 +532,7 @@ function TablaItems({
   );
 }
 
-// ─── Preview/PDF Screen ───────────────────────────────────────────────────────
+// ─── Preview screen ───────────────────────────────────────────────────────────
 
 function VistaPreviaContenido({
   plantilla,
@@ -569,42 +564,28 @@ function VistaPreviaContenido({
 
   return (
     <div>
-      <SectionTitle
-        title="Vista Previa — Cotización"
-        subtitle="Revisa la información antes de descargar el PDF"
-      />
+      <SectionTitle title="Vista Previa — Cotización" subtitle="Revisa antes de descargar el PDF" />
 
-      {/* Actions */}
       <div className="flex gap-3 mb-6 flex-wrap">
-        <Btn variant="ghost" onClick={onEditar}>
-          ← Editar
-        </Btn>
+        <Btn variant="ghost" onClick={onEditar}>← Editar</Btn>
         <Btn variant="success" onClick={handleDescargar} disabled={generando}>
           {generando ? '⏳ Generando...' : '⬇️ Descargar PDF'}
         </Btn>
       </div>
 
-      {/* Preview card */}
       <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
         {/* Header */}
         <div className="bg-slate-800 text-white px-6 py-4 flex items-center gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo-mj-merida.jpg"
-            alt="Logo MJ Mérida"
-            className="h-14 w-auto rounded object-contain bg-white p-1"
-          />
+          <img src="/logo-mj-merida.jpg" alt="Logo MJ Mérida" className="h-14 w-auto rounded object-contain bg-white p-1" />
           <div>
             <div className="font-bold text-base">MICRO DIESEL DE MERIDA</div>
             <div className="text-xs text-slate-300">Héctor Armando Rocha Sepúlveda</div>
-            <div className="text-xs text-slate-400">
-              Circuito Colonias No. 752 x 64j y 64k, Col. Castilla Cámara, CP 97278, Mérida, Yucatán
-            </div>
+            <div className="text-xs text-slate-400">Circuito Colonias No. 752 x 64j y 64k, Col. Castilla Cámara, CP 97278, Mérida, Yucatán</div>
             <div className="text-xs text-slate-400">Tel (999) 317.22.46 · Cel. 999 3597970</div>
           </div>
         </div>
 
-        {/* Title bar */}
         <div className="bg-blue-700 text-white text-center font-bold py-2 tracking-widest text-sm">
           COTIZACIÓN
         </div>
@@ -614,79 +595,43 @@ function VistaPreviaContenido({
           <InfoFila label="No. Cotización" value={form.numeroCotizacion} />
           <InfoFila
             label="Fecha"
-            value={
-              form.fecha
-                ? new Date(form.fecha + 'T12:00:00').toLocaleDateString('es-MX', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                  })
-                : '—'
-            }
+            value={form.fecha ? new Date(form.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
           />
           <InfoFila label="Cliente" value={clienteNombre} />
-          {plantilla === 'ayuntamiento' && (
-            <InfoFila label="Departamento" value={form.departamento} />
-          )}
-          {plantilla === 'red_ambiental' && (
-            <InfoFila label="Núm. Proveedor" value={form.numProveedor} />
-          )}
+          {plantilla === 'ayuntamiento' && <InfoFila label="Departamento" value={form.departamento} />}
+          {plantilla === 'red_ambiental' && <InfoFila label="Núm. Proveedor" value={NUM_PROVEEDOR_RED_AMBIENTAL} />}
           <InfoFila label="Marca" value={form.marca} />
           <InfoFila label="Modelo" value={form.modelo} />
           {form.anio && <InfoFila label="Año" value={form.anio} />}
           {form.placas && <InfoFila label="Placas" value={form.placas} />}
           {form.kms && <InfoFila label="Kilometraje" value={form.kms + ' km'} />}
-          {plantilla === 'ayuntamiento' && form.inventario && (
-            <InfoFila label="No. Inventario" value={form.inventario} />
-          )}
-          {plantilla === 'ayuntamiento' && form.ordenServicio && (
-            <InfoFila label="O.S." value={form.ordenServicio} />
-          )}
+          {plantilla === 'ayuntamiento' && form.inventario && <InfoFila label="No. Inventario" value={form.inventario} />}
+          {plantilla === 'ayuntamiento' && form.ordenServicio && <InfoFila label="O.S." value={form.ordenServicio} />}
         </div>
 
         {form.trabajo && (
           <div className="px-6 py-3 border-b border-slate-200 bg-slate-50">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Trabajo / Descripción:
-            </span>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trabajo / Descripción: </span>
             <p className="text-sm text-slate-700 mt-1">{form.trabajo}</p>
           </div>
         )}
 
-        {/* Refacciones table */}
-        <TablaPreview
-          titulo="REFACCIONES"
-          colorHeader="bg-blue-700"
-          items={form.refacciones}
-          subtotal={subtotalRef}
-        />
+        <TablaPreview titulo="REFACCIONES" colorHeader="bg-blue-700" items={form.refacciones} subtotal={subtotalRef} />
+        <TablaPreview titulo="MANO DE OBRA" colorHeader="bg-emerald-700" items={form.manoDeObra} subtotal={subtotalMO} />
 
-        {/* Mano de Obra table */}
-        <TablaPreview
-          titulo="MANO DE OBRA"
-          colorHeader="bg-emerald-700"
-          items={form.manoDeObra}
-          subtotal={subtotalMO}
-        />
-
-        {/* Totales */}
         <div className="px-6 py-4 border-t border-slate-200">
           <div className="ml-auto w-full max-w-xs space-y-1.5">
             <FilaTotal label="Subtotal Refacciones" value={subtotalRef} />
             <FilaTotal label="Subtotal Mano de Obra" value={subtotalMO} />
             <FilaTotal label="SUBTOTAL" value={subtotal} bold />
-            {form.incluirIVA && (
-              <FilaTotal label="IVA (16%)" value={iva} highlight="amber" />
-            )}
+            {form.incluirIVA && <FilaTotal label="IVA (16%)" value={iva} highlight="amber" />}
             <FilaTotal label="TOTAL" value={total} bold highlight="blue" />
           </div>
         </div>
 
         {form.observaciones && (
           <div className="px-6 py-4 border-t border-slate-200 bg-slate-50">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-              Observaciones
-            </p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Observaciones</p>
             <p className="text-sm text-slate-700">{form.observaciones}</p>
           </div>
         )}
@@ -704,22 +649,10 @@ function InfoFila({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TablaPreview({
-  titulo,
-  colorHeader,
-  items,
-  subtotal,
-}: {
-  titulo: string;
-  colorHeader: string;
-  items: ItemLinea[];
-  subtotal: number;
-}) {
+function TablaPreview({ titulo, colorHeader, items, subtotal }: { titulo: string; colorHeader: string; items: ItemLinea[]; subtotal: number }) {
   return (
     <div className="border-b border-slate-200">
-      <div className={`${colorHeader} text-white px-6 py-2 text-xs font-bold uppercase tracking-wider`}>
-        {titulo}
-      </div>
+      <div className={`${colorHeader} text-white px-6 py-2 text-xs font-bold uppercase tracking-wider`}>{titulo}</div>
       {items.length === 0 ? (
         <div className="px-6 py-3 text-slate-400 text-sm italic text-center">Sin partidas</div>
       ) : (
@@ -740,17 +673,13 @@ function TablaPreview({
                 <td className="px-3 py-2 text-slate-700">{item.cantidad}</td>
                 <td className="px-3 py-2 text-slate-800">{item.descripcion}</td>
                 <td className="px-3 py-2 text-right text-slate-700">${fmtPeso(parseNum(item.precioUnitario))}</td>
-                <td className="px-3 py-2 text-right font-semibold text-slate-900">
-                  ${fmtPeso(calcItem(item))}
-                </td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmtPeso(calcItem(item))}</td>
               </tr>
             ))}
           </tbody>
           <tfoot className="bg-slate-50 border-t border-slate-200">
             <tr>
-              <td colSpan={4} className="px-3 py-2 text-right text-sm font-bold text-slate-600">
-                Subtotal {titulo}:
-              </td>
+              <td colSpan={4} className="px-3 py-2 text-right text-sm font-bold text-slate-600">Subtotal {titulo}:</td>
               <td className="px-3 py-2 text-right font-bold text-slate-900">${fmtPeso(subtotal)}</td>
             </tr>
           </tfoot>
@@ -760,23 +689,11 @@ function TablaPreview({
   );
 }
 
-function FilaTotal({
-  label,
-  value,
-  bold = false,
-  highlight,
-}: {
-  label: string;
-  value: number;
-  bold?: boolean;
-  highlight?: 'blue' | 'amber';
-}) {
+function FilaTotal({ label, value, bold = false, highlight }: { label: string; value: number; bold?: boolean; highlight?: 'blue' | 'amber' }) {
   const cls =
-    highlight === 'blue'
-      ? 'bg-blue-700 text-white px-3 py-2 rounded-lg'
-      : highlight === 'amber'
-      ? 'bg-amber-50 px-3 py-1 rounded'
-      : 'px-1 py-0.5';
+    highlight === 'blue' ? 'bg-blue-700 text-white px-3 py-2 rounded-lg'
+    : highlight === 'amber' ? 'bg-amber-50 px-3 py-1 rounded'
+    : 'px-1 py-0.5';
   return (
     <div className={`flex justify-between items-center ${cls}`}>
       <span className={`text-sm ${bold ? 'font-bold' : 'font-medium'}`}>{label}:</span>
@@ -787,13 +704,21 @@ function FilaTotal({
 
 // ─── Main export ─────────────────────────────────────────────────────────────
 
-export function VistaCotizaciones() {
+export function VistaCotizaciones({
+  clientes = [],
+  vehiculos = [],
+}: {
+  clientes?: Cliente[];
+  vehiculos?: Vehiculo[];
+}) {
   const [pantalla, setPantalla] = useState<Pantalla>('selector');
   const [plantillaActual, setPlantillaActual] = useState<Plantilla>('general');
 
-  const formInit: FormCotizacion = {
-    numeroCotizacion: '',
-    cliente: '',
+  const buildForm = useCallback((p: Plantilla): FormCotizacion => ({
+    numeroCotizacion: nextCotizacionNumber(),
+    clienteId: '',
+    cliente: p === 'ayuntamiento' ? 'Ayuntamiento de Mérida' : p === 'red_ambiental' ? 'Red Ambiental' : '',
+    vehiculoId: '',
     marca: '',
     modelo: '',
     anio: '',
@@ -806,12 +731,22 @@ export function VistaCotizaciones() {
     inventario: '',
     ordenServicio: '',
     departamento: '',
-    numProveedor: '',
     refacciones: [newItem()],
     manoDeObra: [newItem()],
-  };
+  }), []);
 
-  const [form, setForm] = useState<FormCotizacion>(formInit);
+  const [form, setForm] = useState<FormCotizacion>(() => buildForm('general'));
+
+  // Track selected client's vehicles for the General template
+  const [vehiculosCliente, setVehiculosCliente] = useState<Vehiculo[]>([]);
+
+  useEffect(() => {
+    if (form.clienteId) {
+      setVehiculosCliente(vehiculos.filter(v => v.clienteId === form.clienteId));
+    } else {
+      setVehiculosCliente([]);
+    }
+  }, [form.clienteId, vehiculos]);
 
   const set = useCallback(<K extends keyof FormCotizacion>(key: K, val: FormCotizacion[K]) => {
     setForm(f => ({ ...f, [key]: val }));
@@ -819,23 +754,47 @@ export function VistaCotizaciones() {
 
   const elegirPlantilla = (p: Plantilla) => {
     setPlantillaActual(p);
-    // Auto-fill fixed client names
-    if (p === 'ayuntamiento') setForm(f => ({ ...f, cliente: 'Ayuntamiento de Mérida' }));
-    else if (p === 'red_ambiental') setForm(f => ({ ...f, cliente: 'Red Ambiental' }));
-    else setForm(f => ({ ...f, cliente: '' }));
+    setForm(buildForm(p));
     setPantalla('formulario');
   };
 
-  const canPreview = form.marca.trim() !== '' && form.modelo.trim() !== '';
+  const handleClienteChange = (clienteId: string) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    setForm(f => ({
+      ...f,
+      clienteId,
+      cliente: cliente?.nombre ?? '',
+      vehiculoId: '',
+      marca: '',
+      modelo: '',
+      anio: '',
+      placas: '',
+    }));
+  };
 
-  // ── Selector ──
+  const handleVehiculoChange = (vehiculoId: string) => {
+    const v = vehiculos.find(veh => veh.id === vehiculoId);
+    setForm(f => ({
+      ...f,
+      vehiculoId,
+      marca: v?.marca ?? f.marca,
+      modelo: v?.modelo ?? f.modelo,
+      anio: v?.anio ?? f.anio,
+      placas: v?.placa ?? f.placas,
+    }));
+  };
+
+  const canPreview =
+    form.marca.trim() !== '' &&
+    form.modelo.trim() !== '' &&
+    (plantillaActual !== 'ayuntamiento' || form.inventario.trim() !== '') &&
+    (plantillaActual !== 'ayuntamiento' || (form.departamento !== '' && form.departamento !== '— Seleccionar departamento —' && !form.departamento.startsWith('PENDIENTE')));
+
+  // ─── Selector ───────────────────────────────────────────────────────────────
   if (pantalla === 'selector') {
     return (
       <div>
-        <SectionTitle
-          title="Nueva Cotización"
-          subtitle="Selecciona la plantilla según el cliente"
-        />
+        <SectionTitle title="Nueva Cotización" subtitle="Selecciona la plantilla según el cliente" />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
           {PLANTILLAS.map(p => (
             <button
@@ -845,9 +804,7 @@ export function VistaCotizaciones() {
             >
               <span className="text-4xl">{p.emoji}</span>
               <div>
-                <div className="font-bold text-slate-800 text-sm text-center group-hover:text-indigo-700">
-                  {p.label}
-                </div>
+                <div className="font-bold text-slate-800 text-sm text-center group-hover:text-indigo-700">{p.label}</div>
                 <div className="text-xs text-slate-500 mt-1 text-center">{p.desc}</div>
               </div>
             </button>
@@ -857,61 +814,69 @@ export function VistaCotizaciones() {
     );
   }
 
-  // ── Formulario ──
+  // ─── Formulario ─────────────────────────────────────────────────────────────
   if (pantalla === 'formulario') {
     const labelPlantilla = PLANTILLAS.find(p => p.key === plantillaActual)?.label ?? '';
 
     return (
       <div>
         <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => setPantalla('selector')}
-            className="text-slate-400 hover:text-slate-700 transition-colors text-lg"
-          >
-            ←
-          </button>
-          <SectionTitle
-            title={`Cotización — ${labelPlantilla}`}
-            subtitle="Completa los datos del cliente y las partidas"
-          />
+          <button onClick={() => setPantalla('selector')} className="text-slate-400 hover:text-slate-700 transition-colors text-lg">←</button>
+          <SectionTitle title={`Cotización — ${labelPlantilla}`} subtitle="Completa los datos del vehículo y las partidas" />
         </div>
 
-        {/* ── Datos generales ── */}
+        {/* ── No. Cotización (auto) + Fecha ── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
           <div>
             <Label>No. Cotización</Label>
-            <Input
-              value={form.numeroCotizacion}
-              onChange={e => set('numeroCotizacion', e.target.value)}
-              placeholder="Ej. 0012"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                value={form.numeroCotizacion}
+                readOnly
+                className="bg-slate-50 font-mono font-bold text-indigo-700 cursor-default"
+              />
+              <span className="text-xs text-slate-400 whitespace-nowrap">auto</span>
+            </div>
           </div>
           <div>
             <Label>Fecha</Label>
-            <Input
-              type="date"
-              value={form.fecha}
-              onChange={e => set('fecha', e.target.value)}
-            />
+            <Input type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
           </div>
+
+          {/* ── Template-specific top fields ── */}
           {plantillaActual === 'general' && (
             <div>
-              <Label>Cliente</Label>
-              <Input
-                value={form.cliente}
-                onChange={e => set('cliente', e.target.value)}
-                placeholder="Nombre del cliente..."
-              />
+              <Label>Cliente <span className="text-rose-500">*</span></Label>
+              {clientes.length > 0 ? (
+                <select
+                  value={form.clienteId}
+                  onChange={e => handleClienteChange(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                >
+                  <option value="">— Seleccionar cliente —</option>
+                  {clientes.map(c => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  value={form.cliente}
+                  onChange={e => set('cliente', e.target.value)}
+                  placeholder="Nombre del cliente..."
+                />
+              )}
             </div>
           )}
+
           {plantillaActual === 'ayuntamiento' && (
             <>
               <div>
-                <Label>Inventario</Label>
+                <Label>No. Inventario <span className="text-rose-500">*</span></Label>
                 <Input
                   value={form.inventario}
                   onChange={e => set('inventario', e.target.value)}
-                  placeholder="No. Inventario"
+                  placeholder="No. Inventario (obligatorio)"
+                  required
                 />
               </div>
               <div>
@@ -922,38 +887,75 @@ export function VistaCotizaciones() {
                   placeholder="No. O.S."
                 />
               </div>
-              <div>
-                <Label>Departamento</Label>
-                <Input
-                  value={form.departamento}
-                  onChange={e => set('departamento', e.target.value)}
-                  placeholder="Departamento..."
-                />
-              </div>
             </>
           )}
+
           {plantillaActual === 'red_ambiental' && (
             <div>
               <Label>Núm. Proveedor</Label>
-              <Input
-                value={form.numProveedor}
-                onChange={e => set('numProveedor', e.target.value)}
-                placeholder="No. Proveedor"
-              />
+              <div className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-700 text-sm font-mono font-semibold select-none">
+                {NUM_PROVEEDOR_RED_AMBIENTAL}
+                <span className="ml-2 text-xs text-slate-400 font-normal font-sans">(fijo)</span>
+              </div>
             </div>
           )}
         </div>
 
+        {/* ── Ayuntamiento: Departamento ── */}
+        {plantillaActual === 'ayuntamiento' && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+            <div>
+              <Label>Departamento <span className="text-rose-500">*</span></Label>
+              <select
+                value={form.departamento}
+                onChange={e => set('departamento', e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              >
+                {DEPARTAMENTOS_AYUNTAMIENTO.map(d => (
+                  <option key={d} value={d} disabled={d.startsWith('—') || d.startsWith('PENDIENTE')}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-amber-600 mt-1">
+                ⏳ Lista de departamentos pendiente — se actualizará en breve
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ── Datos del vehículo ── */}
         <div className="border border-slate-200 rounded-xl p-4 mb-5 bg-slate-50">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
-            Datos del Vehículo
-          </p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Datos del Vehículo</p>
+
+          {/* Vehicle dropdown for General template when client is selected */}
+          {plantillaActual === 'general' && form.clienteId && vehiculosCliente.length > 0 && (
+            <div className="mb-4">
+              <Label>Seleccionar vehículo registrado</Label>
+              <select
+                value={form.vehiculoId}
+                onChange={e => handleVehiculoChange(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              >
+                <option value="">— Seleccionar vehículo —</option>
+                {vehiculosCliente.map(v => (
+                  <option key={v.id} value={v.id}>
+                    {[v.marca, v.modelo, v.anio, v.placa].filter(Boolean).join(' · ')}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {plantillaActual === 'general' && form.clienteId && vehiculosCliente.length === 0 && (
+            <p className="text-xs text-slate-500 mb-3 italic">
+              Este cliente no tiene vehículos registrados — ingresa los datos manualmente.
+            </p>
+          )}
+
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div>
-              <Label>
-                Marca <span className="text-rose-500">*</span>
-              </Label>
+              <Label>Marca <span className="text-rose-500">*</span></Label>
               <Input
                 value={form.marca}
                 onChange={e => set('marca', e.target.value)}
@@ -962,9 +964,7 @@ export function VistaCotizaciones() {
               />
             </div>
             <div>
-              <Label>
-                Modelo <span className="text-rose-500">*</span>
-              </Label>
+              <Label>Modelo <span className="text-rose-500">*</span></Label>
               <Input
                 value={form.modelo}
                 onChange={e => set('modelo', e.target.value)}
@@ -999,7 +999,7 @@ export function VistaCotizaciones() {
           </div>
         </div>
 
-        {/* ── Trabajo / descripción ── */}
+        {/* ── Trabajo ── */}
         <div className="mb-5">
           <Label>Trabajo / Descripción</Label>
           <textarea
@@ -1012,22 +1012,12 @@ export function VistaCotizaciones() {
         </div>
 
         {/* ── REFACCIONES ── */}
-        <TablaItems
-          titulo="REFACCIONES"
-          color="blue"
-          items={form.refacciones}
-          onChange={items => set('refacciones', items)}
-        />
+        <TablaItems titulo="REFACCIONES" color="blue" items={form.refacciones} onChange={items => set('refacciones', items)} />
 
         {/* ── MANO DE OBRA ── */}
-        <TablaItems
-          titulo="MANO DE OBRA"
-          color="green"
-          items={form.manoDeObra}
-          onChange={items => set('manoDeObra', items)}
-        />
+        <TablaItems titulo="MANO DE OBRA" color="green" items={form.manoDeObra} onChange={items => set('manoDeObra', items)} />
 
-        {/* ── IVA toggle + totals ── */}
+        {/* ── IVA + Totales ── */}
         <div className="border border-slate-200 rounded-xl p-4 mb-5 bg-white">
           <div className="flex items-center gap-3 mb-4">
             <input
@@ -1041,7 +1031,6 @@ export function VistaCotizaciones() {
               ¿Incluir IVA? (16%)
             </label>
           </div>
-
           {(() => {
             const { subtotalRef, subtotalMO, subtotal, iva, total } = calcTotales(form);
             return (
@@ -1069,20 +1058,18 @@ export function VistaCotizaciones() {
         </div>
 
         {/* ── Actions ── */}
-        <div className="flex gap-3 flex-wrap">
-          <Btn variant="ghost" onClick={() => setPantalla('selector')}>
-            ← Cambiar plantilla
-          </Btn>
-          <Btn
-            variant="primary"
-            onClick={() => setPantalla('preview')}
-            disabled={!canPreview}
-          >
+        <div className="flex gap-3 flex-wrap items-center">
+          <Btn variant="ghost" onClick={() => setPantalla('selector')}>← Cambiar plantilla</Btn>
+          <Btn variant="primary" onClick={() => setPantalla('preview')} disabled={!canPreview}>
             Ver Vista Previa →
           </Btn>
           {!canPreview && (
-            <span className="text-xs text-rose-500 self-center">
-              * Marca y Modelo son obligatorios
+            <span className="text-xs text-rose-500">
+              {form.marca.trim() === '' || form.modelo.trim() === ''
+                ? '* Marca y Modelo son obligatorios'
+                : plantillaActual === 'ayuntamiento' && form.inventario.trim() === ''
+                ? '* No. Inventario es obligatorio para Ayuntamiento'
+                : '* Selecciona un departamento válido'}
             </span>
           )}
         </div>
@@ -1090,7 +1077,7 @@ export function VistaCotizaciones() {
     );
   }
 
-  // ── Preview / PDF ──
+  // ─── Preview ─────────────────────────────────────────────────────────────────
   return (
     <VistaPreviaContenido
       plantilla={plantillaActual}
