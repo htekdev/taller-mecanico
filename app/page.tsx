@@ -42,7 +42,7 @@ export default function TallerMecanico() {
   const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
   const [cargando, setCargando] = useState(true);
 
-  // ΓöÇΓöÇ Cargar datos desde Supabase ΓöÇΓöÇ
+  // ── Cargar datos desde Supabase ──
   const cargarDatos = useCallback(async () => {
     if (!taller) return;
     setCargando(true);
@@ -62,7 +62,7 @@ export default function TallerMecanico() {
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
 
-  // ΓöÇΓöÇ Handlers ΓöÇΓöÇ
+  // ── Handlers ──
 
   const guardarCliente = async (data: Omit<Cliente, 'id'>) => {
     if (!taller) return;
@@ -86,7 +86,7 @@ export default function TallerMecanico() {
     await db.updateRefaccionStock(refaccionId, nuevoStock);
     setInventario(prev => prev.map(r => r.id === refaccionId ? { ...r, stock: nuevoStock } : r));
   };
-  /** Creates a new refaccion from within a PO form ΓÇö used by VistaOrdenesCompra */
+  /** Creates a new refaccion from within a PO form — used by VistaOrdenesCompra */
   const crearRefaccionDesdeOrden = async (data: Omit<Refaccion, 'id'>): Promise<Refaccion | null> => {
     if (!taller) return null;
     const nuevo = await db.insertRefaccion(taller.id, data);
@@ -94,7 +94,7 @@ export default function TallerMecanico() {
     return nuevo;
   };
 
-  /** Adds a refaccion — used by cotización conversion reconciliation */
+  /** Adds a refaccion from cotización reconciliation */
   const agregarRefaccionDesdeCotizacion = async (data: Omit<Refaccion, 'id'>): Promise<Refaccion | null> => {
     if (!taller) return null;
     const nuevo = await db.insertRefaccion(taller.id, data);
@@ -129,7 +129,6 @@ export default function TallerMecanico() {
     });
     if (nuevo) {
       setTrabajos(prev => [...prev, nuevo]);
-      // Deduct stock for parts used
       if (data.partes.length > 0) {
         const updatedInv = inventario.map(r => {
           const usada = data.partes.find(p => p.refaccionId === r.id);
@@ -138,7 +137,6 @@ export default function TallerMecanico() {
         await db.updateRefacciones(updatedInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
         setInventario(updatedInv);
       }
-      // Navigate to trabajos tab
       setVista('trabajos');
     }
   };
@@ -201,7 +199,7 @@ export default function TallerMecanico() {
     if (nuevo) setProveedores(prev => [...prev, nuevo]);
   };
 
-  // ΓöÇΓöÇ Purchase Order handlers ΓöÇΓöÇ
+  // ── Purchase Order handlers ──
   const crearOrden = async (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => {
     if (!taller) return;
     const nueva = await db.insertOrden(taller.id, { ...data, numeroOrden: data.numeroOrden || generarNumeroOrden(ordenes) });
@@ -235,7 +233,7 @@ export default function TallerMecanico() {
     setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, pagos: nuevos } : o));
   };
 
-  // ΓöÇΓöÇ Invoice (Factura) handlers ΓöÇΓöÇ
+  // ── Invoice (Factura) handlers ──
   const generarFactura = async (trabajoId: string) => {
     if (!taller) return;
     const trabajo = trabajos.find(t => t.id === trabajoId);
@@ -310,29 +308,29 @@ export default function TallerMecanico() {
   const trabajosPendientesCt   = trabajos.filter(t => t.estado === 'pendiente').length;
 
   const tabs = [
-    { key: 'clientes',    icon: '≡ƒæÑ', label: 'Clientes',         count: clientes.length },
-    { key: 'inventario',  icon: '≡ƒôª', label: 'Inventario',        count: stockBajo > 0 ? `ΓÜá ${stockBajo}` : inventario.length > 0 ? inventario.length : null },
-    { key: 'trabajos',    icon: '≡ƒöº', label: 'Trabajos',          count: trabajosPendientesCt > 0 ? `≡ƒòÉ ${trabajosPendientesCt}` : trabajos.length > 0 ? trabajos.length : null },
-    { key: 'proveedores', icon: '≡ƒÅ¬', label: 'Proveedores',       count: proveedores.length > 0 ? proveedores.length : null },
-    { key: 'ordenes',     icon: '≡ƒôï', label: '├ôrdenes de Compra', count: ordenesPendientesRecibir > 0 ? ordenesPendientesRecibir : ordenes.length > 0 ? ordenes.length : null },
-    { key: 'facturas',    icon: '≡ƒº╛', label: 'Facturas',          count: facturas.length > 0 ? facturas.length : null },
-    { key: 'cuentas',     icon: '≡ƒÆ░', label: 'Por Cobrar',        count: facturasPendientes > 0 ? facturasPendientes : null },
-    { key: 'pagos',       icon: '≡ƒö┤', label: 'Por Pagar',         count: ordenesPendientesPago > 0 ? ordenesPendientesPago : null },
-    { key: 'resumen',       icon: '≡ƒôè', label: 'Resumen',           count: null },
-    { key: 'historial',     icon: '≡ƒôï', label: 'Historial',          count: null },
-    { key: 'cotizaciones',  icon: '≡ƒôä', label: 'Cotizaciones',       count: null },
-    { key: 'configuracion', icon: 'ΓÜÖ∩╕Å', label: 'Configuraci├│n',     count: null },
+    { key: 'clientes',    icon: '👥', label: 'Clientes',         count: clientes.length },
+    { key: 'inventario',  icon: '📦', label: 'Inventario',        count: stockBajo > 0 ? `⚠ ${stockBajo}` : inventario.length > 0 ? inventario.length : null },
+    { key: 'trabajos',    icon: '🔧', label: 'Trabajos',          count: trabajosPendientesCt > 0 ? `🕐 ${trabajosPendientesCt}` : trabajos.length > 0 ? trabajos.length : null },
+    { key: 'proveedores', icon: '🏪', label: 'Proveedores',       count: proveedores.length > 0 ? proveedores.length : null },
+    { key: 'ordenes',     icon: '📋', label: 'Órdenes de Compra', count: ordenesPendientesRecibir > 0 ? ordenesPendientesRecibir : ordenes.length > 0 ? ordenes.length : null },
+    { key: 'facturas',    icon: '🧾', label: 'Facturas',          count: facturas.length > 0 ? facturas.length : null },
+    { key: 'cuentas',     icon: '💰', label: 'Por Cobrar',        count: facturasPendientes > 0 ? facturasPendientes : null },
+    { key: 'pagos',       icon: '🔴', label: 'Por Pagar',         count: ordenesPendientesPago > 0 ? ordenesPendientesPago : null },
+    { key: 'resumen',       icon: '📊', label: 'Resumen',           count: null },
+    { key: 'historial',     icon: '📋', label: 'Historial',          count: null },
+    { key: 'cotizaciones',  icon: '📄', label: 'Cotizaciones',       count: null },
+    { key: 'configuracion', icon: '⚙️', label: 'Configuración',     count: null },
   ] as const;
 
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center text-2xl shadow-inner flex-shrink-0">≡ƒöº</div>
+          <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center text-2xl shadow-inner flex-shrink-0">🔧</div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-white tracking-tight">Taller Mec├ínico</h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Taller Mecánico</h1>
 
-            {/* Taller name ΓÇö clickable dropdown when user has multiple talleres */}
+            {/* Taller name — clickable dropdown when user has multiple talleres */}
             {talleres.length > 1 ? (
               <div className="relative">
                 <button
@@ -340,7 +338,7 @@ export default function TallerMecanico() {
                   className="flex items-center gap-1.5 text-slate-300 text-sm font-medium hover:text-white transition-colors group"
                 >
                   <span className="truncate max-w-[160px]">{taller?.nombre ?? 'Seleccionar taller'}</span>
-                  <span className="text-slate-500 group-hover:text-slate-300 text-xs">Γû╝</span>
+                  <span className="text-slate-500 group-hover:text-slate-300 text-xs">▼</span>
                 </button>
 
                 {showTallerMenu && (
@@ -358,16 +356,16 @@ export default function TallerMecanico() {
                             t.id === taller?.id ? 'bg-indigo-50' : ''
                           }`}
                         >
-                          <span className="text-lg">≡ƒöº</span>
+                          <span className="text-lg">🔧</span>
                           <div className="flex-1 min-w-0">
                             <div className={`text-sm font-semibold truncate ${t.id === taller?.id ? 'text-indigo-700' : 'text-slate-800'}`}>
                               {t.nombre}
                             </div>
                             <div className="text-xs text-slate-400">
-                              {t.role === 'owner' ? '≡ƒÅá Due├▒o' : '≡ƒöº Mec├ínico'}
+                              {t.role === 'owner' ? '🏠 Dueño' : '🔧 Mecánico'}
                             </div>
                           </div>
-                          {t.id === taller?.id && <span className="text-indigo-500 text-sm">Γ£ô</span>}
+                          {t.id === taller?.id && <span className="text-indigo-500 text-sm">✓</span>}
                         </button>
                       ))}
                     </div>
@@ -375,7 +373,7 @@ export default function TallerMecanico() {
                 )}
               </div>
             ) : (
-              <p className="text-slate-400 text-sm font-medium truncate">{taller?.nombre ?? 'Sistema de Gesti├│n'}</p>
+              <p className="text-slate-400 text-sm font-medium truncate">{taller?.nombre ?? 'Sistema de Gestión'}</p>
             )}
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -400,8 +398,8 @@ export default function TallerMecanico() {
               {count !== null && (
                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
                   vista === key ? 'bg-indigo-400 text-white'
-                    : (typeof count === 'string' && count.startsWith('ΓÜá')) ? 'bg-rose-100 text-rose-600'
-                    : (typeof count === 'string' && count.startsWith('≡ƒòÉ')) ? 'bg-amber-100 text-amber-700'
+                    : (typeof count === 'string' && count.startsWith('⚠')) ? 'bg-rose-100 text-rose-600'
+                    : (typeof count === 'string' && count.startsWith('🕐')) ? 'bg-amber-100 text-amber-700'
                     : (key === 'cuentas' && facturasPendientes > 0) || (key === 'pagos' && ordenesPendientesPago > 0) || (key === 'ordenes' && ordenesPendientesRecibir > 0) ? 'bg-rose-100 text-rose-600'
                     : 'bg-slate-200 text-slate-600'
                 }`}>{count}</span>
