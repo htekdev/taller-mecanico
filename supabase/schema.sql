@@ -153,6 +153,19 @@ CREATE TABLE IF NOT EXISTS facturas (
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ── Gastos (Operating Expenses) ──────────────────────────────
+CREATE TABLE IF NOT EXISTS gastos (
+  id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  taller_id    UUID REFERENCES talleres(id) ON DELETE CASCADE NOT NULL,
+  categoria    TEXT NOT NULL CHECK (categoria IN ('operativo', 'administrativo', 'impuesto', 'nomina')),
+  subcategoria TEXT NOT NULL DEFAULT '',
+  concepto     TEXT NOT NULL DEFAULT '',
+  monto        DECIMAL(12,2) NOT NULL DEFAULT 0,
+  fecha        DATE NOT NULL,
+  notas        TEXT,
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ============================================================
 -- Row-Level Security (RLS)
 -- All tables: user must be a member of the taller
@@ -168,6 +181,8 @@ ALTER TABLE proveedores    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trabajos       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ordenes_compra ENABLE ROW LEVEL SECURITY;
 ALTER TABLE facturas       ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE gastos       ENABLE ROW LEVEL SECURITY;
 
 -- Helper function: is current user a member of a given taller?
 CREATE OR REPLACE FUNCTION is_taller_member(tid UUID)
@@ -217,4 +232,4 @@ CREATE POLICY "crud_refacciones"    ON refacciones    FOR ALL USING (is_taller_m
 CREATE POLICY "crud_proveedores"    ON proveedores    FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
 CREATE POLICY "crud_trabajos"       ON trabajos       FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
 CREATE POLICY "crud_ordenes_compra" ON ordenes_compra FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
-CREATE POLICY "crud_facturas"       ON facturas       FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
+CREATE POLICY "crud_gastos"       ON gastos       FOR ALL USING (is_taller_member(taller_id)) WITH CHECK (is_taller_member(taller_id));
