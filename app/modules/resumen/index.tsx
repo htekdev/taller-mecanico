@@ -11,7 +11,9 @@ type ResumenData = {
   totalVentaRef: number; totalCostoRef: number; totalManoObra: number;
   costoServiciosExternos: number; totalCostos: number; margenRef: number;
   utilidadBruta: number; pctUtilidadBruta: number;
-  gastosOperativos: number; utilidadNeta: number; pctUtilidadNeta: number;
+  gastosOperativos: number;
+  gastosPorCategoria: { categoria: string; label: string; emoji: string; total: number }[];
+  utilidadNeta: number; pctUtilidadNeta: number;
   ganancia: number; gananciaCobrada: number; cantidad: number;
   cobradoEnMes: number; porCobrarDelMes: number; pendientePorCobrar: number;
   totalOrdenes: number; porPagarOrdenes: number;
@@ -154,13 +156,35 @@ export function VistaResumen({
             bold pct={resumen.pctUtilidadBruta}
           />
 
-          {/* Gastos operativos */}
-          <PLRow
-            label="💸 Gastos Operativos"
-            amount={resumen.gastosOperativos}
-            sub={resumen.gastosOperativos === 0 ? 'Próximamente — módulo de Gastos' : undefined}
-            color="red" indent
-          />
+          {/* Gastos — desglosados por categoría */}
+          {resumen.gastosOperativos === 0 && resumen.gastosPorCategoria.every(g => g.total === 0) ? (
+            <PLRow
+              label="💸 Gastos"
+              amount={0}
+              sub="Sin gastos registrados este mes"
+              color="red" indent
+            />
+          ) : (
+            <>
+              {/* Header row — label only, no amount */}
+              <div className="flex items-center py-1.5 pl-5 border-b border-slate-100">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">💸 Gastos del mes</span>
+              </div>
+              {resumen.gastosPorCategoria.map(cat => cat.total > 0 && (
+                <PLRow
+                  key={cat.categoria}
+                  label={`${cat.emoji} ${cat.label}`}
+                  amount={cat.total}
+                  color="red" indent
+                />
+              ))}
+              {/* Total gastos — highlighted */}
+              <div className="flex items-center justify-between py-2 pl-5 border-b border-slate-100 bg-slate-50">
+                <span className="text-sm font-bold text-slate-700">Total Gastos</span>
+                <span className="text-sm font-bold text-rose-600 tabular-nums">−${fmt(resumen.gastosOperativos)}</span>
+              </div>
+            </>
+          )}
 
           {/* Utilidad Neta */}
           <div className="my-1 border-t-2 border-indigo-100" />

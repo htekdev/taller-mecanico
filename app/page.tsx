@@ -359,9 +359,18 @@ export default function TallerMecanico() {
     const utilidadBruta = ingresoNeto - totalCostos;
     const pctUtilidadBruta = ingresoNeto > 0 ? Math.round((utilidadBruta / ingresoNeto) * 100) : 0;
     // Gastos operativos: real data from gastos module
-    const gastosOperativos = gastos
-      .filter(g => g.fecha.startsWith(mesActual))
-      .reduce((s, g) => s + g.monto, 0);
+    const gastosMes = gastos.filter(g => g.fecha.startsWith(mesActual));
+    const gastosOperativos = gastosMes.reduce((s, g) => s + g.monto, 0);
+
+    // ── Gastos por categoría (para el Estado de Resultados) ──
+    const gastosPorCategoria = (
+      ['operativo', 'administrativo', 'impuesto', 'nomina'] as const
+    ).map(cat => ({
+      categoria: cat,
+      label: cat === 'operativo' ? 'Operativos' : cat === 'administrativo' ? 'Administrativos' : cat === 'impuesto' ? 'Impuestos' : 'Nómina',
+      emoji: cat === 'operativo' ? '🏠' : cat === 'administrativo' ? '🌐' : cat === 'impuesto' ? '🧾' : '👷',
+      total: gastosMes.filter(g => g.categoria === cat).reduce((s, g) => s + g.monto, 0),
+    }));
     const utilidadNeta   = utilidadBruta - gastosOperativos;
     const pctUtilidadNeta = ingresoNeto > 0 ? Math.round((utilidadNeta / ingresoNeto) * 100) : 0;
 
@@ -406,7 +415,7 @@ export default function TallerMecanico() {
       facturadoMes, ingresoNeto, totalVentaRef, totalCostoRef, margenRef, totalManoObra,
       costoServiciosExternos, totalCostos,
       utilidadBruta, pctUtilidadBruta,
-      gastosOperativos, utilidadNeta, pctUtilidadNeta,
+      gastosOperativos, gastosPorCategoria, utilidadNeta, pctUtilidadNeta,
       ganancia, cantidad: mes.length, cobradoEnMes, porCobrarDelMes,
       totalOrdenes, porPagarOrdenes, gananciaCobrada, pendientePorCobrar,
       totalIVA, ingresoConIVA, ingresoSinIVA,
