@@ -190,7 +190,9 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
       vehiculo_id: data.vehiculoId || null,
       fecha: data.fecha,
       descripcion: data.descripcion,
-      kilometraje: data.kilometraje ?? null,
+      // Only include kilometraje if it has a value — omitting it lets the DB
+      // column default to NULL, and avoids "column not found" on older branches
+      ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
       mano_de_obra: data.manoDeObra,
       mano_de_obra_items: data.manoDeObraItems,
       refacciones_total: data.refacciones,
