@@ -104,6 +104,11 @@ export function VistaFacturas({
                     <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
                       <span>{new Date(factura.fecha).toLocaleDateString('es-MX')}</span>
                       {vehiculo && <span>· {[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>}
+                      {vehiculo?.placa && <span className="font-mono bg-slate-100 px-1 rounded">{vehiculo.placa}</span>}
+                      {(() => {
+                        const trab = trabajos.find(t => t.id === factura.trabajoId);
+                        return trab?.kilometraje != null ? <span>· 🛣 {trab.kilometraje.toLocaleString('es-MX')} km</span> : null;
+                      })()}
                       <span>· {(factura.conceptos ?? []).length} conceptos</span>
                     </div>
                   </div>

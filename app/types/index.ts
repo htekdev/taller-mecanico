@@ -137,6 +137,7 @@ export interface Trabajo {
   fecha: string;
   numeroOrden?: string;            // Número de orden manual del taller
   descripcion: string;
+  kilometraje?: number;            // Kilometraje registrado al ingreso del vehículo
   manoDeObra: number;
   manoDeObraItems: ManoDeObraItem[];
   refacciones: number;             // subtotal of parts (before IVA)

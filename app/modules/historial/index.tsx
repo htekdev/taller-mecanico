@@ -195,6 +195,11 @@ function PantallaUnidades({
                       Placa: <span className="font-mono font-semibold text-slate-700">{vehiculo.placa}</span>
                     </div>
                   )}
+                  {ultimoTrabajo?.kilometraje != null && (
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      🛣 Último km: <span className="font-semibold text-slate-700">{ultimoTrabajo.kilometraje.toLocaleString('es-MX')}</span>
+                    </div>
+                  )}
                   <div className="mt-2 flex items-center gap-2">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                       trabajosVehiculo.length > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
@@ -316,6 +321,11 @@ function PantallaHistorial({
                     {trabajo.numeroOrden && (
                       <span className="text-xs font-semibold px-2.5 py-0.5 bg-slate-200 text-slate-700 rounded-full font-mono">
                         # {trabajo.numeroOrden}
+                      </span>
+                    )}
+                    {trabajo.kilometraje != null && (
+                      <span className="text-xs font-semibold px-2.5 py-0.5 bg-slate-100 text-slate-600 rounded-full">
+                        🛣 {trabajo.kilometraje.toLocaleString('es-MX')} km
                       </span>
                     )}
                   </div>

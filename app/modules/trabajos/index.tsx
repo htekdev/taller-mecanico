@@ -133,6 +133,7 @@ export function VistaTrabajo({
     fecha: new Date().toISOString().split('T')[0],
     numeroOrden: '',
     descripcion: '',
+    kilometraje: '' as string | number,
     requiereFactura: false,
     folioFiscal: '',
     estado: 'pendiente' as Trabajo['estado'],
@@ -245,6 +246,7 @@ export function VistaTrabajo({
       fecha: trabajo.fecha,
       numeroOrden: trabajo.numeroOrden ?? '',
       descripcion: trabajo.descripcion,
+      kilometraje: trabajo.kilometraje ?? '',
       requiereFactura: trabajo.requiereFactura,
       folioFiscal: trabajo.folioFiscal ?? '',
       estado: trabajo.estado,
@@ -263,9 +265,11 @@ export function VistaTrabajo({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.clienteId || !form.vehiculoId || !form.descripcion) return;
+    const kmVal = typeof form.kilometraje === 'string' ? (form.kilometraje.trim() !== '' ? Number(form.kilometraje) : undefined) : (form.kilometraje || undefined);
     const trabajoData = {
       ...form,
       numeroOrden: form.numeroOrden?.trim() || undefined,
+      kilometraje: kmVal,
       manoDeObra: totalManoDeObra,
       manoDeObraItems: laborItems,
       refacciones: totalVentaRefacciones,
@@ -391,8 +395,8 @@ export function VistaTrabajo({
             </div>
           )}
 
-          {/* Fecha + Número de orden + Descripción */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Fecha + Número de orden + Kilometraje + Descripción */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
               <Label>Fecha</Label>
               <Input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} required />
@@ -401,6 +405,12 @@ export function VistaTrabajo({
               <Label>Número de Orden</Label>
               <Input type="text" placeholder="Ej. 001, OT-2026-45..." value={form.numeroOrden}
                 onChange={e => setForm(f => ({ ...f, numeroOrden: e.target.value }))} />
+            </div>
+            <div>
+              <Label>🛣 Kilometraje</Label>
+              <Input type="number" placeholder="Ej. 85000" min="0" step="1"
+                value={form.kilometraje === '' ? '' : form.kilometraje}
+                onChange={e => setForm(f => ({ ...f, kilometraje: e.target.value }))} />
             </div>
             <div>
               <Label>Descripción general del trabajo</Label>
@@ -890,10 +900,15 @@ export function VistaTrabajo({
                     <td className="px-4 py-3 text-slate-800 font-medium">{cliente?.nombre ?? '—'}</td>
                     <td className="px-4 py-3">
                       {vehiculo ? (
-                        <span>
+                        <div>
                           <span className="text-slate-700 font-medium">{[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>
                           {vehiculo.placa && <span className="ml-1.5 text-xs bg-slate-200 text-slate-600 font-mono font-semibold px-1.5 py-0.5 rounded">{vehiculo.placa}</span>}
-                        </span>
+                          {trabajo.kilometraje != null && (
+                            <div className="text-xs text-slate-500 mt-0.5">
+                              🛣 {trabajo.kilometraje.toLocaleString('es-MX')} km
+                            </div>
+                          )}
+                        </div>
                       ) : <span className="text-slate-400">—</span>}
                     </td>
                     <td className="px-4 py-3 text-slate-700">
