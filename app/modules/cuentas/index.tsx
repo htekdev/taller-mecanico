@@ -1045,6 +1045,30 @@ export function VistaCuentasPorPagar({
                           {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
                         </Btn>
                       </div>
+                      {/* Desglose IVA */}
+                      <div className="mt-2 pt-2 border-t border-slate-200 space-y-1">
+                        {orden.conIVA ? (
+                          <>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-500">Subtotal piezas</span>
+                              <span className="text-slate-700">${fmt(orden.subtotalSinIVA)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-amber-700 font-medium">IVA (16%)</span>
+                              <span className="text-amber-700 font-medium">+ ${fmt(orden.ivaAmount)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm font-bold border-t border-slate-200 pt-1 mt-1">
+                              <span className="text-slate-800">Total</span>
+                              <span className="text-slate-900">${fmt(orden.total)}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex justify-between text-sm font-bold">
+                            <span className="text-slate-800">Total</span>
+                            <span className="text-slate-900">${fmt(orden.total)}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {isExp && (
