@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor, OrdenCompra, Factura,
   Pago, PagoCompra, PagoFactura, FacturaConcepto, CompatibilidadVehiculo, PagoServicioExterno,
+  Gasto,
 } from '@/app/types';
 import {
   generarNumeroFactura, generarNumeroOrden,
@@ -23,10 +24,11 @@ import { VistaHistorial } from '@/app/modules/historial';
 import { VistaConfiguracion } from '@/app/modules/configuracion';
 import { VistaCotizaciones } from '@/app/modules/cotizaciones';
 import type { ConversionTrabajo } from '@/app/modules/cotizaciones';
+import { VistaGastos } from '@/app/modules/gastos';
 import { useAuth }      from '@/app/context/auth';
 import * as db          from '@/app/lib/db';
 
-type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones';
+type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones'|'gastos';
 
 export default function TallerMecanico() {
   const { taller, talleres, selectTaller, user, signOut } = useAuth();
@@ -38,6 +40,7 @@ export default function TallerMecanico() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [ordenes,     setOrdenes]     = useState<OrdenCompra[]>([]);
   const [facturas,    setFacturas]    = useState<Factura[]>([]);
+  const [gastos,      setGastos]      = useState<Gasto[]>([]);
   const [vista, setVista] = useState<Vista>('clientes');
   const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
   const [cargando, setCargando] = useState(true);
@@ -46,7 +49,7 @@ export default function TallerMecanico() {
   const cargarDatos = useCallback(async () => {
     if (!taller) return;
     setCargando(true);
-    const [c, v, r, t, p, o, f] = await Promise.all([
+    const [c, v, r, t, p, o, f, g] = await Promise.all([
       db.getClientes(taller.id),
       db.getVehiculos(taller.id),
       db.getRefacciones(taller.id),
@@ -54,9 +57,10 @@ export default function TallerMecanico() {
       db.getProveedores(taller.id),
       db.getOrdenes(taller.id),
       db.getFacturas(taller.id),
+      db.getGastos(taller.id),
     ]);
     setClientes(c); setVehiculos(v); setInventario(r); setTrabajos(t);
-    setProveedores(p); setOrdenes(o); setFacturas(f);
+    setProveedores(p); setOrdenes(o); setFacturas(f); setGastos(g);
     setCargando(false);
   }, [taller]);
 
@@ -317,6 +321,21 @@ export default function TallerMecanico() {
     setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, pagos: nuevos } : f));
   };
 
+  // ── Gastos handlers ──
+  const crearGasto = async (data: Omit<Gasto, 'id' | 'tallerId'>) => {
+    if (!taller) return;
+    const nuevo = await db.insertGasto(taller.id, data);
+    if (nuevo) setGastos(prev => [nuevo, ...prev]);
+  };
+  const editarGasto = async (id: string, data: Partial<Omit<Gasto, 'id' | 'tallerId'>>) => {
+    await db.updateGasto(id, data);
+    setGastos(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
+  };
+  const eliminarGasto = async (id: string) => {
+    await db.deleteGasto(id);
+    setGastos(prev => prev.filter(g => g.id !== id));
+  };
+
   const calcularResumen = () => {
     const mes = trabajos.filter(t => t.fecha.startsWith(mesActual));
     const facturadoMes       = mes.reduce((s, t) => s + t.total, 0);
@@ -339,8 +358,19 @@ export default function TallerMecanico() {
     const totalCostos   = totalCostoRef + costoServiciosExternos;
     const utilidadBruta = ingresoNeto - totalCostos;
     const pctUtilidadBruta = ingresoNeto > 0 ? Math.round((utilidadBruta / ingresoNeto) * 100) : 0;
-    // Gastos operativos: placeholder until Gastos module is built
-    const gastosOperativos = 0;
+    // Gastos operativos: real data from gastos module
+    const gastosMes = gastos.filter(g => g.fecha.startsWith(mesActual));
+    const gastosOperativos = gastosMes.reduce((s, g) => s + g.monto, 0);
+
+    // ── Gastos por categoría (para el Estado de Resultados) ──
+    const gastosPorCategoria = (
+      ['operativo', 'administrativo', 'impuesto', 'nomina'] as const
+    ).map(cat => ({
+      categoria: cat,
+      label: cat === 'operativo' ? 'Operativos' : cat === 'administrativo' ? 'Administrativos' : cat === 'impuesto' ? 'Impuestos' : 'Nómina',
+      emoji: cat === 'operativo' ? '🏠' : cat === 'administrativo' ? '🌐' : cat === 'impuesto' ? '🧾' : '👷',
+      total: gastosMes.filter(g => g.categoria === cat).reduce((s, g) => s + g.monto, 0),
+    }));
     const utilidadNeta   = utilidadBruta - gastosOperativos;
     const pctUtilidadNeta = ingresoNeto > 0 ? Math.round((utilidadNeta / ingresoNeto) * 100) : 0;
 
@@ -385,7 +415,7 @@ export default function TallerMecanico() {
       facturadoMes, ingresoNeto, totalVentaRef, totalCostoRef, margenRef, totalManoObra,
       costoServiciosExternos, totalCostos,
       utilidadBruta, pctUtilidadBruta,
-      gastosOperativos, utilidadNeta, pctUtilidadNeta,
+      gastosOperativos, gastosPorCategoria, utilidadNeta, pctUtilidadNeta,
       ganancia, cantidad: mes.length, cobradoEnMes, porCobrarDelMes,
       totalOrdenes, porPagarOrdenes, gananciaCobrada, pendientePorCobrar,
       totalIVA, ingresoConIVA, ingresoSinIVA,
@@ -409,6 +439,7 @@ export default function TallerMecanico() {
     { key: 'cuentas',     icon: '💰', label: 'Por Cobrar',        count: facturasPendientes > 0 ? facturasPendientes : null },
     { key: 'pagos',       icon: '🔴', label: 'Por Pagar',         count: ordenesPendientesPago > 0 ? ordenesPendientesPago : null },
     { key: 'resumen',       icon: '📊', label: 'Resumen',           count: null },
+    { key: 'gastos',        icon: '💸', label: 'Gastos',            count: gastos.filter(g => g.fecha.startsWith(mesActual)).length > 0 ? gastos.filter(g => g.fecha.startsWith(mesActual)).length : null },
     { key: 'historial',     icon: '📋', label: 'Historial',          count: null },
     { key: 'cotizaciones',  icon: '📄', label: 'Cotizaciones',       count: null },
     { key: 'configuracion', icon: '⚙️', label: 'Configuración',     count: null },
@@ -557,6 +588,15 @@ export default function TallerMecanico() {
               resumen={calcularResumen()}
               trabajos={trabajos.filter(t => t.fecha.startsWith(mesActual))}
               clientes={clientes} vehiculos={vehiculos} />
+          )}
+          {vista === 'gastos' && (
+            <VistaGastos
+              gastos={gastos}
+              mesActual={mesActual}
+              onCrear={crearGasto}
+              onEditar={editarGasto}
+              onEliminar={eliminarGasto}
+            />
           )}
           {vista === 'historial' && (
             <VistaHistorial clientes={clientes} vehiculos={vehiculos} trabajos={trabajos} />

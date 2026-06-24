@@ -10,6 +10,7 @@ import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor,
   OrdenCompra, Factura, TrabajoRefaccion, ManoDeObraItem,
   Pago, PagoCompra, PagoFactura, FacturaConcepto, CompraItem,
+  Gasto, GastoCategoria,
 } from '@/app/types';
 
 // ── Clientes ──────────────────────────────────────────────────
@@ -681,4 +682,67 @@ export async function redeemInvite(email: string, userId: string): Promise<strin
   }
 
   return firstTallerId;
+}
+
+// ── Gastos (Operating Expenses) ───────────────────────────────────────────────
+
+function rowToGasto(r: Record<string, unknown>): Gasto {
+  return {
+    id:           r.id as string,
+    tallerId:     r.taller_id as string,
+    categoria:    r.categoria as GastoCategoria,
+    subcategoria: r.subcategoria as string,
+    concepto:     r.concepto as string,
+    monto:        Number(r.monto),
+    fecha:        r.fecha as string,
+    notas:        (r.notas as string | null) ?? undefined,
+  };
+}
+
+export async function getGastos(tallerId: string): Promise<Gasto[]> {
+  const { data } = await supabase
+    .from('gastos')
+    .select('*')
+    .eq('taller_id', tallerId)
+    .order('fecha', { ascending: false });
+  return (data ?? []).map(rowToGasto);
+}
+
+export async function insertGasto(
+  tallerId: string,
+  data: Omit<Gasto, 'id' | 'tallerId'>,
+): Promise<Gasto | null> {
+  const { data: row, error } = await supabase
+    .from('gastos')
+    .insert({
+      taller_id:    tallerId,
+      categoria:    data.categoria,
+      subcategoria: data.subcategoria,
+      concepto:     data.concepto,
+      monto:        data.monto,
+      fecha:        data.fecha,
+      notas:        data.notas ?? null,
+    })
+    .select()
+    .single();
+  if (error || !row) { console.error('insertGasto', error); return null; }
+  return rowToGasto(row);
+}
+
+export async function updateGasto(
+  gastoId: string,
+  data: Partial<Omit<Gasto, 'id' | 'tallerId'>>,
+): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (data.categoria    !== undefined) patch.categoria    = data.categoria;
+  if (data.subcategoria !== undefined) patch.subcategoria = data.subcategoria;
+  if (data.concepto     !== undefined) patch.concepto     = data.concepto;
+  if (data.monto        !== undefined) patch.monto        = data.monto;
+  if (data.fecha        !== undefined) patch.fecha        = data.fecha;
+  if (data.notas        !== undefined) patch.notas        = data.notas ?? null;
+  await supabase.from('gastos').update(patch).eq('id', gastoId);
+}
+
+export async function deleteGasto(gastoId: string): Promise<void> {
+  await supabase.from('gastos').delete().eq('id', gastoId);
 }

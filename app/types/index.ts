@@ -185,3 +185,32 @@ export interface PricingIntel {
   otherMin: number | null;   // min price charged to other clients
   otherMax: number | null;   // max price charged to other clients
 }
+
+// ─── Gastos (Operating Expenses) ─────────────────────────────────────────────
+
+export type GastoCategoria = 'operativo' | 'administrativo' | 'impuesto' | 'nomina';
+
+export const GASTO_CATEGORIAS: { key: GastoCategoria; label: string; emoji: string }[] = [
+  { key: 'operativo',      label: 'Operativos',       emoji: '🏠' },
+  { key: 'administrativo', label: 'Administrativos',   emoji: '🌐' },
+  { key: 'impuesto',       label: 'Impuestos',         emoji: '🧾' },
+  { key: 'nomina',         label: 'Nómina',            emoji: '👷' },
+];
+
+export const GASTO_SUBCATEGORIAS: Record<GastoCategoria, string[]> = {
+  operativo:      ['Renta', 'Agua', 'Luz / CFE', 'Internet', 'Comida empleados', 'Herramientas', 'Materiales', 'Otro'],
+  administrativo: ['Papelería', 'Software', 'Teléfono', 'Contabilidad', 'Otro'],
+  impuesto:       ['ISR', 'IVA por pagar', 'Tenencias', 'IMSS', 'Otro'],
+  nomina:         ['Salario', 'Aguinaldo', 'Vacaciones', 'Bonos', 'Otro'],
+};
+
+export interface Gasto {
+  id: string;
+  tallerId: string;
+  categoria: GastoCategoria;
+  subcategoria: string;
+  concepto: string;
+  monto: number;
+  fecha: string;       // ISO date YYYY-MM-DD
+  notas?: string;
+}
