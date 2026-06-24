@@ -65,6 +65,8 @@ export const clientes = pgTable('clientes', {
   tallerId: uuid('taller_id').notNull().references(() => talleres.id, { onDelete: 'cascade' }),
   nombre: text('nombre').notNull(),
   telefono: text('telefono').default(''),
+  email: text('email'),
+  email2: text('email2'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
@@ -152,7 +154,10 @@ export const ordenesCompra = pgTable('ordenes_compra', {
   numeroOrden: text('numero_orden'),
   descripcion: text('descripcion').default(''),
   partes: jsonb('partes').default([]),
+  subtotalSinIVA: decimal('subtotal_sin_iva', { precision: 12, scale: 2 }).default('0'),
+  ivaAmount: decimal('iva_amount', { precision: 12, scale: 2 }).default('0'),
   total: decimal('total', { precision: 12, scale: 2 }).default('0'),
+  conIVA: boolean('con_iva').default(false),
   estado: text('estado').default('pendiente'),
   fechaRecibida: date('fecha_recibida'),
   pagos: jsonb('pagos').default([]),

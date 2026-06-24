@@ -3,7 +3,9 @@
 export interface Cliente {
   id: string;
   nombre: string;
-  telefono: string;
+  telefono?: string;   // opcional — no todos los clientes dan teléfono
+  email?: string;      // correo principal
+  email2?: string;     // correo secundario (opcional)
 }
 
 export interface Vehiculo {
@@ -107,7 +109,10 @@ export interface OrdenCompra {
   numeroOrden?: string;
   descripcion: string;
   partes: CompraItem[];
-  total: number;
+  subtotalSinIVA: number;  // total de piezas sin IVA
+  ivaAmount: number;       // 16% IVA si conIVA=true, 0 si no
+  total: number;           // subtotalSinIVA + ivaAmount
+  conIVA: boolean;         // ¿la factura del proveedor incluye IVA?
   estado: 'pendiente' | 'recibida' | 'cancelada';
   fechaRecibida?: string;
   pagos: PagoCompra[];

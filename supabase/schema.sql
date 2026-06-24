@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS clientes (
   taller_id  UUID REFERENCES talleres(id) ON DELETE CASCADE NOT NULL,
   nombre     TEXT NOT NULL,
   telefono   TEXT DEFAULT '',
+  email      TEXT DEFAULT NULL,
+  email2     TEXT DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -115,18 +117,21 @@ CREATE TABLE IF NOT EXISTS trabajos (
 
 -- ── Órdenes de Compra ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ordenes_compra (
-  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  taller_id      UUID REFERENCES talleres(id) ON DELETE CASCADE NOT NULL,
-  proveedor_id   UUID REFERENCES proveedores(id) ON DELETE SET NULL,
-  fecha          DATE NOT NULL,
-  numero_orden   TEXT,
-  descripcion    TEXT DEFAULT '',
-  partes         JSONB DEFAULT '[]',
-  total          DECIMAL(12,2) DEFAULT 0,
-  estado         TEXT DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'recibida', 'cancelada')),
-  fecha_recibida DATE,
-  pagos          JSONB DEFAULT '[]',
-  created_at     TIMESTAMPTZ DEFAULT NOW()
+  id                UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  taller_id         UUID REFERENCES talleres(id) ON DELETE CASCADE NOT NULL,
+  proveedor_id      UUID REFERENCES proveedores(id) ON DELETE SET NULL,
+  fecha             DATE NOT NULL,
+  numero_orden      TEXT,
+  descripcion       TEXT DEFAULT '',
+  partes            JSONB DEFAULT '[]',
+  subtotal_sin_iva  DECIMAL(12,2) DEFAULT 0,
+  iva_amount        DECIMAL(12,2) DEFAULT 0,
+  total             DECIMAL(12,2) DEFAULT 0,
+  con_iva           BOOLEAN DEFAULT false,
+  estado            TEXT DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'recibida', 'cancelada')),
+  fecha_recibida    DATE,
+  pagos             JSONB DEFAULT '[]',
+  created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ── Facturas ──────────────────────────────────────────────────

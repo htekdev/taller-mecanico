@@ -21,18 +21,36 @@ export async function getClientes(tallerId: string): Promise<Cliente[]> {
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
-  return (data ?? []).map(r => ({ id: r.id, nombre: r.nombre, telefono: r.telefono }));
+  return (data ?? []).map(r => ({
+    id: r.id,
+    nombre: r.nombre,
+    telefono: r.telefono ?? undefined,
+    email: r.email ?? undefined,
+    email2: r.email2 ?? undefined,
+  }));
 }
 
 export async function insertCliente(tallerId: string, data: Omit<Cliente, 'id'>): Promise<Cliente | null> {
   const { data: row, error } = await supabase
     .from('clientes')
-    .insert({ taller_id: tallerId, nombre: data.nombre, telefono: data.telefono })
+    .insert({
+      taller_id: tallerId,
+      nombre: data.nombre,
+      telefono: data.telefono ?? '',
+      email: data.email ?? null,
+      email2: data.email2 ?? null,
+    })
     .select()
     .single();
 
   if (error || !row) return null;
-  return { id: row.id, nombre: row.nombre, telefono: row.telefono };
+  return {
+    id: row.id,
+    nombre: row.nombre,
+    telefono: row.telefono ?? undefined,
+    email: row.email ?? undefined,
+    email2: row.email2 ?? undefined,
+  };
 }
 
 // ── Vehículos ────────────────────────────────────────────────
@@ -295,18 +313,26 @@ export async function getOrdenes(tallerId: string): Promise<OrdenCompra[]> {
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
-  return (data ?? []).map(r => ({
-    id: r.id,
-    proveedorId: r.proveedor_id ?? '',
-    fecha: r.fecha,
-    numeroOrden: r.numero_orden ?? undefined,
-    descripcion: r.descripcion,
-    partes: (r.partes as CompraItem[]) ?? [],
-    total: Number(r.total),
-    estado: r.estado,
-    fechaRecibida: r.fecha_recibida ?? undefined,
-    pagos: (r.pagos as PagoCompra[]) ?? [],
-  }));
+  return (data ?? []).map(r => {
+    const conIVA = r.con_iva ?? false;
+    const subtotalSinIVA = r.subtotal_sin_iva != null ? Number(r.subtotal_sin_iva) : Number(r.total) / (conIVA ? 1.16 : 1);
+    const ivaAmount = r.iva_amount != null ? Number(r.iva_amount) : (conIVA ? Number(r.total) - subtotalSinIVA : 0);
+    return {
+      id: r.id,
+      proveedorId: r.proveedor_id ?? '',
+      fecha: r.fecha,
+      numeroOrden: r.numero_orden ?? undefined,
+      descripcion: r.descripcion,
+      partes: (r.partes as CompraItem[]) ?? [],
+      subtotalSinIVA: Math.round(subtotalSinIVA * 100) / 100,
+      ivaAmount: Math.round(ivaAmount * 100) / 100,
+      total: Number(r.total),
+      conIVA,
+      estado: r.estado,
+      fechaRecibida: r.fecha_recibida ?? undefined,
+      pagos: (r.pagos as PagoCompra[]) ?? [],
+    };
+  });
 }
 
 export async function insertOrden(tallerId: string, data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>): Promise<OrdenCompra | null> {
@@ -319,7 +345,10 @@ export async function insertOrden(tallerId: string, data: Omit<OrdenCompra, 'id'
       numero_orden: data.numeroOrden ?? null,
       descripcion: data.descripcion,
       partes: data.partes,
+      subtotal_sin_iva: data.subtotalSinIVA,
+      iva_amount: data.ivaAmount,
       total: data.total,
+      con_iva: data.conIVA,
       estado: 'pendiente',
       pagos: [],
     })
@@ -328,10 +357,18 @@ export async function insertOrden(tallerId: string, data: Omit<OrdenCompra, 'id'
 
   if (error || !row) return null;
   return {
-    id: row.id, proveedorId: row.proveedor_id ?? '', fecha: row.fecha,
-    numeroOrden: row.numero_orden ?? undefined, descripcion: row.descripcion,
-    partes: (row.partes as CompraItem[]) ?? [], total: Number(row.total),
-    estado: row.estado, pagos: [],
+    id: row.id,
+    proveedorId: row.proveedor_id ?? '',
+    fecha: row.fecha,
+    numeroOrden: row.numero_orden ?? undefined,
+    descripcion: row.descripcion,
+    partes: (row.partes as CompraItem[]) ?? [],
+    subtotalSinIVA: Number(row.subtotal_sin_iva ?? data.subtotalSinIVA),
+    ivaAmount: Number(row.iva_amount ?? data.ivaAmount),
+    total: Number(row.total),
+    conIVA: row.con_iva ?? false,
+    estado: row.estado,
+    pagos: [],
   };
 }
 
