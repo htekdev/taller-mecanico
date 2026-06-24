@@ -1131,8 +1131,8 @@ export function VistaTrabajo({
                         ) : (
                           <button type="button"
                             onClick={() => onGenerarFactura(trabajo.id)}
-                            className="ml-2 text-xs bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.5 rounded-full hover:bg-amber-100 hover:text-amber-700 transition-colors">
-                            + Factura
+                            className="ml-2 text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full hover:bg-amber-200 transition-colors">
+                            🧾 Pendiente de facturar
                           </button>
                         )
                       )}
