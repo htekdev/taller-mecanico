@@ -21,10 +21,11 @@ import { VistaCuentas, VistaCuentasPorPagar } from '@/app/modules/cuentas';
 import { VistaResumen } from '@/app/modules/resumen';
 import { VistaHistorial } from '@/app/modules/historial';
 import { VistaConfiguracion } from '@/app/modules/configuracion';
+import { VistaCotizaciones } from '@/app/modules/cotizaciones';
 import { useAuth }      from '@/app/context/auth';
 import * as db          from '@/app/lib/db';
 
-type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion';
+type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones';
 
 export default function TallerMecanico() {
   const { taller, talleres, selectTaller, user, signOut } = useAuth();
@@ -269,6 +270,7 @@ export default function TallerMecanico() {
     { key: 'pagos',       icon: '🔴', label: 'Por Pagar',         count: ordenesPendientesPago > 0 ? ordenesPendientesPago : null },
     { key: 'resumen',       icon: '📊', label: 'Resumen',           count: null },
     { key: 'historial',     icon: '📋', label: 'Historial',          count: null },
+    { key: 'cotizaciones',  icon: '📄', label: 'Cotizaciones',       count: null },
     { key: 'configuracion', icon: '⚙️', label: 'Configuración',     count: null },
   ] as const;
 
@@ -415,6 +417,9 @@ export default function TallerMecanico() {
           )}
           {vista === 'historial' && (
             <VistaHistorial clientes={clientes} vehiculos={vehiculos} trabajos={trabajos} />
+          )}
+          {vista === 'cotizaciones' && (
+            <VistaCotizaciones clientes={clientes} vehiculos={vehiculos} />
           )}
           {vista === 'configuracion' && (
             <VistaConfiguracion />
