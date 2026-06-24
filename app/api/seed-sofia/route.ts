@@ -19,7 +19,7 @@ const MEMBER_ID = 'c0000000-0000-0000-0000-000000000001';
 
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get('secret');
-  if (!secret || secret !== process.env.MIGRATE_SECRET) {
+  if (!secret || secret !== process.env.SEED_SOFIA_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
