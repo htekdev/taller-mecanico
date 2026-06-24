@@ -178,7 +178,8 @@ async function generarPDFReporte(
   const trabsPend = trabajos.filter(t => getEstadoPago(t) !== 'pagado');
   if (trabsPend.length > 0) {
     sectionLabel('Servicios sin factura');
-    const wDesc = 60, wVeh = 42, wFecha = 24, wTotal = 24, wPag = 24, wSal = cw - 174;
+    // cw ≈ 179.9mm — dar espacio justo a columnas de dinero (antes wSal era solo 5.9mm)
+    const wDesc = 48, wVeh = 32, wFecha = 22, wTotal = 28, wPag = 28, wSal = cw - 158;
     thead([
       { label: 'DESCRIPCIÓN', w: wDesc,  align: 'left'  },
       { label: 'UNIDAD',      w: wVeh,   align: 'left'  },
