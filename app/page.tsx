@@ -181,7 +181,10 @@ export default function TallerMecanico() {
     const total    = subtotal + iva;
     const nuevo = await db.insertTrabajo(taller.id, { ...data, iva, total, estadoFacturacion: 'sin_facturar' });
     if (!nuevo) return;
-    setTrabajos(prev => [...prev, nuevo]);
+    // Merge client-side manoDeObraItems into the DB response to ensure tipo/costoTaller
+    // fields are always present — the Supabase JSONB round-trip preserves them but this
+    // guarantees the in-memory state matches exactly what was submitted by the form.
+    setTrabajos(prev => [...prev, { ...nuevo, manoDeObraItems: data.manoDeObraItems }]);
     if (data.partes.length > 0) {
       const nuevoInv = inventario.map(r => {
         const usada = data.partes.find(p => p.refaccionId === r.id);

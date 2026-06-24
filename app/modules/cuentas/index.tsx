@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { Factura, Trabajo, Cliente, Vehiculo, OrdenCompra, Proveedor, PagoFactura, Pago, PagoCompra, PagoServicioExterno, ManoDeObraItem } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import {
@@ -598,11 +598,16 @@ export function VistaCuentasPorPagar({
   const [expandidoItem, setExpandidoItem]   = useState<string | null>(null);
   const [pagoServForm, setPagoServForm]     = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo', nota: '' });
 
-  // Aggregate all external ManoDeObraItems across all trabajos
+  // Aggregate all external ManoDeObraItems across all trabajos.
+  // Dual filter: explicit tipo='externo' OR items with a costoTaller set (belt-and-suspenders
+  // in case the tipo field wasn't returned from the DB JSONB round-trip).
   type ExtItem = { item: ManoDeObraItem; trabajoId: string; trabajoDesc: string; trabajoFecha: string; clienteNombre: string; vehiculoLabel: string };
   const extItems: ExtItem[] = trabajos.flatMap(t =>
     (t.manoDeObraItems ?? [])
-      .filter(i => i.tipo === 'externo')
+      .filter(i =>
+        i.tipo === 'externo' ||
+        (i.costoTaller != null && i.costoTaller > 0 && i.tipo !== 'interno')
+      )
       .map(i => {
         const cli = clientes.find(c => c.id === t.clienteId);
         const veh = vehiculos.find(v => v.id === t.vehiculoId);
@@ -616,6 +621,13 @@ export function VistaCuentasPorPagar({
         };
       })
   );
+
+  // Auto-switch to the Servicios tab whenever external items are present.
+  // This prevents UX confusion where Sofia is on the Refacciones (default) tab
+  // and doesn't notice the new 🏭 Servicios Externos sub-tab.
+  useEffect(() => {
+    if (extItems.length > 0) setTabPago('servicios');
+  }, [extItems.length]);
 
   // Group by proveedorId (or fall back to proveedorNombre)
   type ProvGroup = { key: string; nombre: string; items: ExtItem[]; saldoTotal: number; costoTotal: number };
@@ -935,6 +947,24 @@ export function VistaCuentasPorPagar({
       ════════════════════════════════════════════════════════ */}
       {tabPago === 'refacciones' && (
         <div>
+          {/* Callout: nudge to Servicios tab if there are pending external services */}
+          {extItems.some(ei => getEstadoServicio(ei.item) !== 'pagado') && (
+            <button
+              type="button"
+              onClick={() => setTabPago('servicios')}
+              className="w-full mb-4 flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-left hover:bg-orange-100 transition-colors"
+            >
+              <span className="text-xl">🏭</span>
+              <div className="flex-1">
+                <div className="text-sm font-bold text-orange-800">
+                  {extItems.filter(ei => getEstadoServicio(ei.item) !== 'pagado').length} servicio{extItems.filter(ei => getEstadoServicio(ei.item) !== 'pagado').length !== 1 ? 's' : ''} externo{extItems.filter(ei => getEstadoServicio(ei.item) !== 'pagado').length !== 1 ? 's' : ''} pendiente{extItems.filter(ei => getEstadoServicio(ei.item) !== 'pagado').length !== 1 ? 's' : ''} de pago
+                </div>
+                <div className="text-xs text-orange-600">Ver en pestaña 🏭 Servicios Externos →</div>
+              </div>
+              <span className="text-orange-500 font-bold text-lg">→</span>
+            </button>
+          )}
+
           {ordenesPagables.length === 0 && (
             <div className="text-center py-14 text-slate-400">
               <div className="text-5xl mb-3">🔴</div>
