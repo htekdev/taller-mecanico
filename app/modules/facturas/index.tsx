@@ -34,6 +34,7 @@ export function VistaFacturas({
 
   const counts = { todos: facturas.length, pendiente: facturas.filter(f => getEstadoPagoFactura(f) === 'pendiente').length, parcial: facturas.filter(f => getEstadoPagoFactura(f) === 'parcial').length, pagado: facturas.filter(f => getEstadoPagoFactura(f) === 'pagado').length };
   const totalPendiente = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0);
+  const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
 
   const handlePago = (facturaId: string, saldo: number) => {
     if (pagoForm.monto <= 0) return;
@@ -45,6 +46,16 @@ export function VistaFacturas({
   return (
     <div>
       <SectionTitle title="Facturas" subtitle="Facturas generadas desde trabajos. Aquí se registran los pagos de clientes." />
+
+      {/* Banner: trabajos pendientes de facturar */}
+      {trabajosPendientesFacturar > 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-3 mb-4 flex items-center gap-3 text-sm">
+          <span className="text-2xl">🧾</span>
+          <span className="text-indigo-800 font-semibold">
+            {trabajosPendientesFacturar} trabajo{trabajosPendientesFacturar !== 1 ? 's' : ''} pendiente{trabajosPendientesFacturar !== 1 ? 's' : ''} de facturar — ve a Trabajos para emitirlas
+          </span>
+        </div>
+      )}
 
       {facturas.length === 0 && (
         <div className="text-center py-16 text-slate-400"><div className="text-5xl mb-3">🧾</div>

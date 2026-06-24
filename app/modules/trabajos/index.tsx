@@ -357,6 +357,7 @@ export function VistaTrabajo({
     : inventario.length;
 
   const trabajosPendientes = trabajos.filter(t => t.estado === 'pendiente');
+  const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
   const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
   const trabajosFiltrados = [...trabajos]
     .filter(t => {
@@ -994,6 +995,16 @@ export function VistaTrabajo({
           </div>
         )}
 
+        {/* Banner: trabajos pendientes de facturar */}
+        {trabajosPendientesFacturar > 0 && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-3 mb-4 flex items-center gap-3 text-sm">
+            <span className="text-2xl">🧾</span>
+            <span className="text-indigo-800 font-semibold">
+              {trabajosPendientesFacturar} trabajo{trabajosPendientesFacturar !== 1 ? 's' : ''} pendiente{trabajosPendientesFacturar !== 1 ? 's' : ''} de facturar — usa el botón 🧾 en la columna Descripción
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-base font-bold text-slate-700">
             Historial de Trabajos
@@ -1131,8 +1142,8 @@ export function VistaTrabajo({
                         ) : (
                           <button type="button"
                             onClick={() => onGenerarFactura(trabajo.id)}
-                            className="ml-2 text-xs bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.5 rounded-full hover:bg-amber-100 hover:text-amber-700 transition-colors">
-                            + Factura
+                            className="ml-2 text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full hover:bg-amber-200 transition-colors">
+                            🧾 Pendiente de facturar
                           </button>
                         )
                       )}
