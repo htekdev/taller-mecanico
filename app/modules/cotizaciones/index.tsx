@@ -4,24 +4,24 @@ import { useState, useCallback, useEffect } from 'react';
 import type { Cliente, Vehiculo, Refaccion, TrabajoRefaccion, ManoDeObraItem } from '@/app/types';
 import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
 
-// ΓöÇΓöÇΓöÇ Constants ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const COT_COUNTER_KEY   = 'taller_cot_counter';
 const COT_HISTORY_KEY   = 'taller_cotizaciones';
 const NUM_PROVEEDOR_RED = 'P004093';
 
-// Lista de departamentos del Ayuntamiento de M├⌐rida ΓÇö confirmada por Sofia.
-// Para agregar nuevos departamentos, a├▒adir una entrada a este arreglo.
+// Lista de departamentos del Ayuntamiento de Mérida — confirmada por Sofia.
+// Para agregar nuevos departamentos, añadir una entrada a este arreglo.
 const DEPARTAMENTOS_AYUNTAMIENTO: string[] = [
-  'ΓÇö Seleccionar departamento ΓÇö',
-  'Obras p├║blicas mantenimiento vial',
-  'Servicios p├║blicos aseo urbano poniente',
-  'Servicios p├║blicos aseo urbano oriente',
+  '— Seleccionar departamento —',
+  'Obras públicas mantenimiento vial',
+  'Servicios públicos aseo urbano poniente',
+  'Servicios públicos aseo urbano oriente',
 ];
 
-const AUTORIZADOS: string[] = ['H├⌐ctor Rocha', 'Sof├¡a Rocha'];
+const AUTORIZADOS: string[] = ['Héctor Rocha', 'Sofía Rocha'];
 
-// ΓöÇΓöÇΓöÇ Storage helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── Storage helpers ──────────────────────────────────────────────────────────
 
 function assignNextNumber(): string {
   if (typeof window === 'undefined') return 'COT-001';
@@ -41,7 +41,7 @@ function persistHistory(list: CotizacionGuardada[]): void {
   localStorage.setItem(COT_HISTORY_KEY, JSON.stringify(list));
 }
 
-// ΓöÇΓöÇΓöÇ Types ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type Plantilla = 'ayuntamiento' | 'red_ambiental' | 'general';
 
@@ -66,7 +66,7 @@ interface FormCotizacion {
   trabajo: string;
   observaciones: string;
   incluirIVA: boolean;
-  autorizadoPor: string;      // H├⌐ctor Rocha | Sof├¡a Rocha
+  autorizadoPor: string;      // Héctor Rocha | Sofía Rocha
   // Ayuntamiento
   inventario: string;
   ordenServicio: string;
@@ -104,7 +104,7 @@ export interface ConversionTrabajo {
 
 type Pantalla = 'inicio' | 'formulario' | 'preview';
 
-// ΓöÇΓöÇΓöÇ Helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const newItem = (): ItemLinea => ({
   id: Date.now().toString() + Math.random().toString(36).slice(2),
@@ -126,7 +126,7 @@ function calcTotales(form: FormCotizacion) {
 
 const hoy = () => new Date().toISOString().split('T')[0];
 
-// ΓöÇΓöÇΓöÇ PDF Generator ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── PDF Generator ────────────────────────────────────────────────────────────
 
 async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) {
   const { jsPDF } = await import('jspdf');
@@ -148,12 +148,12 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
   } catch { /* silent */ }
 
   const { subtotal, iva, total } = calcTotales(form);
-  const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de M├⌐rida'
+  const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de Mérida'
     : plantilla === 'red_ambiental' ? 'Red Ambiental' : form.cliente;
 
   let y = 14;
 
-  // ΓöÇΓöÇ Header ΓöÇΓöÇ
+  // ── Header ──
   if (logoData) {
     doc.addImage(logoData, 'JPEG', ml, y, 22, 18);
   } else {
@@ -164,33 +164,33 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
   const hx = ml + 26;
   doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('MICRO DIESEL DE MERIDA', hx, y + 5);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
-  doc.text('H├⌐ctor Armando Rocha Sep├║lveda', hx, y + 10);
-  doc.text('Circuito Colonias No. 752 x 64j y 64k, Col. Castilla C├ímara', hx, y + 14);
-  doc.text('CP 97278, M├⌐rida, Yucat├ín    Tel (999) 317.22.46    Cel. 999 3597970', hx, y + 18);
+  doc.text('Héctor Armando Rocha Sepúlveda', hx, y + 10);
+  doc.text('Circuito Colonias No. 752 x 64j y 64k, Col. Castilla Cámara', hx, y + 14);
+  doc.text('CP 97278, Mérida, Yucatán    Tel (999) 317.22.46    Cel. 999 3597970', hx, y + 18);
   y += 24;
 
-  // ΓöÇΓöÇ Title bar ΓöÇΓöÇ
+  // ── Title bar ──
   doc.setFillColor(30, 64, 175); doc.rect(ml, y, cw, 8, 'F');
   doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-  doc.text('COTIZACI├ôN', pw / 2, y + 5.5, { align: 'center' }); doc.setTextColor(0, 0, 0);
+  doc.text('COTIZACIÓN', pw / 2, y + 5.5, { align: 'center' }); doc.setTextColor(0, 0, 0);
   y += 12;
 
-  // ΓöÇΓöÇ Info block ΓöÇΓöÇ
+  // ── Info block ──
   const col1 = ml, col2 = ml + cw / 2 + 2;
   const infoRow = (label: string, value: string, x: number, cy: number) => {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.text(label + ':', x, cy);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-    doc.text(value || 'ΓÇö', x + doc.getTextWidth(label + ': ') + 0.5, cy);
+    doc.text(value || '—', x + doc.getTextWidth(label + ': ') + 0.5, cy);
   };
 
-  infoRow('No. Cotizaci├│n', form.numeroCotizacion, col1, y);
-  infoRow('Fecha', form.fecha ? new Date(form.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'ΓÇö', col2, y); y += 5;
+  infoRow('No. Cotización', form.numeroCotizacion, col1, y);
+  infoRow('Fecha', form.fecha ? new Date(form.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—', col2, y); y += 5;
   infoRow('Cliente', clienteNombre, col1, y);
   if (plantilla === 'ayuntamiento') infoRow('Departamento', form.departamento, col2, y);
-  else if (plantilla === 'red_ambiental') infoRow('N├║m. Proveedor', NUM_PROVEEDOR_RED, col2, y);
+  else if (plantilla === 'red_ambiental') infoRow('Núm. Proveedor', NUM_PROVEEDOR_RED, col2, y);
   y += 5;
   infoRow('Marca', form.marca, col1, y); infoRow('Modelo', form.modelo, col2, y); y += 5;
-  infoRow('A├▒o', form.anio || 'ΓÇö', col1, y);
+  infoRow('Año', form.anio || '—', col1, y);
   if (form.placas) infoRow('Placas', form.placas, col2, y);
   y += 5;
   if (form.kms) { infoRow('Kilometraje', form.kms + ' km', col1, y); y += 5; }
@@ -201,13 +201,13 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
   }
   if (form.trabajo) {
     y += 2; doc.setDrawColor(200, 200, 200); doc.line(ml, y, ml + cw, y); y += 4;
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.text('TRABAJO / DESCRIPCI├ôN:', ml, y); y += 4;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.text('TRABAJO / DESCRIPCIÓN:', ml, y); y += 4;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
     const tl = doc.splitTextToSize(form.trabajo, cw); doc.text(tl, ml, y); y += tl.length * 4 + 2;
   }
   y += 3;
 
-  // ΓöÇΓöÇ Item table helper ΓöÇΓöÇ
+  // ── Item table helper ──
   const drawTable = (title: string, items: ItemLinea[], hColor: [number, number, number], sy: number): number => {
     let ty = sy;
     const cols = { no: 10, qty: 18, desc: cw - 10 - 18 - 30 - 28, price: 30, tot: 28 };
@@ -220,7 +220,7 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
     let cx = ml;
     doc.text('NO', cx + 2, ty + 4.2); cx += cols.no;
     doc.text('CANTIDAD', cx + 1, ty + 4.2); cx += cols.qty;
-    doc.text('DESCRIPCI├ôN', cx + 1, ty + 4.2); cx += cols.desc;
+    doc.text('DESCRIPCIÓN', cx + 1, ty + 4.2); cx += cols.desc;
     doc.text('PRECIO UNIT.', cx + 1, ty + 4.2); cx += cols.price;
     doc.text('TOTAL', cx + 1, ty + 4.2);
     ty += rh; doc.setDrawColor(200, 210, 230); doc.line(ml, ty, ml + cw, ty);
@@ -255,7 +255,7 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
   y = drawTable('REFACCIONES', form.refacciones, [30, 100, 180], y);
   y = drawTable('MANO DE OBRA', form.manoDeObra, [22, 120, 70], y);
 
-  // ΓöÇΓöÇ Totals block ΓÇö simplified: Subtotal / IVA / TOTAL ΓöÇΓöÇ
+  // ── Totals block — simplified: Subtotal / IVA / TOTAL ──
   const tx = ml + cw - 58, tw = 58;
   const numTotRows = form.incluirIVA ? 3 : 2;
   doc.setDrawColor(180, 190, 210); doc.rect(tx, y, tw, 6 * numTotRows + 2, 'S');
@@ -275,14 +275,14 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
   totRow('SUBTOTAL:', '$' + fmtPeso(subtotal), true, [245, 247, 250]);
   if (form.incluirIVA) totRow('IVA (16%):', '$' + fmtPeso(iva), false, [255, 251, 235]);
 
-  // TOTAL ΓÇö dark blue row with white text
+  // TOTAL — dark blue row with white text
   doc.setFillColor(30, 64, 175); doc.rect(tx, y, tw, 6, 'F');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
   doc.text('TOTAL:', tx + 2, y + 4.3);
   doc.text('$' + fmtPeso(total), tx + tw - 2, y + 4.3, { align: 'right' });
   doc.setTextColor(0, 0, 0); y += 8;
 
-  // ΓöÇΓöÇ Observaciones ΓöÇΓöÇ
+  // ── Observaciones ──
   if (form.observaciones) {
     y += 4; doc.setDrawColor(200, 200, 200); doc.line(ml, y, ml + cw, y); y += 5;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.text('OBSERVACIONES:', ml, y); y += 4;
@@ -290,7 +290,7 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
     const ol = doc.splitTextToSize(form.observaciones, cw); doc.text(ol, ml, y); y += ol.length * 4 + 3;
   }
 
-  // ΓöÇΓöÇ Signature + Autorizador ΓöÇΓöÇ
+  // ── Signature + Autorizador ──
   y += 10;
   doc.setDrawColor(100, 100, 100); doc.line(ml, y, ml + 65, y);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
@@ -300,15 +300,15 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion) 
   doc.save(`${form.numeroCotizacion || 'Cotizacion'}.pdf`);
 }
 
-// ΓöÇΓöÇΓöÇ Template definitions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── Template definitions ─────────────────────────────────────────────────────
 
 const PLANTILLAS: { key: Plantilla; emoji: string; label: string; desc: string }[] = [
-  { key: 'ayuntamiento',  emoji: '≡ƒÅ¢∩╕Å', label: 'Ayuntamiento de M├⌐rida', desc: 'Inventario, O.S. y Departamento' },
-  { key: 'red_ambiental', emoji: 'ΓÖ╗∩╕Å', label: 'Red Ambiental',           desc: 'N├║m. Proveedor fijo P004093'  },
-  { key: 'general',       emoji: '≡ƒöº', label: 'DIMMSA / General',        desc: 'Selecciona cliente y veh├¡culo' },
+  { key: 'ayuntamiento',  emoji: '🏛️', label: 'Ayuntamiento de Mérida', desc: 'Inventario, O.S. y Departamento' },
+  { key: 'red_ambiental', emoji: '♻️', label: 'Red Ambiental',           desc: 'Núm. Proveedor fijo P004093'  },
+  { key: 'general',       emoji: '🔧', label: 'DIMMSA / General',        desc: 'Selecciona cliente y vehículo' },
 ];
 
-// ΓöÇΓöÇΓöÇ Editable items table ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── Editable items table ─────────────────────────────────────────────────────
 
 function TablaItems({ titulo, color, items, onChange }: {
   titulo: string; color: 'blue' | 'green'; items: ItemLinea[]; onChange: (items: ItemLinea[]) => void;
@@ -328,11 +328,11 @@ function TablaItems({ titulo, color, items, onChange }: {
       <div className="border border-slate-200 rounded-b-xl overflow-hidden">
         <div className="hidden sm:grid grid-cols-12 gap-1 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
           <div className="col-span-1">No.</div><div className="col-span-1">Cant.</div>
-          <div className="col-span-6">Descripci├│n</div><div className="col-span-2">Precio Unit.</div>
+          <div className="col-span-6">Descripción</div><div className="col-span-2">Precio Unit.</div>
           <div className="col-span-1 text-right">Total</div><div className="col-span-1"/>
         </div>
         {items.length === 0 && (
-          <div className="px-4 py-4 text-center text-slate-400 text-sm italic">Sin partidas ΓÇö haz clic en &quot;+ Agregar&quot;</div>
+          <div className="px-4 py-4 text-center text-slate-400 text-sm italic">Sin partidas — haz clic en &quot;+ Agregar&quot;</div>
         )}
         {items.map((item, idx) => (
           <div key={item.id} className={`grid grid-cols-12 gap-1 px-3 py-2 items-center border-t border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
@@ -343,7 +343,7 @@ function TablaItems({ titulo, color, items, onChange }: {
             </div>
             <div className="col-span-6">
               <input type="text" value={item.descripcion} onChange={e => upd(item.id, 'descripcion', e.target.value)}
-                className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" placeholder="Descripci├│n..."/>
+                className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" placeholder="Descripción..."/>
             </div>
             <div className="col-span-2">
               <div className="relative">
@@ -354,7 +354,7 @@ function TablaItems({ titulo, color, items, onChange }: {
             </div>
             <div className="col-span-1 text-right text-sm font-semibold text-slate-700">${fmtPeso(calcItem(item))}</div>
             <div className="col-span-1 flex justify-end">
-              <button onClick={() => rem(item.id)} className="text-slate-400 hover:text-rose-500 transition-colors text-lg leading-none" title="Eliminar">├ù</button>
+              <button onClick={() => rem(item.id)} className="text-slate-400 hover:text-rose-500 transition-colors text-lg leading-none" title="Eliminar">×</button>
             </div>
           </div>
         ))}
@@ -367,20 +367,20 @@ function TablaItems({ titulo, color, items, onChange }: {
   );
 }
 
-// ΓöÇΓöÇΓöÇ Preview screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── Preview screen ───────────────────────────────────────────────────────────
 
 function VistaPreviaContenido({ plantilla, form, entry, onEditar, onNueva }: {
   plantilla: Plantilla; form: FormCotizacion; entry: CotizacionGuardada | null; onEditar: () => void; onNueva: () => void;
 }) {
   const [generando, setGenerando] = useState(false);
   const { subtotalRef, subtotalMO, subtotal, iva, total } = calcTotales(form);
-  const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de M├⌐rida'
+  const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de Mérida'
     : plantilla === 'red_ambiental' ? 'Red Ambiental' : form.cliente;
 
   return (
     <div>
       <div className="flex items-center gap-3 mb-2">
-        <SectionTitle title={`Cotizaci├│n ${form.numeroCotizacion}`} subtitle="Guardada ΓÇö descarga el PDF cuando quieras"/>
+        <SectionTitle title={`Cotización ${form.numeroCotizacion}`} subtitle="Guardada — descarga el PDF cuando quieras"/>
         {entry?.editada && (
           <span className="text-xs font-semibold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full self-start mt-1">Editada</span>
         )}
@@ -390,34 +390,34 @@ function VistaPreviaContenido({ plantilla, form, entry, onEditar, onNueva }: {
       </div>
 
       <div className="flex gap-3 mb-6 flex-wrap">
-        <Btn variant="ghost" onClick={onNueva}>ΓåÉ Inicio</Btn>
-        {!entry?.cancelada && <Btn variant="ghost" onClick={onEditar}>Γ£Å∩╕Å Editar</Btn>}
+        <Btn variant="ghost" onClick={onNueva}>← Inicio</Btn>
+        {!entry?.cancelada && <Btn variant="ghost" onClick={onEditar}>✏️ Editar</Btn>}
         <Btn variant="success" onClick={async () => { setGenerando(true); try { await generarYDescargarPDF(plantilla, form); } finally { setGenerando(false); } }} disabled={generando}>
-          {generando ? 'ΓÅ│ Generando...' : 'Γ¼ç∩╕Å Descargar PDF'}
+          {generando ? '⏳ Generando...' : '⬇️ Descargar PDF'}
         </Btn>
       </div>
 
       <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
         <div className="bg-slate-800 text-white px-6 py-4 flex items-center gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-mj-merida.jpg" alt="Logo MJ M├⌐rida" className="h-14 w-auto rounded object-contain bg-white p-1"/>
+          <img src="/logo-mj-merida.jpg" alt="Logo MJ Mérida" className="h-14 w-auto rounded object-contain bg-white p-1"/>
           <div>
             <div className="font-bold text-base">MICRO DIESEL DE MERIDA</div>
-            <div className="text-xs text-slate-300">H├⌐ctor Armando Rocha Sep├║lveda</div>
-            <div className="text-xs text-slate-400">Circuito Colonias No. 752 x 64j y 64k, Col. Castilla C├ímara, CP 97278, M├⌐rida, Yucat├ín</div>
-            <div className="text-xs text-slate-400">Tel (999) 317.22.46 ┬╖ Cel. 999 3597970</div>
+            <div className="text-xs text-slate-300">Héctor Armando Rocha Sepúlveda</div>
+            <div className="text-xs text-slate-400">Circuito Colonias No. 752 x 64j y 64k, Col. Castilla Cámara, CP 97278, Mérida, Yucatán</div>
+            <div className="text-xs text-slate-400">Tel (999) 317.22.46 · Cel. 999 3597970</div>
           </div>
         </div>
-        <div className="bg-blue-700 text-white text-center font-bold py-2 tracking-widest text-sm">COTIZACI├ôN</div>
+        <div className="bg-blue-700 text-white text-center font-bold py-2 tracking-widest text-sm">COTIZACIÓN</div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 px-6 py-4 text-sm border-b border-slate-200">
-          <InfoFila label="No. Cotizaci├│n" value={form.numeroCotizacion}/>
-          <InfoFila label="Fecha" value={form.fecha ? new Date(form.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'ΓÇö'}/>
+          <InfoFila label="No. Cotización" value={form.numeroCotizacion}/>
+          <InfoFila label="Fecha" value={form.fecha ? new Date(form.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}/>
           <InfoFila label="Cliente" value={clienteNombre}/>
           {plantilla === 'ayuntamiento' && <InfoFila label="Departamento" value={form.departamento}/>}
-          {plantilla === 'red_ambiental' && <InfoFila label="N├║m. Proveedor" value={NUM_PROVEEDOR_RED}/>}
+          {plantilla === 'red_ambiental' && <InfoFila label="Núm. Proveedor" value={NUM_PROVEEDOR_RED}/>}
           <InfoFila label="Marca" value={form.marca}/><InfoFila label="Modelo" value={form.modelo}/>
-          {form.anio && <InfoFila label="A├▒o" value={form.anio}/>}
+          {form.anio && <InfoFila label="Año" value={form.anio}/>}
           {form.placas && <InfoFila label="Placas" value={form.placas}/>}
           {form.kms && <InfoFila label="Kilometraje" value={form.kms + ' km'}/>}
           {plantilla === 'ayuntamiento' && form.inventario && <InfoFila label="No. Inventario" value={form.inventario}/>}
@@ -426,14 +426,14 @@ function VistaPreviaContenido({ plantilla, form, entry, onEditar, onNueva }: {
         </div>
 
         {form.trabajo && <div className="px-6 py-3 border-b border-slate-200 bg-slate-50">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trabajo / Descripci├│n: </span>
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trabajo / Descripción: </span>
           <p className="text-sm text-slate-700 mt-1">{form.trabajo}</p>
         </div>}
 
         <TablaPreview titulo="REFACCIONES" colorHeader="bg-blue-700" items={form.refacciones} subtotal={subtotalRef}/>
         <TablaPreview titulo="MANO DE OBRA" colorHeader="bg-emerald-700" items={form.manoDeObra} subtotal={subtotalMO}/>
 
-        {/* Totals ΓÇö simplified (single Subtotal line) */}
+        {/* Totals — simplified (single Subtotal line) */}
         <div className="px-6 py-4 border-t border-slate-200">
           <div className="ml-auto w-full max-w-xs space-y-1.5">
             <FilaTotal label="SUBTOTAL" value={subtotal} bold/>
@@ -459,7 +459,7 @@ function InfoFila({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">{label}: </span>
-      <span className="text-sm text-slate-800">{value || 'ΓÇö'}</span>
+      <span className="text-sm text-slate-800">{value || '—'}</span>
     </div>
   );
 }
@@ -471,7 +471,7 @@ function TablaPreview({ titulo, colorHeader, items, subtotal }: { titulo: string
       {items.length === 0 ? <div className="px-6 py-3 text-slate-400 text-sm italic text-center">Sin partidas</div> : (
         <table className="w-full text-sm">
           <thead className="bg-slate-100"><tr>
-            {['No.', 'Cant.', 'Descripci├│n', 'Precio Unit.', 'Total'].map((h, i) => (
+            {['No.', 'Cant.', 'Descripción', 'Precio Unit.', 'Total'].map((h, i) => (
               <th key={h} className={`px-3 py-2 text-xs font-semibold text-slate-500 uppercase ${i >= 3 ? 'text-right' : 'text-left'}`}>{h}</th>
             ))}
           </tr></thead>
@@ -507,7 +507,8 @@ function FilaTotal({ label, value, bold = false, highlight }: { label: string; v
   );
 }
 
-// ΓöÇΓöÇΓöÇ History list ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── History list ─────────────────────────────────────────────────────────────
+
 
 // ── ModalAgregarInventario ────────────────────────────────────────────────────
 // Mini popup to register a missing part in inventory before conversion
@@ -535,17 +536,17 @@ function ModalAgregarInventario({ item, onGuardar, onCerrar }: {
       onClick={onCerrar}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 relative"
         onClick={e => e.stopPropagation()}>
-        <button onClick={onCerrar} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all text-lg font-bold">&#x2715;</button>
+        <button onClick={onCerrar} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all text-lg font-bold">✕</button>
 
         <div>
-          <div className="text-2xl mb-1">&#128230;</div>
+          <div className="text-2xl mb-1">📦</div>
           <h3 className="font-bold text-slate-800 text-lg">Agregar al Inventario</h3>
-          <p className="text-sm text-slate-500 mt-1">Registra esta pieza antes de convertir la cotizaci&#243;n.</p>
+          <p className="text-sm text-slate-500 mt-1">Registra esta pieza antes de convertir la cotización.</p>
         </div>
 
         <div className="bg-slate-50 rounded-xl p-3 text-sm border border-slate-200">
           <div className="font-semibold text-slate-700">{item.descripcion}</div>
-          <div className="text-slate-500 text-xs mt-0.5">Cant: {item.cantidad} &#183; Precio venta: ${fmtPeso(precioVenta)}</div>
+          <div className="text-slate-500 text-xs mt-0.5">Cant: {item.cantidad} · Precio venta: ${fmtPeso(precioVenta)}</div>
         </div>
 
         <div className="space-y-3">
@@ -557,7 +558,7 @@ function ModalAgregarInventario({ item, onGuardar, onCerrar }: {
                 className="pl-6"
                 value={costoCompra}
                 onChange={e => setCostoCompra(e.target.value)}
-                placeholder="&#191;Cu&#225;nto pagaste al proveedor?" />
+                placeholder="¿Cuánto pagaste al proveedor?" />
             </div>
           </div>
           <div>
@@ -573,7 +574,7 @@ function ModalAgregarInventario({ item, onGuardar, onCerrar }: {
           <Btn variant="ghost" onClick={onCerrar}>Cancelar</Btn>
           <Btn variant="success" onClick={handleGuardar}
             disabled={guardando || parseNum(costoCompra) <= 0}>
-            {guardando ? 'Guardando...' : '&#x2705; Guardar pieza'}
+            {guardando ? 'Guardando...' : '✅ Guardar pieza'}
           </Btn>
         </div>
       </div>
@@ -685,34 +686,34 @@ function ModalReconciliacion({ cotizacion, inventario, onAgregarRefaccion, onCre
     }
   };
 
-  // ── Success screen ─────────────────────────────────────────────────────────
+  // ── Pantalla de éxito ──────────────────────────────────────────────────────
   if (exito) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center space-y-4">
-          <div className="text-5xl">&#x2705;</div>
-          <h2 className="text-xl font-bold text-slate-800">&#161;Trabajo Creado!</h2>
+          <div className="text-5xl">✅</div>
+          <h2 className="text-xl font-bold text-slate-800">¡Trabajo Creado!</h2>
           <p className="text-sm text-slate-500">
             El trabajo fue creado a partir de <strong>{cotizacion.numeroCotizacion}</strong>.
-            Puedes verlo en la pesta&#241;a de Trabajos.
+            Puedes verlo en la pestaña de Trabajos.
           </p>
-          <Btn variant="success" onClick={onCerrar}>Ir a Trabajos &#8594;</Btn>
+          <Btn variant="success" onClick={onCerrar}>Ir a Trabajos →</Btn>
         </div>
       </div>
     );
   }
 
-  // ── Main reconciliation view ───────────────────────────────────────────────
+  // ── Vista principal de reconciliación ─────────────────────────────────────
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
         onClick={addingItem ? undefined : onCerrar}>
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5 relative overflow-y-auto max-h-[92vh]"
           onClick={e => e.stopPropagation()}>
-          <button onClick={onCerrar} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all text-lg font-bold">&#x2715;</button>
+          <button onClick={onCerrar} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all text-lg font-bold">✕</button>
 
           <div>
-            <div className="text-2xl mb-1">&#128295;</div>
+            <div className="text-2xl mb-1">🔧</div>
             <h2 className="text-xl font-bold text-slate-800">Convertir a Trabajo</h2>
             <p className="text-sm text-slate-500 mt-1">
               Verificando refacciones de <strong>{cotizacion.numeroCotizacion}</strong> contra el inventario.
@@ -727,12 +728,12 @@ function ModalReconciliacion({ cotizacion, inventario, onAgregarRefaccion, onCre
                 const resolved = resolvedMap[item.id];
                 return (
                   <div key={item.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${resolved ? 'bg-emerald-50 border-emerald-200' : 'bg-orange-50 border-orange-200'}`}>
-                    <span className="text-xl flex-shrink-0">{resolved ? '&#x2705;' : '&#x26A0;&#xFE0F;'}</span>
+                    <span className="text-xl flex-shrink-0">{resolved ? '✅' : '⚠️'}</span>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-slate-800 text-sm truncate">{item.descripcion}</div>
                       <div className="text-xs text-slate-500">
-                        Cant: {item.cantidad} &#183; ${fmtPeso(parseNum(item.precioUnitario))}
-                        {resolved && <span className="ml-2 text-emerald-600 font-medium">&#10003; En inventario</span>}
+                        Cant: {item.cantidad} · ${fmtPeso(parseNum(item.precioUnitario))}
+                        {resolved && <span className="ml-2 text-emerald-600 font-medium">✓ En inventario</span>}
                       </div>
                     </div>
                     {!resolved && (
@@ -754,7 +755,7 @@ function ModalReconciliacion({ cotizacion, inventario, onAgregarRefaccion, onCre
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Mano de Obra</p>
               {manoDeObraItems.map(item => (
                 <div key={item.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border bg-emerald-50 border-emerald-200">
-                  <span className="text-xl flex-shrink-0">&#x2705;</span>
+                  <span className="text-xl flex-shrink-0">✅</span>
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-slate-800 text-sm truncate">{item.descripcion}</div>
                     <div className="text-xs text-slate-500">${fmtPeso(parseNum(item.precioUnitario))}</div>
@@ -767,15 +768,15 @@ function ModalReconciliacion({ cotizacion, inventario, onAgregarRefaccion, onCre
 
           {refacciones.length === 0 && manoDeObraItems.length === 0 && (
             <div className="text-sm text-slate-500 italic text-center py-4">
-              Sin partidas en esta cotizaci&#243;n.
+              Sin partidas en esta cotización.
             </div>
           )}
 
-          {/* Status bar */}
+          {/* Barra de estado */}
           <div className={`px-4 py-3 rounded-xl text-sm font-medium border ${allResolved ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-orange-50 border-orange-200 text-orange-700'}`}>
             {allResolved
-              ? '&#x2705; Todas las piezas est&#225;n en inventario. &#161;Listo para crear el trabajo!'
-              : `&#x26A0;&#xFE0F; ${pendientes.length} pieza(s) sin registrar en inventario.`}
+              ? '✅ Todas las piezas están en inventario. ¡Listo para crear el trabajo!'
+              : `⚠️ ${pendientes.length} pieza(s) sin registrar en inventario.`}
           </div>
 
           <div className="flex gap-3">
@@ -784,13 +785,13 @@ function ModalReconciliacion({ cotizacion, inventario, onAgregarRefaccion, onCre
               onClick={handleCrearTrabajo}
               disabled={!allResolved || creando}
               className={`flex-1 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${allResolved && !creando ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-              {creando ? '&#x23F3; Creando trabajo...' : '&#128295; Crear Trabajo'}
+              {creando ? '⏳ Creando trabajo...' : '🔧 Crear Trabajo'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mini inventory popup — z-[70] so it renders above the reconciliation modal */}
+      {/* Mini popup de inventario — z-[70] para quedar sobre el modal principal */}
       {addingItem && (
         <ModalAgregarInventario
           item={addingItem}
@@ -831,7 +832,7 @@ function HistorialCotizaciones({
   return (
     <div className="mt-8">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <h3 className="text-lg font-bold text-slate-700">≡ƒôï Historial de Cotizaciones</h3>
+        <h3 className="text-lg font-bold text-slate-700">📋 Historial de Cotizaciones</h3>
         {clientesUnicos.length > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500">Filtrar:</span>
@@ -846,8 +847,8 @@ function HistorialCotizaciones({
 
       {filtradas.length === 0 ? (
         <div className="text-center py-10 text-slate-400">
-          <div className="text-4xl mb-2">≡ƒôä</div>
-          <p className="text-sm">{filtroCliente ? `Sin cotizaciones para "${filtroCliente}"` : 'A├║n no hay cotizaciones guardadas'}</p>
+          <div className="text-4xl mb-2">📄</div>
+          <p className="text-sm">{filtroCliente ? `Sin cotizaciones para "${filtroCliente}"` : 'Aún no hay cotizaciones guardadas'}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -869,22 +870,22 @@ function HistorialCotizaciones({
                 <div className="flex gap-1 flex-wrap">
                   {entry.editada && <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">Editada</span>}
                   {entry.cancelada && <span className="text-xs px-1.5 py-0.5 bg-rose-100 text-rose-700 rounded-full font-medium">Cancelada</span>}
-                  {entry.convertida && <span className="text-xs px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">&#x2705; Convertida</span>}
+                  {entry.convertida && <span className="text-xs px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">✅ Convertida</span>}
                 </div>
               </div>
 
               {/* Client */}
               <div className="col-span-3">
-                <p className="font-semibold text-slate-800 text-sm truncate">{entry.cliente || 'ΓÇö'}</p>
+                <p className="font-semibold text-slate-800 text-sm truncate">{entry.cliente || '—'}</p>
                 <p className="text-xs text-slate-400">
-                  {entry.plantilla === 'ayuntamiento' ? '≡ƒÅ¢∩╕Å' : entry.plantilla === 'red_ambiental' ? 'ΓÖ╗∩╕Å' : '≡ƒöº'}{' '}
+                  {entry.plantilla === 'ayuntamiento' ? '🏛️' : entry.plantilla === 'red_ambiental' ? '♻️' : '🔧'}{' '}
                   {PLANTILLAS.find(p => p.key === entry.plantilla)?.label}
                 </p>
               </div>
 
               {/* Date */}
               <div className="col-span-2 text-sm text-slate-600">
-                {entry.fecha ? new Date(entry.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: '2-digit' }) : 'ΓÇö'}
+                {entry.fecha ? new Date(entry.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
               </div>
 
               {/* Total */}
@@ -896,12 +897,12 @@ function HistorialCotizaciones({
               <div className="col-span-3 flex justify-end gap-1.5 flex-wrap">
                 <button onClick={() => onVer(entry)}
                   className="text-xs font-semibold px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors whitespace-nowrap">
-                  Ver &#8594;
+                  Ver →
                 </button>
                 {!entry.cancelada && !entry.convertida && onConvertir && (
                   <button onClick={() => onConvertir(entry)}
                     className="text-xs font-semibold px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors whitespace-nowrap">
-                    &#128295; Convertir
+                    🔧 Convertir
                   </button>
                 )}
                 {!entry.cancelada && (
@@ -911,7 +912,7 @@ function HistorialCotizaciones({
                         ? 'bg-rose-600 text-white border-rose-600'
                         : 'bg-white text-rose-500 border-rose-200 hover:bg-rose-50'
                     }`}>
-                    {confirmando === entry.id ? '&#191;Confirmar?' : 'Cancelar'}
+                    {confirmando === entry.id ? '¿Confirmar?' : 'Cancelar'}
                   </button>
                 )}
               </div>
@@ -923,7 +924,7 @@ function HistorialCotizaciones({
   );
 }
 
-// ΓöÇΓöÇΓöÇ Main export ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── Main export ──────────────────────────────────────────────────────────────
 
 export function VistaCotizaciones({
   clientes = [],
@@ -938,19 +939,20 @@ export function VistaCotizaciones({
   onConvertirATrabajo?: (data: ConversionTrabajo) => Promise<void>;
   onAgregarRefaccion?: (data: Omit<Refaccion, 'id'>) => Promise<Refaccion | null>;
 }) {
-  const [pantalla, setPantalla]         = useState<Pantalla>('inicio');
-  const [plantilla, setPlantilla]       = useState<Plantilla>('general');
-  const [history, setHistory]           = useState<CotizacionGuardada[]>([]);
+  const [pantalla, setPantalla]     = useState<Pantalla>('inicio');
+  const [plantilla, setPlantilla]   = useState<Plantilla>('general');
+  const [history, setHistory]       = useState<CotizacionGuardada[]>([]);
+  // When editing an existing entry, track its id so we reuse its number
   const [editingId, setEditingId]       = useState<string | null>(null);
   const [viewEntry, setViewEntry]       = useState<CotizacionGuardada | null>(null);
-  // Conversion modal: which cotización is being reconciled
+  // Conversion modal: tracks which cotización is being reconciled
   const [reconciliandoId, setReconciliandoId] = useState<string | null>(null);
 
   useEffect(() => { setHistory(loadHistory()); }, []);
 
   const blankForm = useCallback((p: Plantilla): FormCotizacion => ({
     numeroCotizacion: '',
-    clienteId: '', cliente: p === 'ayuntamiento' ? 'Ayuntamiento de M├⌐rida' : p === 'red_ambiental' ? 'Red Ambiental' : '',
+    clienteId: '', cliente: p === 'ayuntamiento' ? 'Ayuntamiento de Mérida' : p === 'red_ambiental' ? 'Red Ambiental' : '',
     vehiculoId: '', marca: '', modelo: '', anio: '', placas: '', kms: '',
     fecha: hoy(), trabajo: '', observaciones: '',
     incluirIVA: false, autorizadoPor: '',
@@ -984,10 +986,10 @@ export function VistaCotizaciones({
     setForm(f => ({ ...f, vehiculoId, marca: v?.marca ?? f.marca, modelo: v?.modelo ?? f.modelo, anio: v?.anio ?? f.anio, placas: v?.placa ?? f.placas }));
   };
 
-  // ΓöÇΓöÇ Save / Update ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Save / Update ──────────────────────────────────────────────────────────
   const handleGuardar = () => {
     const { total } = calcTotales(form);
-    const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de M├⌐rida'
+    const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de Mérida'
       : plantilla === 'red_ambiental' ? 'Red Ambiental' : form.cliente;
 
     let savedForm: FormCotizacion;
@@ -995,14 +997,14 @@ export function VistaCotizaciones({
     const list = loadHistory();
 
     if (editingId) {
-      // ΓöÇΓöÇ EDIT: reuse original number, mark as editada ΓöÇΓöÇ
+      // ── EDIT: reuse original number, mark as editada ──
       const existing = list.find(e => e.id === editingId)!;
       savedForm = { ...form, numeroCotizacion: existing.numeroCotizacion };
       entry = { ...existing, cliente: clienteNombre, fecha: form.fecha, total, form: savedForm, editada: true };
       const updated = list.map(e => e.id === editingId ? entry : e);
       persistHistory(updated);
     } else {
-      // ΓöÇΓöÇ NEW: assign fresh sequential number ΓöÇΓöÇ
+      // ── NEW: assign fresh sequential number ──
       const numero = assignNextNumber();
       savedForm = { ...form, numeroCotizacion: numero };
       entry = {
@@ -1020,7 +1022,7 @@ export function VistaCotizaciones({
     setPantalla('preview');
   };
 
-  // ΓöÇΓöÇ Cancel a quote (soft) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Cancel a quote (soft) ─────────────────────────────────────────────────
   const handleCancelar = (id: string) => {
     const list = loadHistory().map(e => e.id === id ? { ...e, cancelada: true } : e);
     persistHistory(list);
@@ -1038,13 +1040,13 @@ export function VistaCotizaciones({
     if (!cot || !onConvertirATrabajo) return;
     const descripcionBase = cot.form.trabajo?.trim() || 'Trabajo';
     await onConvertirATrabajo({
-      cotizacionId: cot.id,
-      cotizacionNumero: cot.numeroCotizacion,
-      clienteId: cot.form.clienteId,
-      vehiculoId: cot.form.vehiculoId,
-      descripcion: `${descripcionBase} (Desde ${cot.numeroCotizacion})`,
-      fecha: cot.form.fecha || hoy(),
-      manoDeObraItems: manoDeObra,
+      cotizacionId:      cot.id,
+      cotizacionNumero:  cot.numeroCotizacion,
+      clienteId:         cot.form.clienteId,
+      vehiculoId:        cot.form.vehiculoId,
+      descripcion:       `${descripcionBase} (Desde ${cot.numeroCotizacion})`,
+      fecha:             cot.form.fecha || hoy(),
+      manoDeObraItems:   manoDeObra,
       partes,
     });
     // Mark cotización as convertida in localStorage
@@ -1053,33 +1055,33 @@ export function VistaCotizaciones({
     setHistory(list);
   };
 
-  // ΓöÇΓöÇ Open saved entry for viewing ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Open saved entry for viewing ──────────────────────────────────────────
   const handleVerEntry = (entry: CotizacionGuardada) => {
     setPlantilla(entry.plantilla); setForm(entry.form); setViewEntry(entry); setEditingId(null);
     setPantalla('preview');
   };
 
-  // ΓöÇΓöÇ Start editing from preview ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Start editing from preview ────────────────────────────────────────────
   const handleEditar = () => {
     if (viewEntry) setEditingId(viewEntry.id);
     setPantalla('formulario');
   };
 
-  // ΓöÇΓöÇ Validation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Validation ────────────────────────────────────────────────────────────
   const canSave =
     form.marca.trim() !== '' && form.modelo.trim() !== '' &&
     (plantilla !== 'ayuntamiento' || form.inventario.trim() !== '') &&
-    (plantilla !== 'ayuntamiento' || (form.departamento !== '' && !form.departamento.startsWith('ΓÇö')));
+    (plantilla !== 'ayuntamiento' || (form.departamento !== '' && !form.departamento.startsWith('—')));
 
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // ══════════════════════════════════════════════════════════════════════════
   // Pantalla: INICIO
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // ══════════════════════════════════════════════════════════════════════════
   if (pantalla === 'inicio') {
     const cotizacionReconciliando = reconciliandoId ? history.find(e => e.id === reconciliandoId) ?? null : null;
     return (
       <div>
         <SectionTitle title="Cotizaciones" subtitle="Crea y guarda cotizaciones para tus clientes"/>
-        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Nueva Cotizaci&#243;n</h3>
+        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Nueva Cotización</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {PLANTILLAS.map(p => (
             <button key={p.key} onClick={() => elegirPlantilla(p.key)}
@@ -1098,7 +1100,6 @@ export function VistaCotizaciones({
           onCancelar={handleCancelar}
           onConvertir={onConvertirATrabajo ? handleConvertir : undefined}
         />
-        {/* Reconciliation modal — only when conversion callback is wired up */}
         {cotizacionReconciliando && onAgregarRefaccion && (
           <ModalReconciliacion
             cotizacion={cotizacionReconciliando}
@@ -1112,9 +1113,9 @@ export function VistaCotizaciones({
     );
   }
 
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // ══════════════════════════════════════════════════════════════════════════
   // Pantalla: FORMULARIO
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // ══════════════════════════════════════════════════════════════════════════
   if (pantalla === 'formulario') {
     const labelPlantilla = PLANTILLAS.find(p => p.key === plantilla)?.label ?? '';
     const isEditing = editingId !== null;
@@ -1122,25 +1123,25 @@ export function VistaCotizaciones({
     return (
       <div>
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => setPantalla(viewEntry ? 'preview' : 'inicio')} className="text-slate-400 hover:text-slate-700 transition-colors text-lg">ΓåÉ</button>
+          <button onClick={() => setPantalla(viewEntry ? 'preview' : 'inicio')} className="text-slate-400 hover:text-slate-700 transition-colors text-lg">←</button>
           <SectionTitle
-            title={isEditing ? `Editando ΓÇö ${form.numeroCotizacion}` : `Cotizaci├│n ΓÇö ${labelPlantilla}`}
-            subtitle={isEditing ? 'Se conservar├í el mismo n├║mero al guardar' : 'Completa los datos y guarda para asignar n├║mero'}
+            title={isEditing ? `Editando — ${form.numeroCotizacion}` : `Cotización — ${labelPlantilla}`}
+            subtitle={isEditing ? 'Se conservará el mismo número al guardar' : 'Completa los datos y guarda para asignar número'}
           />
         </div>
 
         {/* Edit indicator or new quote info banner */}
         {isEditing ? (
           <div className="flex items-center gap-3 mb-5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
-            <span className="text-amber-500 text-lg">Γ£Å∩╕Å</span>
+            <span className="text-amber-500 text-lg">✏️</span>
             <p className="text-sm text-amber-700">
-              Editando <strong>{form.numeroCotizacion}</strong> ΓÇö el n├║mero se conservar├í al guardar.
+              Editando <strong>{form.numeroCotizacion}</strong> — el número se conservará al guardar.
             </p>
           </div>
         ) : (
           <div className="flex items-center gap-3 mb-5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
-            <span className="text-amber-500 text-lg">≡ƒöó</span>
-            <p className="text-sm text-amber-700">El n├║mero <strong>COT-XXX</strong> se asignar├í autom├íticamente al guardar.</p>
+            <span className="text-amber-500 text-lg">🔢</span>
+            <p className="text-sm text-amber-700">El número <strong>COT-XXX</strong> se asignará automáticamente al guardar.</p>
           </div>
         )}
 
@@ -1157,7 +1158,7 @@ export function VistaCotizaciones({
               {clientes.length > 0 ? (
                 <select value={form.clienteId} onChange={e => handleClienteChange(e.target.value)}
                   className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                  <option value="">ΓÇö Seleccionar cliente ΓÇö</option>
+                  <option value="">— Seleccionar cliente —</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
               ) : (
@@ -1179,7 +1180,7 @@ export function VistaCotizaciones({
 
           {plantilla === 'red_ambiental' && (
             <div>
-              <Label>N├║m. Proveedor</Label>
+              <Label>Núm. Proveedor</Label>
               <div className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-700 text-sm font-mono font-semibold select-none">
                 {NUM_PROVEEDOR_RED}<span className="ml-2 text-xs text-slate-400 font-normal font-sans">(fijo)</span>
               </div>
@@ -1195,7 +1196,7 @@ export function VistaCotizaciones({
               <select value={form.departamento} onChange={e => set('departamento', e.target.value)}
                 className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
                 {DEPARTAMENTOS_AYUNTAMIENTO.map(d => (
-                  <option key={d} value={d} disabled={d.startsWith('ΓÇö')}>{d}</option>
+                  <option key={d} value={d} disabled={d.startsWith('—')}>{d}</option>
                 ))}
               </select>
             </div>
@@ -1204,26 +1205,26 @@ export function VistaCotizaciones({
 
         {/* Vehicle section */}
         <div className="border border-slate-200 rounded-xl p-4 mb-5 bg-slate-50">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Datos del Veh├¡culo</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Datos del Vehículo</p>
           {plantilla === 'general' && form.clienteId && vehiculosCliente.length > 0 && (
             <div className="mb-4">
-              <Label>Seleccionar veh├¡culo registrado</Label>
+              <Label>Seleccionar vehículo registrado</Label>
               <select value={form.vehiculoId} onChange={e => handleVehiculoChange(e.target.value)}
                 className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                <option value="">ΓÇö Seleccionar veh├¡culo ΓÇö</option>
+                <option value="">— Seleccionar vehículo —</option>
                 {vehiculosCliente.map(v => (
-                  <option key={v.id} value={v.id}>{[v.marca, v.modelo, v.anio, v.placa].filter(Boolean).join(' ┬╖ ')}</option>
+                  <option key={v.id} value={v.id}>{[v.marca, v.modelo, v.anio, v.placa].filter(Boolean).join(' · ')}</option>
                 ))}
               </select>
             </div>
           )}
           {plantilla === 'general' && form.clienteId && vehiculosCliente.length === 0 && (
-            <p className="text-xs text-slate-500 mb-3 italic">Sin veh├¡culos registrados ΓÇö ingresa los datos manualmente.</p>
+            <p className="text-xs text-slate-500 mb-3 italic">Sin vehículos registrados — ingresa los datos manualmente.</p>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div><Label>Marca <span className="text-rose-500">*</span></Label><Input value={form.marca} onChange={e => set('marca', e.target.value)} placeholder="Ej. Ford"/></div>
             <div><Label>Modelo <span className="text-rose-500">*</span></Label><Input value={form.modelo} onChange={e => set('modelo', e.target.value)} placeholder="Ej. F-150"/></div>
-            <div><Label>A├▒o</Label><Input value={form.anio} onChange={e => set('anio', e.target.value)} placeholder="Ej. 2020"/></div>
+            <div><Label>Año</Label><Input value={form.anio} onChange={e => set('anio', e.target.value)} placeholder="Ej. 2020"/></div>
             <div><Label>Placas (opcional)</Label><Input value={form.placas} onChange={e => set('placas', e.target.value)} placeholder="AAA-000-A"/></div>
             <div><Label>Kilometraje (opcional)</Label><Input value={form.kms} onChange={e => set('kms', e.target.value)} placeholder="Ej. 85000"/></div>
           </div>
@@ -1231,7 +1232,7 @@ export function VistaCotizaciones({
 
         {/* Trabajo */}
         <div className="mb-5">
-          <Label>Trabajo / Descripci├│n</Label>
+          <Label>Trabajo / Descripción</Label>
           <textarea value={form.trabajo} onChange={e => set('trabajo', e.target.value)} rows={3}
             placeholder="Describe el trabajo a realizar..."
             className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm resize-none"/>
@@ -1245,7 +1246,7 @@ export function VistaCotizaciones({
           <div className="flex items-center gap-3 mb-4">
             <input id="iva-toggle" type="checkbox" checked={form.incluirIVA} onChange={e => set('incluirIVA', e.target.checked)}
               className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"/>
-            <label htmlFor="iva-toggle" className="text-sm font-semibold text-slate-700 cursor-pointer">┬┐Incluir IVA? (16%)</label>
+            <label htmlFor="iva-toggle" className="text-sm font-semibold text-slate-700 cursor-pointer">¿Incluir IVA? (16%)</label>
           </div>
           {(() => {
             const { subtotal, iva, total } = calcTotales(form);
@@ -1272,22 +1273,22 @@ export function VistaCotizaciones({
           <Label>Autorizado por</Label>
           <select value={form.autorizadoPor} onChange={e => set('autorizadoPor', e.target.value)}
             className="w-full sm:w-64 px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-            <option value="">ΓÇö Sin especificar ΓÇö</option>
+            <option value="">— Sin especificar —</option>
             {AUTORIZADOS.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
 
         {/* Actions */}
         <div className="flex gap-3 flex-wrap items-center">
-          <Btn variant="ghost" onClick={() => setPantalla(viewEntry ? 'preview' : 'inicio')}>ΓåÉ Cancelar</Btn>
+          <Btn variant="ghost" onClick={() => setPantalla(viewEntry ? 'preview' : 'inicio')}>← Cancelar</Btn>
           <Btn variant="success" onClick={handleGuardar} disabled={!canSave}>
-            {isEditing ? '≡ƒÆ╛ Guardar cambios' : '≡ƒÆ╛ Guardar Cotizaci├│n'}
+            {isEditing ? '💾 Guardar cambios' : '💾 Guardar Cotización'}
           </Btn>
           {!canSave && (
             <span className="text-xs text-rose-500">
               {form.marca.trim() === '' || form.modelo.trim() === '' ? '* Marca y Modelo son obligatorios'
                 : plantilla === 'ayuntamiento' && form.inventario.trim() === '' ? '* No. Inventario es obligatorio'
-                : '* Selecciona un departamento v├ílido'}
+                : '* Selecciona un departamento válido'}
             </span>
           )}
         </div>
@@ -1295,9 +1296,9 @@ export function VistaCotizaciones({
     );
   }
 
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // ══════════════════════════════════════════════════════════════════════════
   // Pantalla: PREVIEW
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // ══════════════════════════════════════════════════════════════════════════
   return (
     <VistaPreviaContenido
       plantilla={viewEntry?.plantilla ?? plantilla}
