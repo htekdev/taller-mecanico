@@ -377,6 +377,26 @@ export default function TallerMecanico() {
     setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, numeroFactura } : f));
   };
 
+  const cancelarFactura = async (facturaId: string) => {
+    await db.cancelarFactura(facturaId);
+    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, notas: 'CANCELADA' } : f));
+  };
+
+  const reactivarFactura = async (facturaId: string) => {
+    await db.reactivarFactura(facturaId);
+    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, notas: undefined } : f));
+  };
+
+  const cancelarNota = async (trabajoId: string) => {
+    await db.cancelarNota(trabajoId);
+    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, folioFiscal: '__CANCELADA__' } : t));
+  };
+
+  const reactivarNota = async (trabajoId: string) => {
+    await db.reactivarNota(trabajoId);
+    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, folioFiscal: undefined } : t));
+  };
+
   // ── Gastos handlers ──
   const crearGasto = async (data: Omit<Gasto, 'id' | 'tallerId'>) => {
     if (!taller) return;
@@ -628,12 +648,15 @@ export default function TallerMecanico() {
           {vista === 'facturas' && (
             <VistaFacturas facturas={facturas} clientes={clientes} vehiculos={vehiculos} trabajos={trabajos}
               onRegistrarPago={registrarPagoFactura} onEditarFechaFactura={editarFechaFactura}
-              onEditarNumeroFactura={editarNumeroFactura} />
+              onEditarNumeroFactura={editarNumeroFactura}
+              onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura} />
           )}
           {vista === 'cuentas' && (
             <VistaCuentas facturas={facturas} trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
               onRegistrarPagoFactura={registrarPagoFactura}
-              onRegistrarPagoTrabajo={registrarPago} />
+              onRegistrarPagoTrabajo={registrarPago}
+              onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura}
+              onCancelarNota={cancelarNota} onReactivarNota={reactivarNota} />
           )}
           {vista === 'pagos' && (
             <VistaCuentasPorPagar ordenes={ordenes} proveedores={proveedores}

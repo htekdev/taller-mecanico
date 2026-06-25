@@ -450,6 +450,10 @@ export function VistaCuentas({
   vehiculos,
   onRegistrarPagoFactura,
   onRegistrarPagoTrabajo,
+  onCancelarFactura,
+  onReactivarFactura,
+  onCancelarNota,
+  onReactivarNota,
 }: {
   facturas: Factura[];
   trabajos: Trabajo[];
@@ -457,9 +461,14 @@ export function VistaCuentas({
   vehiculos: Vehiculo[];
   onRegistrarPagoFactura: (facturaId: string, pago: Omit<PagoFactura, 'id'>) => void;
   onRegistrarPagoTrabajo: (trabajoId: string, pago: Omit<Pago, 'id'>) => void;
+  onCancelarFactura: (facturaId: string) => void;
+  onReactivarFactura: (facturaId: string) => void;
+  onCancelarNota: (trabajoId: string) => void;
+  onReactivarNota: (trabajoId: string) => void;
 }) {
   const hoy = new Date().toISOString().split('T')[0];
   const [filtro, setFiltro] = useState<FiltroCuenta>('todos');
+  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'notas' | 'facturas'>('todos');
   const [clienteFiltroId, setClienteFiltroId] = useState<string>('');
   const [busquedaCliente, setBusquedaCliente] = useState('');
   const [mostrarReporte, setMostrarReporte] = useState(false);
@@ -467,15 +476,24 @@ export function VistaCuentas({
   const [expandidoT, setExpandidoT] = useState<string | null>(null);
   const [pagoFormF, setPagoFormF] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
   const [pagoFormT, setPagoFormT] = useState({ monto: 0, fecha: hoy, nota: '' });
+  const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
 
   // Por cobrar: solo trabajos COMPLETADOS (no en progreso) sin factura formal.
   // Regla de negocio: (1) terminado, (2) facturado o nota completa → aparece en por cobrar.
   // Notas completadas SÍ aparecen (son recibos simples con saldo pendiente).
   // Se excluyen trabajos que ya tienen una Factura formal asociada (evita duplicados).
+  // Se excluyen notas canceladas (folioFiscal === '__CANCELADA__').
   const legacyTrabajos = trabajos.filter(t =>
     t.estado === 'completado' &&
     !t.facturaId &&
-    !facturas.some(f => f.trabajoId === t.id)
+    !facturas.some(f => f.trabajoId === t.id) &&
+    t.folioFiscal !== '__CANCELADA__'
+  );
+
+  // Cancelled notas (for restore)
+  const notasCanceladas = trabajos.filter(t =>
+    t.estado === 'completado' &&
+    t.folioFiscal === '__CANCELADA__'
   );
 
   // Clients that actually have records in AR
@@ -494,11 +512,14 @@ export function VistaCuentas({
   const facturasPorCliente = clienteFiltroId ? facturas.filter(f => f.clienteId === clienteFiltroId) : facturas;
   const legacyPorCliente   = clienteFiltroId ? legacyTrabajos.filter(t => t.clienteId === clienteFiltroId) : legacyTrabajos;
 
-  const facturasFiltradas = [...facturasPorCliente]
+  // Active (non-cancelled) facturas
+  const facturasActivasPorCliente = facturasPorCliente.filter(f => f.notas !== 'CANCELADA');
+
+  const facturasFiltradas = filtroTipo === 'notas' ? [] : [...facturasActivasPorCliente]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
     .filter(f => filtro === 'todos' || getEstadoPagoFactura(f) === filtro);
 
-  const legacyFiltrados = legacyPorCliente.filter(t => filtro === 'todos' || getEstadoPago(t) === filtro);
+  const legacyFiltrados = filtroTipo === 'facturas' ? [] : legacyPorCliente.filter(t => filtro === 'todos' || getEstadoPago(t) === filtro);
 
   // Global total pending (all clients)
   const totalPendienteGlobal = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
@@ -647,7 +668,7 @@ export function VistaCuentas({
         </div>
       )}
 
-      <div className="flex gap-2 mb-5 flex-wrap">
+      <div className="flex gap-2 mb-3 flex-wrap">
         {(['todos','pendiente','parcial','pagado'] as FiltroCuenta[]).map(f => (
           <button key={f} onClick={() => setFiltro(f)}
             className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${filtro === f ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'}`}>
@@ -656,7 +677,105 @@ export function VistaCuentas({
         ))}
       </div>
 
-      {/* ── Facturas section ── */}
+      {/* ── Filtro por tipo ── */}
+      <div className="flex gap-2 mb-5 flex-wrap">
+        {([
+          { key: 'todos', label: '📋 Todo' },
+          { key: 'notas', label: '📄 Solo notas' },
+          { key: 'facturas', label: '🧾 Solo facturas' },
+        ] as const).map(({ key, label }) => (
+          <button key={key} onClick={() => setFiltroTipo(key)}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${filtroTipo === key ? 'bg-slate-800 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-400 hover:text-slate-800'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── NOTAS first (por solicitud de Sofia) ── */}
+      {legacyFiltrados.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-sm font-bold text-slate-600 mb-2 uppercase tracking-wide">📄 Notas</h3>
+          <div className="space-y-2">
+            {legacyFiltrados.map(trabajo => {
+              const cliente  = clientes.find(c => c.id === trabajo.clienteId);
+              const vehiculo = vehiculos.find(v => v.id === trabajo.vehiculoId);
+              const estado   = getEstadoPago(trabajo);
+              const montoPag = getMontoPagado(trabajo);
+              const saldo    = getSaldo(trabajo);
+              const badge    = BADGE_ESTADO[estado];
+              const isExp    = expandidoT === trabajo.id;
+              return (
+                <div key={trabajo.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className={`grid grid-cols-1 sm:grid-cols-6 gap-2 items-center px-4 py-3 ${isExp ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'} transition-colors`}>
+                    <div className="sm:col-span-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-slate-800 text-sm">{cliente?.nombre ?? '—'}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
+                        <span>{new Date(trabajo.fecha).toLocaleDateString('es-MX')}</span>
+                        {vehiculo && <span>· {[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>}
+                        <span>· {trabajo.descripcion}</span>
+                      </div>
+                    </div>
+                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Total</div><div className="font-semibold text-slate-800">${fmt(trabajo.total)}</div></div>
+                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
+                    <div className="flex items-center justify-between sm:justify-end gap-2">
+                      <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
+                      <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'} onClick={() => { setExpandidoT(isExp ? null : trabajo.id); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); setConfirmCancelarId(null); }}>
+                        {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
+                      </Btn>
+                    </div>
+                  </div>
+                  {isExp && (
+                    <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200 space-y-3">
+                      {(trabajo.pagos ?? []).length > 0 && (
+                        <div>
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
+                          <div className="space-y-1">
+                            {(trabajo.pagos ?? []).map(p => (
+                              <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                <div className="flex gap-3">
+                                  <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
+                                  {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
+                                </div>
+                                <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {estado !== 'pagado' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div><Label>Fecha</Label><Input type="date" value={pagoFormT.fecha} onChange={e => setPagoFormT(f => ({ ...f, fecha: e.target.value }))} /></div>
+                          <div><Label>Monto ($)</Label><Input type="number" placeholder="0.00" min="0.01" step="0.01" value={pagoFormT.monto || ''} onChange={e => setPagoFormT(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
+                          <div><Label>Nota</Label><Input type="text" placeholder="Efectivo, transferencia..." value={pagoFormT.nota} onChange={e => setPagoFormT(f => ({ ...f, nota: e.target.value }))} /></div>
+                          <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoFormT.monto <= 0} onClick={() => { onRegistrarPagoTrabajo(trabajo.id, { monto: Math.min(pagoFormT.monto, saldo), fecha: pagoFormT.fecha, nota: pagoFormT.nota || undefined }); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); setExpandidoT(null); }}>✓ Registrar</Btn></div>
+                        </div>
+                      )}
+                      {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Completamente pagado.</p>}
+                      {/* Cancelar nota */}
+                      {confirmCancelarId === trabajo.id ? (
+                        <div className="bg-rose-50 border border-rose-300 rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap">
+                          <span className="text-xs font-semibold text-rose-800 flex-1">⚠️ ¿Cancelar esta nota? Se ocultará de cuentas por cobrar. Puedes reactivarla después.</span>
+                          <button type="button" onClick={() => { onCancelarNota(trabajo.id); setConfirmCancelarId(null); setExpandidoT(null); }} className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors">Sí, cancelar</button>
+                          <button type="button" onClick={() => setConfirmCancelarId(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors">No</button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end">
+                          <button type="button" onClick={() => setConfirmCancelarId(trabajo.id)} className="text-xs text-rose-500 hover:text-rose-700 font-medium transition-colors">🚫 Cancelar nota</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── FACTURAS below notas ── */}
       {facturasFiltradas.length > 0 && (
         <div className="mb-4">
           <h3 className="text-sm font-bold text-slate-600 mb-2 uppercase tracking-wide">🧾 Facturas emitidas</h3>
@@ -684,7 +803,7 @@ export function VistaCuentas({
                     <div className="flex items-center justify-between sm:justify-end gap-2">
                       <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
                       <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'}
-                        onClick={() => { setExpandidoF(isExp ? null : factura.id); setPagoFormF({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' }); }}>
+                        onClick={() => { setExpandidoF(isExp ? null : factura.id); setPagoFormF({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' }); setConfirmCancelarId(null); }}>
                         {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
                       </Btn>
                     </div>
@@ -722,6 +841,18 @@ export function VistaCuentas({
                         </div>
                       )}
                       {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Esta factura está completamente pagada.</p>}
+                      {/* Cancelar desde cuentas */}
+                      {confirmCancelarId === factura.id ? (
+                        <div className="bg-rose-50 border border-rose-300 rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap">
+                          <span className="text-xs font-semibold text-rose-800 flex-1">⚠️ ¿Cancelar esta factura? Se ocultará de todas las vistas. Puedes reactivarla en el módulo Facturas.</span>
+                          <button type="button" onClick={() => { onCancelarFactura(factura.id); setConfirmCancelarId(null); setExpandidoF(null); }} className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors">Sí, cancelar</button>
+                          <button type="button" onClick={() => setConfirmCancelarId(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors">No</button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end">
+                          <button type="button" onClick={() => setConfirmCancelarId(factura.id)} className="text-xs text-rose-500 hover:text-rose-700 font-medium transition-colors">🚫 Cancelar factura</button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -731,75 +862,29 @@ export function VistaCuentas({
         </div>
       )}
 
-      {/* ── Legacy trabajos (without factura) ── */}
-      {legacyFiltrados.length > 0 && (
-        <div>
-          <h3 className="text-sm font-bold text-slate-600 mb-2 uppercase tracking-wide">🔧 Trabajos sin factura (legado)</h3>
-          <div className="space-y-2">
-            {legacyFiltrados.map(trabajo => {
-              const cliente  = clientes.find(c => c.id === trabajo.clienteId);
-              const vehiculo = vehiculos.find(v => v.id === trabajo.vehiculoId);
-              const estado   = getEstadoPago(trabajo);
-              const montoPag = getMontoPagado(trabajo);
-              const saldo    = getSaldo(trabajo);
-              const badge    = BADGE_ESTADO[estado];
-              const isExp    = expandidoT === trabajo.id;
-              return (
-                <div key={trabajo.id} className="border border-slate-200 rounded-xl overflow-hidden">
-                  <div className={`grid grid-cols-1 sm:grid-cols-6 gap-2 items-center px-4 py-3 ${isExp ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'} transition-colors`}>
-                    <div className="sm:col-span-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-slate-800 text-sm">{cliente?.nombre ?? '—'}</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
-                      </div>
-                      <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
-                        <span>{new Date(trabajo.fecha).toLocaleDateString('es-MX')}</span>
-                        {vehiculo && <span>· {[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>}
-                        <span>· {trabajo.descripcion}</span>
-                      </div>
+      {/* Notas canceladas restore */}
+      {notasCanceladas.length > 0 && (
+        <div className="mt-3">
+          <details>
+            <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-700 font-medium">
+              Ver notas canceladas ({notasCanceladas.length})
+            </summary>
+            <div className="mt-2 space-y-1">
+              {notasCanceladas.map(t => {
+                const cl = clientes.find(c => c.id === t.clienteId);
+                return (
+                  <div key={t.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 opacity-60">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm text-slate-500 line-through">{cl?.nombre ?? '—'}</span>
+                      <span className="text-xs text-slate-400">{new Date(t.fecha).toLocaleDateString('es-MX')} · {t.descripcion}</span>
+                      <span className="text-xs bg-rose-100 text-rose-600 font-semibold px-2 py-0.5 rounded-full">Cancelada</span>
                     </div>
-                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Total</div><div className="font-semibold text-slate-800">${fmt(trabajo.total)}</div></div>
-                    <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
-                    <div className="flex items-center justify-between sm:justify-end gap-2">
-                      <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
-                      <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'} onClick={() => { setExpandidoT(isExp ? null : trabajo.id); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); }}>
-                        {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
-                      </Btn>
-                    </div>
+                    <button type="button" onClick={() => onReactivarNota(t.id)} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-4 flex-shrink-0">↩ Reactivar</button>
                   </div>
-                  {isExp && (
-                    <div className="px-4 pb-4 pt-3 bg-slate-50 border-t border-slate-200 space-y-3">
-                      {(trabajo.pagos ?? []).length > 0 && (
-                        <div>
-                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
-                          <div className="space-y-1">
-                            {(trabajo.pagos ?? []).map(p => (
-                              <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                <div className="flex gap-3">
-                                  <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
-                                  {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
-                                </div>
-                                <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {estado !== 'pagado' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                          <div><Label>Fecha</Label><Input type="date" value={pagoFormT.fecha} onChange={e => setPagoFormT(f => ({ ...f, fecha: e.target.value }))} /></div>
-                          <div><Label>Monto ($)</Label><Input type="number" placeholder="0.00" min="0.01" step="0.01" value={pagoFormT.monto || ''} onChange={e => setPagoFormT(f => ({ ...f, monto: Number(e.target.value) }))} /></div>
-                          <div><Label>Nota</Label><Input type="text" placeholder="Efectivo, transferencia..." value={pagoFormT.nota} onChange={e => setPagoFormT(f => ({ ...f, nota: e.target.value }))} /></div>
-                          <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoFormT.monto <= 0} onClick={() => { onRegistrarPagoTrabajo(trabajo.id, { monto: Math.min(pagoFormT.monto, saldo), fecha: pagoFormT.fecha, nota: pagoFormT.nota || undefined }); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); setExpandidoT(null); }}>✓ Registrar</Btn></div>
-                        </div>
-                      )}
-                      {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Completamente pagado.</p>}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </details>
         </div>
       )}
 
