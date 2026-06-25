@@ -103,6 +103,13 @@ export async function insertVehiculo(tallerId: string, data: Omit<Vehiculo, 'id'
   return { id: row.id, clienteId: row.cliente_id ?? '', marca: row.marca, modelo: row.modelo, anio: row.anio, placa: row.placa };
 }
 
+export async function updateVehiculo(vehiculoId: string, data: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>): Promise<void> {
+  await supabase
+    .from('vehiculos')
+    .update({ marca: data.marca, modelo: data.modelo, anio: data.anio, placa: data.placa })
+    .eq('id', vehiculoId);
+}
+
 // ── Refacciones ───────────────────────────────────────────────
 
 export async function getRefacciones(tallerId: string): Promise<Refaccion[]> {
