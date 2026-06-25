@@ -537,6 +537,24 @@ export async function updateFacturaConceptos(
   }).eq('id', facturaId);
 }
 
+// Cancellation: facturas use notas='CANCELADA' convention (column already exists).
+// Notas (trabajos sin factura) use folio_fiscal='__CANCELADA__' convention.
+export async function cancelarFactura(facturaId: string): Promise<void> {
+  await supabase.from('facturas').update({ notas: 'CANCELADA' }).eq('id', facturaId);
+}
+
+export async function reactivarFactura(facturaId: string): Promise<void> {
+  await supabase.from('facturas').update({ notas: null }).eq('id', facturaId);
+}
+
+export async function cancelarNota(trabajoId: string): Promise<void> {
+  await supabase.from('trabajos').update({ folio_fiscal: '__CANCELADA__' }).eq('id', trabajoId);
+}
+
+export async function reactivarNota(trabajoId: string): Promise<void> {
+  await supabase.from('trabajos').update({ folio_fiscal: null }).eq('id', trabajoId);
+}
+
 // ── Taller Members ────────────────────────────────────────────
 
 export interface TallerMember {

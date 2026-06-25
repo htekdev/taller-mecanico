@@ -13,6 +13,8 @@ export function VistaFacturas({
   onRegistrarPago,
   onEditarFechaFactura,
   onEditarNumeroFactura,
+  onCancelarFactura,
+  onReactivarFactura,
 }: {
   facturas: Factura[];
   clientes: Cliente[];
@@ -21,6 +23,8 @@ export function VistaFacturas({
   onRegistrarPago: (facturaId: string, pago: Omit<PagoFactura, 'id'>) => void;
   onEditarFechaFactura: (facturaId: string, fecha: string) => void;
   onEditarNumeroFactura: (facturaId: string, numero: string) => void;
+  onCancelarFactura: (facturaId: string) => void;
+  onReactivarFactura: (facturaId: string) => void;
 }) {
   const hoy = new Date().toISOString().split('T')[0];
   const [expandido, setExpandido] = useState<string | null>(null);
@@ -31,8 +35,13 @@ export function VistaFacturas({
   const [nuevaFecha, setNuevaFecha] = useState('');
   const [editandoNumeroId, setEditandoNumeroId] = useState<string | null>(null);
   const [nuevoNumero, setNuevoNumero] = useState('');
+  const [verCanceladas, setVerCanceladas] = useState(false);
+  const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
 
-  const facturasFiltradas = [...facturas]
+  const facturasCanceladas = facturas.filter(f => f.notas === 'CANCELADA');
+  const facturasActivas = facturas.filter(f => f.notas !== 'CANCELADA');
+
+  const facturasFiltradas = [...facturasActivas]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
     .filter(f => {
       if (filtro !== 'todos' && getEstadoPagoFactura(f) !== filtro) return false;
@@ -40,8 +49,8 @@ export function VistaFacturas({
       return true;
     });
 
-  const counts = { todos: facturas.length, pendiente: facturas.filter(f => getEstadoPagoFactura(f) === 'pendiente').length, parcial: facturas.filter(f => getEstadoPagoFactura(f) === 'parcial').length, pagado: facturas.filter(f => getEstadoPagoFactura(f) === 'pagado').length };
-  const totalPendiente = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0);
+  const counts = { todos: facturasActivas.length, pendiente: facturasActivas.filter(f => getEstadoPagoFactura(f) === 'pendiente').length, parcial: facturasActivas.filter(f => getEstadoPagoFactura(f) === 'parcial').length, pagado: facturasActivas.filter(f => getEstadoPagoFactura(f) === 'pagado').length };
+  const totalPendiente = facturasActivas.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0);
   const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
 
   const handlePago = (facturaId: string, saldo: number) => {
@@ -311,6 +320,19 @@ export function VistaFacturas({
                       </div>
                     )}
                     {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Esta factura está completamente pagada.</p>}
+
+                    {/* Cancelar factura */}
+                    {confirmCancelarId === factura.id ? (
+                      <div className="bg-rose-50 border border-rose-300 rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap">
+                        <span className="text-xs font-semibold text-rose-800 flex-1">⚠️ ¿Cancelar esta factura? Se ocultará de todas las vistas. Puedes reactivarla después.</span>
+                        <button type="button" onClick={() => { onCancelarFactura(factura.id); setConfirmCancelarId(null); setExpandido(null); }} className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors">Sí, cancelar</button>
+                        <button type="button" onClick={() => setConfirmCancelarId(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors">No</button>
+                      </div>
+                    ) : (
+                      <div className="flex justify-end">
+                        <button type="button" onClick={() => setConfirmCancelarId(factura.id)} className="text-xs text-rose-500 hover:text-rose-700 font-medium transition-colors">🚫 Cancelar factura</button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -318,6 +340,32 @@ export function VistaFacturas({
           })}
         </div>
       </>}
+
+      {/* ── Facturas canceladas ── */}
+      {facturasCanceladas.length > 0 && (
+        <div className="mt-4">
+          <button type="button" onClick={() => setVerCanceladas(v => !v)} className="text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors">
+            {verCanceladas ? '▲ Ocultar' : '▼ Ver'} canceladas ({facturasCanceladas.length})
+          </button>
+          {verCanceladas && (
+            <div className="mt-2 space-y-1">
+              {facturasCanceladas.map(f => {
+                const cl = clientes.find(c => c.id === f.clienteId);
+                return (
+                  <div key={f.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 opacity-60">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs text-slate-400 line-through">{f.numeroFactura}</span>
+                      <span className="text-sm text-slate-500 line-through">{cl?.nombre ?? '—'}</span>
+                      <span className="text-xs bg-rose-100 text-rose-600 font-semibold px-2 py-0.5 rounded-full">Cancelada</span>
+                    </div>
+                    <button type="button" onClick={() => onReactivarFactura(f.id)} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-4 flex-shrink-0">↩ Reactivar</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
