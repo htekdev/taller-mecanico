@@ -332,7 +332,10 @@ export default function TallerMecanico() {
       ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
     ];
     const subtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
-    const iva = trabajo.tipoDocumento === 'factura' ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+    // Apply IVA if job was finalized as 'factura' (new jobs) OR has requiereFactura=true (migrated Excel data
+    // where tipo_documento was not stored — requiereFactura is the reliable fallback).
+    const aplicaIva = trabajo.tipoDocumento === 'factura' || (trabajo.tipoDocumento == null && trabajo.requiereFactura === true);
+    const iva = aplicaIva ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
     const total = subtotal + iva;
     const nuevaFactura = await db.insertFactura(taller.id, {
       numeroFactura,
