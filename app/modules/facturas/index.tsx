@@ -13,6 +13,7 @@ export function VistaFacturas({
   onRegistrarPago,
   onEditarFechaFactura,
   onEditarNumeroFactura,
+  onEditarSubtotalFactura,
   onCancelarFactura,
   onReactivarFactura,
 }: {
@@ -23,6 +24,7 @@ export function VistaFacturas({
   onRegistrarPago: (facturaId: string, pago: Omit<PagoFactura, 'id'>) => void;
   onEditarFechaFactura: (facturaId: string, fecha: string) => void;
   onEditarNumeroFactura: (facturaId: string, numero: string) => void;
+  onEditarSubtotalFactura: (facturaId: string, subtotal: number, incluirIva: boolean, nuevoNumero: string) => void;
   onCancelarFactura: (facturaId: string) => void;
   onReactivarFactura: (facturaId: string) => void;
 }) {
@@ -36,6 +38,10 @@ export function VistaFacturas({
   const [nuevaFecha, setNuevaFecha] = useState('');
   const [editandoNumeroId, setEditandoNumeroId] = useState<string | null>(null);
   const [nuevoNumero, setNuevoNumero] = useState('');
+  const [editandoSubtotalId, setEditandoSubtotalId] = useState<string | null>(null);
+  const [nuevoSubtotal, setNuevoSubtotal] = useState<string>('');
+  const [subtotalIncluyeIva, setSubtotalIncluyeIva] = useState(false);
+  const [nuevoNumeroAjuste, setNuevoNumeroAjuste] = useState('');
   const [verCanceladas, setVerCanceladas] = useState(false);
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
 
@@ -208,6 +214,116 @@ export function VistaFacturas({
                         </table>
                       </div>
                     </div>
+
+                    {/* Editar subtotal + IVA + nuevo número */}
+                    {(() => {
+                      const subtotalNum = parseFloat(nuevoSubtotal) || 0;
+                      const ivaCalc = subtotalIncluyeIva ? Math.round(subtotalNum * 0.16 * 100) / 100 : 0;
+                      const totalCalc = subtotalNum + ivaCalc;
+                      const canSave = subtotalNum > 0 && nuevoNumeroAjuste.trim() !== '';
+                      return (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Subtotal / IVA / Total</p>
+                            {editandoSubtotalId !== factura.id && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditandoSubtotalId(factura.id);
+                                  setNuevoSubtotal(String(factura.subtotal));
+                                  setSubtotalIncluyeIva((factura.iva ?? 0) > 0);
+                                  // Suggest a new number based on existing
+                                  setNuevoNumeroAjuste(factura.numeroFactura + '-ADJ');
+                                }}
+                                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                              >
+                                ✏️ Editar subtotal
+                              </button>
+                            )}
+                          </div>
+                          {editandoSubtotalId === factura.id ? (
+                            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <Label>Nuevo subtotal ($)</Label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={nuevoSubtotal}
+                                    onChange={e => setNuevoSubtotal(e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-full border border-indigo-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                  />
+                                </div>
+                                <div className="flex flex-col justify-end">
+                                  <label className="flex items-center gap-2 cursor-pointer select-none mb-1">
+                                    <input
+                                      type="checkbox"
+                                      checked={subtotalIncluyeIva}
+                                      onChange={e => setSubtotalIncluyeIva(e.target.checked)}
+                                      className="w-4 h-4 accent-indigo-600"
+                                    />
+                                    <span className="text-sm font-medium text-slate-700">Agregar IVA 16%</span>
+                                  </label>
+                                  {subtotalIncluyeIva && subtotalNum > 0 && (
+                                    <div className="text-xs text-indigo-700 font-medium">
+                                      IVA: ${fmt(ivaCalc)} → Total: ${fmt(totalCalc)}
+                                    </div>
+                                  )}
+                                  {!subtotalIncluyeIva && subtotalNum > 0 && (
+                                    <div className="text-xs text-slate-500">Total sin IVA: ${fmt(totalCalc)}</div>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <Label>Nuevo número de factura *</Label>
+                                <input
+                                  type="text"
+                                  value={nuevoNumeroAjuste}
+                                  onChange={e => setNuevoNumeroAjuste(e.target.value)}
+                                  placeholder="Ej. FAC-2026-005"
+                                  className="w-full border border-indigo-300 rounded-lg px-3 py-2 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Requerido — el número cambia porque los totales se modificaron</p>
+                              </div>
+                              <div className="bg-white border border-indigo-200 rounded-lg px-3 py-2 text-sm text-slate-700 flex flex-col gap-1">
+                                <div>Subtotal: <strong>${fmt(subtotalNum)}</strong></div>
+                                {ivaCalc > 0 && <div>IVA (16%): <strong>${fmt(ivaCalc)}</strong></div>}
+                                <div className="font-bold text-indigo-700">Total nuevo: ${fmt(totalCalc)}</div>
+                                <div className="text-xs text-amber-700 mt-1">⚡ Este cambio también actualizará el total del trabajo vinculado.</div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  disabled={!canSave}
+                                  onClick={() => {
+                                    onEditarSubtotalFactura(factura.id, subtotalNum, subtotalIncluyeIva, nuevoNumeroAjuste.trim());
+                                    setEditandoSubtotalId(null);
+                                  }}
+                                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                                >
+                                  ✓ Guardar y sincronizar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditandoSubtotalId(null)}
+                                  className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-slate-700 flex gap-4 flex-wrap">
+                              <span>Subtotal: <strong>${fmt(factura.subtotal)}</strong></span>
+                              {(factura.iva ?? 0) > 0 && <span>IVA: <strong>${fmt(factura.iva ?? 0)}</strong></span>}
+                              <span className="font-bold">Total: ${fmt(factura.total)}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Editar número de factura */}
                     {(() => {

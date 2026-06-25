@@ -384,6 +384,24 @@ export default function TallerMecanico() {
     setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, numeroFactura } : f));
   };
 
+  const editarSubtotalFactura = async (
+    facturaId: string,
+    subtotal: number,
+    incluirIva: boolean,
+    nuevoNumero: string,
+  ) => {
+    const iva = incluirIva ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+    const total = subtotal + iva;
+    await db.updateFacturaTotales(facturaId, { subtotal, iva: iva > 0 ? iva : undefined, total, numeroFactura: nuevoNumero });
+    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, subtotal, iva: iva > 0 ? iva : undefined, total, numeroFactura: nuevoNumero } : f));
+    // Sync back to the linked trabajo
+    const factura = facturas.find(f => f.id === facturaId);
+    if (factura?.trabajoId) {
+      await db.updateTrabajoTotales(factura.trabajoId, { iva, total });
+      setTrabajos(prev => prev.map(t => t.id === factura.trabajoId ? { ...t, iva, total } : t));
+    }
+  };
+
   const cancelarFactura = async (facturaId: string) => {
     await db.cancelarFactura(facturaId);
     setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, notas: 'CANCELADA' } : f));
@@ -657,6 +675,7 @@ export default function TallerMecanico() {
             <VistaFacturas facturas={facturas} clientes={clientes} vehiculos={vehiculos} trabajos={trabajos}
               onRegistrarPago={registrarPagoFactura} onEditarFechaFactura={editarFechaFactura}
               onEditarNumeroFactura={editarNumeroFactura}
+              onEditarSubtotalFactura={editarSubtotalFactura}
               onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura} />
           )}
           {vista === 'cuentas' && (
