@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS gastos (
 
 ALTER TABLE gastos ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "crud_gastos" ON gastos
-  FOR ALL USING (is_taller_member(taller_id))
-  WITH CHECK (is_taller_member(taller_id));
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'crud_gastos' AND tablename = 'gastos') THEN
+    CREATE POLICY "crud_gastos" ON gastos
+      FOR ALL USING (is_taller_member(taller_id))
+      WITH CHECK (is_taller_member(taller_id));
+  END IF;
+END $$;
