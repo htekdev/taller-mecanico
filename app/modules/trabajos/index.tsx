@@ -1,10 +1,235 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel, Proveedor } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
-import { labelVehiculo, fmt } from '@/app/lib/utils';
+import { labelVehiculo, fmt, getMontoPagado } from '@/app/lib/utils';
 import { getPricingIntel } from '@/app/lib/pricing';
+
+// ─── Departamentos localStorage ───────────────────────────────────────────────
+
+const DEPTOS_KEY = 'taller_departamentos_ayuntamiento';
+const DEFAULT_DEPTOS: string[] = [
+  'Obras públicas mantenimiento vial',
+  'Servicios públicos aseo urbano poniente',
+  'Servicios públicos aseo urbano oriente',
+];
+
+function loadDepartamentos(): string[] {
+  try {
+    const raw = localStorage.getItem(DEPTOS_KEY);
+    if (!raw) {
+      saveDepartamentos(DEFAULT_DEPTOS);
+      return [...DEFAULT_DEPTOS];
+    }
+    const parsed = JSON.parse(raw) as string[];
+    return Array.isArray(parsed) ? parsed : [...DEFAULT_DEPTOS];
+  } catch {
+    return [...DEFAULT_DEPTOS];
+  }
+}
+
+function saveDepartamentos(deptos: string[]): void {
+  try { localStorage.setItem(DEPTOS_KEY, JSON.stringify(deptos)); } catch { /* noop */ }
+}
+
+// ─── PDF helpers (Ayuntamiento) ───────────────────────────────────────────────
+
+function fmtPesoA(n: number): string {
+  return n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function loadLogoBase64Aya(): Promise<string | null> {
+  try {
+    const res = await fetch('/logo-mj-merida.jpg');
+    const buf = await res.arrayBuffer();
+    let bin = '';
+    new Uint8Array(buf).forEach(b => { bin += String.fromCharCode(b); });
+    return 'data:image/jpeg;base64,' + btoa(bin);
+  } catch { return null; }
+}
+
+type FiltroAyuntamiento = 'sin_tft' | 'con_tft_sin_pago' | 'facturadas' | 'todos';
+
+async function generarPDFAyuntamiento(
+  trabajos: Trabajo[],
+  vehiculos: Vehiculo[],
+  filtro: FiltroAyuntamiento,
+): Promise<void> {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+
+  const pw = 279.4;
+  const ml = 18, mr = 18, cw = pw - ml - mr;
+  const DARK   = [15,  23,  42]  as [number, number, number];
+  const MID    = [71,  85, 105]  as [number, number, number];
+  const LIGHT  = [203,213,225]  as [number, number, number];
+  const XLIGHT = [248,250,252]  as [number, number, number];
+  const WHITE  = [255,255,255]  as [number, number, number];
+
+  const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+  const fechaSlug = new Date().toISOString().split('T')[0];
+
+  const filtroNombres: Record<FiltroAyuntamiento, string> = {
+    sin_tft:          'Sin TFT',
+    con_tft_sin_pago: 'Con TFT Sin Pago',
+    facturadas:       'Facturadas',
+    todos:            'Todos',
+  };
+  const filtroSlugs: Record<FiltroAyuntamiento, string> = {
+    sin_tft:          'sin-tft',
+    con_tft_sin_pago: 'con-tft-sin-pago',
+    facturadas:       'facturadas',
+    todos:            'todos',
+  };
+
+  const trabajosAyu = trabajos.filter(t => {
+    if (t.folioFiscal === '__CANCELADA__') return false;
+    if (t.tipoCliente !== 'ayuntamiento') return false;
+    if (filtro === 'sin_tft')          return (t.tftEstado ?? 'sin_tft') === 'sin_tft' && t.estado === 'completado';
+    if (filtro === 'con_tft_sin_pago') return (t.tftEstado ?? 'sin_tft') === 'con_tft' && getMontoPagado(t) < t.total;
+    if (filtro === 'facturadas')       return t.estadoFacturacion === 'facturado';
+    return true;
+  });
+
+  let y = 15;
+
+  // ═══ HEADER ════════════════════════════════════════════════════════════════
+  const logoB64 = await loadLogoBase64Aya();
+  if (logoB64) doc.addImage(logoB64, 'JPEG', ml, y, 16, 16);
+
+  const cx = ml + 20;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...DARK);
+  doc.text('MICRO DIESEL DE MÉRIDA', cx, y + 5);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MID);
+  doc.text('Héctor Armando Rocha Sepúlveda', cx, y + 10);
+  doc.text('Circuito Colonias No. 752, Col. Castilla Cámara, CP 97278  ·  Mérida, Yucatán', cx, y + 14.5);
+  doc.text('Tel. (999) 317.22.46  ·  Cel. 999 359.79.70', cx, y + 18.5);
+
+  y += 22;
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.4); doc.line(ml, y, ml + cw, y);
+  y += 6;
+
+  // ═══ TITLE + DATE ══════════════════════════════════════════════════════════
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...DARK);
+  doc.text(`REPORTE AYUNTAMIENTO — ${filtroNombres[filtro].toUpperCase()}`, ml, y + 4);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...MID);
+  doc.text(fechaHoy, ml + cw, y + 4, { align: 'right' });
+  y += 10;
+
+  // ═══ CLIENT BLOCK ══════════════════════════════════════════════════════════
+  doc.setFillColor(...XLIGHT);
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3);
+  doc.roundedRect(ml, y, cw, 12, 1.5, 1.5, 'FD');
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...MID);
+  doc.text('CLIENTE', ml + 4, y + 4.5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+  doc.text('AYUNTAMIENTO DE MÉRIDA', ml + 4, y + 9.5);
+  y += 17;
+
+  // ═══ TABLE ══════════════════════════════════════════════════════════════════
+  const rh = 6;
+  // cw ≈ 243.4mm landscape letter
+  const wOrden = 30, wInv = 24, wVeh = 52, wDepto = 58, wDesc = 44, wTotal = 28, wTft = cw - 30 - 24 - 52 - 58 - 44 - 28;
+
+  // thead
+  doc.setFillColor(...DARK); doc.rect(ml, y, cw, rh, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...WHITE);
+  const colDefs = [
+    { label: 'ORDEN SERVICIO', w: wOrden, align: 'left'   as const },
+    { label: 'INVENTARIO',     w: wInv,   align: 'left'   as const },
+    { label: 'UNIDAD',         w: wVeh,   align: 'left'   as const },
+    { label: 'DEPARTAMENTO',   w: wDepto, align: 'left'   as const },
+    { label: 'DESCRIPCIÓN',    w: wDesc,  align: 'left'   as const },
+    { label: 'TOTAL',          w: wTotal, align: 'right'  as const },
+    { label: 'ESTADO TFT',     w: wTft,   align: 'center' as const },
+  ];
+  let xh = ml;
+  colDefs.forEach(c => {
+    const tx = c.align === 'right' ? xh + c.w - 2.5 : c.align === 'center' ? xh + c.w / 2 : xh + 2.5;
+    doc.text(c.label, tx, y + 4, { align: c.align });
+    xh += c.w;
+  });
+  doc.setTextColor(...DARK);
+  y += rh;
+
+  // rows
+  let totalSum = 0;
+  let pagadoSum = 0;
+  trabajosAyu.forEach((t, i) => {
+    const veh = vehiculos.find(v => v.id === t.vehiculoId);
+    const vLabel = veh ? [veh.anio, veh.marca, veh.modelo].filter(Boolean).join(' ') : '—';
+    const tftLabel = (t.tftEstado ?? 'sin_tft') === 'con_tft' ? `TFT-${t.tftNumero ?? '?'}` : 'Sin TFT';
+    const pagado = getMontoPagado(t);
+    totalSum += t.total;
+    pagadoSum += pagado;
+
+    if (i % 2 === 1) { doc.setFillColor(...XLIGHT); doc.rect(ml, y, cw, rh, 'F'); }
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...DARK);
+
+    const rowCells = [
+      { text: t.ordenServicioGob ?? '—', w: wOrden, align: 'left'   as const },
+      { text: t.inventarioNum    ?? '—', w: wInv,   align: 'left'   as const },
+      { text: vLabel,                    w: wVeh,   align: 'left'   as const },
+      { text: t.departamento     ?? '—', w: wDepto, align: 'left'   as const },
+      { text: t.descripcion,             w: wDesc,  align: 'left'   as const },
+      { text: '$' + fmtPesoA(t.total),   w: wTotal, align: 'right'  as const },
+      { text: tftLabel,                  w: wTft,   align: 'center' as const },
+    ];
+    let xr = ml;
+    rowCells.forEach(c => {
+      const tx = c.align === 'right' ? xr + c.w - 2.5 : c.align === 'center' ? xr + c.w / 2 : xr + 2.5;
+      const txt = (doc.splitTextToSize(c.text, c.w - 4))[0] ?? '';
+      doc.text(txt, tx, y + 4, { align: c.align });
+      xr += c.w;
+    });
+    doc.setDrawColor(...LIGHT); doc.setLineWidth(0.2); doc.line(ml, y + rh, ml + cw, y + rh);
+    y += rh;
+  });
+
+  if (trabajosAyu.length === 0) {
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(...MID);
+    doc.text('Sin resultados para este filtro.', ml + 2.5, y + 4);
+    y += rh;
+  }
+
+  // ═══ SUMMARY ══════════════════════════════════════════════════════════════
+  y += 4;
+  const pendienteSum = Math.max(0, totalSum - pagadoSum);
+  const sumX = ml + cw - 90;
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3); doc.line(sumX, y, ml + cw, y);
+  y += 4;
+
+  const sumRow = (label: string, value: string, bold = false) => {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(bold ? 9 : 8);
+    doc.setTextColor(...(bold ? DARK : MID));
+    doc.text(label, sumX + 2, y);
+    if (value) doc.text(value, ml + cw, y, { align: 'right' });
+    y += 5.5;
+  };
+
+  sumRow(`Trabajos incluidos: ${trabajosAyu.length}`, '');
+  sumRow('Total importe:', '$' + fmtPesoA(totalSum));
+  sumRow('Total abonado:', '$' + fmtPesoA(pagadoSum));
+
+  doc.setDrawColor(...DARK); doc.setLineWidth(0.4);
+  doc.line(sumX, y, ml + cw, y); y += 0.8;
+  doc.line(sumX, y, ml + cw, y); y += 5;
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+  doc.text('SALDO PENDIENTE', sumX + 2, y);
+  doc.text('$' + fmtPesoA(pendienteSum), ml + cw, y, { align: 'right' });
+  y += 10;
+
+  // ═══ FOOTER ═══════════════════════════════════════════════════════════════
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3); doc.line(ml, y, ml + cw, y); y += 5;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...MID);
+  doc.text(`Documento generado el ${fechaHoy}  ·  Este documento no tiene validez fiscal.`, ml, y);
+  doc.text('MICRO DIESEL DE MÉRIDA', ml + cw, y, { align: 'right' });
+
+  doc.save(`reporte-ayuntamiento-${filtroSlugs[filtro]}-${fechaSlug}.pdf`);
+}
 
 // ── Finalization Modal ──────────────────────────────────────────────────────
 function ModalFinalizacion({
@@ -102,11 +327,7 @@ function ModalFinalizacion({
   );
 }
 
-const DEPARTAMENTOS_AYUNTAMIENTO: string[] = [
-  'Obras públicas mantenimiento vial',
-  'Servicios públicos aseo urbano poniente',
-  'Servicios públicos aseo urbano oriente',
-];
+// DEPARTAMENTOS_AYUNTAMIENTO is now managed via localStorage (see loadDepartamentos/saveDepartamentos above)
 
 // ── Main Component ──────────────────────────────────────────────────────────
 export function VistaTrabajo({
@@ -186,6 +407,15 @@ export function VistaTrabajo({
   const [capturandoTftId, setCapturandoTftId] = useState<string | null>(null);
   const [tftNumeroDraft, setTftNumeroDraft] = useState('');
   const [verCancelados, setVerCancelados] = useState(false);
+
+  // ── Departamentos CRUD ──────────────────────────────────────────────────
+  const [departamentos, setDepartamentos] = useState<string[]>([]);
+  const [showDeptoManager, setShowDeptoManager] = useState(false);
+  const [nuevoDepto, setNuevoDepto] = useState('');
+
+  useEffect(() => {
+    setDepartamentos(loadDepartamentos());
+  }, []);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
   const totalManoDeObra       = laborItems.reduce((s, l) => s + l.precio, 0);
@@ -453,6 +683,24 @@ export function VistaTrabajo({
     setFinalizandoId(trabajo.id);
   };
 
+  // ── Departamentos CRUD handlers ────────────────────────────────────────────
+  const agregarDepto = () => {
+    const trimmed = nuevoDepto.trim();
+    if (!trimmed || departamentos.includes(trimmed)) return;
+    const updated = [...departamentos, trimmed];
+    setDepartamentos(updated);
+    saveDepartamentos(updated);
+    setNuevoDepto('');
+  };
+
+  const eliminarDepto = (depto: string) => {
+    const updated = departamentos.filter(d => d !== depto);
+    setDepartamentos(updated);
+    saveDepartamentos(updated);
+    // Clear form selection if the deleted depto was selected
+    if (form.departamento === depto) setForm(f => ({ ...f, departamento: '' }));
+  };
+
   return (
     <div>
       {trabajoFinalizando && (
@@ -469,7 +717,7 @@ export function VistaTrabajo({
       )}
       <SectionTitle title="Registro de Trabajos" subtitle="Selecciona cliente, unidad y las refacciones usadas del inventario." />
 
-      <div className="flex gap-1 bg-white rounded-xl p-1.5 border border-slate-200 mb-6">
+      <div className="flex gap-1 bg-white rounded-xl p-1.5 border border-slate-200 mb-3">
         <button
           type="button"
           onClick={() => { setSubTab('general'); setFiltroTft('todos'); resetForm(); }}
@@ -489,6 +737,56 @@ export function VistaTrabajo({
           🏛️ Ayuntamiento
         </button>
       </div>
+
+      {/* ── Gestión de Departamentos (solo tab Ayuntamiento) ── */}
+      {esAyuntamientoTab && (
+        <div className="mb-4">
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setShowDeptoManager(v => !v)}
+              className="text-xs font-semibold text-slate-500 hover:text-rose-700 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-300 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
+            >
+              ⚙️ Departamentos
+            </button>
+          </div>
+          {showDeptoManager && (
+            <div className="mt-2 border border-rose-200 bg-rose-50 rounded-xl p-4 space-y-3">
+              <p className="text-xs font-bold text-rose-700 uppercase tracking-widest">Gestión de Departamentos</p>
+              <div className="space-y-1">
+                {departamentos.map(d => (
+                  <div key={d} className="flex items-center justify-between bg-white border border-rose-100 rounded-lg px-3 py-2 text-sm">
+                    <span className="text-slate-700">{d}</span>
+                    <button
+                      type="button"
+                      onClick={() => eliminarDepto(d)}
+                      className="text-xs text-rose-400 hover:text-rose-700 font-bold ml-2 transition-colors"
+                      title="Eliminar departamento"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {departamentos.length === 0 && (
+                  <p className="text-xs text-rose-400 italic px-1">Sin departamentos registrados.</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="Nuevo departamento..."
+                  value={nuevoDepto}
+                  onChange={e => setNuevoDepto(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarDepto(); } }}
+                />
+                <Btn type="button" size="sm" variant="primary" onClick={agregarDepto} disabled={!nuevoDepto.trim() || departamentos.includes(nuevoDepto.trim())}>
+                  Agregar
+                </Btn>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={`border rounded-xl p-5 mb-8 ${editandoId ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
         <div className="flex items-center justify-between mb-4">
@@ -525,7 +823,7 @@ export function VistaTrabajo({
                   <Label>Departamento</Label>
                   <Select value={form.departamento} onChange={e => setForm(f => ({ ...f, departamento: e.target.value }))}>
                     <option value="">Seleccionar departamento...</option>
-                    {DEPARTAMENTOS_AYUNTAMIENTO.map(departamento => (
+                    {departamentos.map(departamento => (
                       <option key={departamento} value={departamento}>{departamento}</option>
                     ))}
                   </Select>
@@ -1248,6 +1546,26 @@ export function VistaTrabajo({
                   >
                     {label}
                   </Btn>
+                ))}
+              </div>
+            )}
+            {esAyuntamientoTab && (
+              <div className="flex gap-2 flex-wrap pt-1 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest self-center">📄 Reportes PDF:</span>
+                {([
+                  { filtro: 'sin_tft'          as FiltroAyuntamiento, label: 'Sin TFT' },
+                  { filtro: 'con_tft_sin_pago' as FiltroAyuntamiento, label: 'Con TFT sin pago' },
+                  { filtro: 'facturadas'       as FiltroAyuntamiento, label: 'Facturadas' },
+                  { filtro: 'todos'            as FiltroAyuntamiento, label: 'Todos' },
+                ]).map(({ filtro, label }) => (
+                  <button
+                    key={filtro}
+                    type="button"
+                    onClick={() => generarPDFAyuntamiento(trabajos, vehiculos, filtro)}
+                    className="text-xs font-semibold text-slate-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1"
+                  >
+                    📄 {label}
+                  </button>
                 ))}
               </div>
             )}
