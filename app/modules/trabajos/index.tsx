@@ -124,8 +124,8 @@ export function VistaTrabajo({
   trabajos: Trabajo[];
   facturas: Factura[];
   proveedores: Proveedor[];
-  onGuardar: (t: Omit<Trabajo, 'id' | 'total' | 'iva'>) => void;
-  onEditar: (trabajoId: string, data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => void;
+  onGuardar: (t: Omit<Trabajo, 'id' | 'total' | 'iva'>) => Promise<void>;
+  onEditar: (trabajoId: string, data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => Promise<void>;
   onFinalizar: (trabajoId: string, tipo: 'factura' | 'nota') => void;
   onIrAInventario: () => void;
   onGenerarFactura: (trabajoId: string) => void;
@@ -163,6 +163,8 @@ export function VistaTrabajo({
   const [filtroFacturacion, setFiltroFacturacion] = useState<'todos' | 'con_factura' | 'sin_factura'>('todos');
   const [filtroClienteId, setFiltroClienteId] = useState('');
   const [filtroVehiculoId, setFiltroVehiculoId] = useState('');
+  const [guardandoError, setGuardandoError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
   const totalManoDeObra       = laborItems.reduce((s, l) => s + l.precio, 0);
@@ -299,7 +301,7 @@ export function VistaTrabajo({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.clienteId || !form.vehiculoId || !form.descripcion) return;
     const kmVal = typeof form.kilometraje === 'string' ? (form.kilometraje.trim() !== '' ? Number(form.kilometraje) : undefined) : (form.kilometraje || undefined);
@@ -318,12 +320,21 @@ export function VistaTrabajo({
       partes: partesSeleccionadas,
       pagos: editandoId ? (trabajoExistente?.pagos ?? []) : [],
     };
-    if (editandoId) {
-      onEditar(editandoId, trabajoData);
-    } else {
-      onGuardar(trabajoData);
+    setGuardandoError(null);
+    setGuardando(true);
+    try {
+      if (editandoId) {
+        await onEditar(editandoId, trabajoData);
+      } else {
+        await onGuardar(trabajoData);
+      }
+      resetForm();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido al guardar el trabajo';
+      setGuardandoError(msg);
+    } finally {
+      setGuardando(false);
     }
-    resetForm();
   };
 
   const getCliente  = (id: string) => clientes.find(c => c.id === id);
@@ -419,7 +430,22 @@ export function VistaTrabajo({
         })()}
         <form onSubmit={handleSubmit} className="space-y-6">
 
-          {/* ① Cliente + ② Unidad */}
+          {/* ── Error banner ── */}
+          {guardandoError && (
+            <div className="flex items-start gap-3 bg-rose-50 border border-rose-300 rounded-xl px-4 py-3 text-sm text-rose-800">
+              <span className="text-lg flex-shrink-0">🚨</span>
+              <div className="flex-1">
+                <p className="font-bold">No se pudo guardar el trabajo</p>
+                <p className="text-xs mt-0.5 text-rose-600">{guardandoError}</p>
+                {guardandoError.includes('expirada') && (
+                  <button type="button" onClick={() => window.location.reload()} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">
+                    → Recargar la página
+                  </button>
+                )}
+              </div>
+              <button type="button" onClick={() => setGuardandoError(null)} className="text-rose-400 hover:text-rose-600 text-lg leading-none flex-shrink-0">×</button>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>① Cliente</Label>
@@ -987,8 +1013,8 @@ export function VistaTrabajo({
           )}
 
           <Btn type="submit" variant="primary" fullWidth
-            disabled={!form.clienteId || !form.vehiculoId || !form.descripcion}>
-            ✓ Registrar Trabajo
+            disabled={guardando || !form.clienteId || !form.vehiculoId || !form.descripcion}>
+            {guardando ? '⏳ Guardando...' : editandoId ? '✓ Guardar cambios' : '✓ Registrar Trabajo'}
           </Btn>
         </form>
       </div>

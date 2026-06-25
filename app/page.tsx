@@ -192,11 +192,15 @@ export default function TallerMecanico() {
     await db.updateRefaccionCompatibilidad(refaccionId, compat ?? null);
     setInventario(prev => prev.map(r => r.id === refaccionId ? { ...r, compatibilidad: compat } : r));
   };
-  const guardarTrabajo = async (data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => {
-    if (!taller) return;
+  const guardarTrabajo = async (data: Omit<Trabajo, 'id' | 'total' | 'iva'>): Promise<void> => {
+    if (!taller) {
+      // Auth session likely expired — surface this clearly
+      throw new Error('Sesión expirada. Por favor recarga la página e intenta de nuevo.');
+    }
     const subtotal = data.manoDeObra + data.refacciones;
     const iva      = data.requiereFactura ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
     const total    = subtotal + iva;
+    // insertTrabajo throws on DB error — let it propagate so handleSubmit can catch it
     const nuevo = await db.insertTrabajo(taller.id, { ...data, iva, total, estadoFacturacion: 'sin_facturar' });
     if (!nuevo) return;
     // Merge client-side manoDeObraItems into the DB response to ensure tipo/costoTaller
@@ -213,7 +217,7 @@ export default function TallerMecanico() {
     }
   };
 
-  const editarTrabajo = async (trabajoId: string, data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => {
+  const editarTrabajo = async (trabajoId: string, data: Omit<Trabajo, 'id' | 'total' | 'iva'>): Promise<void> => {
     const subtotal = data.manoDeObra + data.refacciones;
     const iva = data.requiereFactura ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
     const total = subtotal + iva;
