@@ -741,6 +741,7 @@ export default function TallerMecanico() {
           )}
           {vista === 'cotizaciones' && (
             <VistaCotizaciones
+              tallerId={taller?.id ?? ''}
               clientes={clientes}
               vehiculos={vehiculos}
               inventario={inventario}
