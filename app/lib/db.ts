@@ -6,6 +6,20 @@
  */
 
 import { supabase } from '@/app/lib/supabase';
+
+// ── JSONB safety helper ────────────────────────────────────────────────────
+// Supabase JSONB columns should always come back as parsed JS values (arrays/objects).
+// But if data was inserted via JSON.stringify() (double-encoded string), the column
+// stores a JSON string value like '"[]"' instead of a proper array '[]'.
+// This helper transparently parses double-encoded strings so the rest of the app
+// always sees real arrays — prevents "X.reduce is not a function" crashes.
+function safeJsonb<T>(val: unknown, fallback: T): T {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'string') {
+    try { return JSON.parse(val) as T; } catch { return fallback; }
+  }
+  return val as T;
+}
 import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor,
   OrdenCompra, Factura, TrabajoRefaccion, ManoDeObraItem,
@@ -206,15 +220,15 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
     descripcion: r.descripcion,
     kilometraje: r.kilometraje ?? undefined,
     manoDeObra: Number(r.mano_de_obra),
-    manoDeObraItems: (r.mano_de_obra_items as ManoDeObraItem[]) ?? [],
+    manoDeObraItems: safeJsonb<ManoDeObraItem[]>(r.mano_de_obra_items, []),
     refacciones: Number(r.refacciones_total),
     costoRefacciones: Number(r.costo_refacciones),
     requiereFactura: r.requiere_factura,
     folioFiscal: r.folio_fiscal ?? undefined,
     iva: Number(r.iva),
     total: Number(r.total),
-    partes: (r.partes as TrabajoRefaccion[]) ?? [],
-    pagos: (r.pagos as Pago[]) ?? [],
+    partes: safeJsonb<TrabajoRefaccion[]>(r.partes, []),
+    pagos: safeJsonb<Pago[]>(r.pagos, []),
     facturaId: r.factura_id ?? undefined,
     estadoFacturacion: r.estado_facturacion,
     estado: r.estado,
@@ -465,11 +479,11 @@ export async function getFacturas(tallerId: string): Promise<Factura[]> {
     vehiculoId: r.vehiculo_id ?? '',
     fecha: r.fecha,
     fechaVencimiento: r.fecha_vencimiento ?? undefined,
-    conceptos: (r.conceptos as FacturaConcepto[]) ?? [],
+    conceptos: safeJsonb<FacturaConcepto[]>(r.conceptos, []),
     subtotal: Number(r.subtotal),
     iva: r.iva != null ? Number(r.iva) : undefined,
     total: Number(r.total),
-    pagos: (r.pagos as PagoFactura[]) ?? [],
+    pagos: safeJsonb<PagoFactura[]>(r.pagos, []),
     notas: r.notas ?? undefined,
   }));
 }
