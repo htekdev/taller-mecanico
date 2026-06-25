@@ -294,6 +294,11 @@ export async function updateTrabajoFactura(trabajoId: string, facturaId: string)
   await supabase.from('trabajos').update({ factura_id: facturaId, estado_facturacion: 'facturado' }).eq('id', trabajoId);
 }
 
+/** Reset facturación — allows re-invoicing after a factura was cancelled */
+export async function resetFacturacionTrabajo(trabajoId: string): Promise<void> {
+  await supabase.from('trabajos').update({ factura_id: null, estado_facturacion: 'sin_facturar' }).eq('id', trabajoId);
+}
+
 /** Editar trabajo pendiente — actualiza todos los campos en la DB */
 export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<void> {
   await supabase.from('trabajos').update({
