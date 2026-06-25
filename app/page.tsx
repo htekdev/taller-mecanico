@@ -83,6 +83,11 @@ export default function TallerMecanico() {
     const nuevo = await db.insertVehiculo(taller.id, data);
     if (nuevo) setVehiculos(prev => [...prev, nuevo]);
   };
+
+  const actualizarVehiculo = async (vehiculoId: string, data: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => {
+    await db.updateVehiculo(vehiculoId, data);
+    setVehiculos(prev => prev.map(v => v.id === vehiculoId ? { ...v, ...data } : v));
+  };
   const guardarRefaccion = async (data: Omit<Refaccion, 'id'>) => {
     if (!taller) return;
     const nuevo = await db.insertRefaccion(taller.id, data);
@@ -569,7 +574,7 @@ export default function TallerMecanico() {
           {vista === 'clientes' && (
             <VistaClientes clientes={clientes} vehiculos={vehiculos}
               onGuardarCliente={guardarCliente} onGuardarVehiculo={guardarVehiculo}
-              onActualizarCliente={actualizarCliente} />
+              onActualizarCliente={actualizarCliente} onActualizarVehiculo={actualizarVehiculo} />
           )}
           {vista === 'inventario' && (
             <VistaInventario inventario={inventario} clientes={clientes} vehiculos={vehiculos}

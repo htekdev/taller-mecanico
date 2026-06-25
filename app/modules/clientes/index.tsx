@@ -37,85 +37,135 @@ function ModalEditarCliente({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-      onClick={onCerrar}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onCerrar}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-base font-bold text-slate-800">Editar Cliente</h2>
             <p className="text-xs text-slate-500 mt-0.5">Actualiza los datos de contacto.</p>
           </div>
-          <button
-            type="button"
-            onClick={onCerrar}
-            className="text-slate-400 hover:text-slate-600 text-xl leading-none"
-            aria-label="Cerrar"
-          >
-            ×
-          </button>
+          <button type="button" onClick={onCerrar} className="text-slate-400 hover:text-slate-600 text-xl leading-none" aria-label="Cerrar">×</button>
         </div>
-
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label>Nombre *</Label>
-            <Input
-              type="text"
-              placeholder="Nombre completo"
-              value={form.nombre}
-              onChange={e => setForm({ ...form, nombre: e.target.value })}
-              required
-            />
+            <Input type="text" placeholder="Nombre completo" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} required />
           </div>
           <div>
-            <Label>
-              Teléfono{' '}
-              <span className="text-slate-400 font-normal text-xs">(opcional)</span>
-            </Label>
-            <Input
-              type="tel"
-              placeholder="Ej. 555-123-4567"
-              value={form.telefono}
-              onChange={e => setForm({ ...form, telefono: e.target.value })}
-            />
+            <Label>Teléfono <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
+            <Input type="tel" placeholder="Ej. 555-123-4567" value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} />
           </div>
           <div>
-            <Label>
-              Correo 1{' '}
-              <span className="text-slate-400 font-normal text-xs">(opcional)</span>
-            </Label>
-            <Input
-              type="email"
-              placeholder="correo@ejemplo.com"
-              value={form.email}
-              onChange={e => setForm({ ...form, email: e.target.value })}
-            />
+            <Label>Correo 1 <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
+            <Input type="email" placeholder="correo@ejemplo.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
           </div>
           <div>
-            <Label>
-              Correo 2{' '}
-              <span className="text-slate-400 font-normal text-xs">(opcional)</span>
-            </Label>
-            <Input
-              type="email"
-              placeholder="correo2@ejemplo.com"
-              value={form.email2}
-              onChange={e => setForm({ ...form, email2: e.target.value })}
-            />
+            <Label>Correo 2 <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
+            <Input type="email" placeholder="correo2@ejemplo.com" value={form.email2} onChange={e => setForm({ ...form, email2: e.target.value })} />
           </div>
-
-          {/* Actions */}
           <div className="flex gap-3 pt-1">
-            <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>
-              Cancelar
-            </Btn>
-            <Btn type="submit" variant="primary" fullWidth disabled={guardando}>
+            <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>Cancelar</Btn>
+            <Btn type="submit" variant="primary" fullWidth disabled={guardando}>{guardando ? 'Guardando...' : '✓ Guardar cambios'}</Btn>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal de edición de vehículo ───────────────────────────────────────────────
+function ModalEditarVehiculo({
+  vehiculo,
+  onGuardar,
+  onCerrar,
+}: {
+  vehiculo: Vehiculo;
+  onGuardar: (id: string, datos: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => void;
+  onCerrar: () => void;
+}) {
+  const [form, setForm] = useState({
+    marca: vehiculo.marca ?? '',
+    modelo: vehiculo.modelo ?? '',
+    anio: vehiculo.anio ?? '',
+    placa: vehiculo.placa ?? '',
+  });
+  const [guardando, setGuardando] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.marca.trim() || !form.modelo.trim()) return;
+    setGuardando(true);
+    await onGuardar(vehiculo.id, {
+      marca: form.marca.trim(),
+      modelo: form.modelo.trim(),
+      anio: form.anio.trim(),
+      placa: form.placa.trim().toUpperCase(),
+    });
+    setGuardando(false);
+    onCerrar();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onCerrar}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Editar Unidad</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Los cambios se reflejan en todos los trabajos, facturas, historial y reportes relacionados.
+            </p>
+          </div>
+          <button type="button" onClick={onCerrar} className="text-slate-400 hover:text-slate-600 text-xl leading-none" aria-label="Cerrar">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Marca *</Label>
+              <Input
+                type="text"
+                placeholder="Ej. Isuzu, Ford, VW"
+                value={form.marca}
+                onChange={e => setForm({ ...form, marca: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label>Modelo *</Label>
+              <Input
+                type="text"
+                placeholder="Ej. ELF, F-150, Pointer"
+                value={form.modelo}
+                onChange={e => setForm({ ...form, modelo: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label>Año <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
+              <Input
+                type="text"
+                placeholder="Ej. 2018"
+                value={form.anio}
+                onChange={e => setForm({ ...form, anio: e.target.value })}
+                maxLength={4}
+              />
+            </div>
+            <div>
+              <Label>Placa <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
+              <Input
+                type="text"
+                placeholder="Ej. ABC-123"
+                value={form.placa}
+                onChange={e => setForm({ ...form, placa: e.target.value.toUpperCase() })}
+                className="font-mono"
+              />
+            </div>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+            ⚠️ El nombre completo de la unidad se verá como: <strong>{[form.anio, form.marca, form.modelo].filter(Boolean).join(' ') || '(vacío)'}</strong>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>Cancelar</Btn>
+            <Btn type="submit" variant="primary" fullWidth disabled={guardando || !form.marca.trim() || !form.modelo.trim()}>
               {guardando ? 'Guardando...' : '✓ Guardar cambios'}
             </Btn>
           </div>
@@ -132,18 +182,21 @@ export function VistaClientes({
   onGuardarCliente,
   onGuardarVehiculo,
   onActualizarCliente,
+  onActualizarVehiculo,
 }: {
   clientes: Cliente[];
   vehiculos: Vehiculo[];
   onGuardarCliente: (c: Omit<Cliente, 'id'>) => void;
   onGuardarVehiculo: (v: Omit<Vehiculo, 'id'>) => void;
   onActualizarCliente: (id: string, datos: Omit<Cliente, 'id'>) => void;
+  onActualizarVehiculo: (id: string, datos: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => void;
 }) {
   const [formCliente, setFormCliente] = useState({ nombre: '', telefono: '', email: '', email2: '' });
   const [clienteExpandido, setClienteExpandido] = useState<string | null>(null);
   const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: '', placa: '' });
   const [busqueda, setBusqueda] = useState('');
   const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
+  const [vehiculoEditando, setVehiculoEditando] = useState<Vehiculo | null>(null);
 
   const handleSubmitCliente = (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,6 +237,15 @@ export function VistaClientes({
           cliente={clienteEditando}
           onGuardar={onActualizarCliente}
           onCerrar={() => setClienteEditando(null)}
+        />
+      )}
+
+      {/* ── Modal de edición de vehículo ── */}
+      {vehiculoEditando && (
+        <ModalEditarVehiculo
+          vehiculo={vehiculoEditando}
+          onGuardar={onActualizarVehiculo}
+          onCerrar={() => setVehiculoEditando(null)}
         />
       )}
 
@@ -309,7 +371,7 @@ export function VistaClientes({
                           {unidades.map(v => (
                             <div key={v.id} className="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 shadow-sm">
                               <span className="text-2xl flex-shrink-0">🚗</span>
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <div className="font-semibold text-slate-800 text-sm truncate">
                                   {[v.anio, v.marca, v.modelo].filter(Boolean).join(' ') || '(sin datos)'}
                                 </div>
@@ -319,6 +381,14 @@ export function VistaClientes({
                                   </div>
                                 )}
                               </div>
+                              <button
+                                type="button"
+                                onClick={e => { e.stopPropagation(); setVehiculoEditando(v); }}
+                                className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2 py-1 rounded-lg transition-colors border border-indigo-200 hover:border-indigo-300 flex-shrink-0"
+                                title="Editar unidad"
+                              >
+                                ✏️
+                              </button>
                             </div>
                           ))}
                         </div>
