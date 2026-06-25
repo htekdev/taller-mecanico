@@ -102,6 +102,12 @@ function ModalFinalizacion({
   );
 }
 
+const DEPARTAMENTOS_AYUNTAMIENTO: string[] = [
+  'Obras públicas mantenimiento vial',
+  'Servicios públicos aseo urbano poniente',
+  'Servicios públicos aseo urbano oriente',
+];
+
 // ── Main Component ──────────────────────────────────────────────────────────
 export function VistaTrabajo({
   clientes,
@@ -118,6 +124,7 @@ export function VistaTrabajo({
   onRefacturar,
   onCancelarTrabajo,
   onReactivarTrabajo,
+  onActualizarTft,
   onIrAFacturas,
 }: {
   clientes: Cliente[];
@@ -134,6 +141,7 @@ export function VistaTrabajo({
   onRefacturar: (trabajoId: string) => void;
   onCancelarTrabajo: (trabajoId: string) => void;
   onReactivarTrabajo: (trabajoId: string) => void;
+  onActualizarTft: (trabajoId: string, tftNumero: string) => Promise<void> | void;
   onIrAFacturas: () => void;
 }) {
   const emptyForm = {
@@ -145,6 +153,11 @@ export function VistaTrabajo({
     requiereFactura: false,
     folioFiscal: '',
     estado: 'pendiente' as Trabajo['estado'],
+    departamento: '',
+    inventarioNum: '',
+    ordenServicioGob: '',
+    fechaEntrada: '',
+    fechaSalida: '',
   };
   const [form, setForm] = useState(emptyForm);
   const [laborItems, setLaborItems] = useState<ManoDeObraItem[]>([]);
@@ -163,11 +176,15 @@ export function VistaTrabajo({
   const [pickerPrecioVenta, setPickerPrecioVenta] = useState(0);
   const [finalizandoId, setFinalizandoId] = useState<string | null>(null);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [subTab, setSubTab] = useState<'general' | 'ayuntamiento'>('general');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'completado'>('todos');
   const [filtroFacturacion, setFiltroFacturacion] = useState<'todos' | 'con_factura' | 'sin_factura'>('todos');
+  const [filtroTft, setFiltroTft] = useState<'todos' | 'sin_tft' | 'con_tft'>('todos');
   const [filtroClienteId, setFiltroClienteId] = useState('');
   const [filtroVehiculoId, setFiltroVehiculoId] = useState('');
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
+  const [capturandoTftId, setCapturandoTftId] = useState<string | null>(null);
+  const [tftNumeroDraft, setTftNumeroDraft] = useState('');
   const [verCancelados, setVerCancelados] = useState(false);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
@@ -176,8 +193,7 @@ export function VistaTrabajo({
   const totalCostoRefacciones = partesSeleccionadas.reduce((s, p) => s + (p.costoTotal ?? 0), 0);
   const utilidadRefacciones   = totalVentaRefacciones - totalCostoRefacciones;
   const subtotalSinIVA        = totalManoDeObra + totalVentaRefacciones;
-  const ivaCalculado          = form.requiereFactura ? Math.round(subtotalSinIVA * 0.16 * 100) / 100 : 0;
-  const totalConIVA           = subtotalSinIVA + ivaCalculado;
+  const esAyuntamientoTab = subTab === 'ayuntamiento';
 
   const handleClienteChange = (clienteId: string) =>
     setForm(f => ({ ...f, clienteId, vehiculoId: '' }));
@@ -280,9 +296,12 @@ export function VistaTrabajo({
     setExtCostoTaller(0);
     setExtPrecioCliente(0);
     setExtProveedorId('');
+    setCapturandoTftId(null);
+    setTftNumeroDraft('');
   };
 
   const iniciarEdicion = (trabajo: Trabajo) => {
+    setSubTab(trabajo.tipoCliente === 'ayuntamiento' ? 'ayuntamiento' : 'general');
     setForm({
       clienteId: trabajo.clienteId,
       vehiculoId: trabajo.vehiculoId,
@@ -293,6 +312,11 @@ export function VistaTrabajo({
       requiereFactura: trabajo.requiereFactura,
       folioFiscal: trabajo.folioFiscal ?? '',
       estado: trabajo.estado,
+      departamento: trabajo.departamento ?? '',
+      inventarioNum: trabajo.inventarioNum ?? '',
+      ordenServicioGob: trabajo.ordenServicioGob ?? '',
+      fechaEntrada: trabajo.fechaEntrada ?? '',
+      fechaSalida: trabajo.fechaSalida ?? '',
     });
     setLaborItems(trabajo.manoDeObraItems ?? []);
     setPartesSeleccionadas(trabajo.partes ?? []);
@@ -318,8 +342,28 @@ export function VistaTrabajo({
       manoDeObraItems: laborItems,
       refacciones: totalVentaRefacciones,
       costoRefacciones: totalCostoRefacciones,
+      tipoCliente: subTab as 'general' | 'ayuntamiento',
+      ...(subTab === 'ayuntamiento' ? {
+        departamento: form.departamento || undefined,
+        inventarioNum: form.inventarioNum || undefined,
+        ordenServicioGob: form.ordenServicioGob || undefined,
+        fechaEntrada: form.fechaEntrada || undefined,
+        fechaSalida: form.fechaSalida || undefined,
+        tftEstado: trabajoExistente?.tftEstado ?? 'sin_tft',
+        tftNumero: trabajoExistente?.tftNumero,
+      } : {
+        departamento: undefined,
+        inventarioNum: undefined,
+        ordenServicioGob: undefined,
+        fechaEntrada: undefined,
+        fechaSalida: undefined,
+        tftEstado: undefined,
+        tftNumero: undefined,
+      }),
       // Preserve requiereFactura for completed jobs so IVA is recalculated correctly
-      requiereFactura: trabajoExistente?.estado === 'completado' ? (trabajoExistente.requiereFactura ?? false) : false,
+      requiereFactura: trabajoExistente?.estado === 'completado'
+        ? (trabajoExistente.requiereFactura ?? false)
+        : false,
       folioFiscal: undefined,
       partes: partesSeleccionadas,
       pagos: editandoId ? (trabajoExistente?.pagos ?? []) : [],
@@ -369,17 +413,21 @@ export function VistaTrabajo({
   // Exclude cancelled jobs from all active views
   const trabajosActivos = trabajos.filter(t => t.folioFiscal !== '__CANCELADA__');
   const trabajosCancelados = trabajos.filter(t => t.folioFiscal === '__CANCELADA__');
+  const coincideTab = (trabajo: Trabajo) => esAyuntamientoTab ? trabajo.tipoCliente === 'ayuntamiento' : trabajo.tipoCliente !== 'ayuntamiento';
+  const trabajosDelTab = trabajosActivos.filter(coincideTab);
+  const trabajosCanceladosDelTab = trabajosCancelados.filter(coincideTab);
 
-  const trabajosPendientes = trabajosActivos.filter(t => t.estado === 'pendiente');
-  const trabajosPendientesFacturar = trabajosActivos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
+  const trabajosPendientes = trabajosDelTab.filter(t => t.estado === 'pendiente');
+  const trabajosPendientesFacturar = trabajosDelTab.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
   const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
-  const trabajosFiltrados = [...trabajosActivos]
+  const trabajosFiltrados = [...trabajosDelTab]
     .filter(t => {
       if (filtroClienteId && t.clienteId !== filtroClienteId) return false;
       if (filtroVehiculoId && t.vehiculoId !== filtroVehiculoId) return false;
       if (filtroEstado !== 'todos' && t.estado !== filtroEstado) return false;
       if (filtroFacturacion === 'con_factura' && t.estadoFacturacion !== 'facturado') return false;
       if (filtroFacturacion === 'sin_factura' && t.estadoFacturacion === 'facturado') return false;
+      if (esAyuntamientoTab && filtroTft !== 'todos' && (t.tftEstado ?? 'sin_tft') !== filtroTft) return false;
       return true;
     })
     .sort((a, b) => ordenHistorial === 'desc'
@@ -387,6 +435,23 @@ export function VistaTrabajo({
       : a.fecha.localeCompare(b.fecha)
     );
   const trabajoFinalizando = finalizandoId ? trabajos.find(t => t.id === finalizandoId) : null;
+
+  const guardarTft = async (trabajoId: string) => {
+    const numero = tftNumeroDraft.trim();
+    if (!numero) return;
+    await onActualizarTft(trabajoId, numero);
+    setCapturandoTftId(null);
+    setTftNumeroDraft('');
+  };
+
+  const finalizarDesdeFila = (trabajo: Trabajo) => {
+    if (trabajo.tipoCliente === 'ayuntamiento') {
+      const confirmar = window.confirm('¿Finalizar este trabajo del Ayuntamiento como factura?');
+      if (confirmar) onFinalizar(trabajo.id, 'factura');
+      return;
+    }
+    setFinalizandoId(trabajo.id);
+  };
 
   return (
     <div>
@@ -403,6 +468,27 @@ export function VistaTrabajo({
         />
       )}
       <SectionTitle title="Registro de Trabajos" subtitle="Selecciona cliente, unidad y las refacciones usadas del inventario." />
+
+      <div className="flex gap-1 bg-white rounded-xl p-1.5 border border-slate-200 mb-6">
+        <button
+          type="button"
+          onClick={() => { setSubTab('general'); setFiltroTft('todos'); resetForm(); }}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+            subTab === 'general' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          👥 General
+        </button>
+        <button
+          type="button"
+          onClick={() => { setSubTab('ayuntamiento'); setFiltroTft('todos'); resetForm(); }}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+            subTab === 'ayuntamiento' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          🏛️ Ayuntamiento
+        </button>
+      </div>
 
       <div className={`border rounded-xl p-5 mb-8 ${editandoId ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
         <div className="flex items-center justify-between mb-4">
@@ -428,6 +514,49 @@ export function VistaTrabajo({
           );
         })()}
         <form onSubmit={handleSubmit} className="space-y-6">
+
+          {esAyuntamientoTab && (
+            <div className="border border-rose-200 rounded-xl bg-white overflow-hidden">
+              <div className="px-4 py-3 bg-rose-700">
+                <span className="text-xs font-bold text-white uppercase tracking-widest">🏛️ Datos del Ayuntamiento</span>
+              </div>
+              <div className="p-4 space-y-4">
+                <div>
+                  <Label>Departamento</Label>
+                  <Select value={form.departamento} onChange={e => setForm(f => ({ ...f, departamento: e.target.value }))}>
+                    <option value="">Seleccionar departamento...</option>
+                    {DEPARTAMENTOS_AYUNTAMIENTO.map(departamento => (
+                      <option key={departamento} value={departamento}>{departamento}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Inventario</Label>
+                    <Input type="text" placeholder="Ej. INV-203" value={form.inventarioNum}
+                      onChange={e => setForm(f => ({ ...f, inventarioNum: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Orden de Servicio</Label>
+                    <Input type="text" placeholder="Ej. OS-1456" value={form.ordenServicioGob}
+                      onChange={e => setForm(f => ({ ...f, ordenServicioGob: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Fecha Entrada</Label>
+                    <Input type="date" value={form.fechaEntrada}
+                      onChange={e => setForm(f => ({ ...f, fechaEntrada: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Fecha Salida</Label>
+                    <Input type="date" value={form.fechaSalida}
+                      onChange={e => setForm(f => ({ ...f, fechaSalida: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ① Cliente + ② Unidad */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -970,10 +1099,12 @@ export function VistaTrabajo({
           </div>
 
           {/* ── Nota: IVA se elige al finalizar ── */}
-          <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4 text-sm text-indigo-700 flex items-start gap-2">
-            <span className="text-lg mt-0.5">ℹ️</span>
-            <span>El IVA se elige cuando el trabajo se <strong>finaliza</strong> — al presionar el botón 🏁 Finalizar elegirás entre <strong>Nota</strong> (sin IVA) o <strong>Factura Fiscal</strong> (IVA 16%).</span>
-          </div>
+          {!esAyuntamientoTab && (
+            <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4 text-sm text-indigo-700 flex items-start gap-2">
+              <span className="text-lg mt-0.5">ℹ️</span>
+              <span>El IVA se elige cuando el trabajo se <strong>finaliza</strong> — al presionar el botón 🏁 Finalizar elegirás entre <strong>Nota</strong> (sin IVA) o <strong>Factura Fiscal</strong> (IVA 16%).</span>
+            </div>
+          )}
 
           {(totalManoDeObra > 0 || totalVentaRefacciones > 0) && (
             <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-4 space-y-2 text-sm">
@@ -1028,11 +1159,11 @@ export function VistaTrabajo({
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-base font-bold text-slate-700">
             Historial de Trabajos
-            {trabajos.length > 0 && <span className="ml-2 text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{trabajos.length}</span>}
+            {trabajosDelTab.length > 0 && <span className="ml-2 text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{trabajosDelTab.length}</span>}
           </h3>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Ordenamiento */}
-            {trabajos.length > 0 && (
+            {trabajosDelTab.length > 0 && (
               <button
                 onClick={() => setOrdenHistorial(o => o === 'desc' ? 'asc' : 'desc')}
                 className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-700 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 px-3 py-1.5 rounded-lg transition-all"
@@ -1041,7 +1172,7 @@ export function VistaTrabajo({
               </button>
             )}
             {/* Filtro estado */}
-            {trabajos.length > 0 && (
+            {trabajosDelTab.length > 0 && (
               <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
                 {([['todos', 'Todos'], ['pendiente', '🕐 En progreso'], ['completado', '✓ Terminados']] as const).map(([val, label]) => (
                   <button key={val} onClick={() => setFiltroEstado(val)}
@@ -1055,7 +1186,7 @@ export function VistaTrabajo({
         </div>
 
         {/* Filtros estructurados */}
-        {trabajos.length > 0 && (
+        {trabajosDelTab.length > 0 && (
           <div className="mb-4 space-y-2">
             <div className="flex gap-3 mb-4 flex-wrap items-end">
               <div className="min-w-44">
@@ -1102,6 +1233,24 @@ export function VistaTrabajo({
                 </Btn>
               ))}
             </div>
+            {esAyuntamientoTab && (
+              <div className="flex gap-2 flex-wrap">
+                {([
+                  { key: 'todos', label: 'Todos' },
+                  { key: 'sin_tft', label: '❌ Sin TFT' },
+                  { key: 'con_tft', label: '✅ Con TFT' },
+                ] as const).map(({ key, label }) => (
+                  <Btn
+                    key={key}
+                    size="sm"
+                    variant={filtroTft === key ? 'primary' : 'ghost'}
+                    onClick={() => setFiltroTft(key)}
+                  >
+                    {label}
+                  </Btn>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1109,16 +1258,26 @@ export function VistaTrabajo({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-800 text-white">
-                {['Fecha','Estado','Cliente','Unidad','Placas','Km','Descripción','Refacciones','Mano de Obra','Total',''].map((h, i) => (
-                  <th key={i} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 7 && i <= 9 ? 'text-right' : 'text-left'}`}>{h}</th>
-                ))}
+                {[
+                  'Fecha', 'Estado', 'Cliente', 'Unidad', 'Placas', 'Km',
+                  ...(esAyuntamientoTab ? ['Depto', 'Inv.'] : []),
+                  'Descripción', 'Refacciones', 'Mano de Obra', 'Total',
+                  ...(esAyuntamientoTab ? ['TFT'] : []),
+                  '',
+                ].map((h, i) => {
+                  const alignRight = (!esAyuntamientoTab && i >= 7 && i <= 9) || (esAyuntamientoTab && i >= 9 && i <= 11);
+                  return (
+                    <th key={i} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${alignRight ? 'text-right' : 'text-left'}`}>{h}</th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {trabajosFiltrados.map((trabajo, i) => {
-                const cliente  = getCliente(trabajo.clienteId);
+                const cliente = getCliente(trabajo.clienteId);
                 const vehiculo = getVehiculo(trabajo.vehiculoId);
                 const isPendiente = trabajo.estado === 'pendiente';
+                const tftEstado = trabajo.tftEstado ?? 'sin_tft';
                 const badgeEstado = trabajo.tipoDocumento === 'factura'
                   ? <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">🧾 Factura</span>
                   : trabajo.tipoDocumento === 'nota'
@@ -1133,22 +1292,25 @@ export function VistaTrabajo({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">{badgeEstado}</td>
                     <td className="px-4 py-3 text-slate-800 font-medium">{cliente?.nombre ?? '—'}</td>
-                    {/* Unidad */}
                     <td className="px-4 py-3 text-slate-700 font-medium whitespace-nowrap">
                       {vehiculo ? [vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ') : <span className="text-slate-400">—</span>}
                     </td>
-                    {/* Placas */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       {vehiculo?.placa
                         ? <span className="text-xs bg-slate-200 text-slate-700 font-mono font-semibold px-2 py-0.5 rounded">{vehiculo.placa}</span>
                         : <span className="text-slate-300">—</span>}
                     </td>
-                    {/* Km */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       {trabajo.kilometraje != null
                         ? <span className="text-xs font-semibold text-slate-700">{trabajo.kilometraje.toLocaleString('es-MX')} km</span>
                         : <span className="text-slate-300">—</span>}
                     </td>
+                    {esAyuntamientoTab && (
+                      <>
+                        <td className="px-4 py-3 text-slate-700">{trabajo.departamento ?? <span className="text-slate-300">—</span>}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-slate-700">{trabajo.inventarioNum ?? <span className="text-slate-300">—</span>}</td>
+                      </>
+                    )}
                     <td className="px-4 py-3 text-slate-700">
                       {trabajo.descripcion}
                       {trabajo.partes?.length > 0 && (
@@ -1188,12 +1350,55 @@ export function VistaTrabajo({
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-slate-900">${fmt(trabajo.total)}</td>
+                    {esAyuntamientoTab && (
+                      <td className="px-4 py-3 align-top">
+                        {tftEstado === 'con_tft' ? (
+                          <span className="inline-flex items-center text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+                            ✅ TFT-{trabajo.tftNumero}
+                          </span>
+                        ) : (
+                          <div className="space-y-2 min-w-36">
+                            <span className="inline-flex items-center text-xs bg-rose-100 text-rose-700 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+                              ❌ SIN TFT
+                            </span>
+                            {!isPendiente && (
+                              capturandoTftId === trabajo.id ? (
+                                <div className="space-y-2">
+                                  <Input
+                                    type="text"
+                                    placeholder="Número TFT"
+                                    value={tftNumeroDraft}
+                                    onChange={e => setTftNumeroDraft(e.target.value)}
+                                  />
+                                  <div className="flex gap-1">
+                                    <Btn size="sm" variant="primary" onClick={() => guardarTft(trabajo.id)} disabled={!tftNumeroDraft.trim()}>
+                                      Guardar
+                                    </Btn>
+                                    <Btn size="sm" variant="ghost" onClick={() => { setCapturandoTftId(null); setTftNumeroDraft(''); }}>
+                                      Cancelar
+                                    </Btn>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => { setCapturandoTftId(trabajo.id); setTftNumeroDraft(''); }}
+                                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                                >
+                                  + Registrar TFT
+                                </button>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-center">
                       <div className="flex flex-col gap-1 items-center">
                         {isPendiente && (
                           <button
                             type="button"
-                            onClick={() => setFinalizandoId(trabajo.id)}
+                            onClick={() => finalizarDesdeFila(trabajo)}
                             className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap shadow-sm"
                           >
                             🏁 Finalizar
@@ -1232,21 +1437,21 @@ export function VistaTrabajo({
                   </tr>
                 );
               })}
-              {trabajosFiltrados.length === 0 && <EmptyRow cols={11} message={filtroClienteId || filtroVehiculoId || filtroEstado !== 'todos' || filtroFacturacion !== 'todos' ? 'No se encontraron resultados.' : 'Sin trabajos registrados. Agrega el primero arriba.'} />}
+              {trabajosFiltrados.length === 0 && <EmptyRow cols={esAyuntamientoTab ? 14 : 11} message={filtroClienteId || filtroVehiculoId || filtroEstado !== 'todos' || filtroFacturacion !== 'todos' || (esAyuntamientoTab && filtroTft !== 'todos') ? 'No se encontraron resultados.' : 'Sin trabajos registrados. Agrega el primero arriba.'} />}
             </tbody>
           </table>
         </div>
 
         {/* ── Trabajos cancelados ── */}
-        {trabajosCancelados.length > 0 && (
+        {trabajosCanceladosDelTab.length > 0 && (
           <div className="mt-3">
             <button type="button" onClick={() => setVerCancelados(v => !v)}
               className="text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors">
-              {verCancelados ? '▲ Ocultar' : '▼ Ver'} cancelados ({trabajosCancelados.length})
+              {verCancelados ? '▲ Ocultar' : '▼ Ver'} cancelados ({trabajosCanceladosDelTab.length})
             </button>
             {verCancelados && (
               <div className="mt-2 space-y-1">
-                {trabajosCancelados.map(t => {
+                {trabajosCanceladosDelTab.map(t => {
                   const cl = clientes.find(c => c.id === t.clienteId);
                   const vh = vehiculos.find(v => v.id === t.vehiculoId);
                   return (

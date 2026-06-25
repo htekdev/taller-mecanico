@@ -227,6 +227,14 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
     estado: r.estado,
     tipoDocumento: (r.tipo_documento as Trabajo['tipoDocumento']) ?? undefined,
     fechaFinalizacion: r.fecha_finalizacion ?? undefined,
+    tipoCliente: (r.tipo_cliente as Trabajo['tipoCliente']) ?? 'general',
+    departamento: r.departamento ?? undefined,
+    inventarioNum: r.inventario_num ?? undefined,
+    ordenServicioGob: r.orden_servicio_gob ?? undefined,
+    tftNumero: r.tft_numero ?? undefined,
+    tftEstado: (r.tft_estado as Trabajo['tftEstado']) ?? 'sin_tft',
+    fechaEntrada: r.fecha_entrada ?? undefined,
+    fechaSalida: r.fecha_salida ?? undefined,
   }));
 }
 
@@ -242,6 +250,14 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
       // Only include kilometraje if it has a value — omitting it lets the DB
       // column default to NULL, and avoids "column not found" on older branches
       ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
+      tipo_cliente: data.tipoCliente ?? 'general',
+      ...(data.departamento !== undefined ? { departamento: data.departamento } : {}),
+      ...(data.inventarioNum !== undefined ? { inventario_num: data.inventarioNum } : {}),
+      ...(data.ordenServicioGob !== undefined ? { orden_servicio_gob: data.ordenServicioGob } : {}),
+      ...(data.tftNumero !== undefined ? { tft_numero: data.tftNumero } : {}),
+      tft_estado: data.tftEstado ?? 'sin_tft',
+      ...(data.fechaEntrada !== undefined ? { fecha_entrada: data.fechaEntrada } : {}),
+      ...(data.fechaSalida !== undefined ? { fecha_salida: data.fechaSalida } : {}),
       mano_de_obra: data.manoDeObra,
       mano_de_obra_items: data.manoDeObraItems,
       refacciones_total: data.refacciones,
@@ -268,6 +284,14 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
     id: row.id, clienteId: row.cliente_id ?? '', vehiculoId: row.vehiculo_id ?? '',
     fecha: row.fecha, descripcion: row.descripcion,
     kilometraje: row.kilometraje ?? undefined,
+    tipoCliente: (row.tipo_cliente as Trabajo['tipoCliente']) ?? 'general',
+    departamento: row.departamento ?? undefined,
+    inventarioNum: row.inventario_num ?? undefined,
+    ordenServicioGob: row.orden_servicio_gob ?? undefined,
+    tftNumero: row.tft_numero ?? undefined,
+    tftEstado: (row.tft_estado as Trabajo['tftEstado']) ?? 'sin_tft',
+    fechaEntrada: row.fecha_entrada ?? undefined,
+    fechaSalida: row.fecha_salida ?? undefined,
     manoDeObra: Number(row.mano_de_obra),
     manoDeObraItems: (row.mano_de_obra_items as ManoDeObraItem[]) ?? [],
     refacciones: Number(row.refacciones_total), costoRefacciones: Number(row.costo_refacciones),
@@ -307,6 +331,14 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
     fecha: data.fecha,
     descripcion: data.descripcion,
     kilometraje: data.kilometraje ?? null,
+    tipo_cliente: data.tipoCliente ?? 'general',
+    departamento: data.departamento ?? null,
+    inventario_num: data.inventarioNum ?? null,
+    orden_servicio_gob: data.ordenServicioGob ?? null,
+    tft_numero: data.tftNumero ?? null,
+    tft_estado: data.tftEstado ?? 'sin_tft',
+    fecha_entrada: data.fechaEntrada ?? null,
+    fecha_salida: data.fechaSalida ?? null,
     mano_de_obra: data.manoDeObra,
     mano_de_obra_items: data.manoDeObraItems,
     refacciones_total: data.refacciones,
@@ -337,6 +369,13 @@ export async function updateTrabajoFinalizar(
     iva,
     total,
     fecha_finalizacion: new Date().toISOString(),
+  }).eq('id', trabajoId);
+}
+
+export async function updateTrabajoTft(trabajoId: string, tftNumero: string): Promise<void> {
+  await supabase.from('trabajos').update({
+    tft_numero: tftNumero,
+    tft_estado: 'con_tft',
   }).eq('id', trabajoId);
 }
 

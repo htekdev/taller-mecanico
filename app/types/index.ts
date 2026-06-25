@@ -175,6 +175,15 @@ export interface Trabajo {
   tipoDocumento?: 'factura' | 'nota';
   /** ISO date-time when the job was finalized (truck left the shop) */
   fechaFinalizacion?: string;
+  /** 'general' for regular clients, 'ayuntamiento' for government municipality */
+  tipoCliente?: 'general' | 'ayuntamiento';
+  departamento?: string;
+  inventarioNum?: string;
+  ordenServicioGob?: string;
+  tftNumero?: string;
+  tftEstado?: 'sin_tft' | 'con_tft';
+  fechaEntrada?: string;
+  fechaSalida?: string;
 }
 
 export interface PricingIntel {

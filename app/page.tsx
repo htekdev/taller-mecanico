@@ -282,6 +282,14 @@ export default function TallerMecanico() {
       : t
     ));
   };
+
+  const actualizarTft = async (trabajoId: string, tftNumero: string) => {
+    await db.updateTrabajoTft(trabajoId, tftNumero);
+    setTrabajos(prev => prev.map(t => t.id === trabajoId
+      ? { ...t, tftNumero, tftEstado: 'con_tft' as const }
+      : t
+    ));
+  };
   const guardarProveedor = async (data: Omit<Proveedor, 'id'>) => {
     if (!taller) return;
     const nuevo = await db.insertProveedor(taller.id, data);
@@ -687,6 +695,7 @@ export default function TallerMecanico() {
               onRefacturar={refacturarTrabajo}
               onCancelarTrabajo={cancelarTrabajo}
               onReactivarTrabajo={reactivarTrabajo}
+              onActualizarTft={actualizarTft}
               onIrAFacturas={() => setVista('facturas')} />
           )}
           {vista === 'proveedores' && (
