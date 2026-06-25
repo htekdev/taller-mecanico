@@ -44,7 +44,7 @@ export default function TallerMecanico() {
   const [vista, setVista] = useState<Vista>('clientes');
   const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
   const [cargando, setCargando] = useState(true);
-  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string } | null>(null);
+  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string } | null>(null);
 
   // ── Cargar datos desde Supabase ──
   const cargarDatos = useCallback(async () => {
@@ -297,7 +297,7 @@ export default function TallerMecanico() {
   };
 
   // ── Invoice (Factura) handlers ──
-  const generarFactura = async (trabajoId: string, numeroFactura: string) => {
+  const generarFactura = async (trabajoId: string, numeroFactura: string, fechaFactura: string) => {
     if (!taller) return;
     const trabajo = trabajos.find(t => t.id === trabajoId);
     if (!trabajo || trabajo.facturaId) return;
@@ -309,7 +309,7 @@ export default function TallerMecanico() {
     const nuevaFactura = await db.insertFactura(taller.id, {
       numeroFactura,
       trabajoId, clienteId: trabajo.clienteId, vehiculoId: trabajo.vehiculoId,
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: fechaFactura,
       conceptos, subtotal, total: subtotal, pagos: [],
     });
     if (!nuevaFactura) return;
@@ -320,12 +320,13 @@ export default function TallerMecanico() {
 
   const abrirModalFactura = (trabajoId: string) => {
     const sugerido = generarNumeroFactura(facturas);
-    setPendingFactura({ trabajoId, numero: sugerido });
+    const hoy = new Date().toISOString().split('T')[0];
+    setPendingFactura({ trabajoId, numero: sugerido, fecha: hoy });
   };
 
   const confirmarFactura = async () => {
     if (!pendingFactura || !pendingFactura.numero.trim()) return;
-    await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim());
+    await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha);
     setPendingFactura(null);
     setVista('facturas');
   };
@@ -336,6 +337,16 @@ export default function TallerMecanico() {
     const nuevos = [...(facturaActual.pagos ?? []), nuevoPago];
     await db.updateFacturaPagos(facturaId, nuevos);
     setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, pagos: nuevos } : f));
+  };
+
+  const editarFechaFactura = async (facturaId: string, fecha: string) => {
+    await db.updateFacturaFecha(facturaId, fecha);
+    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, fecha } : f));
+  };
+
+  const editarNumeroFactura = async (facturaId: string, numeroFactura: string) => {
+    await db.updateFacturaNumero(facturaId, numeroFactura);
+    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, numeroFactura } : f));
   };
 
   // ── Gastos handlers ──
@@ -588,7 +599,8 @@ export default function TallerMecanico() {
           )}
           {vista === 'facturas' && (
             <VistaFacturas facturas={facturas} clientes={clientes} vehiculos={vehiculos} trabajos={trabajos}
-              onRegistrarPago={registrarPagoFactura} />
+              onRegistrarPago={registrarPagoFactura} onEditarFechaFactura={editarFechaFactura}
+              onEditarNumeroFactura={editarNumeroFactura} />
           )}
           {vista === 'cuentas' && (
             <VistaCuentas facturas={facturas} trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
@@ -656,7 +668,16 @@ export default function TallerMecanico() {
               onChange={e => setPendingFactura(prev => prev ? { ...prev, numero: e.target.value } : null)}
               onKeyDown={e => { if (e.key === 'Enter') confirmarFactura(); if (e.key === 'Escape') setPendingFactura(null); }}
               placeholder="Ej. FAC-2026-001 o F-001"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-5"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
+            />
+            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+              Fecha de factura
+            </label>
+            <input
+              type="date"
+              value={pendingFactura.fecha}
+              onChange={e => setPendingFactura(prev => prev ? { ...prev, fecha: e.target.value } : null)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-5"
             />
             <div className="flex gap-3">
               <button
@@ -666,7 +687,7 @@ export default function TallerMecanico() {
               </button>
               <button
                 onClick={confirmarFactura}
-                disabled={!pendingFactura.numero.trim()}
+                disabled={!pendingFactura.numero.trim() || !pendingFactura.fecha}
                 className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 ✓ Crear Factura
               </button>
