@@ -514,6 +514,10 @@ export async function updateFacturaFecha(facturaId: string, fecha: string): Prom
   await supabase.from('facturas').update({ fecha }).eq('id', facturaId);
 }
 
+export async function updateFacturaNumero(facturaId: string, numeroFactura: string): Promise<void> {
+  await supabase.from('facturas').update({ numero_factura: numeroFactura }).eq('id', facturaId);
+}
+
 // ── Taller Members ────────────────────────────────────────────
 
 export interface TallerMember {

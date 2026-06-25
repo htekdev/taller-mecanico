@@ -12,6 +12,7 @@ export function VistaFacturas({
   trabajos,
   onRegistrarPago,
   onEditarFechaFactura,
+  onEditarNumeroFactura,
 }: {
   facturas: Factura[];
   clientes: Cliente[];
@@ -19,6 +20,7 @@ export function VistaFacturas({
   trabajos: Trabajo[];
   onRegistrarPago: (facturaId: string, pago: Omit<PagoFactura, 'id'>) => void;
   onEditarFechaFactura: (facturaId: string, fecha: string) => void;
+  onEditarNumeroFactura: (facturaId: string, numero: string) => void;
 }) {
   const hoy = new Date().toISOString().split('T')[0];
   const [expandido, setExpandido] = useState<string | null>(null);
@@ -27,6 +29,8 @@ export function VistaFacturas({
   const [filtroClienteId, setFiltroClienteId] = useState('');
   const [editandoFechaId, setEditandoFechaId] = useState<string | null>(null);
   const [nuevaFecha, setNuevaFecha] = useState('');
+  const [editandoNumeroId, setEditandoNumeroId] = useState<string | null>(null);
+  const [nuevoNumero, setNuevoNumero] = useState('');
 
   const facturasFiltradas = [...facturas]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
@@ -172,6 +176,64 @@ export function VistaFacturas({
                         </table>
                       </div>
                     </div>
+
+                    {/* Editar número de factura */}
+                    {(() => {
+                      const isDuplicate = nuevoNumero.trim() !== '' &&
+                        nuevoNumero.trim().toLowerCase() !== factura.numeroFactura.toLowerCase() &&
+                        facturas.some(f => f.id !== factura.id && f.numeroFactura.toLowerCase() === nuevoNumero.trim().toLowerCase());
+                      return (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Número de Factura</p>
+                            {editandoNumeroId !== factura.id && (
+                              <button
+                                type="button"
+                                onClick={() => { setEditandoNumeroId(factura.id); setNuevoNumero(factura.numeroFactura); }}
+                                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                              >
+                                ✏️ Editar número
+                              </button>
+                            )}
+                          </div>
+                          {editandoNumeroId === factura.id ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <input
+                                  type="text"
+                                  value={nuevoNumero}
+                                  onChange={e => setNuevoNumero(e.target.value)}
+                                  placeholder="Ej. FAC-2026-001"
+                                  className={`border rounded-lg px-3 py-2 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 ${isDuplicate ? 'border-amber-400 focus:ring-amber-400 bg-amber-50' : 'border-indigo-300 focus:ring-indigo-500'}`}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={!nuevoNumero.trim() || isDuplicate}
+                                  onClick={() => { onEditarNumeroFactura(factura.id, nuevoNumero.trim()); setEditandoNumeroId(null); }}
+                                  className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                                >
+                                  ✓ Guardar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditandoNumeroId(null)}
+                                  className="px-3 py-2 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                              {isDuplicate && (
+                                <div className="flex items-center gap-2 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 text-xs font-semibold text-amber-800">
+                                  ⚠️ Ya existe una factura con ese número — elige uno diferente.
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-sm font-mono text-slate-700 font-medium">{factura.numeroFactura || '—'}</p>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Editar fecha de factura */}
                     <div>

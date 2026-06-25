@@ -344,6 +344,11 @@ export default function TallerMecanico() {
     setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, fecha } : f));
   };
 
+  const editarNumeroFactura = async (facturaId: string, numeroFactura: string) => {
+    await db.updateFacturaNumero(facturaId, numeroFactura);
+    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, numeroFactura } : f));
+  };
+
   // ── Gastos handlers ──
   const crearGasto = async (data: Omit<Gasto, 'id' | 'tallerId'>) => {
     if (!taller) return;
@@ -594,7 +599,8 @@ export default function TallerMecanico() {
           )}
           {vista === 'facturas' && (
             <VistaFacturas facturas={facturas} clientes={clientes} vehiculos={vehiculos} trabajos={trabajos}
-              onRegistrarPago={registrarPagoFactura} onEditarFechaFactura={editarFechaFactura} />
+              onRegistrarPago={registrarPagoFactura} onEditarFechaFactura={editarFechaFactura}
+              onEditarNumeroFactura={editarNumeroFactura} />
           )}
           {vista === 'cuentas' && (
             <VistaCuentas facturas={facturas} trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
