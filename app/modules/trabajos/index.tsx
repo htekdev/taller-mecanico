@@ -115,6 +115,7 @@ export function VistaTrabajo({
   onFinalizar,
   onIrAInventario,
   onGenerarFactura,
+  onRefacturar,
   onIrAFacturas,
 }: {
   clientes: Cliente[];
@@ -128,6 +129,7 @@ export function VistaTrabajo({
   onFinalizar: (trabajoId: string, tipo: 'factura' | 'nota') => void;
   onIrAInventario: () => void;
   onGenerarFactura: (trabajoId: string) => void;
+  onRefacturar: (trabajoId: string) => void;
   onIrAFacturas: () => void;
 }) {
   const emptyForm = {
@@ -1146,7 +1148,15 @@ export function VistaTrabajo({
                       )}
                       {trabajo.tipoDocumento !== 'nota' && (
                         trabajo.estadoFacturacion === 'facturado' ? (
-                          <span className="ml-2 text-xs bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">✓ Facturado</span>
+                          <span className="ml-2 inline-flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">✓ Facturado</span>
+                            <button type="button"
+                              onClick={() => onRefacturar(trabajo.id)}
+                              title="Cancelar la factura actual y volver a facturar este trabajo"
+                              className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full hover:bg-amber-200 transition-colors border border-amber-200">
+                              🔄 Refacturar
+                            </button>
+                          </span>
                         ) : (
                           <button type="button"
                             onClick={() => onGenerarFactura(trabajo.id)}

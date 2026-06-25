@@ -352,6 +352,13 @@ export default function TallerMecanico() {
     setPendingFactura({ trabajoId, numero: sugerido, fecha: hoy });
   };
 
+  const refacturarTrabajo = async (trabajoId: string) => {
+    await db.resetFacturacionTrabajo(trabajoId);
+    setTrabajos(prev => prev.map(t =>
+      t.id === trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
+    ));
+  };
+
   const confirmarFactura = async () => {
     if (!pendingFactura || !pendingFactura.numero.trim()) return;
     await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha);
@@ -633,6 +640,7 @@ export default function TallerMecanico() {
               onFinalizar={finalizarTrabajo}
               onIrAInventario={() => setVista('inventario')}
               onGenerarFactura={abrirModalFactura}
+              onRefacturar={refacturarTrabajo}
               onIrAFacturas={() => setVista('facturas')} />
           )}
           {vista === 'proveedores' && (
