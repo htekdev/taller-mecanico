@@ -5,6 +5,145 @@ import type { OrdenCompra, Proveedor, Refaccion, CompraItem } from '@/app/types'
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { fmt, BADGE_ORDEN } from '@/app/lib/utils';
 
+// ── Modal de edición de OC ────────────────────────────────────────────────────
+function ModalEditarOrden({
+  orden,
+  inventario,
+  onGuardar,
+  onCerrar,
+}: {
+  orden: OrdenCompra;
+  inventario: Refaccion[];
+  onGuardar: (data: Pick<OrdenCompra, 'descripcion' | 'numeroOrden' | 'partes' | 'subtotalSinIVA' | 'ivaAmount' | 'total' | 'conIVA'>) => void;
+  onCerrar: () => void;
+}) {
+  const [desc, setDesc] = useState(orden.descripcion);
+  const [numOrden, setNumOrden] = useState(orden.numeroOrden ?? '');
+  const [conIVA, setConIVA] = useState(orden.conIVA);
+  const [items, setItems] = useState<CompraItem[]>(orden.partes ?? []);
+  const [pickerRefId, setPickerRefId] = useState('');
+  const [pickerCantidad, setPickerCantidad] = useState(1);
+  const [pickerPrecio, setPickerPrecio] = useState(0);
+  const [guardando, setGuardando] = useState(false);
+
+  const agregarItem = () => {
+    const ref = inventario.find(r => r.id === pickerRefId);
+    if (!ref || pickerCantidad <= 0 || pickerPrecio <= 0) return;
+    const subtotal = pickerCantidad * pickerPrecio;
+    setItems(prev => [...prev, {
+      refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad,
+      precioCompra: pickerPrecio, subtotal,
+    }]);
+    setPickerRefId(''); setPickerCantidad(1); setPickerPrecio(0);
+  };
+
+  const quitarItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
+
+  const subtotalSinIVA = items.reduce((s, p) => s + p.subtotal, 0);
+  const ivaAmount = conIVA ? Math.round(subtotalSinIVA * 0.16 * 100) / 100 : 0;
+  const total = subtotalSinIVA + ivaAmount;
+
+  const handleGuardar = () => {
+    if (!desc.trim() || items.length === 0) return;
+    setGuardando(true);
+    onGuardar({ descripcion: desc.trim(), numeroOrden: numOrden.trim() || undefined, partes: items, subtotalSinIVA, ivaAmount, total, conIVA });
+    onCerrar();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8 overflow-y-auto" onClick={onCerrar}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 space-y-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">✏️ Editar Orden de Compra</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Solo disponible mientras la orden está pendiente.</p>
+          </div>
+          <button type="button" onClick={onCerrar} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+        </div>
+
+        {/* Descripción + Número */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label>Descripción *</Label>
+            <Input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ej. Compra mensual de filtros" />
+          </div>
+          <div>
+            <Label>Número de orden <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
+            <Input type="text" value={numOrden} onChange={e => setNumOrden(e.target.value)} placeholder="Ej. OC-001" />
+          </div>
+        </div>
+
+        {/* IVA toggle */}
+        <label className="flex items-center gap-3 cursor-pointer bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 select-none">
+          <input type="checkbox" checked={conIVA} onChange={e => setConIVA(e.target.checked)} className="w-4 h-4 accent-indigo-600" />
+          <span className="text-sm font-medium text-slate-700">Factura del proveedor incluye IVA (16%)</span>
+        </label>
+
+        {/* Items actuales */}
+        {items.length > 0 && (
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Piezas en la orden</p>
+            <div className="rounded-lg border border-slate-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-100">
+                  <tr>{['Pieza', 'Cant.', 'Precio', 'Subtotal', ''].map((h, i) => <th key={i} className={`px-3 py-2 text-xs font-semibold text-slate-600 uppercase ${i >= 1 && i <= 3 ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {items.map((item, idx) => (
+                    <tr key={idx} className="bg-white">
+                      <td className="px-3 py-2 text-slate-800 font-medium">{item.nombre}</td>
+                      <td className="px-3 py-2 text-right text-slate-700">{item.cantidad}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">${fmt(item.precioCompra)}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(item.subtotal)}</td>
+                      <td className="px-3 py-2 text-center">
+                        <button type="button" onClick={() => quitarItem(idx)} className="text-rose-500 hover:text-rose-700 font-bold text-sm">✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                  {conIVA && <tr><td colSpan={3} className="px-3 py-2 text-right text-slate-600 text-sm">IVA (16%):</td><td className="px-3 py-2 text-right text-slate-700">${fmt(ivaAmount)}</td><td/></tr>}
+                  <tr><td colSpan={3} className="px-3 py-2 text-right font-bold text-slate-700">Total:</td><td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(total)}</td><td/></tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Agregar pieza */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">+ Agregar pieza del inventario</p>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="sm:col-span-2">
+              <Label>Pieza</Label>
+              <Select value={pickerRefId} onChange={e => {
+                setPickerRefId(e.target.value);
+                const r = inventario.find(x => x.id === e.target.value);
+                if (r) setPickerPrecio(r.precioCompra);
+              }}>
+                <option value="">Seleccionar pieza...</option>
+                {inventario.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.codigo})</option>)}
+              </Select>
+            </div>
+            <div><Label>Cantidad</Label><Input type="number" min="1" step="1" value={pickerCantidad} onChange={e => setPickerCantidad(Number(e.target.value))} /></div>
+            <div><Label>Precio ($)</Label><Input type="number" min="0" step="0.01" value={pickerPrecio || ''} onChange={e => setPickerPrecio(Number(e.target.value))} /></div>
+          </div>
+          <div className="mt-3 flex justify-end">
+            <Btn type="button" size="sm" variant="ghost" onClick={agregarItem} disabled={!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0}>+ Agregar pieza</Btn>
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-1">
+          <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>Cancelar</Btn>
+          <Btn type="button" variant="primary" fullWidth onClick={handleGuardar} disabled={guardando || !desc.trim() || items.length === 0}>
+            {guardando ? 'Guardando...' : '✓ Guardar cambios'}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Categor├¡as comunes de refacciones para el selector r├ípido
 const CATEGORIAS_COMUNES = [
   'Filtros', 'Frenos', 'Suspensi├│n', 'Motor', 'Transmisi├│n',
@@ -18,6 +157,7 @@ export function VistaOrdenesCompra({
   onCrearOrden,
   onRecibirOrden,
   onCancelarOrden,
+  onEditarOrden,
   onIrAProveedores,
   onCrearRefaccionNueva,
 }: {
@@ -27,6 +167,7 @@ export function VistaOrdenesCompra({
   onCrearOrden: (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => void;
   onRecibirOrden: (id: string) => void;
   onCancelarOrden: (id: string) => void;
+  onEditarOrden: (ordenId: string, data: Pick<OrdenCompra, 'descripcion' | 'numeroOrden' | 'partes' | 'subtotalSinIVA' | 'ivaAmount' | 'total' | 'conIVA'>) => void;
   onIrAProveedores: () => void;
   onCrearRefaccionNueva: (data: Omit<Refaccion, 'id'>) => Promise<Refaccion | null>;
 }) {
@@ -42,6 +183,7 @@ export function VistaOrdenesCompra({
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'recibida'|'cancelada'>('todos');
   const [expandido, setExpandido] = useState<string | null>(null);
   const [filtroProveedorId, setFiltroProveedorId] = useState('');
+  const [editandoOrden, setEditandoOrden] = useState<OrdenCompra | null>(null);
 
   // ── Modo agregar pieza ────────────────────────────────────────────────────────
   const [modoAgregar, setModoAgregar] = useState<'existente' | 'nueva'>('existente');
@@ -167,7 +309,17 @@ export function VistaOrdenesCompra({
 
   return (
     <div>
-      <SectionTitle title="├ôrdenes de Compra" subtitle="Crea una OC para un proveedor. Al marcarla como 'recibida', el inventario se actualiza y pasa a Cuentas por Pagar." />
+      <SectionTitle title="Órdenes de Compra" subtitle="Crea una OC para un proveedor. Al marcarla como 'recibida', el inventario se actualiza y pasa a Cuentas por Pagar." />
+
+      {/* ── Modal de edición de OC ── */}
+      {editandoOrden && (
+        <ModalEditarOrden
+          orden={editandoOrden}
+          inventario={inventario}
+          onGuardar={(data) => { onEditarOrden(editandoOrden.id, data); setEditandoOrden(null); }}
+          onCerrar={() => setEditandoOrden(null)}
+        />
+      )}
 
       {pendientesRecibir > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-5 flex items-center gap-3 text-sm">
@@ -452,6 +604,7 @@ export function VistaOrdenesCompra({
                     </Btn>
                     {orden.estado === 'pendiente' && (
                       <>
+                        <Btn size="sm" variant="ghost" onClick={() => setEditandoOrden(orden)}>✏️ Editar</Btn>
                         <Btn size="sm" variant="success" onClick={() => onRecibirOrden(orden.id)}>✓ Marcar Recibida</Btn>
                         <Btn size="sm" variant="danger" onClick={() => onCancelarOrden(orden.id)}>Cancelar</Btn>
                       </>
