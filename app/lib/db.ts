@@ -537,8 +537,10 @@ export async function updateFacturaConceptos(
   }).eq('id', facturaId);
 }
 
-// Cancellation: facturas use notas='CANCELADA' convention (column already exists).
-// Notas (trabajos sin factura) use folio_fiscal='__CANCELADA__' convention.
+// Cancellation conventions (no DB schema changes required):
+// - Facturas: use notas='CANCELADA' (column already exists in facturas table).
+// - Notas/trabajos sin factura: use folio_fiscal='__CANCELADA__' (column already exists in trabajos table).
+// Both can be restored at any time via the reactivar* functions.
 export async function cancelarFactura(facturaId: string): Promise<void> {
   await supabase.from('facturas').update({ notas: 'CANCELADA' }).eq('id', facturaId);
 }
