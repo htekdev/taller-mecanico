@@ -211,8 +211,7 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
     vehiculoId: r.vehiculo_id ?? '',
     fecha: r.fecha,
     descripcion: r.descripcion,
-    // Production DB column is 'km' — map to app field 'kilometraje'
-    kilometraje: r.km ?? undefined,
+    kilometraje: r.kilometraje ?? undefined,
     manoDeObra: Number(r.mano_de_obra),
     manoDeObraItems: (r.mano_de_obra_items as ManoDeObraItem[]) ?? [],
     refacciones: Number(r.refacciones_total),
@@ -253,10 +252,10 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
     estado: data.estado,
   };
 
-  // The DB column is named 'km' — map form field 'kilometraje' to it
+  // The DB column is 'kilometraje' — only include it when a value is provided
   const payload = {
     ...basePayload,
-    ...(data.kilometraje !== undefined ? { km: data.kilometraje } : {}),
+    ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
   };
 
   const { data: row, error } = await supabase
@@ -268,7 +267,7 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
   if (error || !row) {
     throw new Error(`insertTrabajo: ${error?.message ?? error?.details ?? 'Unknown Supabase error'}`);
   }
-  return mapTrabajo(row, row.km as number | undefined);
+  return mapTrabajo(row, row.kilometraje as number | undefined);
 }
 
 function mapTrabajo(row: Record<string, unknown>, km: number | undefined): Trabajo {
@@ -278,8 +277,7 @@ function mapTrabajo(row: Record<string, unknown>, km: number | undefined): Traba
     vehiculoId: (row.vehiculo_id as string) ?? '',
     fecha: row.fecha as string,
     descripcion: row.descripcion as string,
-    // Support both column names: 'km' and 'kilometraje'
-    kilometraje: km ?? (row.km as number | undefined),
+    kilometraje: km ?? (row.kilometraje as number | undefined),
     manoDeObra: Number(row.mano_de_obra),
     manoDeObraItems: (row.mano_de_obra_items as ManoDeObraItem[]) ?? [],
     refacciones: Number(row.refacciones_total),

@@ -343,8 +343,8 @@ describe('insertTrabajo', () => {
     })).rejects.toThrow('insertTrabajo: DB error');
   });
 
-  it('maps kilometraje form field to km DB column', async () => {
-    const mockRow = { id: 'tj1', cliente_id: 'c1', vehiculo_id: 'v1', fecha: '2026-06-01', descripcion: 'Test', km: 85000, mano_de_obra: 200, mano_de_obra_items: [], refacciones_total: 0, costo_refacciones: 0, requiere_factura: false, iva: 0, total: 200, partes: [], pagos: [], factura_id: null, estado_facturacion: 'sin_facturar', estado: 'pendiente' };
+  it('inserts kilometraje into DB column of same name', async () => {
+    const mockRow = { id: 'tj1', cliente_id: 'c1', vehiculo_id: 'v1', fecha: '2026-06-01', descripcion: 'Test', kilometraje: 85000, mano_de_obra: 200, mano_de_obra_items: [], refacciones_total: 0, costo_refacciones: 0, requiere_factura: false, iva: 0, total: 200, partes: [], pagos: [], factura_id: null, estado_facturacion: 'sin_facturar', estado: 'pendiente' };
     const { insert } = mockInsertChain(mockRow);
 
     const result = await insertTrabajo('t1', {
@@ -355,13 +355,13 @@ describe('insertTrabajo', () => {
       estadoFacturacion: 'sin_facturar', estado: 'pendiente',
     });
     expect(result?.id).toBe('tj1');
-    expect(result?.kilometraje).toBe(85000); // form field mapped back from km column
+    expect(result?.kilometraje).toBe(85000);
     const payload = (insert as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(payload).toHaveProperty('km', 85000);      // stored as 'km' in DB
-    expect(payload).not.toHaveProperty('kilometraje'); // NOT as 'kilometraje'
+    expect(payload).toHaveProperty('kilometraje', 85000);
+    expect(payload).not.toHaveProperty('km');
   });
 
-  it('inserts without km when kilometraje not provided', async () => {
+  it('omits kilometraje from payload when not provided', async () => {
     const mockRow = { id: 'tj2', cliente_id: 'c1', vehiculo_id: 'v1', fecha: '2026-06-01', descripcion: 'Test', mano_de_obra: 200, mano_de_obra_items: [], refacciones_total: 0, costo_refacciones: 0, requiere_factura: false, iva: 0, total: 200, partes: [], pagos: [], factura_id: null, estado_facturacion: 'sin_facturar', estado: 'pendiente' };
     const { insert } = mockInsertChain(mockRow);
 
@@ -372,6 +372,7 @@ describe('insertTrabajo', () => {
       estadoFacturacion: 'sin_facturar', estado: 'pendiente',
     });
     const payload = (insert as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(payload).not.toHaveProperty('kilometraje');
     expect(payload).not.toHaveProperty('km');
   });
 });
