@@ -311,11 +311,13 @@ export default function TallerMecanico() {
       ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
     ];
     const subtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
+    const iva = trabajo.tipoDocumento === 'factura' ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+    const total = subtotal + iva;
     const nuevaFactura = await db.insertFactura(taller.id, {
       numeroFactura,
       trabajoId, clienteId: trabajo.clienteId, vehiculoId: trabajo.vehiculoId,
       fecha: fechaFactura,
-      conceptos, subtotal, total: subtotal, pagos: [],
+      conceptos, subtotal, iva: iva > 0 ? iva : undefined, total, pagos: [],
     });
     if (!nuevaFactura) return;
     setFacturas(prev => [...prev, nuevaFactura]);
