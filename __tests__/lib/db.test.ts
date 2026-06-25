@@ -18,6 +18,7 @@ import {
   cancelarFactura, reactivarFactura, cancelarNota, reactivarNota,
   updateFacturaTotales, updateTrabajoTotales,
   getMembers, getInvites, sendInvite, cancelInvite, redeemInvite,
+  getCotizaciones, insertCotizacion, updateCotizacion, nextCotizacionNumber,
 } from '@/app/lib/db';
 
 const mockFrom = vi.mocked(supabase.from);
@@ -810,5 +811,184 @@ describe('updateTrabajoTotales', () => {
   it('resolves without error', async () => {
     mockUpdateChain();
     await expect(updateTrabajoTotales('t2', { iva: 0, total: 500 })).resolves.toBeUndefined();
+  });
+});
+
+// ── getCotizaciones ─────────────────────────────────────────────────────────
+
+describe('getCotizaciones', () => {
+  it('queries cotizaciones table', async () => {
+    mockFlexibleChain([]);
+    await getCotizaciones('t1');
+    expect(mockFrom).toHaveBeenCalledWith('cotizaciones');
+  });
+
+  it('maps snake_case DB row to CotizacionRow', async () => {
+    const rawData = [{
+      id: 'cot1',
+      taller_id: 't1',
+      numero_cotizacion: 'COT-001',
+      plantilla: 'general',
+      cliente: 'Juan García',
+      fecha: '2026-06-25',
+      total: '1500.00',
+      cancelada: false,
+      editada: false,
+      convertida: false,
+      form: { marca: 'Ford', modelo: 'F-150' },
+      saved_at: '2026-06-25T12:00:00Z',
+      created_at: '2026-06-25T12:00:00Z',
+    }];
+    mockFlexibleChain(rawData);
+    const result = await getCotizaciones('t1');
+    expect(result).toHaveLength(1);
+    expect(result[0].numeroCotizacion).toBe('COT-001');
+    expect(result[0].plantilla).toBe('general');
+    expect(result[0].cliente).toBe('Juan García');
+    expect(result[0].total).toBe(1500);
+    expect(result[0].cancelada).toBe(false);
+    expect(result[0].form).toEqual({ marca: 'Ford', modelo: 'F-150' });
+  });
+
+  it('returns empty array when data is null', async () => {
+    mockFlexibleChain(null);
+    const result = await getCotizaciones('t1');
+    expect(result).toEqual([]);
+  });
+
+  it('handles cancelada/editada/convertida flags', async () => {
+    const rawData = [{
+      id: 'cot2', taller_id: 't1', numero_cotizacion: 'COT-002',
+      plantilla: 'ayuntamiento', cliente: 'Ayuntamiento', fecha: null,
+      total: '0', cancelada: true, editada: true, convertida: true,
+      form: {}, saved_at: '2026-06-25T12:00:00Z', created_at: '2026-06-25T12:00:00Z',
+    }];
+    mockFlexibleChain(rawData);
+    const result = await getCotizaciones('t1');
+    expect(result[0].cancelada).toBe(true);
+    expect(result[0].editada).toBe(true);
+    expect(result[0].convertida).toBe(true);
+    expect(result[0].fecha).toBeNull();
+  });
+});
+
+// ── insertCotizacion ────────────────────────────────────────────────────────
+
+describe('insertCotizacion', () => {
+  const payload = {
+    numeroCotizacion: 'COT-001',
+    plantilla: 'general' as const,
+    cliente: 'Pedro López',
+    fecha: '2026-06-25',
+    total: 2000,
+    cancelada: false,
+    editada: false,
+    convertida: false,
+    form: { marca: 'Toyota', modelo: 'Hilux' } as Record<string, unknown>,
+  };
+
+  it('queries cotizaciones table', async () => {
+    const rawRow = { id: 'cot3', taller_id: 't1', numero_cotizacion: 'COT-001',
+      plantilla: 'general', cliente: 'Pedro López', fecha: '2026-06-25', total: '2000',
+      cancelada: false, editada: false, convertida: false, form: {},
+      saved_at: '2026-06-25T12:00:00Z', created_at: '2026-06-25T12:00:00Z' };
+    mockInsertChain(rawRow);
+    await insertCotizacion('t1', payload);
+    expect(mockFrom).toHaveBeenCalledWith('cotizaciones');
+  });
+
+  it('returns mapped CotizacionRow on success', async () => {
+    const rawRow = { id: 'cot3', taller_id: 't1', numero_cotizacion: 'COT-001',
+      plantilla: 'general', cliente: 'Pedro López', fecha: '2026-06-25', total: '2000.00',
+      cancelada: false, editada: false, convertida: false, form: { marca: 'Toyota' },
+      saved_at: '2026-06-25T12:00:00Z', created_at: '2026-06-25T12:00:00Z' };
+    mockInsertChain(rawRow);
+    const result = await insertCotizacion('t1', payload);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('cot3');
+    expect(result!.numeroCotizacion).toBe('COT-001');
+    expect(result!.total).toBe(2000);
+  });
+
+  it('returns null on DB error', async () => {
+    mockInsertChain(null, { message: 'DB error' });
+    const result = await insertCotizacion('t1', payload);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when row is null', async () => {
+    mockInsertChain(null, null);
+    const result = await insertCotizacion('t1', payload);
+    expect(result).toBeNull();
+  });
+});
+
+// ── updateCotizacion ────────────────────────────────────────────────────────
+
+describe('updateCotizacion', () => {
+  it('queries cotizaciones table', async () => {
+    mockFlexibleChain(null);
+    await updateCotizacion('cot1', { cancelada: true });
+    expect(mockFrom).toHaveBeenCalledWith('cotizaciones');
+  });
+
+  it('returns true on success', async () => {
+    mockFlexibleChain(null);
+    const result = await updateCotizacion('cot1', { cancelada: true });
+    expect(result).toBe(true);
+  });
+
+  it('returns false on DB error', async () => {
+    mockFlexibleChain(null, { message: 'update failed' });
+    const result = await updateCotizacion('cot1', { editada: true });
+    expect(result).toBe(false);
+  });
+
+  it('updates convertida flag', async () => {
+    mockFlexibleChain(null);
+    const result = await updateCotizacion('cot2', { convertida: true });
+    expect(result).toBe(true);
+  });
+});
+
+// ── nextCotizacionNumber ────────────────────────────────────────────────────
+
+describe('nextCotizacionNumber', () => {
+  it('returns COT-001 when no counter exists', async () => {
+    // First call: select counter → null (no row yet)
+    // Second call: upsert counter
+    mockFromSequence(
+      { data: null },         // select counter → not found
+      { data: null },         // upsert counter
+    );
+    const result = await nextCotizacionNumber('t1');
+    expect(result).toBe('COT-001');
+  });
+
+  it('returns incremented number when counter exists', async () => {
+    mockFromSequence(
+      { data: { last_number: 4 } },   // select counter → 4
+      { data: null },                  // upsert counter
+    );
+    const result = await nextCotizacionNumber('t1');
+    expect(result).toBe('COT-005');
+  });
+
+  it('pads number to 3 digits', async () => {
+    mockFromSequence(
+      { data: { last_number: 11 } },
+      { data: null },
+    );
+    const result = await nextCotizacionNumber('t1');
+    expect(result).toBe('COT-012');
+  });
+
+  it('queries cotizacion_counter table', async () => {
+    mockFromSequence(
+      { data: null },
+      { data: null },
+    );
+    await nextCotizacionNumber('t1');
+    expect(mockFrom).toHaveBeenCalledWith('cotizacion_counter');
   });
 });
