@@ -542,6 +542,27 @@ export async function updateFacturaConceptos(
   }).eq('id', facturaId);
 }
 
+/** Manual adjustment of factura totals + invoice number — used when Sofia corrects migrated data */
+export async function updateFacturaTotales(
+  facturaId: string,
+  data: { subtotal: number; iva: number | undefined; total: number; numeroFactura: string },
+): Promise<void> {
+  await supabase.from('facturas').update({
+    subtotal: data.subtotal,
+    iva: data.iva ?? null,
+    total: data.total,
+    numero_factura: data.numeroFactura,
+  }).eq('id', facturaId);
+}
+
+/** Update only iva + total on a trabajo — used to sync back when factura totals are manually adjusted */
+export async function updateTrabajoTotales(
+  trabajoId: string,
+  data: { iva: number; total: number },
+): Promise<void> {
+  await supabase.from('trabajos').update({ iva: data.iva, total: data.total }).eq('id', trabajoId);
+}
+
 // Cancellation conventions (no DB schema changes required):
 // - Facturas: use notas='CANCELADA' (column already exists in facturas table).
 // - Notas/trabajos sin factura: use folio_fiscal='__CANCELADA__' (column already exists in trabajos table).

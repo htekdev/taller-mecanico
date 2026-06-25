@@ -16,6 +16,7 @@ import {
   getOrdenes, updateOrdenEstado, updateOrdenPagos,
   getFacturas, updateFacturaPagos,
   cancelarFactura, reactivarFactura, cancelarNota, reactivarNota,
+  updateFacturaTotales, updateTrabajoTotales,
   getMembers, getInvites, sendInvite, cancelInvite, redeemInvite,
 } from '@/app/lib/db';
 
@@ -769,5 +770,45 @@ describe('reactivarNota', () => {
   it('resolves without error', async () => {
     mockUpdateChain();
     await expect(reactivarNota('t2')).resolves.toBeUndefined();
+  });
+});
+
+// ── updateFacturaTotales ─────────────────────────────────────────────────────
+
+describe('updateFacturaTotales', () => {
+  it('updates subtotal, iva, total and numero_factura on facturas table', async () => {
+    const { update, eq } = mockUpdateChain();
+    await updateFacturaTotales('f1', { subtotal: 1000, iva: 160, total: 1160, numeroFactura: 'FAC-001-ADJ' });
+    expect(mockFrom).toHaveBeenCalledWith('facturas');
+    expect(update).toHaveBeenCalledWith({ subtotal: 1000, iva: 160, total: 1160, numero_factura: 'FAC-001-ADJ' });
+    expect(eq).toHaveBeenCalledWith('id', 'f1');
+  });
+
+  it('stores null iva when iva is undefined', async () => {
+    const { update } = mockUpdateChain();
+    await updateFacturaTotales('f2', { subtotal: 500, iva: undefined, total: 500, numeroFactura: 'F-002' });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ iva: null }));
+  });
+
+  it('resolves without error', async () => {
+    mockUpdateChain();
+    await expect(updateFacturaTotales('f3', { subtotal: 200, iva: undefined, total: 200, numeroFactura: 'F-003' })).resolves.toBeUndefined();
+  });
+});
+
+// ── updateTrabajoTotales ─────────────────────────────────────────────────────
+
+describe('updateTrabajoTotales', () => {
+  it('updates iva and total on trabajos table', async () => {
+    const { update, eq } = mockUpdateChain();
+    await updateTrabajoTotales('t1', { iva: 160, total: 1160 });
+    expect(mockFrom).toHaveBeenCalledWith('trabajos');
+    expect(update).toHaveBeenCalledWith({ iva: 160, total: 1160 });
+    expect(eq).toHaveBeenCalledWith('id', 't1');
+  });
+
+  it('resolves without error', async () => {
+    mockUpdateChain();
+    await expect(updateTrabajoTotales('t2', { iva: 0, total: 500 })).resolves.toBeUndefined();
   });
 });
