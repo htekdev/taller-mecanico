@@ -342,6 +342,34 @@ describe('insertTrabajo', () => {
       estadoFacturacion: 'sin_facturar', estado: 'pendiente',
     })).rejects.toThrow('insertTrabajo: DB error');
   });
+
+  it('retries without kilometraje when column is missing in schema', async () => {
+    // First call: error with "kilometraje" in message
+    const single1 = vi.fn().mockResolvedValue({ data: null, error: { message: "Could not find the 'kilometraje' column of 'trabajos' in the schema cache" } });
+    const select1 = vi.fn().mockReturnValue({ single: single1 });
+    const insert1 = vi.fn().mockReturnValue({ select: select1 });
+    // Second call (fallback): success
+    const mockRow = { id: 'tj1', cliente_id: 'c1', vehiculo_id: 'v1', fecha: '2026-06-01', descripcion: 'Test', mano_de_obra: 200, mano_de_obra_items: [], refacciones_total: 0, costo_refacciones: 0, requiere_factura: false, iva: 0, total: 200, partes: [], pagos: [], factura_id: null, estado_facturacion: 'sin_facturar', estado: 'pendiente' };
+    const single2 = vi.fn().mockResolvedValue({ data: mockRow, error: null });
+    const select2 = vi.fn().mockReturnValue({ single: single2 });
+    const insert2 = vi.fn().mockReturnValue({ select: select2 });
+    mockFrom
+      .mockReturnValueOnce({ insert: insert1 } as unknown as ReturnType<typeof mockFrom>)
+      .mockReturnValue({ insert: insert2 } as unknown as ReturnType<typeof mockFrom>);
+
+    const result = await insertTrabajo('t1', {
+      clienteId: 'c1', vehiculoId: 'v1', fecha: '2026-06-01', descripcion: 'Test',
+      kilometraje: 85000, // this triggers the fallback
+      manoDeObra: 200, manoDeObraItems: [], refacciones: 0, costoRefacciones: 0,
+      requiereFactura: false, iva: 0, total: 200, partes: [], pagos: [],
+      estadoFacturacion: 'sin_facturar', estado: 'pendiente',
+    });
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe('tj1');
+    expect(result?.kilometraje).toBeUndefined(); // column wasn't available
+    expect(insert1).toHaveBeenCalledTimes(1); // first attempt with km
+    expect(insert2).toHaveBeenCalledTimes(1); // fallback without km
+  });
 });
 
 // ── updateTrabajoPagos ──────────────────────────────────────────────────────
