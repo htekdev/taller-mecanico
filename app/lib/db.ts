@@ -525,6 +525,18 @@ export async function updateFacturaNumero(facturaId: string, numeroFactura: stri
   await supabase.from('facturas').update({ numero_factura: numeroFactura }).eq('id', facturaId);
 }
 
+export async function updateFacturaConceptos(
+  facturaId: string,
+  data: { conceptos: FacturaConcepto[]; subtotal: number; iva: number | undefined; total: number },
+): Promise<void> {
+  await supabase.from('facturas').update({
+    conceptos: data.conceptos,
+    subtotal: data.subtotal,
+    iva: data.iva ?? null,
+    total: data.total,
+  }).eq('id', facturaId);
+}
+
 // ── Taller Members ────────────────────────────────────────────
 
 export interface TallerMember {

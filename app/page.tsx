@@ -222,6 +222,27 @@ export default function TallerMecanico() {
     const updated = { ...existing, ...data, iva, total };
     await db.updateTrabajo(trabajoId, updated);
     setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, ...updated } : t));
+
+    // If this job has a linked invoice, sync it with the updated costs
+    if (existing.facturaId) {
+      const conceptos: FacturaConcepto[] = [
+        ...data.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
+        ...data.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
+      ];
+      const facturaSubtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
+      const facturaIva = data.requiereFactura ? Math.round(facturaSubtotal * 0.16 * 100) / 100 : 0;
+      const facturaTotal = facturaSubtotal + facturaIva;
+      await db.updateFacturaConceptos(existing.facturaId, {
+        conceptos,
+        subtotal: facturaSubtotal,
+        iva: facturaIva > 0 ? facturaIva : undefined,
+        total: facturaTotal,
+      });
+      setFacturas(prev => prev.map(f => f.id === existing.facturaId
+        ? { ...f, conceptos, subtotal: facturaSubtotal, iva: facturaIva > 0 ? facturaIva : undefined, total: facturaTotal }
+        : f,
+      ));
+    }
   };
   const registrarPago = async (trabajoId: string, pago: Omit<Pago, 'id'>) => {
     const trabajoActual = trabajos.find(t => t.id === trabajoId);
