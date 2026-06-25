@@ -44,7 +44,7 @@ export default function TallerMecanico() {
   const [vista, setVista] = useState<Vista>('clientes');
   const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
   const [cargando, setCargando] = useState(true);
-  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string } | null>(null);
+  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: boolean } | null>(null);
 
   // ── Cargar datos desde Supabase ──
   const cargarDatos = useCallback(async () => {
@@ -323,7 +323,7 @@ export default function TallerMecanico() {
   };
 
   // ── Invoice (Factura) handlers ──
-  const generarFactura = async (trabajoId: string, numeroFactura: string, fechaFactura: string) => {
+  const generarFactura = async (trabajoId: string, numeroFactura: string, fechaFactura: string, incluirIva: boolean) => {
     if (!taller) return;
     const trabajo = trabajos.find(t => t.id === trabajoId);
     if (!trabajo || trabajo.facturaId) return;
@@ -332,7 +332,8 @@ export default function TallerMecanico() {
       ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
     ];
     const subtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
-    const iva = trabajo.tipoDocumento === 'factura' ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+    // IVA is now explicit: controlled by the checkbox in the modal (incluirIva param).
+    const iva = incluirIva ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
     const total = subtotal + iva;
     const nuevaFactura = await db.insertFactura(taller.id, {
       numeroFactura,
@@ -349,7 +350,10 @@ export default function TallerMecanico() {
   const abrirModalFactura = (trabajoId: string) => {
     const sugerido = generarNumeroFactura(facturas);
     const hoy = new Date().toISOString().split('T')[0];
-    setPendingFactura({ trabajoId, numero: sugerido, fecha: hoy });
+    const trabajo = trabajos.find(t => t.id === trabajoId);
+    // Default IVA checkbox: true if job was finalized as Factura or has requiereFactura=true (covers migrated data)
+    const defaultIva = trabajo?.tipoDocumento === 'factura' || (trabajo?.tipoDocumento == null && trabajo?.requiereFactura === true);
+    setPendingFactura({ trabajoId, numero: sugerido, fecha: hoy, incluirIva: defaultIva ?? false });
   };
 
   const refacturarTrabajo = async (trabajoId: string) => {
@@ -361,7 +365,7 @@ export default function TallerMecanico() {
 
   const confirmarFactura = async () => {
     if (!pendingFactura || !pendingFactura.numero.trim()) return;
-    await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha);
+    await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
     setPendingFactura(null);
     setVista('facturas');
   };
@@ -743,11 +747,22 @@ export default function TallerMecanico() {
               type="text"
               autoFocus
               value={pendingFactura.numero}
-              onChange={e => setPendingFactura(prev => prev ? { ...prev, numero: e.target.value } : null)}
+              onChange={e => {
+                const num = e.target.value;
+                // Auto-detect IVA from prefix: "SF" = sin factura (no IVA), "A" = factura fiscal (con IVA)
+                const upperNum = num.trim().toUpperCase();
+                let incluirIva = pendingFactura.incluirIva;
+                if (upperNum.startsWith('SF')) incluirIva = false;
+                else if (upperNum.startsWith('A')) incluirIva = true;
+                setPendingFactura(prev => prev ? { ...prev, numero: num, incluirIva } : null);
+              }}
               onKeyDown={e => { if (e.key === 'Enter') confirmarFactura(); if (e.key === 'Escape') setPendingFactura(null); }}
-              placeholder="Ej. FAC-2026-001 o F-001"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
+              placeholder="A-001 = con IVA · SF-001 = sin IVA"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-1"
             />
+            <p className="text-xs text-slate-400 mb-4">
+              💡 El IVA se ajusta automáticamente según el prefijo: <span className="font-mono font-semibold">A</span> = con IVA · <span className="font-mono font-semibold">SF</span> = sin IVA
+            </p>
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
               Fecha de factura
             </label>
@@ -755,8 +770,22 @@ export default function TallerMecanico() {
               type="date"
               value={pendingFactura.fecha}
               onChange={e => setPendingFactura(prev => prev ? { ...prev, fecha: e.target.value } : null)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-5"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
             />
+            <label className="flex items-center gap-3 cursor-pointer select-none mb-5 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+              <input
+                type="checkbox"
+                checked={pendingFactura.incluirIva}
+                onChange={e => setPendingFactura(prev => prev ? { ...prev, incluirIva: e.target.checked } : null)}
+                className="w-4 h-4 accent-indigo-600"
+              />
+              <div>
+                <span className="text-sm font-semibold text-slate-700">Incluir IVA (16%)</span>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {pendingFactura.incluirIva ? '✅ Se sumará 16% de IVA al total' : '⬜ Sin IVA — cobro informal o cliente exento'}
+                </p>
+              </div>
+            </label>
             <div className="flex gap-3">
               <button
                 onClick={() => setPendingFactura(null)}
