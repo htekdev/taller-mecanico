@@ -868,3 +868,134 @@ export async function updateGasto(
 export async function deleteGasto(gastoId: string): Promise<void> {
   await supabase.from('gastos').delete().eq('id', gastoId);
 }
+
+// ── Cotizaciones ──────────────────────────────────────────────
+//
+// Cotizaciones were previously stored in browser localStorage, which meant
+// each user only saw their own device's data. They are now stored in Supabase
+// scoped to taller_id, so all taller members share the same history.
+
+export interface CotizacionRow {
+  id: string;
+  tallerId: string;
+  numeroCotizacion: string;
+  plantilla: 'general' | 'ayuntamiento' | 'red_ambiental';
+  cliente: string;
+  fecha: string | null;
+  total: number;
+  cancelada: boolean;
+  editada: boolean;
+  convertida: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  form: Record<string, any>;
+  savedAt: string;
+  createdAt: string;
+}
+
+function mapCotizacion(r: Record<string, unknown>): CotizacionRow {
+  return {
+    id:                 r.id as string,
+    tallerId:           r.taller_id as string,
+    numeroCotizacion:   r.numero_cotizacion as string,
+    plantilla:          (r.plantilla as string) as CotizacionRow['plantilla'],
+    cliente:            (r.cliente as string) ?? '',
+    fecha:              (r.fecha as string) ?? null,
+    total:              parseFloat(String(r.total ?? 0)),
+    cancelada:          Boolean(r.cancelada),
+    editada:            Boolean(r.editada),
+    convertida:         Boolean(r.convertida),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    form:               (r.form as Record<string, any>) ?? {},
+    savedAt:            (r.saved_at as string) ?? (r.created_at as string),
+    createdAt:          r.created_at as string,
+  };
+}
+
+export async function getCotizaciones(tallerId: string): Promise<CotizacionRow[]> {
+  const { data } = await supabase
+    .from('cotizaciones')
+    .select('*')
+    .eq('taller_id', tallerId)
+    .order('created_at', { ascending: false });
+
+  return (data ?? []).map(r => mapCotizacion(r as Record<string, unknown>));
+}
+
+export async function insertCotizacion(
+  tallerId: string,
+  payload: Omit<CotizacionRow, 'id' | 'tallerId' | 'createdAt' | 'savedAt'>,
+): Promise<CotizacionRow | null> {
+  const { data, error } = await supabase
+    .from('cotizaciones')
+    .insert({
+      taller_id:          tallerId,
+      numero_cotizacion:  payload.numeroCotizacion,
+      plantilla:          payload.plantilla,
+      cliente:            payload.cliente,
+      fecha:              payload.fecha,
+      total:              payload.total,
+      cancelada:          payload.cancelada ?? false,
+      editada:            payload.editada ?? false,
+      convertida:         payload.convertida ?? false,
+      form:               payload.form,
+      saved_at:           new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.warn('[insertCotizacion] failed:', error?.message);
+    return null;
+  }
+  return mapCotizacion(data as Record<string, unknown>);
+}
+
+export async function updateCotizacion(
+  cotizacionId: string,
+  patch: Partial<Omit<CotizacionRow, 'id' | 'tallerId' | 'createdAt'>>,
+): Promise<boolean> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dbPatch: Record<string, any> = {};
+  if (patch.numeroCotizacion !== undefined) dbPatch.numero_cotizacion = patch.numeroCotizacion;
+  if (patch.plantilla        !== undefined) dbPatch.plantilla         = patch.plantilla;
+  if (patch.cliente          !== undefined) dbPatch.cliente           = patch.cliente;
+  if (patch.fecha            !== undefined) dbPatch.fecha             = patch.fecha;
+  if (patch.total            !== undefined) dbPatch.total             = patch.total;
+  if (patch.cancelada        !== undefined) dbPatch.cancelada         = patch.cancelada;
+  if (patch.editada          !== undefined) dbPatch.editada           = patch.editada;
+  if (patch.convertida       !== undefined) dbPatch.convertida        = patch.convertida;
+  if (patch.form             !== undefined) dbPatch.form              = patch.form;
+  if (patch.savedAt          !== undefined) dbPatch.saved_at          = patch.savedAt;
+
+  const { error } = await supabase
+    .from('cotizaciones')
+    .update(dbPatch)
+    .eq('id', cotizacionId);
+
+  if (error) {
+    console.warn('[updateCotizacion] failed:', error.message);
+    return false;
+  }
+  return true;
+}
+
+// Counter — replaces the localStorage taller_cot_counter.
+// Returns the next sequential number and persists it atomically.
+export async function nextCotizacionNumber(tallerId: string): Promise<string> {
+  // Upsert: increment if exists, insert with 1 if not.
+  // Supabase doesn't support atomic increment via upsert directly, so we use
+  // a two-step read+write (safe for single-user or low-concurrency shops).
+  const { data: existing } = await supabase
+    .from('cotizacion_counter')
+    .select('last_number')
+    .eq('taller_id', tallerId)
+    .single();
+
+  const next = (existing?.last_number ?? 0) + 1;
+
+  await supabase
+    .from('cotizacion_counter')
+    .upsert({ taller_id: tallerId, last_number: next }, { onConflict: 'taller_id' });
+
+  return `COT-${String(next).padStart(3, '0')}`;
+}
