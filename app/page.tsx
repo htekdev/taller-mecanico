@@ -363,6 +363,20 @@ export default function TallerMecanico() {
     ));
   };
 
+  const cancelarTrabajo = async (trabajoId: string) => {
+    await db.cancelarTrabajo(trabajoId);
+    setTrabajos(prev => prev.map(t =>
+      t.id === trabajoId ? { ...t, folioFiscal: '__CANCELADA__' } : t,
+    ));
+  };
+
+  const reactivarTrabajo = async (trabajoId: string) => {
+    await db.reactivarTrabajo(trabajoId);
+    setTrabajos(prev => prev.map(t =>
+      t.id === trabajoId ? { ...t, folioFiscal: undefined } : t,
+    ));
+  };
+
   const confirmarFactura = async () => {
     if (!pendingFactura || !pendingFactura.numero.trim()) return;
     await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
@@ -663,6 +677,8 @@ export default function TallerMecanico() {
               onIrAInventario={() => setVista('inventario')}
               onGenerarFactura={abrirModalFactura}
               onRefacturar={refacturarTrabajo}
+              onCancelarTrabajo={cancelarTrabajo}
+              onReactivarTrabajo={reactivarTrabajo}
               onIrAFacturas={() => setVista('facturas')} />
           )}
           {vista === 'proveedores' && (

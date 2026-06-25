@@ -116,6 +116,8 @@ export function VistaTrabajo({
   onIrAInventario,
   onGenerarFactura,
   onRefacturar,
+  onCancelarTrabajo,
+  onReactivarTrabajo,
   onIrAFacturas,
 }: {
   clientes: Cliente[];
@@ -130,6 +132,8 @@ export function VistaTrabajo({
   onIrAInventario: () => void;
   onGenerarFactura: (trabajoId: string) => void;
   onRefacturar: (trabajoId: string) => void;
+  onCancelarTrabajo: (trabajoId: string) => void;
+  onReactivarTrabajo: (trabajoId: string) => void;
   onIrAFacturas: () => void;
 }) {
   const emptyForm = {
@@ -163,6 +167,8 @@ export function VistaTrabajo({
   const [filtroFacturacion, setFiltroFacturacion] = useState<'todos' | 'con_factura' | 'sin_factura'>('todos');
   const [filtroClienteId, setFiltroClienteId] = useState('');
   const [filtroVehiculoId, setFiltroVehiculoId] = useState('');
+  const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
+  const [verCancelados, setVerCancelados] = useState(false);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
   const totalManoDeObra       = laborItems.reduce((s, l) => s + l.precio, 0);
@@ -360,10 +366,14 @@ export function VistaTrabajo({
     ? partesParaEstaUnidad.length + partesCompatibles.length + partesUniversales.length
     : inventario.length;
 
-  const trabajosPendientes = trabajos.filter(t => t.estado === 'pendiente');
-  const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
+  // Exclude cancelled jobs from all active views
+  const trabajosActivos = trabajos.filter(t => t.folioFiscal !== '__CANCELADA__');
+  const trabajosCancelados = trabajos.filter(t => t.folioFiscal === '__CANCELADA__');
+
+  const trabajosPendientes = trabajosActivos.filter(t => t.estado === 'pendiente');
+  const trabajosPendientesFacturar = trabajosActivos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
   const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
-  const trabajosFiltrados = [...trabajos]
+  const trabajosFiltrados = [...trabajosActivos]
     .filter(t => {
       if (filtroClienteId && t.clienteId !== filtroClienteId) return false;
       if (filtroVehiculoId && t.vehiculoId !== filtroVehiculoId) return false;
@@ -1196,6 +1206,27 @@ export function VistaTrabajo({
                         >
                           ✏️ Editar
                         </button>
+                        {confirmCancelarId === trabajo.id ? (
+                          <div className="flex gap-1">
+                            <button type="button" onClick={() => { onCancelarTrabajo(trabajo.id); setConfirmCancelarId(null); }}
+                              className="text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded transition-colors">
+                              ¿Sí?
+                            </button>
+                            <button type="button" onClick={() => setConfirmCancelarId(null)}
+                              className="text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded transition-colors">
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmCancelarId(trabajo.id)}
+                            className="text-xs font-semibold text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-2 py-1 rounded transition-colors"
+                            title="Cancelar trabajo"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1205,6 +1236,38 @@ export function VistaTrabajo({
             </tbody>
           </table>
         </div>
+
+        {/* ── Trabajos cancelados ── */}
+        {trabajosCancelados.length > 0 && (
+          <div className="mt-3">
+            <button type="button" onClick={() => setVerCancelados(v => !v)}
+              className="text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors">
+              {verCancelados ? '▲ Ocultar' : '▼ Ver'} cancelados ({trabajosCancelados.length})
+            </button>
+            {verCancelados && (
+              <div className="mt-2 space-y-1">
+                {trabajosCancelados.map(t => {
+                  const cl = clientes.find(c => c.id === t.clienteId);
+                  const vh = vehiculos.find(v => v.id === t.vehiculoId);
+                  return (
+                    <div key={t.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 opacity-60">
+                      <div className="flex items-center gap-2 flex-wrap text-sm">
+                        <span className="text-slate-500 line-through">{cl?.nombre ?? '—'}</span>
+                        {vh && <span className="text-xs text-slate-400">{[vh.anio, vh.marca, vh.modelo].filter(Boolean).join(' ')}</span>}
+                        <span className="text-xs text-slate-400">{new Date(t.fecha).toLocaleDateString('es-MX')}</span>
+                        <span className="text-xs bg-rose-100 text-rose-600 font-semibold px-2 py-0.5 rounded-full">Cancelado</span>
+                      </div>
+                      <button type="button" onClick={() => onReactivarTrabajo(t.id)}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-4 flex-shrink-0">
+                        ↩ Reactivar
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

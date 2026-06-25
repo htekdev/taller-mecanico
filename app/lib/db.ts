@@ -583,6 +583,15 @@ export async function reactivarNota(trabajoId: string): Promise<void> {
   await supabase.from('trabajos').update({ folio_fiscal: null }).eq('id', trabajoId);
 }
 
+// cancelarTrabajo / reactivarTrabajo — same convention, applies to ALL job types (not just notas)
+export async function cancelarTrabajo(trabajoId: string): Promise<void> {
+  await supabase.from('trabajos').update({ folio_fiscal: '__CANCELADA__' }).eq('id', trabajoId);
+}
+
+export async function reactivarTrabajo(trabajoId: string): Promise<void> {
+  await supabase.from('trabajos').update({ folio_fiscal: null }).eq('id', trabajoId);
+}
+
 // ── Taller Members ────────────────────────────────────────────
 
 export interface TallerMember {
