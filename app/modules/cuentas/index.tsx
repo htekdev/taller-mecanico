@@ -521,23 +521,23 @@ export function VistaCuentas({
 
   const legacyFiltrados = filtroTipo === 'facturas' ? [] : legacyPorCliente.filter(t => filtro === 'todos' || getEstadoPago(t) === filtro);
 
-  // Global total pending (all clients)
-  const totalPendienteGlobal = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
+  // Global total pending (all clients) — cancelled facturas excluded
+  const totalPendienteGlobal = facturas.filter(f => f.notas !== 'CANCELADA' && getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
     + legacyTrabajos.filter(t => getEstadoPago(t) !== 'pagado').reduce((s, t) => s + getSaldo(t), 0);
 
-  // Client-specific pending total
+  // Client-specific pending total — use facturasActivasPorCliente (already excludes cancelled)
   const totalPendienteCliente = clienteFiltroId
-    ? facturasPorCliente.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
+    ? facturasActivasPorCliente.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
       + legacyPorCliente.filter(t => getEstadoPago(t) !== 'pagado').reduce((s, t) => s + getSaldo(t), 0)
     : 0;
 
   const totalPendiente = clienteFiltroId ? totalPendienteCliente : totalPendienteGlobal;
 
   const counts = {
-    todos: facturasPorCliente.length + legacyPorCliente.length,
-    pendiente: facturasPorCliente.filter(f => getEstadoPagoFactura(f) === 'pendiente').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'pendiente').length,
-    parcial: facturasPorCliente.filter(f => getEstadoPagoFactura(f) === 'parcial').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'parcial').length,
-    pagado: facturasPorCliente.filter(f => getEstadoPagoFactura(f) === 'pagado').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'pagado').length,
+    todos: facturasActivasPorCliente.length + legacyPorCliente.length,
+    pendiente: facturasActivasPorCliente.filter(f => getEstadoPagoFactura(f) === 'pendiente').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'pendiente').length,
+    parcial: facturasActivasPorCliente.filter(f => getEstadoPagoFactura(f) === 'parcial').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'parcial').length,
+    pagado: facturasActivasPorCliente.filter(f => getEstadoPagoFactura(f) === 'pagado').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'pagado').length,
   };
 
   const limpiarFiltroCliente = () => {
@@ -551,7 +551,7 @@ export function VistaCuentas({
       {mostrarReporte && clienteSeleccionado && (
         <ReporteCliente
           cliente={clienteSeleccionado}
-          facturas={facturasPorCliente}
+          facturas={facturasActivasPorCliente}
           trabajos={legacyPorCliente}
           vehiculos={vehiculos}
           onCerrar={() => setMostrarReporte(false)}
@@ -582,7 +582,7 @@ export function VistaCuentas({
                 {busquedaCliente && clientesFiltrados.length > 0 && (
                   <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
                     {clientesFiltrados.map(c => {
-                      const saldo = facturas.filter(f => f.clienteId === c.id && getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
+                      const saldo = facturas.filter(f => f.clienteId === c.id && f.notas !== 'CANCELADA' && getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
                         + legacyTrabajos.filter(t => t.clienteId === c.id && getEstadoPago(t) !== 'pagado').reduce((s, t) => s + getSaldo(t), 0);
                       return (
                         <button
@@ -627,13 +627,13 @@ export function VistaCuentas({
             <span className="text-xs text-slate-400 self-center">Pendientes:</span>
             {clientesConRegistros
               .filter(c => {
-                const s = facturas.filter(f => f.clienteId === c.id && getEstadoPagoFactura(f) !== 'pagado').reduce((a, f) => a + getSaldoFactura(f), 0)
+                const s = facturas.filter(f => f.clienteId === c.id && f.notas !== 'CANCELADA' && getEstadoPagoFactura(f) !== 'pagado').reduce((a, f) => a + getSaldoFactura(f), 0)
                   + legacyTrabajos.filter(t => t.clienteId === c.id && getEstadoPago(t) !== 'pagado').reduce((a, t) => a + getSaldo(t), 0);
                 return s > 0;
               })
               .slice(0, 6)
               .map(c => {
-                const saldo = facturas.filter(f => f.clienteId === c.id && getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
+                const saldo = facturas.filter(f => f.clienteId === c.id && f.notas !== 'CANCELADA' && getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
                   + legacyTrabajos.filter(t => t.clienteId === c.id && getEstadoPago(t) !== 'pagado').reduce((s, t) => s + getSaldo(t), 0);
                 return (
                   <button
