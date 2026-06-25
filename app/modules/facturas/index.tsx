@@ -31,6 +31,7 @@ export function VistaFacturas({
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
   const [filtroClienteId, setFiltroClienteId] = useState('');
+  const [busquedaNumero, setBusquedaNumero] = useState('');
   const [editandoFechaId, setEditandoFechaId] = useState<string | null>(null);
   const [nuevaFecha, setNuevaFecha] = useState('');
   const [editandoNumeroId, setEditandoNumeroId] = useState<string | null>(null);
@@ -46,6 +47,7 @@ export function VistaFacturas({
     .filter(f => {
       if (filtro !== 'todos' && getEstadoPagoFactura(f) !== filtro) return false;
       if (filtroClienteId && f.clienteId !== filtroClienteId) return false;
+      if (busquedaNumero.trim() && !f.numeroFactura.toLowerCase().includes(busquedaNumero.trim().toLowerCase())) return false;
       return true;
     });
 
@@ -88,12 +90,33 @@ export function VistaFacturas({
           </div>
         )}
 
-        <div className="mb-4 max-w-xs">
-          <Label>Cliente</Label>
-          <Select value={filtroClienteId} onChange={e => setFiltroClienteId(e.target.value)}>
-            <option value="">Todos los clientes</option>
-            {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </Select>
+        <div className="mb-4 flex flex-wrap gap-3">
+          <div className="flex-1 min-w-[180px] max-w-xs">
+            <Label>Número de factura</Label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="🔍 Buscar por número..."
+                value={busquedaNumero}
+                onChange={e => setBusquedaNumero(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+              {busquedaNumero && (
+                <button
+                  type="button"
+                  onClick={() => setBusquedaNumero('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                >✕</button>
+              )}
+            </div>
+          </div>
+          <div className="flex-1 min-w-[180px] max-w-xs">
+            <Label>Cliente</Label>
+            <Select value={filtroClienteId} onChange={e => setFiltroClienteId(e.target.value)}>
+              <option value="">Todos los clientes</option>
+              {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            </Select>
+          </div>
         </div>
 
         <div className="flex gap-2 mb-5 flex-wrap">
