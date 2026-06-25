@@ -1,18 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/auth';
 
 export default function LoginPage() {
   const { signIn, signUp, authLoading } = useAuth();
-  const router = useRouter();
 
   const [mode,     setMode]     = useState<'login' | 'registro'>('login');
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [error,    setError]    = useState('');
   const [mensaje,  setMensaje]  = useState('');
+  const [redirecting, setRedirecting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +21,9 @@ export default function LoginPage() {
     if (mode === 'login') {
       const err = await signIn(email, password);
       if (err) { setError(err); return; }
-      router.push('/');
+      // Show loading while AuthGate handles the redirect — avoids competing
+      // router.push + replace that causes ERR_FAILED in mobile browsers.
+      setRedirecting(true);
     } else {
       const err = await signUp(email, password);
       if (err) { setError(err); return; }
@@ -92,10 +93,10 @@ export default function LoginPage() {
             )}
 
             <button
-              type="submit" disabled={authLoading}
+              type="submit" disabled={authLoading || redirecting}
               className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-xl transition-colors text-sm shadow-sm"
             >
-              {authLoading ? 'Procesando...' : mode === 'login' ? 'Entrar al Sistema' : 'Crear Cuenta'}
+              {(authLoading || redirecting) ? 'Procesando...' : mode === 'login' ? 'Entrar al Sistema' : 'Crear Cuenta'}
             </button>
           </form>
         </div>
