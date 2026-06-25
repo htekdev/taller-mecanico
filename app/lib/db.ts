@@ -231,10 +231,7 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
 }
 
 export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>): Promise<Trabajo | null> {
-  // Note: kilometraje column requires migration 20260624_add_kilometraje_to_trabajos.sql.
-  // Until that migration is applied to production, we intentionally skip it to avoid
-  // "column not found" errors. The field is captured in the UI but not persisted yet.
-  const payload = {
+  const basePayload = {
     taller_id: tallerId,
     cliente_id: data.clienteId || null,
     vehiculo_id: data.vehiculoId || null,
@@ -255,27 +252,56 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
     estado: data.estado,
   };
 
+  // Include kilometraje when provided — requires migration:
+  //   ALTER TABLE trabajos ADD COLUMN IF NOT EXISTS kilometraje INTEGER;
+  // If the column doesn't exist yet, we fall back to insert without it so jobs
+  // always save successfully. Once the migration is applied, km will persist.
+  const payload = data.kilometraje !== undefined
+    ? { ...basePayload, kilometraje: data.kilometraje }
+    : basePayload;
+
   const { data: row, error } = await supabase
     .from('trabajos')
     .insert(payload)
     .select()
     .single();
 
-  if (error || !row) {
-    const msg = error?.message ?? error?.details ?? 'Unknown Supabase error';
-    console.error('[insertTrabajo] FAILED:', msg, error);
-    throw new Error(`insertTrabajo: ${msg}`);
+  // Fallback: if kilometraje column is missing in production, retry without it
+  if (error && error.message?.includes('kilometraje')) {
+    console.warn('[insertTrabajo] kilometraje column not in DB — retrying without it. Apply migration 20260624_add_kilometraje_to_trabajos.sql');
+    const { data: fbRow, error: fbErr } = await supabase
+      .from('trabajos').insert(basePayload).select().single();
+    if (fbErr || !fbRow) {
+      throw new Error(`insertTrabajo: ${fbErr?.message ?? 'Unknown error'}`);
+    }
+    return mapTrabajo(fbRow, undefined);
   }
+
+  if (error || !row) {
+    throw new Error(`insertTrabajo: ${error?.message ?? error?.details ?? 'Unknown Supabase error'}`);
+  }
+  return mapTrabajo(row, row.kilometraje ?? undefined);
+}
+
+function mapTrabajo(row: Record<string, unknown>, km: number | undefined): Trabajo {
   return {
-    id: row.id, clienteId: row.cliente_id ?? '', vehiculoId: row.vehiculo_id ?? '',
-    fecha: row.fecha, descripcion: row.descripcion,
-    kilometraje: row.kilometraje ?? undefined,
+    id: row.id as string,
+    clienteId: (row.cliente_id as string) ?? '',
+    vehiculoId: (row.vehiculo_id as string) ?? '',
+    fecha: row.fecha as string,
+    descripcion: row.descripcion as string,
+    kilometraje: km,
     manoDeObra: Number(row.mano_de_obra),
     manoDeObraItems: (row.mano_de_obra_items as ManoDeObraItem[]) ?? [],
-    refacciones: Number(row.refacciones_total), costoRefacciones: Number(row.costo_refacciones),
-    requiereFactura: row.requiere_factura, iva: Number(row.iva), total: Number(row.total),
-    partes: (row.partes as TrabajoRefaccion[]) ?? [], pagos: (row.pagos as Pago[]) ?? [],
-    estadoFacturacion: row.estado_facturacion, estado: row.estado,
+    refacciones: Number(row.refacciones_total),
+    costoRefacciones: Number(row.costo_refacciones),
+    requiereFactura: row.requiere_factura as boolean,
+    iva: Number(row.iva),
+    total: Number(row.total),
+    partes: (row.partes as TrabajoRefaccion[]) ?? [],
+    pagos: (row.pagos as Pago[]) ?? [],
+    estadoFacturacion: row.estado_facturacion as Trabajo['estadoFacturacion'],
+    estado: row.estado as Trabajo['estado'],
   };
 }
 

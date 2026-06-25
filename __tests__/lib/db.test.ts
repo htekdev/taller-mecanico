@@ -343,22 +343,47 @@ describe('insertTrabajo', () => {
     })).rejects.toThrow('insertTrabajo: DB error');
   });
 
-  it('succeeds without sending kilometraje (column not in DB yet)', async () => {
+  it('retries without kilometraje when column is missing in DB', async () => {
+    const kmError = { message: "Could not find the 'kilometraje' column of 'trabajos' in the schema cache" };
     const mockRow = { id: 'tj1', cliente_id: 'c1', vehiculo_id: 'v1', fecha: '2026-06-01', descripcion: 'Test', mano_de_obra: 200, mano_de_obra_items: [], refacciones_total: 0, costo_refacciones: 0, requiere_factura: false, iva: 0, total: 200, partes: [], pagos: [], factura_id: null, estado_facturacion: 'sin_facturar', estado: 'pendiente' };
-    const { insert } = mockInsertChain(mockRow);
+    const single1 = vi.fn().mockResolvedValue({ data: null, error: kmError });
+    const select1 = vi.fn().mockReturnValue({ single: single1 });
+    const insert1 = vi.fn().mockReturnValue({ select: select1 });
+    const single2 = vi.fn().mockResolvedValue({ data: mockRow, error: null });
+    const select2 = vi.fn().mockReturnValue({ single: single2 });
+    const insert2 = vi.fn().mockReturnValue({ select: select2 });
+    mockFrom
+      .mockReturnValueOnce({ insert: insert1 } as unknown as ReturnType<typeof mockFrom>)
+      .mockReturnValue({ insert: insert2 } as unknown as ReturnType<typeof mockFrom>);
 
     const result = await insertTrabajo('t1', {
       clienteId: 'c1', vehiculoId: 'v1', fecha: '2026-06-01', descripcion: 'Test',
-      kilometraje: 85000, // provided but not inserted
+      kilometraje: 85000,
       manoDeObra: 200, manoDeObraItems: [], refacciones: 0, costoRefacciones: 0,
       requiereFactura: false, iva: 0, total: 200, partes: [], pagos: [],
       estadoFacturacion: 'sin_facturar', estado: 'pendiente',
     });
-    expect(result).not.toBeNull();
     expect(result?.id).toBe('tj1');
-    // insert payload should NOT contain kilometraje
+    expect(result?.kilometraje).toBeUndefined(); // column not in DB yet
+    expect(insert1).toHaveBeenCalledTimes(1);
+    expect(insert2).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes kilometraje when column exists in DB', async () => {
+    const mockRow = { id: 'tj2', cliente_id: 'c1', vehiculo_id: 'v1', fecha: '2026-06-01', descripcion: 'Test', kilometraje: 85000, mano_de_obra: 200, mano_de_obra_items: [], refacciones_total: 0, costo_refacciones: 0, requiere_factura: false, iva: 0, total: 200, partes: [], pagos: [], factura_id: null, estado_facturacion: 'sin_facturar', estado: 'pendiente' };
+    const { insert } = mockInsertChain(mockRow);
+
+    const result = await insertTrabajo('t1', {
+      clienteId: 'c1', vehiculoId: 'v1', fecha: '2026-06-01', descripcion: 'Test',
+      kilometraje: 85000,
+      manoDeObra: 200, manoDeObraItems: [], refacciones: 0, costoRefacciones: 0,
+      requiereFactura: false, iva: 0, total: 200, partes: [], pagos: [],
+      estadoFacturacion: 'sin_facturar', estado: 'pendiente',
+    });
+    expect(result?.id).toBe('tj2');
+    expect(result?.kilometraje).toBe(85000);
     const payload = (insert as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(payload).not.toHaveProperty('kilometraje');
+    expect(payload).toHaveProperty('kilometraje', 85000);
   });
 });
 
