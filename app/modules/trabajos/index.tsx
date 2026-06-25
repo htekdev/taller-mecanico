@@ -1,10 +1,235 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel, Proveedor } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
-import { labelVehiculo, fmt } from '@/app/lib/utils';
+import { labelVehiculo, fmt, getMontoPagado } from '@/app/lib/utils';
 import { getPricingIntel } from '@/app/lib/pricing';
+
+// ─── Departamentos localStorage ───────────────────────────────────────────────
+
+const DEPTOS_KEY = 'taller_departamentos_ayuntamiento';
+const DEFAULT_DEPTOS: string[] = [
+  'Obras públicas mantenimiento vial',
+  'Servicios públicos aseo urbano poniente',
+  'Servicios públicos aseo urbano oriente',
+];
+
+function loadDepartamentos(): string[] {
+  try {
+    const raw = localStorage.getItem(DEPTOS_KEY);
+    if (!raw) {
+      saveDepartamentos(DEFAULT_DEPTOS);
+      return [...DEFAULT_DEPTOS];
+    }
+    const parsed = JSON.parse(raw) as string[];
+    return Array.isArray(parsed) ? parsed : [...DEFAULT_DEPTOS];
+  } catch {
+    return [...DEFAULT_DEPTOS];
+  }
+}
+
+function saveDepartamentos(deptos: string[]): void {
+  try { localStorage.setItem(DEPTOS_KEY, JSON.stringify(deptos)); } catch { /* noop */ }
+}
+
+// ─── PDF helpers (Ayuntamiento) ───────────────────────────────────────────────
+
+function fmtPesoA(n: number): string {
+  return n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function loadLogoBase64Aya(): Promise<string | null> {
+  try {
+    const res = await fetch('/logo-mj-merida.jpg');
+    const buf = await res.arrayBuffer();
+    let bin = '';
+    new Uint8Array(buf).forEach(b => { bin += String.fromCharCode(b); });
+    return 'data:image/jpeg;base64,' + btoa(bin);
+  } catch { return null; }
+}
+
+type FiltroAyuntamiento = 'sin_tft' | 'con_tft_sin_pago' | 'facturadas' | 'todos';
+
+async function generarPDFAyuntamiento(
+  trabajos: Trabajo[],
+  vehiculos: Vehiculo[],
+  filtro: FiltroAyuntamiento,
+): Promise<void> {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+
+  const pw = 279.4;
+  const ml = 18, mr = 18, cw = pw - ml - mr;
+  const DARK   = [15,  23,  42]  as [number, number, number];
+  const MID    = [71,  85, 105]  as [number, number, number];
+  const LIGHT  = [203,213,225]  as [number, number, number];
+  const XLIGHT = [248,250,252]  as [number, number, number];
+  const WHITE  = [255,255,255]  as [number, number, number];
+
+  const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+  const fechaSlug = new Date().toISOString().split('T')[0];
+
+  const filtroNombres: Record<FiltroAyuntamiento, string> = {
+    sin_tft:          'Sin TFT',
+    con_tft_sin_pago: 'Con TFT Sin Pago',
+    facturadas:       'Facturadas',
+    todos:            'Todos',
+  };
+  const filtroSlugs: Record<FiltroAyuntamiento, string> = {
+    sin_tft:          'sin-tft',
+    con_tft_sin_pago: 'con-tft-sin-pago',
+    facturadas:       'facturadas',
+    todos:            'todos',
+  };
+
+  const trabajosAyu = trabajos.filter(t => {
+    if (t.folioFiscal === '__CANCELADA__') return false;
+    if (t.tipoCliente !== 'ayuntamiento') return false;
+    if (filtro === 'sin_tft')          return (t.tftEstado ?? 'sin_tft') === 'sin_tft' && t.estado === 'completado';
+    if (filtro === 'con_tft_sin_pago') return (t.tftEstado ?? 'sin_tft') === 'con_tft' && getMontoPagado(t) < t.total;
+    if (filtro === 'facturadas')       return t.estadoFacturacion === 'facturado';
+    return true;
+  });
+
+  let y = 15;
+
+  // ═══ HEADER ════════════════════════════════════════════════════════════════
+  const logoB64 = await loadLogoBase64Aya();
+  if (logoB64) doc.addImage(logoB64, 'JPEG', ml, y, 16, 16);
+
+  const cx = ml + 20;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...DARK);
+  doc.text('MICRO DIESEL DE MÉRIDA', cx, y + 5);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MID);
+  doc.text('Héctor Armando Rocha Sepúlveda', cx, y + 10);
+  doc.text('Circuito Colonias No. 752, Col. Castilla Cámara, CP 97278  ·  Mérida, Yucatán', cx, y + 14.5);
+  doc.text('Tel. (999) 317.22.46  ·  Cel. 999 359.79.70', cx, y + 18.5);
+
+  y += 22;
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.4); doc.line(ml, y, ml + cw, y);
+  y += 6;
+
+  // ═══ TITLE + DATE ══════════════════════════════════════════════════════════
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...DARK);
+  doc.text(`REPORTE AYUNTAMIENTO — ${filtroNombres[filtro].toUpperCase()}`, ml, y + 4);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...MID);
+  doc.text(fechaHoy, ml + cw, y + 4, { align: 'right' });
+  y += 10;
+
+  // ═══ CLIENT BLOCK ══════════════════════════════════════════════════════════
+  doc.setFillColor(...XLIGHT);
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3);
+  doc.roundedRect(ml, y, cw, 12, 1.5, 1.5, 'FD');
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...MID);
+  doc.text('CLIENTE', ml + 4, y + 4.5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+  doc.text('AYUNTAMIENTO DE MÉRIDA', ml + 4, y + 9.5);
+  y += 17;
+
+  // ═══ TABLE ══════════════════════════════════════════════════════════════════
+  const rh = 6;
+  // cw ≈ 243.4mm landscape letter
+  const wOrden = 30, wInv = 24, wVeh = 52, wDepto = 58, wDesc = 44, wTotal = 28, wTft = cw - 30 - 24 - 52 - 58 - 44 - 28;
+
+  // thead
+  doc.setFillColor(...DARK); doc.rect(ml, y, cw, rh, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...WHITE);
+  const colDefs = [
+    { label: 'ORDEN SERVICIO', w: wOrden, align: 'left'   as const },
+    { label: 'INVENTARIO',     w: wInv,   align: 'left'   as const },
+    { label: 'UNIDAD',         w: wVeh,   align: 'left'   as const },
+    { label: 'DEPARTAMENTO',   w: wDepto, align: 'left'   as const },
+    { label: 'DESCRIPCIÓN',    w: wDesc,  align: 'left'   as const },
+    { label: 'TOTAL',          w: wTotal, align: 'right'  as const },
+    { label: 'ESTADO TFT',     w: wTft,   align: 'center' as const },
+  ];
+  let xh = ml;
+  colDefs.forEach(c => {
+    const tx = c.align === 'right' ? xh + c.w - 2.5 : c.align === 'center' ? xh + c.w / 2 : xh + 2.5;
+    doc.text(c.label, tx, y + 4, { align: c.align });
+    xh += c.w;
+  });
+  doc.setTextColor(...DARK);
+  y += rh;
+
+  // rows
+  let totalSum = 0;
+  let pagadoSum = 0;
+  trabajosAyu.forEach((t, i) => {
+    const veh = vehiculos.find(v => v.id === t.vehiculoId);
+    const vLabel = veh ? [veh.anio, veh.marca, veh.modelo].filter(Boolean).join(' ') : '—';
+    const tftLabel = (t.tftEstado ?? 'sin_tft') === 'con_tft' ? `TFT-${t.tftNumero ?? '?'}` : 'Sin TFT';
+    const pagado = getMontoPagado(t);
+    totalSum += t.total;
+    pagadoSum += pagado;
+
+    if (i % 2 === 1) { doc.setFillColor(...XLIGHT); doc.rect(ml, y, cw, rh, 'F'); }
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...DARK);
+
+    const rowCells = [
+      { text: t.ordenServicioGob ?? '—', w: wOrden, align: 'left'   as const },
+      { text: t.inventarioNum    ?? '—', w: wInv,   align: 'left'   as const },
+      { text: vLabel,                    w: wVeh,   align: 'left'   as const },
+      { text: t.departamento     ?? '—', w: wDepto, align: 'left'   as const },
+      { text: t.descripcion,             w: wDesc,  align: 'left'   as const },
+      { text: '$' + fmtPesoA(t.total),   w: wTotal, align: 'right'  as const },
+      { text: tftLabel,                  w: wTft,   align: 'center' as const },
+    ];
+    let xr = ml;
+    rowCells.forEach(c => {
+      const tx = c.align === 'right' ? xr + c.w - 2.5 : c.align === 'center' ? xr + c.w / 2 : xr + 2.5;
+      const txt = (doc.splitTextToSize(c.text, c.w - 4))[0] ?? '';
+      doc.text(txt, tx, y + 4, { align: c.align });
+      xr += c.w;
+    });
+    doc.setDrawColor(...LIGHT); doc.setLineWidth(0.2); doc.line(ml, y + rh, ml + cw, y + rh);
+    y += rh;
+  });
+
+  if (trabajosAyu.length === 0) {
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(...MID);
+    doc.text('Sin resultados para este filtro.', ml + 2.5, y + 4);
+    y += rh;
+  }
+
+  // ═══ SUMMARY ══════════════════════════════════════════════════════════════
+  y += 4;
+  const pendienteSum = Math.max(0, totalSum - pagadoSum);
+  const sumX = ml + cw - 90;
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3); doc.line(sumX, y, ml + cw, y);
+  y += 4;
+
+  const sumRow = (label: string, value: string, bold = false) => {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(bold ? 9 : 8);
+    doc.setTextColor(...(bold ? DARK : MID));
+    doc.text(label, sumX + 2, y);
+    if (value) doc.text(value, ml + cw, y, { align: 'right' });
+    y += 5.5;
+  };
+
+  sumRow(`Trabajos incluidos: ${trabajosAyu.length}`, '');
+  sumRow('Total importe:', '$' + fmtPesoA(totalSum));
+  sumRow('Total abonado:', '$' + fmtPesoA(pagadoSum));
+
+  doc.setDrawColor(...DARK); doc.setLineWidth(0.4);
+  doc.line(sumX, y, ml + cw, y); y += 0.8;
+  doc.line(sumX, y, ml + cw, y); y += 5;
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+  doc.text('SALDO PENDIENTE', sumX + 2, y);
+  doc.text('$' + fmtPesoA(pendienteSum), ml + cw, y, { align: 'right' });
+  y += 10;
+
+  // ═══ FOOTER ═══════════════════════════════════════════════════════════════
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3); doc.line(ml, y, ml + cw, y); y += 5;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...MID);
+  doc.text(`Documento generado el ${fechaHoy}  ·  Este documento no tiene validez fiscal.`, ml, y);
+  doc.text('MICRO DIESEL DE MÉRIDA', ml + cw, y, { align: 'right' });
+
+  doc.save(`reporte-ayuntamiento-${filtroSlugs[filtro]}-${fechaSlug}.pdf`);
+}
 
 // ── Finalization Modal ──────────────────────────────────────────────────────
 function ModalFinalizacion({
@@ -102,6 +327,8 @@ function ModalFinalizacion({
   );
 }
 
+// DEPARTAMENTOS_AYUNTAMIENTO is now managed via localStorage (see loadDepartamentos/saveDepartamentos above)
+
 // ── Main Component ──────────────────────────────────────────────────────────
 export function VistaTrabajo({
   clientes,
@@ -118,6 +345,7 @@ export function VistaTrabajo({
   onRefacturar,
   onCancelarTrabajo,
   onReactivarTrabajo,
+  onActualizarTft,
   onIrAFacturas,
 }: {
   clientes: Cliente[];
@@ -134,6 +362,7 @@ export function VistaTrabajo({
   onRefacturar: (trabajoId: string) => void;
   onCancelarTrabajo: (trabajoId: string) => void;
   onReactivarTrabajo: (trabajoId: string) => void;
+  onActualizarTft: (trabajoId: string, tftNumero: string) => Promise<void> | void;
   onIrAFacturas: () => void;
 }) {
   const emptyForm = {
@@ -145,6 +374,11 @@ export function VistaTrabajo({
     requiereFactura: false,
     folioFiscal: '',
     estado: 'pendiente' as Trabajo['estado'],
+    departamento: '',
+    inventarioNum: '',
+    ordenServicioGob: '',
+    fechaEntrada: '',
+    fechaSalida: '',
   };
   const [form, setForm] = useState(emptyForm);
   const [laborItems, setLaborItems] = useState<ManoDeObraItem[]>([]);
@@ -163,12 +397,25 @@ export function VistaTrabajo({
   const [pickerPrecioVenta, setPickerPrecioVenta] = useState(0);
   const [finalizandoId, setFinalizandoId] = useState<string | null>(null);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [subTab, setSubTab] = useState<'general' | 'ayuntamiento'>('general');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'completado'>('todos');
   const [filtroFacturacion, setFiltroFacturacion] = useState<'todos' | 'con_factura' | 'sin_factura'>('todos');
+  const [filtroTft, setFiltroTft] = useState<'todos' | 'sin_tft' | 'con_tft'>('todos');
   const [filtroClienteId, setFiltroClienteId] = useState('');
   const [filtroVehiculoId, setFiltroVehiculoId] = useState('');
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
+  const [capturandoTftId, setCapturandoTftId] = useState<string | null>(null);
+  const [tftNumeroDraft, setTftNumeroDraft] = useState('');
   const [verCancelados, setVerCancelados] = useState(false);
+
+  // ── Departamentos CRUD ──────────────────────────────────────────────────
+  const [departamentos, setDepartamentos] = useState<string[]>([]);
+  const [showDeptoManager, setShowDeptoManager] = useState(false);
+  const [nuevoDepto, setNuevoDepto] = useState('');
+
+  useEffect(() => {
+    setDepartamentos(loadDepartamentos());
+  }, []);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
   const totalManoDeObra       = laborItems.reduce((s, l) => s + l.precio, 0);
@@ -176,8 +423,10 @@ export function VistaTrabajo({
   const totalCostoRefacciones = partesSeleccionadas.reduce((s, p) => s + (p.costoTotal ?? 0), 0);
   const utilidadRefacciones   = totalVentaRefacciones - totalCostoRefacciones;
   const subtotalSinIVA        = totalManoDeObra + totalVentaRefacciones;
-  const ivaCalculado          = form.requiereFactura ? Math.round(subtotalSinIVA * 0.16 * 100) / 100 : 0;
-  const totalConIVA           = subtotalSinIVA + ivaCalculado;
+  const esAyuntamientoTab = subTab === 'ayuntamiento';
+
+  // Auto-detect Ayuntamiento client (case-insensitive match on name containing "ayuntamiento")
+  const clienteAyuntamiento = clientes.find(c => c.nombre.toLowerCase().includes('ayuntamiento'));
 
   const handleClienteChange = (clienteId: string) =>
     setForm(f => ({ ...f, clienteId, vehiculoId: '' }));
@@ -280,9 +529,12 @@ export function VistaTrabajo({
     setExtCostoTaller(0);
     setExtPrecioCliente(0);
     setExtProveedorId('');
+    setCapturandoTftId(null);
+    setTftNumeroDraft('');
   };
 
   const iniciarEdicion = (trabajo: Trabajo) => {
+    setSubTab(trabajo.tipoCliente === 'ayuntamiento' ? 'ayuntamiento' : 'general');
     setForm({
       clienteId: trabajo.clienteId,
       vehiculoId: trabajo.vehiculoId,
@@ -293,6 +545,11 @@ export function VistaTrabajo({
       requiereFactura: trabajo.requiereFactura,
       folioFiscal: trabajo.folioFiscal ?? '',
       estado: trabajo.estado,
+      departamento: trabajo.departamento ?? '',
+      inventarioNum: trabajo.inventarioNum ?? '',
+      ordenServicioGob: trabajo.ordenServicioGob ?? '',
+      fechaEntrada: trabajo.fechaEntrada ?? '',
+      fechaSalida: trabajo.fechaSalida ?? '',
     });
     setLaborItems(trabajo.manoDeObraItems ?? []);
     setPartesSeleccionadas(trabajo.partes ?? []);
@@ -318,8 +575,28 @@ export function VistaTrabajo({
       manoDeObraItems: laborItems,
       refacciones: totalVentaRefacciones,
       costoRefacciones: totalCostoRefacciones,
+      tipoCliente: subTab as 'general' | 'ayuntamiento',
+      ...(subTab === 'ayuntamiento' ? {
+        departamento: form.departamento || undefined,
+        inventarioNum: form.inventarioNum || undefined,
+        ordenServicioGob: form.ordenServicioGob || undefined,
+        fechaEntrada: form.fechaEntrada || undefined,
+        fechaSalida: form.fechaSalida || undefined,
+        tftEstado: trabajoExistente?.tftEstado ?? 'sin_tft',
+        tftNumero: trabajoExistente?.tftNumero,
+      } : {
+        departamento: undefined,
+        inventarioNum: undefined,
+        ordenServicioGob: undefined,
+        fechaEntrada: undefined,
+        fechaSalida: undefined,
+        tftEstado: undefined,
+        tftNumero: undefined,
+      }),
       // Preserve requiereFactura for completed jobs so IVA is recalculated correctly
-      requiereFactura: trabajoExistente?.estado === 'completado' ? (trabajoExistente.requiereFactura ?? false) : false,
+      requiereFactura: trabajoExistente?.estado === 'completado'
+        ? (trabajoExistente.requiereFactura ?? false)
+        : false,
       folioFiscal: undefined,
       partes: partesSeleccionadas,
       pagos: editandoId ? (trabajoExistente?.pagos ?? []) : [],
@@ -369,17 +646,21 @@ export function VistaTrabajo({
   // Exclude cancelled jobs from all active views
   const trabajosActivos = trabajos.filter(t => t.folioFiscal !== '__CANCELADA__');
   const trabajosCancelados = trabajos.filter(t => t.folioFiscal === '__CANCELADA__');
+  const coincideTab = (trabajo: Trabajo) => esAyuntamientoTab ? trabajo.tipoCliente === 'ayuntamiento' : trabajo.tipoCliente !== 'ayuntamiento';
+  const trabajosDelTab = trabajosActivos.filter(coincideTab);
+  const trabajosCanceladosDelTab = trabajosCancelados.filter(coincideTab);
 
-  const trabajosPendientes = trabajosActivos.filter(t => t.estado === 'pendiente');
-  const trabajosPendientesFacturar = trabajosActivos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
+  const trabajosPendientes = trabajosDelTab.filter(t => t.estado === 'pendiente');
+  const trabajosPendientesFacturar = trabajosDelTab.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
   const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
-  const trabajosFiltrados = [...trabajosActivos]
+  const trabajosFiltrados = [...trabajosDelTab]
     .filter(t => {
       if (filtroClienteId && t.clienteId !== filtroClienteId) return false;
       if (filtroVehiculoId && t.vehiculoId !== filtroVehiculoId) return false;
       if (filtroEstado !== 'todos' && t.estado !== filtroEstado) return false;
       if (filtroFacturacion === 'con_factura' && t.estadoFacturacion !== 'facturado') return false;
       if (filtroFacturacion === 'sin_factura' && t.estadoFacturacion === 'facturado') return false;
+      if (esAyuntamientoTab && filtroTft !== 'todos' && (t.tftEstado ?? 'sin_tft') !== filtroTft) return false;
       return true;
     })
     .sort((a, b) => ordenHistorial === 'desc'
@@ -387,6 +668,41 @@ export function VistaTrabajo({
       : a.fecha.localeCompare(b.fecha)
     );
   const trabajoFinalizando = finalizandoId ? trabajos.find(t => t.id === finalizandoId) : null;
+
+  const guardarTft = async (trabajoId: string) => {
+    const numero = tftNumeroDraft.trim();
+    if (!numero) return;
+    await onActualizarTft(trabajoId, numero);
+    setCapturandoTftId(null);
+    setTftNumeroDraft('');
+  };
+
+  const finalizarDesdeFila = (trabajo: Trabajo) => {
+    if (trabajo.tipoCliente === 'ayuntamiento') {
+      const confirmar = window.confirm('¿Finalizar este trabajo del Ayuntamiento como factura?');
+      if (confirmar) onFinalizar(trabajo.id, 'factura');
+      return;
+    }
+    setFinalizandoId(trabajo.id);
+  };
+
+  // ── Departamentos CRUD handlers ────────────────────────────────────────────
+  const agregarDepto = () => {
+    const trimmed = nuevoDepto.trim();
+    if (!trimmed || departamentos.includes(trimmed)) return;
+    const updated = [...departamentos, trimmed];
+    setDepartamentos(updated);
+    saveDepartamentos(updated);
+    setNuevoDepto('');
+  };
+
+  const eliminarDepto = (depto: string) => {
+    const updated = departamentos.filter(d => d !== depto);
+    setDepartamentos(updated);
+    saveDepartamentos(updated);
+    // Clear form selection if the deleted depto was selected
+    if (form.departamento === depto) setForm(f => ({ ...f, departamento: '' }));
+  };
 
   return (
     <div>
@@ -403,6 +719,77 @@ export function VistaTrabajo({
         />
       )}
       <SectionTitle title="Registro de Trabajos" subtitle="Selecciona cliente, unidad y las refacciones usadas del inventario." />
+
+      <div className="flex gap-1 bg-white rounded-xl p-1.5 border border-slate-200 mb-3">
+        <button
+          type="button"
+          onClick={() => { setSubTab('general'); setFiltroTft('todos'); resetForm(); }}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+            subTab === 'general' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          👥 General
+        </button>
+        <button
+          type="button"
+          onClick={() => { setSubTab('ayuntamiento'); setFiltroTft('todos'); resetForm(); if (clienteAyuntamiento) { setForm(f => ({ ...f, clienteId: clienteAyuntamiento.id })); } }}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+            subTab === 'ayuntamiento' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          🏛️ Ayuntamiento
+        </button>
+      </div>
+
+      {/* ── Gestión de Departamentos (solo tab Ayuntamiento) ── */}
+      {esAyuntamientoTab && (
+        <div className="mb-4">
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setShowDeptoManager(v => !v)}
+              className="text-xs font-semibold text-slate-500 hover:text-rose-700 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-300 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
+            >
+              ⚙️ Departamentos
+            </button>
+          </div>
+          {showDeptoManager && (
+            <div className="mt-2 border border-rose-200 bg-rose-50 rounded-xl p-4 space-y-3">
+              <p className="text-xs font-bold text-rose-700 uppercase tracking-widest">Gestión de Departamentos</p>
+              <div className="space-y-1">
+                {departamentos.map(d => (
+                  <div key={d} className="flex items-center justify-between bg-white border border-rose-100 rounded-lg px-3 py-2 text-sm">
+                    <span className="text-slate-700">{d}</span>
+                    <button
+                      type="button"
+                      onClick={() => eliminarDepto(d)}
+                      className="text-xs text-rose-400 hover:text-rose-700 font-bold ml-2 transition-colors"
+                      title="Eliminar departamento"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {departamentos.length === 0 && (
+                  <p className="text-xs text-rose-400 italic px-1">Sin departamentos registrados.</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="Nuevo departamento..."
+                  value={nuevoDepto}
+                  onChange={e => setNuevoDepto(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarDepto(); } }}
+                />
+                <Btn type="button" size="sm" variant="primary" onClick={agregarDepto} disabled={!nuevoDepto.trim() || departamentos.includes(nuevoDepto.trim())}>
+                  Agregar
+                </Btn>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={`border rounded-xl p-5 mb-8 ${editandoId ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
         <div className="flex items-center justify-between mb-4">
@@ -429,15 +816,69 @@ export function VistaTrabajo({
         })()}
         <form onSubmit={handleSubmit} className="space-y-6">
 
+          {esAyuntamientoTab && (
+            <div className="border border-rose-200 rounded-xl bg-white overflow-hidden">
+              <div className="px-4 py-3 bg-rose-700">
+                <span className="text-xs font-bold text-white uppercase tracking-widest">🏛️ Datos del Ayuntamiento</span>
+              </div>
+              <div className="p-4 space-y-4">
+                <div>
+                  <Label>Departamento</Label>
+                  <Select value={form.departamento} onChange={e => setForm(f => ({ ...f, departamento: e.target.value }))}>
+                    <option value="">Seleccionar departamento...</option>
+                    {departamentos.map(departamento => (
+                      <option key={departamento} value={departamento}>{departamento}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Inventario</Label>
+                    <Input type="text" placeholder="Ej. INV-203" value={form.inventarioNum}
+                      onChange={e => setForm(f => ({ ...f, inventarioNum: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Orden de Servicio</Label>
+                    <Input type="text" placeholder="Ej. OS-1456" value={form.ordenServicioGob}
+                      onChange={e => setForm(f => ({ ...f, ordenServicioGob: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Fecha Entrada</Label>
+                    <Input type="date" value={form.fechaEntrada}
+                      onChange={e => setForm(f => ({ ...f, fechaEntrada: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Fecha Salida</Label>
+                    <Input type="date" value={form.fechaSalida}
+                      onChange={e => setForm(f => ({ ...f, fechaSalida: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ① Cliente + ② Unidad */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>① Cliente</Label>
-              <Select value={form.clienteId} onChange={e => handleClienteChange(e.target.value)} required>
-                <option value="">Seleccionar cliente...</option>
-                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-              </Select>
-            </div>
+            {esAyuntamientoTab ? (
+              <div>
+                <Label>① Cliente</Label>
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700">
+                  <span>🏛️</span>
+                  <span>{clienteAyuntamiento?.nombre ?? 'Ayuntamiento de Mérida'}</span>
+                  <span className="ml-auto text-xs text-slate-400 font-normal">🔒 Fijo</span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Label>① Cliente</Label>
+                <Select value={form.clienteId} onChange={e => handleClienteChange(e.target.value)} required>
+                  <option value="">Seleccionar cliente...</option>
+                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </Select>
+              </div>
+            )}
             <div>
               <Label>② Unidad / Vehículo</Label>
               <Select value={form.vehiculoId} onChange={e => setForm(f => ({ ...f, vehiculoId: e.target.value }))}
@@ -452,6 +893,13 @@ export function VistaTrabajo({
             <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
               <span>⚠️</span>
               <span>Este cliente no tiene unidades. Ve a <span className="font-bold">👥 Clientes</span> para registrar una primero.</span>
+            </div>
+          )}
+
+          {esAyuntamientoTab && !clienteAyuntamiento && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800">
+              <span>⚠️</span>
+              <span>No se encontró un cliente con nombre &quot;Ayuntamiento&quot;. Ve a <span className="font-bold">👥 Clientes</span> y crea un cliente llamado <span className="font-bold">&quot;Ayuntamiento de Mérida&quot;</span> primero.</span>
             </div>
           )}
 
@@ -970,10 +1418,12 @@ export function VistaTrabajo({
           </div>
 
           {/* ── Nota: IVA se elige al finalizar ── */}
-          <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4 text-sm text-indigo-700 flex items-start gap-2">
-            <span className="text-lg mt-0.5">ℹ️</span>
-            <span>El IVA se elige cuando el trabajo se <strong>finaliza</strong> — al presionar el botón 🏁 Finalizar elegirás entre <strong>Nota</strong> (sin IVA) o <strong>Factura Fiscal</strong> (IVA 16%).</span>
-          </div>
+          {!esAyuntamientoTab && (
+            <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4 text-sm text-indigo-700 flex items-start gap-2">
+              <span className="text-lg mt-0.5">ℹ️</span>
+              <span>El IVA se elige cuando el trabajo se <strong>finaliza</strong> — al presionar el botón 🏁 Finalizar elegirás entre <strong>Nota</strong> (sin IVA) o <strong>Factura Fiscal</strong> (IVA 16%).</span>
+            </div>
+          )}
 
           {(totalManoDeObra > 0 || totalVentaRefacciones > 0) && (
             <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-4 space-y-2 text-sm">
@@ -1028,11 +1478,11 @@ export function VistaTrabajo({
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-base font-bold text-slate-700">
             Historial de Trabajos
-            {trabajos.length > 0 && <span className="ml-2 text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{trabajos.length}</span>}
+            {trabajosDelTab.length > 0 && <span className="ml-2 text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{trabajosDelTab.length}</span>}
           </h3>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Ordenamiento */}
-            {trabajos.length > 0 && (
+            {trabajosDelTab.length > 0 && (
               <button
                 onClick={() => setOrdenHistorial(o => o === 'desc' ? 'asc' : 'desc')}
                 className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-700 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 px-3 py-1.5 rounded-lg transition-all"
@@ -1041,7 +1491,7 @@ export function VistaTrabajo({
               </button>
             )}
             {/* Filtro estado */}
-            {trabajos.length > 0 && (
+            {trabajosDelTab.length > 0 && (
               <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
                 {([['todos', 'Todos'], ['pendiente', '🕐 En progreso'], ['completado', '✓ Terminados']] as const).map(([val, label]) => (
                   <button key={val} onClick={() => setFiltroEstado(val)}
@@ -1055,7 +1505,7 @@ export function VistaTrabajo({
         </div>
 
         {/* Filtros estructurados */}
-        {trabajos.length > 0 && (
+        {trabajosDelTab.length > 0 && (
           <div className="mb-4 space-y-2">
             <div className="flex gap-3 mb-4 flex-wrap items-end">
               <div className="min-w-44">
@@ -1102,6 +1552,44 @@ export function VistaTrabajo({
                 </Btn>
               ))}
             </div>
+            {esAyuntamientoTab && (
+              <div className="flex gap-2 flex-wrap">
+                {([
+                  { key: 'todos', label: 'Todos' },
+                  { key: 'sin_tft', label: '❌ Sin TFT' },
+                  { key: 'con_tft', label: '✅ Con TFT' },
+                ] as const).map(({ key, label }) => (
+                  <Btn
+                    key={key}
+                    size="sm"
+                    variant={filtroTft === key ? 'primary' : 'ghost'}
+                    onClick={() => setFiltroTft(key)}
+                  >
+                    {label}
+                  </Btn>
+                ))}
+              </div>
+            )}
+            {esAyuntamientoTab && (
+              <div className="flex gap-2 flex-wrap pt-1 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest self-center">📄 Reportes PDF:</span>
+                {([
+                  { filtro: 'sin_tft'          as FiltroAyuntamiento, label: 'Sin TFT' },
+                  { filtro: 'con_tft_sin_pago' as FiltroAyuntamiento, label: 'Con TFT sin pago' },
+                  { filtro: 'facturadas'       as FiltroAyuntamiento, label: 'Facturadas' },
+                  { filtro: 'todos'            as FiltroAyuntamiento, label: 'Todos' },
+                ]).map(({ filtro, label }) => (
+                  <button
+                    key={filtro}
+                    type="button"
+                    onClick={() => generarPDFAyuntamiento(trabajos, vehiculos, filtro)}
+                    className="text-xs font-semibold text-slate-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1"
+                  >
+                    📄 {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1109,16 +1597,26 @@ export function VistaTrabajo({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-800 text-white">
-                {['Fecha','Estado','Cliente','Unidad','Placas','Km','Descripción','Refacciones','Mano de Obra','Total',''].map((h, i) => (
-                  <th key={i} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 7 && i <= 9 ? 'text-right' : 'text-left'}`}>{h}</th>
-                ))}
+                {[
+                  'Fecha', 'Estado', 'Cliente', 'Unidad', 'Placas', 'Km',
+                  ...(esAyuntamientoTab ? ['Depto', 'Inv.'] : []),
+                  'Descripción', 'Refacciones', 'Mano de Obra', 'Total',
+                  ...(esAyuntamientoTab ? ['TFT'] : []),
+                  '',
+                ].map((h, i) => {
+                  const alignRight = (!esAyuntamientoTab && i >= 7 && i <= 9) || (esAyuntamientoTab && i >= 9 && i <= 11);
+                  return (
+                    <th key={i} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${alignRight ? 'text-right' : 'text-left'}`}>{h}</th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {trabajosFiltrados.map((trabajo, i) => {
-                const cliente  = getCliente(trabajo.clienteId);
+                const cliente = getCliente(trabajo.clienteId);
                 const vehiculo = getVehiculo(trabajo.vehiculoId);
                 const isPendiente = trabajo.estado === 'pendiente';
+                const tftEstado = trabajo.tftEstado ?? 'sin_tft';
                 const badgeEstado = trabajo.tipoDocumento === 'factura'
                   ? <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">🧾 Factura</span>
                   : trabajo.tipoDocumento === 'nota'
@@ -1133,22 +1631,25 @@ export function VistaTrabajo({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">{badgeEstado}</td>
                     <td className="px-4 py-3 text-slate-800 font-medium">{cliente?.nombre ?? '—'}</td>
-                    {/* Unidad */}
                     <td className="px-4 py-3 text-slate-700 font-medium whitespace-nowrap">
                       {vehiculo ? [vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ') : <span className="text-slate-400">—</span>}
                     </td>
-                    {/* Placas */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       {vehiculo?.placa
                         ? <span className="text-xs bg-slate-200 text-slate-700 font-mono font-semibold px-2 py-0.5 rounded">{vehiculo.placa}</span>
                         : <span className="text-slate-300">—</span>}
                     </td>
-                    {/* Km */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       {trabajo.kilometraje != null
                         ? <span className="text-xs font-semibold text-slate-700">{trabajo.kilometraje.toLocaleString('es-MX')} km</span>
                         : <span className="text-slate-300">—</span>}
                     </td>
+                    {esAyuntamientoTab && (
+                      <>
+                        <td className="px-4 py-3 text-slate-700">{trabajo.departamento ?? <span className="text-slate-300">—</span>}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-slate-700">{trabajo.inventarioNum ?? <span className="text-slate-300">—</span>}</td>
+                      </>
+                    )}
                     <td className="px-4 py-3 text-slate-700">
                       {trabajo.descripcion}
                       {trabajo.partes?.length > 0 && (
@@ -1188,12 +1689,55 @@ export function VistaTrabajo({
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-slate-900">${fmt(trabajo.total)}</td>
+                    {esAyuntamientoTab && (
+                      <td className="px-4 py-3 align-top">
+                        {tftEstado === 'con_tft' ? (
+                          <span className="inline-flex items-center text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+                            ✅ TFT-{trabajo.tftNumero}
+                          </span>
+                        ) : (
+                          <div className="space-y-2 min-w-36">
+                            <span className="inline-flex items-center text-xs bg-rose-100 text-rose-700 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+                              ❌ SIN TFT
+                            </span>
+                            {!isPendiente && (
+                              capturandoTftId === trabajo.id ? (
+                                <div className="space-y-2">
+                                  <Input
+                                    type="text"
+                                    placeholder="Número TFT"
+                                    value={tftNumeroDraft}
+                                    onChange={e => setTftNumeroDraft(e.target.value)}
+                                  />
+                                  <div className="flex gap-1">
+                                    <Btn size="sm" variant="primary" onClick={() => guardarTft(trabajo.id)} disabled={!tftNumeroDraft.trim()}>
+                                      Guardar
+                                    </Btn>
+                                    <Btn size="sm" variant="ghost" onClick={() => { setCapturandoTftId(null); setTftNumeroDraft(''); }}>
+                                      Cancelar
+                                    </Btn>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => { setCapturandoTftId(trabajo.id); setTftNumeroDraft(''); }}
+                                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                                >
+                                  + Registrar TFT
+                                </button>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-center">
                       <div className="flex flex-col gap-1 items-center">
                         {isPendiente && (
                           <button
                             type="button"
-                            onClick={() => setFinalizandoId(trabajo.id)}
+                            onClick={() => finalizarDesdeFila(trabajo)}
                             className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap shadow-sm"
                           >
                             🏁 Finalizar
@@ -1232,21 +1776,21 @@ export function VistaTrabajo({
                   </tr>
                 );
               })}
-              {trabajosFiltrados.length === 0 && <EmptyRow cols={11} message={filtroClienteId || filtroVehiculoId || filtroEstado !== 'todos' || filtroFacturacion !== 'todos' ? 'No se encontraron resultados.' : 'Sin trabajos registrados. Agrega el primero arriba.'} />}
+              {trabajosFiltrados.length === 0 && <EmptyRow cols={esAyuntamientoTab ? 14 : 11} message={filtroClienteId || filtroVehiculoId || filtroEstado !== 'todos' || filtroFacturacion !== 'todos' || (esAyuntamientoTab && filtroTft !== 'todos') ? 'No se encontraron resultados.' : 'Sin trabajos registrados. Agrega el primero arriba.'} />}
             </tbody>
           </table>
         </div>
 
         {/* ── Trabajos cancelados ── */}
-        {trabajosCancelados.length > 0 && (
+        {trabajosCanceladosDelTab.length > 0 && (
           <div className="mt-3">
             <button type="button" onClick={() => setVerCancelados(v => !v)}
               className="text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors">
-              {verCancelados ? '▲ Ocultar' : '▼ Ver'} cancelados ({trabajosCancelados.length})
+              {verCancelados ? '▲ Ocultar' : '▼ Ver'} cancelados ({trabajosCanceladosDelTab.length})
             </button>
             {verCancelados && (
               <div className="mt-2 space-y-1">
-                {trabajosCancelados.map(t => {
+                {trabajosCanceladosDelTab.map(t => {
                   const cl = clientes.find(c => c.id === t.clienteId);
                   const vh = vehiculos.find(v => v.id === t.vehiculoId);
                   return (
