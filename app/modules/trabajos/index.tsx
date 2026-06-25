@@ -425,6 +425,9 @@ export function VistaTrabajo({
   const subtotalSinIVA        = totalManoDeObra + totalVentaRefacciones;
   const esAyuntamientoTab = subTab === 'ayuntamiento';
 
+  // Auto-detect Ayuntamiento client (case-insensitive match on name containing "ayuntamiento")
+  const clienteAyuntamiento = clientes.find(c => c.nombre.toLowerCase().includes('ayuntamiento'));
+
   const handleClienteChange = (clienteId: string) =>
     setForm(f => ({ ...f, clienteId, vehiculoId: '' }));
 
@@ -729,7 +732,7 @@ export function VistaTrabajo({
         </button>
         <button
           type="button"
-          onClick={() => { setSubTab('ayuntamiento'); setFiltroTft('todos'); resetForm(); }}
+          onClick={() => { setSubTab('ayuntamiento'); setFiltroTft('todos'); resetForm(); if (clienteAyuntamiento) { setForm(f => ({ ...f, clienteId: clienteAyuntamiento.id })); } }}
           className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
             subTab === 'ayuntamiento' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
           }`}
@@ -858,13 +861,24 @@ export function VistaTrabajo({
 
           {/* ① Cliente + ② Unidad */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>① Cliente</Label>
-              <Select value={form.clienteId} onChange={e => handleClienteChange(e.target.value)} required>
-                <option value="">Seleccionar cliente...</option>
-                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-              </Select>
-            </div>
+            {esAyuntamientoTab ? (
+              <div>
+                <Label>① Cliente</Label>
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700">
+                  <span>🏛️</span>
+                  <span>{clienteAyuntamiento?.nombre ?? 'Ayuntamiento de Mérida'}</span>
+                  <span className="ml-auto text-xs text-slate-400 font-normal">🔒 Fijo</span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Label>① Cliente</Label>
+                <Select value={form.clienteId} onChange={e => handleClienteChange(e.target.value)} required>
+                  <option value="">Seleccionar cliente...</option>
+                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </Select>
+              </div>
+            )}
             <div>
               <Label>② Unidad / Vehículo</Label>
               <Select value={form.vehiculoId} onChange={e => setForm(f => ({ ...f, vehiculoId: e.target.value }))}
@@ -879,6 +893,13 @@ export function VistaTrabajo({
             <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
               <span>⚠️</span>
               <span>Este cliente no tiene unidades. Ve a <span className="font-bold">👥 Clientes</span> para registrar una primero.</span>
+            </div>
+          )}
+
+          {esAyuntamientoTab && !clienteAyuntamiento && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800">
+              <span>⚠️</span>
+              <span>No se encontró un cliente con nombre &quot;Ayuntamiento&quot;. Ve a <span className="font-bold">👥 Clientes</span> y crea un cliente llamado <span className="font-bold">&quot;Ayuntamiento de Mérida&quot;</span> primero.</span>
             </div>
           )}
 
