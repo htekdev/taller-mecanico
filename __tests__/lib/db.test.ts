@@ -15,6 +15,7 @@ import {
   getTrabajos, insertTrabajo, updateTrabajoPagos, updateTrabajoFactura,
   getOrdenes, updateOrdenEstado, updateOrdenPagos,
   getFacturas, updateFacturaPagos,
+  cancelarFactura, reactivarFactura, cancelarNota, reactivarNota,
   getMembers, getInvites, sendInvite, cancelInvite, redeemInvite,
 } from '@/app/lib/db';
 
@@ -704,5 +705,69 @@ describe('redeemInvite', () => {
     const result = await redeemInvite('UPPER@EXAMPLE.COM', 'u5');
     expect(result).toBeNull();
     expect(mockFrom).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── cancelarFactura / reactivarFactura ───────────────────────────────────────
+
+describe('cancelarFactura', () => {
+  it('sets notas=CANCELADA on facturas table', async () => {
+    const { update, eq } = mockUpdateChain();
+    await cancelarFactura('f1');
+    expect(mockFrom).toHaveBeenCalledWith('facturas');
+    expect(update).toHaveBeenCalledWith({ notas: 'CANCELADA' });
+    expect(eq).toHaveBeenCalledWith('id', 'f1');
+  });
+
+  it('resolves without error', async () => {
+    mockUpdateChain();
+    await expect(cancelarFactura('f2')).resolves.toBeUndefined();
+  });
+});
+
+describe('reactivarFactura', () => {
+  it('sets notas=null on facturas table', async () => {
+    const { update, eq } = mockUpdateChain();
+    await reactivarFactura('f1');
+    expect(mockFrom).toHaveBeenCalledWith('facturas');
+    expect(update).toHaveBeenCalledWith({ notas: null });
+    expect(eq).toHaveBeenCalledWith('id', 'f1');
+  });
+
+  it('resolves without error', async () => {
+    mockUpdateChain();
+    await expect(reactivarFactura('f2')).resolves.toBeUndefined();
+  });
+});
+
+// ── cancelarNota / reactivarNota ─────────────────────────────────────────────
+
+describe('cancelarNota', () => {
+  it('sets folio_fiscal=__CANCELADA__ on trabajos table', async () => {
+    const { update, eq } = mockUpdateChain();
+    await cancelarNota('t1');
+    expect(mockFrom).toHaveBeenCalledWith('trabajos');
+    expect(update).toHaveBeenCalledWith({ folio_fiscal: '__CANCELADA__' });
+    expect(eq).toHaveBeenCalledWith('id', 't1');
+  });
+
+  it('resolves without error', async () => {
+    mockUpdateChain();
+    await expect(cancelarNota('t2')).resolves.toBeUndefined();
+  });
+});
+
+describe('reactivarNota', () => {
+  it('sets folio_fiscal=null on trabajos table', async () => {
+    const { update, eq } = mockUpdateChain();
+    await reactivarNota('t1');
+    expect(mockFrom).toHaveBeenCalledWith('trabajos');
+    expect(update).toHaveBeenCalledWith({ folio_fiscal: null });
+    expect(eq).toHaveBeenCalledWith('id', 't1');
+  });
+
+  it('resolves without error', async () => {
+    mockUpdateChain();
+    await expect(reactivarNota('t2')).resolves.toBeUndefined();
   });
 });
