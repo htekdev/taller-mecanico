@@ -11,18 +11,22 @@ export function VistaFacturas({
   vehiculos,
   trabajos,
   onRegistrarPago,
+  onEditarFechaFactura,
 }: {
   facturas: Factura[];
   clientes: Cliente[];
   vehiculos: Vehiculo[];
   trabajos: Trabajo[];
   onRegistrarPago: (facturaId: string, pago: Omit<PagoFactura, 'id'>) => void;
+  onEditarFechaFactura: (facturaId: string, fecha: string) => void;
 }) {
   const hoy = new Date().toISOString().split('T')[0];
   const [expandido, setExpandido] = useState<string | null>(null);
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
   const [filtroClienteId, setFiltroClienteId] = useState('');
+  const [editandoFechaId, setEditandoFechaId] = useState<string | null>(null);
+  const [nuevaFecha, setNuevaFecha] = useState('');
 
   const facturasFiltradas = [...facturas]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
@@ -167,6 +171,51 @@ export function VistaFacturas({
                           </tfoot>
                         </table>
                       </div>
+                    </div>
+
+                    {/* Editar fecha de factura */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Fecha de Factura</p>
+                        {editandoFechaId !== factura.id && (
+                          <button
+                            type="button"
+                            onClick={() => { setEditandoFechaId(factura.id); setNuevaFecha(factura.fecha); }}
+                            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                          >
+                            ✏️ Cambiar fecha
+                          </button>
+                        )}
+                      </div>
+                      {editandoFechaId === factura.id ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="date"
+                            value={nuevaFecha}
+                            onChange={e => setNuevaFecha(e.target.value)}
+                            className="border border-indigo-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <button
+                            type="button"
+                            disabled={!nuevaFecha}
+                            onClick={() => { onEditarFechaFactura(factura.id, nuevaFecha); setEditandoFechaId(null); }}
+                            className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                          >
+                            ✓ Guardar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditandoFechaId(null)}
+                            className="px-3 py-2 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-700 font-medium">
+                          {new Date(factura.fecha + 'T00:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                      )}
                     </div>
 
                     {/* Pagos historial */}

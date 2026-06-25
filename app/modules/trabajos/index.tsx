@@ -301,6 +301,7 @@ export function VistaTrabajo({
     e.preventDefault();
     if (!form.clienteId || !form.vehiculoId || !form.descripcion) return;
     const kmVal = typeof form.kilometraje === 'string' ? (form.kilometraje.trim() !== '' ? Number(form.kilometraje) : undefined) : (form.kilometraje || undefined);
+    const trabajoExistente = editandoId ? trabajos.find(t => t.id === editandoId) : null;
     const trabajoData = {
       ...form,
       numeroOrden: form.numeroOrden?.trim() || undefined,
@@ -309,10 +310,11 @@ export function VistaTrabajo({
       manoDeObraItems: laborItems,
       refacciones: totalVentaRefacciones,
       costoRefacciones: totalCostoRefacciones,
-      requiereFactura: false,
+      // Preserve requiereFactura for completed jobs so IVA is recalculated correctly
+      requiereFactura: trabajoExistente?.estado === 'completado' ? (trabajoExistente.requiereFactura ?? false) : false,
       folioFiscal: undefined,
       partes: partesSeleccionadas,
-      pagos: editandoId ? (trabajos.find(t => t.id === editandoId)?.pagos ?? []) : [],
+      pagos: editandoId ? (trabajoExistente?.pagos ?? []) : [],
     };
     if (editandoId) {
       onEditar(editandoId, trabajoData);
@@ -402,11 +404,17 @@ export function VistaTrabajo({
             </button>
           )}
         </div>
-        {editandoId && (
-          <div className="mb-4 px-3 py-2 bg-amber-100 border border-amber-300 rounded-lg text-xs font-medium text-amber-800">
-            ✏️ Editando trabajo del {new Date(form.fecha + 'T00:00:00').toLocaleDateString('es-MX')}
-          </div>
-        )}
+        {editandoId && (() => {
+          const trabajoEditando = trabajos.find(t => t.id === editandoId);
+          const esCompletado = trabajoEditando?.estado === 'completado';
+          return (
+            <div className={`mb-4 px-3 py-2 border rounded-lg text-xs font-medium ${esCompletado ? 'bg-indigo-50 border-indigo-300 text-indigo-800' : 'bg-amber-100 border-amber-300 text-amber-800'}`}>
+              {esCompletado
+                ? '✏️ Editando trabajo terminado — puedes agregar costos. El estado y tipo de cobro se conservan.'
+                : `✏️ Editando trabajo del ${new Date(form.fecha + 'T00:00:00').toLocaleDateString('es-MX')}`}
+            </div>
+          );
+        })()}
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* ① Cliente + ② Unidad */}
@@ -1171,15 +1179,13 @@ export function VistaTrabajo({
                             🏁 Finalizar
                           </button>
                         )}
-                        {isPendiente && (
-                          <button
-                            type="button"
-                            onClick={() => iniciarEdicion(trabajo)}
-                            className="text-xs font-semibold bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
-                          >
-                            ✏️ Editar
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => iniciarEdicion(trabajo)}
+                          className="text-xs font-semibold bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          ✏️ Editar
+                        </button>
                       </div>
                     </td>
                   </tr>

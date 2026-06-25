@@ -510,6 +510,10 @@ export async function updateFacturaPagos(facturaId: string, pagos: PagoFactura[]
   await supabase.from('facturas').update({ pagos }).eq('id', facturaId);
 }
 
+export async function updateFacturaFecha(facturaId: string, fecha: string): Promise<void> {
+  await supabase.from('facturas').update({ fecha }).eq('id', facturaId);
+}
+
 // ── Taller Members ────────────────────────────────────────────
 
 export interface TallerMember {
