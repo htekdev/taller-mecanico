@@ -231,33 +231,64 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
 }
 
 export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>): Promise<Trabajo | null> {
+  const basePayload = {
+    taller_id: tallerId,
+    cliente_id: data.clienteId || null,
+    vehiculo_id: data.vehiculoId || null,
+    fecha: data.fecha,
+    descripcion: data.descripcion,
+    mano_de_obra: data.manoDeObra,
+    mano_de_obra_items: data.manoDeObraItems,
+    refacciones_total: data.refacciones,
+    costo_refacciones: data.costoRefacciones,
+    requiere_factura: data.requiereFactura,
+    folio_fiscal: data.folioFiscal ?? null,
+    iva: data.iva,
+    total: data.total,
+    partes: data.partes,
+    pagos: data.pagos,
+    factura_id: data.facturaId ?? null,
+    estado_facturacion: data.estadoFacturacion,
+    estado: data.estado,
+  };
+
+  // First attempt: with kilometraje (requires migration 20260624_add_kilometraje_to_trabajos)
+  const withKm = data.kilometraje !== undefined
+    ? { ...basePayload, kilometraje: data.kilometraje }
+    : basePayload;
+
   const { data: row, error } = await supabase
     .from('trabajos')
-    .insert({
-      taller_id: tallerId,
-      cliente_id: data.clienteId || null,
-      vehiculo_id: data.vehiculoId || null,
-      fecha: data.fecha,
-      descripcion: data.descripcion,
-      // Only include kilometraje if it has a value — omitting it lets the DB
-      // column default to NULL, and avoids "column not found" on older branches
-      ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
-      mano_de_obra: data.manoDeObra,
-      mano_de_obra_items: data.manoDeObraItems,
-      refacciones_total: data.refacciones,
-      costo_refacciones: data.costoRefacciones,
-      requiere_factura: data.requiereFactura,
-      folio_fiscal: data.folioFiscal ?? null,
-      iva: data.iva,
-      total: data.total,
-      partes: data.partes,
-      pagos: data.pagos,
-      factura_id: data.facturaId ?? null,
-      estado_facturacion: data.estadoFacturacion,
-      estado: data.estado,
-    })
+    .insert(withKm)
     .select()
     .single();
+
+  // If kilometraje column is missing (migration not yet applied), retry without it
+  if (error && error.message?.includes('kilometraje')) {
+    console.warn('[insertTrabajo] kilometraje column not found — retrying without it. Run migration 20260624_add_kilometraje_to_trabajos.sql');
+    const { data: fallbackRow, error: fallbackError } = await supabase
+      .from('trabajos')
+      .insert(basePayload)
+      .select()
+      .single();
+
+    if (fallbackError || !fallbackRow) {
+      const msg = fallbackError?.message ?? fallbackError?.details ?? 'Unknown Supabase error';
+      console.error('[insertTrabajo] FAILED (fallback):', msg, fallbackError);
+      throw new Error(`insertTrabajo: ${msg}`);
+    }
+    return {
+      id: fallbackRow.id, clienteId: fallbackRow.cliente_id ?? '', vehiculoId: fallbackRow.vehiculo_id ?? '',
+      fecha: fallbackRow.fecha, descripcion: fallbackRow.descripcion,
+      kilometraje: undefined, // column doesn't exist yet
+      manoDeObra: Number(fallbackRow.mano_de_obra),
+      manoDeObraItems: (fallbackRow.mano_de_obra_items as ManoDeObraItem[]) ?? [],
+      refacciones: Number(fallbackRow.refacciones_total), costoRefacciones: Number(fallbackRow.costo_refacciones),
+      requiereFactura: fallbackRow.requiere_factura, iva: Number(fallbackRow.iva), total: Number(fallbackRow.total),
+      partes: (fallbackRow.partes as TrabajoRefaccion[]) ?? [], pagos: (fallbackRow.pagos as Pago[]) ?? [],
+      estadoFacturacion: fallbackRow.estado_facturacion, estado: fallbackRow.estado,
+    };
+  }
 
   if (error || !row) {
     const msg = error?.message ?? error?.details ?? 'Unknown Supabase error';
