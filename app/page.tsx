@@ -728,11 +728,22 @@ export default function TallerMecanico() {
               type="text"
               autoFocus
               value={pendingFactura.numero}
-              onChange={e => setPendingFactura(prev => prev ? { ...prev, numero: e.target.value } : null)}
+              onChange={e => {
+                const num = e.target.value;
+                // Auto-detect IVA from prefix: "SF" = sin factura (no IVA), "A" = factura fiscal (con IVA)
+                const upperNum = num.trim().toUpperCase();
+                let incluirIva = pendingFactura.incluirIva;
+                if (upperNum.startsWith('SF')) incluirIva = false;
+                else if (upperNum.startsWith('A')) incluirIva = true;
+                setPendingFactura(prev => prev ? { ...prev, numero: num, incluirIva } : null);
+              }}
               onKeyDown={e => { if (e.key === 'Enter') confirmarFactura(); if (e.key === 'Escape') setPendingFactura(null); }}
-              placeholder="Ej. FAC-2026-001 o F-001"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
+              placeholder="A-001 = con IVA · SF-001 = sin IVA"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-1"
             />
+            <p className="text-xs text-slate-400 mb-4">
+              💡 El IVA se ajusta automáticamente según el prefijo: <span className="font-mono font-semibold">A</span> = con IVA · <span className="font-mono font-semibold">SF</span> = sin IVA
+            </p>
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
               Fecha de factura
             </label>
