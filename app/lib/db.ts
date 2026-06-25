@@ -460,6 +460,23 @@ export async function updateOrdenPagos(ordenId: string, pagos: PagoCompra[]): Pr
   await supabase.from('ordenes_compra').update({ pagos }).eq('id', ordenId);
 }
 
+/** Edit a pending purchase order — updates items, description, and totals.
+ *  Only safe to call when orden.estado === 'pendiente'. */
+export async function updateOrden(
+  ordenId: string,
+  data: Pick<OrdenCompra, 'descripcion' | 'numeroOrden' | 'partes' | 'subtotalSinIVA' | 'ivaAmount' | 'total' | 'conIVA'>,
+): Promise<void> {
+  await supabase.from('ordenes_compra').update({
+    descripcion: data.descripcion,
+    numero_orden: data.numeroOrden ?? null,
+    partes: data.partes,
+    subtotal_sin_iva: data.subtotalSinIVA,
+    iva_amount: data.ivaAmount,
+    total: data.total,
+    con_iva: data.conIVA,
+  }).eq('id', ordenId);
+}
+
 // ── Facturas ──────────────────────────────────────────────────
 
 export async function getFacturas(tallerId: string): Promise<Factura[]> {

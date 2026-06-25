@@ -313,6 +313,14 @@ export default function TallerMecanico() {
     await db.updateOrdenEstado(ordenId, 'cancelada');
     setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'cancelada' as const } : o));
   };
+
+  const editarOrden = async (
+    ordenId: string,
+    data: Pick<OrdenCompra, 'descripcion' | 'numeroOrden' | 'partes' | 'subtotalSinIVA' | 'ivaAmount' | 'total' | 'conIVA'>,
+  ) => {
+    await db.updateOrden(ordenId, data);
+    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, ...data } : o));
+  };
   const registrarPagoOrden = async (ordenId: string, pago: Omit<PagoCompra, 'id'>) => {
     const ordenActual = ordenes.find(o => o.id === ordenId);
     if (!ordenActual) return;
@@ -688,6 +696,7 @@ export default function TallerMecanico() {
           {vista === 'ordenes' && (
             <VistaOrdenesCompra ordenes={ordenes} proveedores={proveedores} inventario={inventario}
               onCrearOrden={crearOrden} onRecibirOrden={recibirOrden} onCancelarOrden={cancelarOrden}
+              onEditarOrden={editarOrden}
               onIrAProveedores={() => setVista('proveedores')}
               onCrearRefaccionNueva={crearRefaccionDesdeOrden} />
           )}
