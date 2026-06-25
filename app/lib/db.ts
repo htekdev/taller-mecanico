@@ -211,7 +211,8 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
     vehiculoId: r.vehiculo_id ?? '',
     fecha: r.fecha,
     descripcion: r.descripcion,
-    kilometraje: r.kilometraje ?? undefined,
+    // Production DB may have 'km' or 'kilometraje' depending on which migration was applied
+    kilometraje: r.km ?? r.kilometraje ?? undefined,
     manoDeObra: Number(r.mano_de_obra),
     manoDeObraItems: (r.mano_de_obra_items as ManoDeObraItem[]) ?? [],
     refacciones: Number(r.refacciones_total),
@@ -252,30 +253,44 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
     estado: data.estado,
   };
 
-  // Include kilometraje when provided — requires migration:
-  //   ALTER TABLE trabajos ADD COLUMN IF NOT EXISTS kilometraje INTEGER;
-  // If the column doesn't exist yet, we fall back to insert without it so jobs
-  // always save successfully. Once the migration is applied, km will persist.
-  const payload = data.kilometraje !== undefined
-    ? { ...basePayload, kilometraje: data.kilometraje }
-    : basePayload;
+  // Try inserting km value. Production DB may have column named 'km' or 'kilometraje'.
+  // We try 'km' first (Sofia confirmed this is what shows in the history table),
+  // then fall back to 'kilometraje' (schema.sql name), then without any km column.
+  const kmValue = data.kilometraje;
 
+  // Attempt 1: with 'km' column (production may have this name)
+  if (kmValue !== undefined) {
+    const { data: row1, error: err1 } = await supabase
+      .from('trabajos').insert({ ...basePayload, km: kmValue }).select().single();
+    if (!err1 && row1) return mapTrabajo(row1, (row1.km ?? row1.kilometraje) as number | undefined);
+
+    const err1Msg = err1?.message ?? '';
+    // Attempt 2: with 'kilometraje' column (schema.sql name)
+    if (err1Msg.includes('km') || err1Msg.includes('kilometraje')) {
+      const { data: row2, error: err2 } = await supabase
+        .from('trabajos').insert({ ...basePayload, kilometraje: kmValue }).select().single();
+      if (!err2 && row2) return mapTrabajo(row2, (row2.kilometraje ?? row2.km) as number | undefined);
+
+      const err2Msg = err2?.message ?? '';
+      // Attempt 3: without any km column — job must save even if km can't persist
+      if (err2Msg.includes('km') || err2Msg.includes('kilometraje')) {
+        console.warn('[insertTrabajo] Neither km nor kilometraje column found — saving without km. Run DB migration.');
+        const { data: row3, error: err3 } = await supabase
+          .from('trabajos').insert(basePayload).select().single();
+        if (err3 || !row3) throw new Error(`insertTrabajo: ${err3?.message ?? 'Unknown error'}`);
+        return mapTrabajo(row3, undefined);
+      }
+      throw new Error(`insertTrabajo: ${err2Msg || 'Unknown error'}`);
+    }
+    throw new Error(`insertTrabajo: ${err1Msg || 'Unknown error'}`);
+  }
+
+  // No km value provided — straightforward insert
   const { data: row, error } = await supabase
     .from('trabajos')
-    .insert(payload)
+    .insert(basePayload)
     .select()
     .single();
-
-  // Fallback: if kilometraje column is missing in production, retry without it
-  if (error && error.message?.includes('kilometraje')) {
-    console.warn('[insertTrabajo] kilometraje column not in DB — retrying without it. Apply migration 20260624_add_kilometraje_to_trabajos.sql');
-    const { data: fbRow, error: fbErr } = await supabase
-      .from('trabajos').insert(basePayload).select().single();
-    if (fbErr || !fbRow) {
-      throw new Error(`insertTrabajo: ${fbErr?.message ?? 'Unknown error'}`);
-    }
-    return mapTrabajo(fbRow, undefined);
-  }
 
   if (error || !row) {
     throw new Error(`insertTrabajo: ${error?.message ?? error?.details ?? 'Unknown Supabase error'}`);
@@ -290,7 +305,8 @@ function mapTrabajo(row: Record<string, unknown>, km: number | undefined): Traba
     vehiculoId: (row.vehiculo_id as string) ?? '',
     fecha: row.fecha as string,
     descripcion: row.descripcion as string,
-    kilometraje: km,
+    // Support both column names: 'km' and 'kilometraje'
+    kilometraje: km ?? (row.km as number | undefined) ?? (row.kilometraje as number | undefined),
     manoDeObra: Number(row.mano_de_obra),
     manoDeObraItems: (row.mano_de_obra_items as ManoDeObraItem[]) ?? [],
     refacciones: Number(row.refacciones_total),

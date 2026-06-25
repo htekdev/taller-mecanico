@@ -383,7 +383,8 @@ describe('insertTrabajo', () => {
     expect(result?.id).toBe('tj2');
     expect(result?.kilometraje).toBe(85000);
     const payload = (insert as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(payload).toHaveProperty('kilometraje', 85000);
+    // First attempt uses 'km' column name (production may have this)
+    expect(payload).toHaveProperty('km', 85000);
   });
 });
 
