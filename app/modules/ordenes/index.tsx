@@ -187,10 +187,10 @@ function ModalEditarOrden({
   );
 }
 
-// Categor├¡as comunes de refacciones para el selector r├ípido
+// Categorías comunes de refacciones para el selector rápido
 const CATEGORIAS_COMUNES = [
-  'Filtros', 'Frenos', 'Suspensi├│n', 'Motor', 'Transmisi├│n',
-  'El├⌐ctrico', 'Escape', 'Enfriamiento', 'Lubricantes', 'Otro',
+  'Filtros', 'Frenos', 'Suspensión', 'Motor', 'Transmisión',
+  'Eléctrico', 'Escape', 'Enfriamiento', 'Lubricantes', 'Otro',
 ];
 
 export function VistaOrdenesCompra({
@@ -274,7 +274,7 @@ export function VistaOrdenesCompra({
     ));
   };
 
-  // ΓöÇΓöÇ Agregar pieza existente ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Agregar pieza existente ───────────────────────────────────────────────
   const agregarItem = () => {
     if (!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0) return;
     const ref = inventario.find(r => r.id === pickerRefId);
@@ -287,7 +287,7 @@ export function VistaOrdenesCompra({
     setPickerRefId(''); setPickerCantidad(1); setPickerPrecio(0);
   };
 
-  // ΓöÇΓöÇ Agregar nueva refacci├│n al cat├ílogo + orden ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Agregar nueva refacción al catálogo + orden ───────────────────────────
   const agregarRefaccionNueva = async () => {
     if (!newNombre.trim() || newPrecio <= 0 || newCantidad <= 0) return;
     const categoriaFinal = newCategoria === '__custom__' ? newCategoriaCustom.trim() : newCategoria;
@@ -297,7 +297,7 @@ export function VistaOrdenesCompra({
       categoria:    categoriaFinal,
       unidad:       newUnidad || 'pza',
       precioCompra: newPrecio,
-      stock:        0,          // stock arranca en 0 ΓÇö sube al recibir OC
+      stock:        0,          // stock arranca en 0 — sube al recibir OC
       stockMinimo:  1,
     });
     if (!nuevaRef) return;
@@ -312,7 +312,7 @@ export function VistaOrdenesCompra({
         compatibilidad: [],
       },
     ]);
-    // Limpiar form nueva refacci├│n
+    // Limpiar form nueva refacción
     setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
     setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
   };
@@ -391,7 +391,7 @@ export function VistaOrdenesCompra({
 
       {pendientesRecibir > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-5 flex items-center gap-3 text-sm">
-          <span className="text-amber-600 font-semibold">ΓÅ│ {pendientesRecibir} orden{pendientesRecibir !== 1 ? 'es' : ''} pendiente{pendientesRecibir !== 1 ? 's' : ''} de recibir</span>
+          <span className="text-amber-600 font-semibold">⚠️ {pendientesRecibir} orden{pendientesRecibir !== 1 ? 'es' : ''} pendiente{pendientesRecibir !== 1 ? 's' : ''} de recibir</span>
         </div>
       )}
 
@@ -401,7 +401,7 @@ export function VistaOrdenesCompra({
         {proveedores.length === 0 ? (
           <div className="text-center py-4 text-sm text-slate-400">
             <p>Registra un proveedor primero.</p>
-            <button type="button" onClick={onIrAProveedores} className="mt-1 text-indigo-600 font-semibold hover:underline">Ir a Proveedores ΓåÆ</button>
+            <button type="button" onClick={onIrAProveedores} className="mt-1 text-indigo-600 font-semibold hover:underline">Ir a Proveedores →</button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -416,39 +416,39 @@ export function VistaOrdenesCompra({
               <div><Label>N┬║ Orden (opcional)</Label>
                 <Input type="text" placeholder="Ej. OC-2026-001" value={formNumOrden} onChange={e => setFormNumOrden(e.target.value)} className="font-mono" /></div>
             </div>
-            <div><Label>Descripci├│n (opcional)</Label>
-              <Input type="text" placeholder="Ej. Reposici├│n mensual filtros" value={formDesc} onChange={e => setFormDesc(e.target.value)} /></div>
+            <div><Label>Descripción (opcional)</Label>
+              <Input type="text" placeholder="Ej. Reposición mensual filtros" value={formDesc} onChange={e => setFormDesc(e.target.value)} /></div>
 
             <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
               <div className="px-4 py-3 bg-slate-700">
                 <span className="text-xs font-bold text-white uppercase tracking-widest">Piezas a Ordenar</span>
-                <span className="ml-3 text-slate-400 text-xs">El inventario aumentar├í cuando marques la OC como recibida</span>
+                <span className="ml-3 text-slate-400 text-xs">El inventario aumentará cuando marques la OC como recibida</span>
               </div>
               <div className="p-4 space-y-3">
 
-                {/* ΓöÇΓöÇ Toggle modo agregar ΓöÇΓöÇ */}
+                {/* ── Toggle modo agregar ── */}
                 <div className="flex gap-2 p-1 bg-slate-100 rounded-lg w-fit">
                   <button
                     type="button"
                     onClick={() => setModoAgregar('existente')}
                     className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${modoAgregar === 'existente' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                   >
-                    ≡ƒôª Del inventario
+                    📦 Del inventario
                   </button>
                   <button
                     type="button"
                     onClick={() => setModoAgregar('nueva')}
                     className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${modoAgregar === 'nueva' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                   >
-                    Γ£¿ Nueva refacci├│n
+                    ✨ Nueva refacción
                   </button>
                 </div>
 
-                {/* ΓöÇΓöÇ Modo: Pieza existente ΓöÇΓöÇ */}
+                {/* ── Modo: Pieza existente ── */}
                 {modoAgregar === 'existente' && (
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                      <div className="sm:col-span-2"><Label>Refacci├│n</Label>
+                      <div className="sm:col-span-2"><Label>Refacción</Label>
                         <Select value={pickerRefId} onChange={e => { setPickerRefId(e.target.value); const r = inventario.find(x => x.id === e.target.value); setPickerPrecio(r?.precioCompra ?? 0); }}>
                           <option value="">Seleccionar pieza...</option>
                           {inventario.map(r => <option key={r.id} value={r.id}>{r.nombre}{r.codigo ? ` (${r.codigo})` : ''}</option>)}
@@ -465,11 +465,11 @@ export function VistaOrdenesCompra({
                   </>
                 )}
 
-                {/* ΓöÇΓöÇ Modo: Nueva refacci├│n ΓöÇΓöÇ */}
+                {/* ── Modo: Nueva refacción ── */}
                 {modoAgregar === 'nueva' && (
                   <div className="border border-indigo-100 rounded-xl bg-indigo-50 p-4 space-y-3">
                     <p className="text-xs text-indigo-700 font-medium">
-                      ≡ƒÆí La refacci├│n se registrar├í autom├íticamente en el cat├ílogo de inventario. El stock comenzar├í en 0 y aumentar├í al marcar la OC como recibida.
+                      💡 La refacción se registrará automáticamente en el catálogo de inventario. El stock comenzará en 0 y aumentará al marcar la OC como recibida.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -477,20 +477,20 @@ export function VistaOrdenesCompra({
                         <Input type="text" placeholder="Ej. Filtro de aceite Bosch" value={newNombre} onChange={e => setNewNombre(e.target.value)} />
                       </div>
                       <div>
-                        <Label>C├│digo (opcional)</Label>
+                        <Label>Código (opcional)</Label>
                         <Input type="text" placeholder="Ej. 0986AF1036" value={newCodigo} onChange={e => setNewCodigo(e.target.value)} className="font-mono" />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
-                        <Label>Categor├¡a</Label>
+                        <Label>Categoría</Label>
                         <Select value={newCategoria} onChange={e => setNewCategoria(e.target.value)}>
-                          <option value="">Sin categor├¡a</option>
+                          <option value="">Sin categoría</option>
                           {CATEGORIAS_COMUNES.map(c => <option key={c} value={c}>{c}</option>)}
                           <option value="__custom__">Otra (escribir)...</option>
                         </Select>
                         {newCategoria === '__custom__' && (
-                          <Input type="text" placeholder="Ej. Direcci├│n hidr├íulica" value={newCategoriaCustom} onChange={e => setNewCategoriaCustom(e.target.value)} className="mt-2" />
+                          <Input type="text" placeholder="Ej. Dirección hidráulica" value={newCategoriaCustom} onChange={e => setNewCategoriaCustom(e.target.value)} className="mt-2" />
                         )}
                       </div>
                       <div>
