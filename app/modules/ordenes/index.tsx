@@ -413,7 +413,7 @@ export function VistaOrdenesCompra({
                 </Select></div>
               <div><Label>Fecha</Label>
                 <Input type="date" value={formFecha} onChange={e => setFormFecha(e.target.value)} required /></div>
-              <div><Label>N┬║ Orden (opcional)</Label>
+              <div><Label>Nº Orden (opcional)</Label>
                 <Input type="text" placeholder="Ej. OC-2026-001" value={formNumOrden} onChange={e => setFormNumOrden(e.target.value)} className="font-mono" /></div>
             </div>
             <div><Label>Descripción (opcional)</Label>
