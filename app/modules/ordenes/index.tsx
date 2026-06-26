@@ -108,8 +108,8 @@ function ModalEditarOrden({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8 overflow-y-auto" onClick={onCerrar}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 space-y-5" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/50 overflow-y-auto px-4 py-6" onClick={onCerrar}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto my-auto p-6 space-y-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-800">✏️ Editar Orden de Compra</h2>
