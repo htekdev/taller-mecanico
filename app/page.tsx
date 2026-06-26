@@ -90,8 +90,8 @@ export default function TallerMecanico() {
   };
   const guardarRefaccion = async (data: Omit<Refaccion, 'id'>) => {
     if (!taller) return;
-    const nuevo = await db.insertRefaccion(taller.id, data);
-    if (nuevo) setInventario(prev => [...prev, nuevo]);
+    const nuevo = await db.insertRefaccion(taller.id, data); // throws on error
+    setInventario(prev => [...prev, nuevo]);
   };
   const recibirStock = async (refaccionId: string, cantidad: number) => {
     const ref = inventario.find(r => r.id === refaccionId);
@@ -103,9 +103,13 @@ export default function TallerMecanico() {
   /** Creates a new refaccion from within a PO form — used by VistaOrdenesCompra */
   const crearRefaccionDesdeOrden = async (data: Omit<Refaccion, 'id'>): Promise<Refaccion | null> => {
     if (!taller) return null;
-    const nuevo = await db.insertRefaccion(taller.id, data);
-    if (nuevo) setInventario(prev => [...prev, nuevo]);
-    return nuevo;
+    try {
+      const nuevo = await db.insertRefaccion(taller.id, data);
+      setInventario(prev => [...prev, nuevo]);
+      return nuevo;
+    } catch {
+      return null;
+    }
   };
 
   /** Adds a refaccion + optional PO from cotización reconciliation */

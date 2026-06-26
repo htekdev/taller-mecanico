@@ -232,10 +232,11 @@ describe('getRefacciones', () => {
 // ── insertRefaccion ─────────────────────────────────────────────────────────
 
 describe('insertRefaccion', () => {
-  it('returns null on error', async () => {
+  it('throws on DB error', async () => {
     mockInsertChain(null, { message: 'error' });
-    const result = await insertRefaccion('t1', { nombre: 'Filtro', codigo: 'F001', categoria: 'Filtros', unidad: 'pza', precioCompra: 100, stock: 5, stockMinimo: 1 });
-    expect(result).toBeNull();
+    await expect(
+      insertRefaccion('t1', { nombre: 'Filtro', codigo: 'F001', categoria: 'Filtros', unidad: 'pza', precioCompra: 100, stock: 5, stockMinimo: 1 })
+    ).rejects.toThrow('insertRefaccion');
   });
 });
 

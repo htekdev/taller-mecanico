@@ -129,7 +129,7 @@ export async function getRefacciones(tallerId: string): Promise<Refaccion[]> {
   }));
 }
 
-export async function insertRefaccion(tallerId: string, data: Omit<Refaccion, 'id'>): Promise<Refaccion | null> {
+export async function insertRefaccion(tallerId: string, data: Omit<Refaccion, 'id'>): Promise<Refaccion> {
   const { data: row, error } = await supabase
     .from('refacciones')
     .insert({
@@ -137,14 +137,14 @@ export async function insertRefaccion(tallerId: string, data: Omit<Refaccion, 'i
       categoria: data.categoria, unidad: data.unidad,
       precio_compra: data.precioCompra, stock: data.stock,
       stock_minimo: data.stockMinimo,
-      vehiculo_id: data.vehiculoId ?? null,
-      proveedor_id: data.proveedorId ?? null,
+      vehiculo_id:  data.vehiculoId  || null,  // empty string → null for UUID column
+      proveedor_id: data.proveedorId || null,  // empty string → null for UUID column
       compatibilidad: data.compatibilidad ?? null,
     })
     .select()
     .single();
 
-  if (error || !row) return null;
+  if (error || !row) throw new Error(`insertRefaccion: ${error?.message ?? 'no row returned'}`);
   return {
     id: row.id, nombre: row.nombre, codigo: row.codigo, categoria: row.categoria,
     unidad: row.unidad, precioCompra: row.precio_compra,
