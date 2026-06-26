@@ -1133,9 +1133,10 @@ export function VistaCotizaciones({
         migrationDone.current = true;
         const legacy = readLegacyHistory();
         if (legacy.length > 0) {
-          // Migrate each legacy cotización to Supabase (ignore errors — best effort)
+          // Migrate each legacy cotización to Supabase — track success count
+          let successCount = 0;
           for (const entry of legacy) {
-            await db.insertCotizacion(tallerId, {
+            const result = await db.insertCotizacion(tallerId, {
               numeroCotizacion: entry.numeroCotizacion,
               plantilla:        entry.plantilla as CotizacionRow['plantilla'],
               cliente:          entry.cliente,
@@ -1146,20 +1147,26 @@ export function VistaCotizaciones({
               convertida:       entry.convertida ?? false,
               form:             entry.form as unknown as Record<string, unknown>,
             });
+            if (result) successCount++;
           }
-          // Update the counter to match the highest legacy number
-          const maxNum = legacy.reduce((m, e) => {
-            const n = parseInt(e.numeroCotizacion.replace('COT-', ''), 10);
-            return isNaN(n) ? m : Math.max(m, n);
-          }, 0);
-          if (maxNum > 0) {
-            await supabaseUpsertCounter(tallerId, maxNum);
+
+          // ONLY clear localStorage if ALL inserts succeeded.
+          // If Supabase inserts failed (e.g. table doesn't exist), keep localStorage intact.
+          if (successCount === legacy.length) {
+            // Update the counter to match the highest legacy number
+            const maxNum = legacy.reduce((m, e) => {
+              const n = parseInt(e.numeroCotizacion.replace('COT-', ''), 10);
+              return isNaN(n) ? m : Math.max(m, n);
+            }, 0);
+            if (maxNum > 0) {
+              await supabaseUpsertCounter(tallerId, maxNum);
+            }
+            // Mark migration done and clear legacy keys
+            localStorage.setItem(migratedKey, '1');
+            localStorage.removeItem(LS_COT_HISTORY_KEY);
+            localStorage.removeItem(LS_COT_COUNTER_KEY);
           }
-          // Mark migration done
-          localStorage.setItem(migratedKey, '1');
-          // Clear legacy keys so they don't take up space
-          localStorage.removeItem(LS_COT_HISTORY_KEY);
-          localStorage.removeItem(LS_COT_COUNTER_KEY);
+          // If inserts failed, DON'T mark as migrated — retry next time the table exists
         } else {
           localStorage.setItem(migratedKey, '1');
         }
