@@ -25,6 +25,8 @@ function ModalEditarOrden({
   const [pickerCantidad, setPickerCantidad] = useState(1);
   const [pickerPrecio, setPickerPrecio] = useState(0);
   const [guardando, setGuardando] = useState(false);
+  // Compatibilidad por pieza: texto en curso del input por refaccionId
+  const [compatInputs, setCompatInputs] = useState<Record<string, string>>({});
 
   const agregarItem = () => {
     const ref = inventario.find(r => r.id === pickerRefId);
@@ -32,12 +34,31 @@ function ModalEditarOrden({
     const subtotal = pickerCantidad * pickerPrecio;
     setItems(prev => [...prev, {
       refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad,
-      precioCompra: pickerPrecio, subtotal,
+      precioCompra: pickerPrecio, subtotal, compatibilidad: [],
     }]);
     setPickerRefId(''); setPickerCantidad(1); setPickerPrecio(0);
   };
 
   const quitarItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
+
+  const agregarVehiculo = (refaccionId: string) => {
+    const val = (compatInputs[refaccionId] ?? '').trim();
+    if (!val) return;
+    setItems(prev => prev.map(it =>
+      it.refaccionId === refaccionId
+        ? { ...it, compatibilidad: [...(it.compatibilidad ?? []), val] }
+        : it
+    ));
+    setCompatInputs(prev => ({ ...prev, [refaccionId]: '' }));
+  };
+
+  const quitarVehiculo = (refaccionId: string, vehiculo: string) => {
+    setItems(prev => prev.map(it =>
+      it.refaccionId === refaccionId
+        ? { ...it, compatibilidad: (it.compatibilidad ?? []).filter(v => v !== vehiculo) }
+        : it
+    ));
+  };
 
   const subtotalSinIVA = items.reduce((s, p) => s + p.subtotal, 0);
   const ivaAmount = conIVA ? Math.round(subtotalSinIVA * 0.16 * 100) / 100 : 0;
@@ -83,29 +104,51 @@ function ModalEditarOrden({
         {items.length > 0 && (
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Piezas en la orden</p>
-            <div className="rounded-lg border border-slate-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-100">
-                  <tr>{['Pieza', 'Cant.', 'Precio', 'Subtotal', ''].map((h, i) => <th key={i} className={`px-3 py-2 text-xs font-semibold text-slate-600 uppercase ${i >= 1 && i <= 3 ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {items.map((item, idx) => (
-                    <tr key={idx} className="bg-white">
-                      <td className="px-3 py-2 text-slate-800 font-medium">{item.nombre}</td>
-                      <td className="px-3 py-2 text-right text-slate-700">{item.cantidad}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">${fmt(item.precioCompra)}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(item.subtotal)}</td>
-                      <td className="px-3 py-2 text-center">
-                        <button type="button" onClick={() => quitarItem(idx)} className="text-rose-500 hover:text-rose-700 font-bold text-sm">✕</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-slate-50 border-t-2 border-slate-200">
-                  {conIVA && <tr><td colSpan={3} className="px-3 py-2 text-right text-slate-600 text-sm">IVA (16%):</td><td className="px-3 py-2 text-right text-slate-700">${fmt(ivaAmount)}</td><td/></tr>}
-                  <tr><td colSpan={3} className="px-3 py-2 text-right font-bold text-slate-700">Total:</td><td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(total)}</td><td/></tr>
-                </tfoot>
-              </table>
+            <div className="space-y-2">
+              {items.map((item, idx) => (
+                <div key={idx} className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+                  {/* Fila principal */}
+                  <div className="flex items-center gap-2 px-3 py-2.5">
+                    <span className="flex-1 font-medium text-slate-800 text-sm truncate">{item.nombre}</span>
+                    <span className="text-xs text-slate-500 whitespace-nowrap">×{item.cantidad}</span>
+                    <span className="text-xs text-slate-400 whitespace-nowrap">${fmt(item.precioCompra)}</span>
+                    <span className="text-sm font-semibold text-slate-900 whitespace-nowrap">${fmt(item.subtotal)}</span>
+                    <button type="button" onClick={() => quitarItem(idx)} className="text-rose-500 hover:text-rose-700 font-bold text-sm ml-1 shrink-0">✕</button>
+                  </div>
+                  {/* Fila compatibilidad */}
+                  <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 flex items-center gap-2 flex-wrap">
+                    <span className="text-sm">🚗</span>
+                    {(item.compatibilidad ?? []).length === 0 && (
+                      <span className="text-xs text-slate-400 italic">Sin asignar</span>
+                    )}
+                    {(item.compatibilidad ?? []).map((v, vi) => (
+                      <span key={vi} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                        {v}
+                        <button type="button" onClick={() => quitarVehiculo(item.refaccionId, v)} className="text-indigo-400 hover:text-indigo-600 leading-none ml-0.5">×</button>
+                      </span>
+                    ))}
+                    <div className="flex items-center gap-1 ml-auto">
+                      <input
+                        type="text"
+                        placeholder="Ej. Aveo 2018"
+                        value={compatInputs[item.refaccionId] ?? ''}
+                        onChange={e => setCompatInputs(prev => ({ ...prev, [item.refaccionId]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(item.refaccionId); } }}
+                        className="text-xs border border-slate-200 rounded px-2 py-1 w-28 focus:outline-none focus:border-indigo-400 bg-white"
+                      />
+                      <button type="button" onClick={() => agregarVehiculo(item.refaccionId)} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded font-semibold hover:bg-indigo-700 shrink-0">+ Auto</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {/* Totales */}
+              <div className="pt-1 text-right space-y-0.5">
+                {conIVA && <>
+                  <p className="text-xs text-slate-500">Subtotal (sin IVA): ${fmt(subtotalSinIVA)}</p>
+                  <p className="text-xs text-amber-700">IVA (16%): +${fmt(ivaAmount)}</p>
+                </>}
+                <p className="text-sm font-extrabold text-slate-900">Total: ${fmt(total)}</p>
+              </div>
             </div>
           </div>
         )}
@@ -202,11 +245,34 @@ export function VistaOrdenesCompra({
   const [newPrecio, setNewPrecio]         = useState(0);
   const [newCantidad, setNewCantidad]     = useState(1);
 
+  // Compatibilidad por pieza: texto en curso del input, keyed por refaccionId
+  const [compatInputs, setCompatInputs] = useState<Record<string, string>>({});
+
   // ── IVA calculations ──────────────────────────────────────────────────────────
   const subtotalPiezas = itemsOrden.reduce((s, i) => s + i.subtotal, 0);
   const ivaCalculado   = formConIVA ? Math.round(subtotalPiezas * 0.16 * 100) / 100 : 0;
   const totalOrden     = subtotalPiezas + ivaCalculado;
   const pickerRef      = inventario.find(r => r.id === pickerRefId);
+
+  // ── Compatibilidad helpers ────────────────────────────────────────────────────
+  const agregarVehiculo = (refaccionId: string) => {
+    const val = (compatInputs[refaccionId] ?? '').trim();
+    if (!val) return;
+    setItemsOrden(prev => prev.map(it =>
+      it.refaccionId === refaccionId
+        ? { ...it, compatibilidad: [...(it.compatibilidad ?? []), val] }
+        : it
+    ));
+    setCompatInputs(prev => ({ ...prev, [refaccionId]: '' }));
+  };
+
+  const quitarVehiculo = (refaccionId: string, vehiculo: string) => {
+    setItemsOrden(prev => prev.map(it =>
+      it.refaccionId === refaccionId
+        ? { ...it, compatibilidad: (it.compatibilidad ?? []).filter(v => v !== vehiculo) }
+        : it
+    ));
+  };
 
   // ΓöÇΓöÇ Agregar pieza existente ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const agregarItem = () => {
@@ -216,7 +282,7 @@ export function VistaOrdenesCompra({
     setItemsOrden(prev => {
       const ex = prev.find(i => i.refaccionId === ref.id);
       if (ex) { const nc = ex.cantidad + pickerCantidad; return prev.map(i => i.refaccionId === ref.id ? { ...i, cantidad: nc, subtotal: nc * i.precioCompra } : i); }
-      return [...prev, { refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad, precioCompra: pickerPrecio, subtotal: pickerCantidad * pickerPrecio }];
+      return [...prev, { refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad, precioCompra: pickerPrecio, subtotal: pickerCantidad * pickerPrecio, compatibilidad: [] }];
     });
     setPickerRefId(''); setPickerCantidad(1); setPickerPrecio(0);
   };
@@ -243,6 +309,7 @@ export function VistaOrdenesCompra({
         cantidad:     newCantidad,
         precioCompra: newPrecio,
         subtotal:     newCantidad * newPrecio,
+        compatibilidad: [],
       },
     ]);
     // Limpiar form nueva refacci├│n
@@ -275,6 +342,7 @@ export function VistaOrdenesCompra({
         cantidad:     newCantidad,
         precioCompra: newPrecio,
         subtotal:     newCantidad * newPrecio,
+        compatibilidad: [],
       }];
       setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
       setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
@@ -466,41 +534,53 @@ export function VistaOrdenesCompra({
                   </div>
                 )}
                 {itemsOrden.length > 0 && (
-                  <div className="rounded-lg border border-slate-200 overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-100">
-                        <tr>{['Pieza','Cant.','Precio','Subtotal',''].map((h,i) => <th key={i} className={`px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide ${i > 0 && i < 4 ? 'text-right' : i === 0 ? 'text-left' : ''}`}>{h}</th>)}</tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {itemsOrden.map(it => (
-                          <tr key={it.refaccionId} className="bg-white">
-                            <td className="px-3 py-2 font-medium text-slate-800">{it.nombre}</td>
-                            <td className="px-3 py-2 text-right text-slate-700">{it.cantidad}</td>
-                            <td className="px-3 py-2 text-right text-slate-600">${fmt(it.precioCompra)}</td>
-                            <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(it.subtotal)}</td>
-                            <td className="px-3 py-2 text-center"><Btn size="sm" variant="danger" onClick={() => setItemsOrden(prev => prev.filter(i => i.refaccionId !== it.refaccionId))}>Γ£ò</Btn></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-slate-50 border-t-2 border-slate-200">
-                        {formConIVA && (
-                          <>
-                            <tr>
-                              <td colSpan={3} className="px-3 py-1.5 text-xs text-slate-600 text-right">Subtotal (sin IVA):</td>
-                              <td className="px-3 py-1.5 text-right text-slate-700">${fmt(subtotalPiezas)}</td><td></td>
-                            </tr>
-                            <tr>
-                              <td colSpan={3} className="px-3 py-1.5 text-xs text-amber-700 text-right">IVA (16%):</td>
-                              <td className="px-3 py-1.5 text-right text-amber-700 font-semibold">+${fmt(ivaCalculado)}</td><td></td>
-                            </tr>
-                          </>
-                        )}
-                        <tr>
-                          <td colSpan={3} className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total OC:</td>
-                          <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(totalOrden)}</td><td></td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                  <div className="space-y-2 mt-1">
+                    {itemsOrden.map(it => (
+                      <div key={it.refaccionId} className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+                        {/* Fila principal */}
+                        <div className="flex items-center gap-2 px-3 py-2.5">
+                          <span className="flex-1 font-medium text-slate-800 text-sm truncate">{it.nombre}</span>
+                          <span className="text-xs text-slate-500 whitespace-nowrap">×{it.cantidad}</span>
+                          <span className="text-xs text-slate-400 whitespace-nowrap">${fmt(it.precioCompra)}</span>
+                          <span className="text-sm font-semibold text-slate-900 whitespace-nowrap">${fmt(it.subtotal)}</span>
+                          <button type="button" onClick={() => setItemsOrden(prev => prev.filter(i => i.refaccionId !== it.refaccionId))} className="text-rose-400 hover:text-rose-600 font-bold text-sm ml-1 shrink-0">✕</button>
+                        </div>
+                        {/* Fila compatibilidad — siempre visible */}
+                        <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 flex items-center gap-2 flex-wrap">
+                          <span className="text-sm">🚗</span>
+                          {(it.compatibilidad ?? []).length === 0 && (
+                            <span className="text-xs text-slate-400 italic">Sin asignar</span>
+                          )}
+                          {(it.compatibilidad ?? []).map((v, vi) => (
+                            <span key={vi} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                              {v}
+                              <button type="button" onClick={() => quitarVehiculo(it.refaccionId, v)} className="text-indigo-400 hover:text-indigo-600 leading-none ml-0.5">×</button>
+                            </span>
+                          ))}
+                          <div className="flex items-center gap-1 ml-auto">
+                            <input
+                              type="text"
+                              placeholder="Ej. Aveo 2018"
+                              value={compatInputs[it.refaccionId] ?? ''}
+                              onChange={e => setCompatInputs(prev => ({ ...prev, [it.refaccionId]: e.target.value }))}
+                              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(it.refaccionId); } }}
+                              className="text-xs border border-slate-200 rounded px-2 py-1 w-28 focus:outline-none focus:border-indigo-400 bg-white"
+                            />
+                            <button type="button" onClick={() => agregarVehiculo(it.refaccionId)} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded font-semibold hover:bg-indigo-700 shrink-0">+ Auto</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {/* Totales */}
+                    <div className="pt-1 text-right space-y-0.5">
+                      {formConIVA && (
+                        <>
+                          <p className="text-xs text-slate-500">Subtotal (sin IVA): ${fmt(subtotalPiezas)}</p>
+                          <p className="text-xs text-amber-700">IVA (16%): +${fmt(ivaCalculado)}</p>
+                        </>
+                      )}
+                      <p className="text-sm font-extrabold text-slate-900">Total OC: ${fmt(totalOrden)}</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -614,11 +694,25 @@ export function VistaOrdenesCompra({
                 {isExpandida && (
                   <div className="mt-3 pt-3 border-t border-slate-200">
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Piezas en esta orden</p>
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       {(orden.partes ?? []).map((it, index) => (
-                        <div key={`${orden.id}-${index}`} className="flex justify-between items-center bg-white border border-slate-200 rounded px-3 py-2 text-sm">
-                          <span className="text-slate-700">{it.nombre} × {it.cantidad}</span>
-                          <span className="font-semibold text-slate-800">${fmt(it.subtotal ?? 0)}</span>
+                        <div key={`${orden.id}-${index}`} className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+                          {/* Fila principal */}
+                          <div className="flex justify-between items-center px-3 py-2.5">
+                            <span className="text-slate-700 font-medium text-sm">{it.nombre} × {it.cantidad}</span>
+                            <span className="font-semibold text-slate-800">${fmt(it.subtotal ?? 0)}</span>
+                          </div>
+                          {/* Fila compatibilidad — siempre visible (read-only) */}
+                          <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 flex items-center gap-2 flex-wrap">
+                            <span className="text-sm">🚗</span>
+                            {(it.compatibilidad ?? []).length === 0 ? (
+                              <span className="text-xs text-slate-400 italic">Sin asignar</span>
+                            ) : (
+                              (it.compatibilidad ?? []).map((v, vi) => (
+                                <span key={vi} className="bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">{v}</span>
+                              ))
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

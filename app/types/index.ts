@@ -91,6 +91,7 @@ export interface CompraItem {
   cantidad: number;
   precioCompra: number;
   subtotal: number;
+  compatibilidad?: string[]; // vehículos compatibles con esta pieza (ej. ["Aveo 2018", "F-150 2020"])
 }
 
 export interface PagoCompra {
