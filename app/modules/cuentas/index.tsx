@@ -450,6 +450,8 @@ export function VistaCuentas({
   vehiculos,
   onRegistrarPagoFactura,
   onRegistrarPagoTrabajo,
+  onEliminarPagoFactura,
+  onEliminarPagoTrabajo,
   onCancelarFactura,
   onReactivarFactura,
   onCancelarNota,
@@ -461,6 +463,8 @@ export function VistaCuentas({
   vehiculos: Vehiculo[];
   onRegistrarPagoFactura: (facturaId: string, pago: Omit<PagoFactura, 'id'>) => void;
   onRegistrarPagoTrabajo: (trabajoId: string, pago: Omit<Pago, 'id'>) => void;
+  onEliminarPagoFactura: (facturaId: string, pagoId: string) => void;
+  onEliminarPagoTrabajo: (trabajoId: string, pagoId: string) => void;
   onCancelarFactura: (facturaId: string) => void;
   onReactivarFactura: (facturaId: string) => void;
   onCancelarNota: (trabajoId: string) => void;
@@ -477,6 +481,8 @@ export function VistaCuentas({
   const [pagoFormF, setPagoFormF] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
   const [pagoFormT, setPagoFormT] = useState({ monto: 0, fecha: hoy, nota: '' });
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
+  // Tracks which pago id (within the currently expanded item) is pending delete confirmation
+  const [confirmEliminarPagoId, setConfirmEliminarPagoId] = useState<string | null>(null);
 
   // Por cobrar: solo trabajos COMPLETADOS (no en progreso) sin factura formal.
   // Regla de negocio: (1) terminado, (2) facturado o nota completa → aparece en por cobrar.
@@ -722,7 +728,7 @@ export function VistaCuentas({
                     <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
                     <div className="flex items-center justify-between sm:justify-end gap-2">
                       <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
-                      <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'} onClick={() => { setExpandidoT(isExp ? null : trabajo.id); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); setConfirmCancelarId(null); }}>
+                      <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'} onClick={() => { setExpandidoT(isExp ? null : trabajo.id); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); setConfirmCancelarId(null); setConfirmEliminarPagoId(null); }}>
                         {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
                       </Btn>
                     </div>
@@ -734,12 +740,31 @@ export function VistaCuentas({
                           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
                           <div className="space-y-1">
                             {(trabajo.pagos ?? []).map(p => (
-                              <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                <div className="flex gap-3">
-                                  <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
-                                  {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
+                              <div key={p.id}>
+                                <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                  <div className="flex gap-3">
+                                    <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
+                                    {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                                    {confirmEliminarPagoId !== p.id && (
+                                      <button
+                                        type="button"
+                                        title="Eliminar pago"
+                                        onClick={() => setConfirmEliminarPagoId(p.id)}
+                                        className="text-slate-300 hover:text-rose-500 transition-colors text-base leading-none ml-1"
+                                      >🗑</button>
+                                    )}
+                                  </div>
                                 </div>
-                                <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                                {confirmEliminarPagoId === p.id && (
+                                  <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 mt-1 flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs font-semibold text-amber-800 flex-1">¿Eliminar este pago de ${fmt(p.monto)}? El saldo se reajustará.</span>
+                                    <button type="button" onClick={() => { onEliminarPagoTrabajo(trabajo.id, p.id); setConfirmEliminarPagoId(null); }} className="px-3 py-1 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors">Sí, eliminar</button>
+                                    <button type="button" onClick={() => setConfirmEliminarPagoId(null)} className="px-3 py-1 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors">Cancelar</button>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -803,7 +828,7 @@ export function VistaCuentas({
                     <div className="flex items-center justify-between sm:justify-end gap-2">
                       <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
                       <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'}
-                        onClick={() => { setExpandidoF(isExp ? null : factura.id); setPagoFormF({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' }); setConfirmCancelarId(null); }}>
+                        onClick={() => { setExpandidoF(isExp ? null : factura.id); setPagoFormF({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' }); setConfirmCancelarId(null); setConfirmEliminarPagoId(null); }}>
                         {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
                       </Btn>
                     </div>
@@ -815,12 +840,31 @@ export function VistaCuentas({
                           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
                           <div className="space-y-1">
                             {(factura.pagos ?? []).map(p => (
-                              <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                <div className="flex gap-3">
-                                  <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
-                                  <span className="text-slate-500">{p.metodoPago}</span>
+                              <div key={p.id}>
+                                <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                  <div className="flex gap-3">
+                                    <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
+                                    <span className="text-slate-500">{p.metodoPago}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                                    {confirmEliminarPagoId !== p.id && (
+                                      <button
+                                        type="button"
+                                        title="Eliminar pago"
+                                        onClick={() => setConfirmEliminarPagoId(p.id)}
+                                        className="text-slate-300 hover:text-rose-500 transition-colors text-base leading-none ml-1"
+                                      >🗑</button>
+                                    )}
+                                  </div>
                                 </div>
-                                <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                                {confirmEliminarPagoId === p.id && (
+                                  <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 mt-1 flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs font-semibold text-amber-800 flex-1">¿Eliminar este pago de ${fmt(p.monto)}? El saldo se reajustará.</span>
+                                    <button type="button" onClick={() => { onEliminarPagoFactura(factura.id, p.id); setConfirmEliminarPagoId(null); }} className="px-3 py-1 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors">Sí, eliminar</button>
+                                    <button type="button" onClick={() => setConfirmEliminarPagoId(null)} className="px-3 py-1 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors">Cancelar</button>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
