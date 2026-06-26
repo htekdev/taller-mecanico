@@ -25,6 +25,8 @@ function ModalEditarOrden({
   const [pickerCantidad, setPickerCantidad] = useState(1);
   const [pickerPrecio, setPickerPrecio] = useState(0);
   const [guardando, setGuardando] = useState(false);
+  // Modo agregar: collapsed by default, expanded when user taps "+ Agregar refacción"
+  const [mostrarAgregar, setMostrarAgregar] = useState(false);
   // Modo de agregar: del inventario o libre (nombre libre)
   const [modoAgregarModal, setModoAgregarModal] = useState<'existente' | 'libre'>('existente');
   // Campos para pieza libre
@@ -101,7 +103,7 @@ function ModalEditarOrden({
   const total = subtotalSinIVA + ivaAmount;
 
   const handleGuardar = () => {
-    if (!desc.trim() || items.length === 0) return;
+    if (items.length === 0) return;  // description is optional — only parts are required
     setGuardando(true);
     onGuardar({ descripcion: desc.trim(), numeroOrden: numOrden.trim() || undefined, partes: items, subtotalSinIVA, ivaAmount, total, conIVA });
     onCerrar();
@@ -121,7 +123,7 @@ function ModalEditarOrden({
         {/* Descripción + Número */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label>Descripción *</Label>
+            <Label>Descripción <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
             <Input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ej. Compra mensual de filtros" />
           </div>
           <div>
@@ -215,76 +217,86 @@ function ModalEditarOrden({
           </div>
         )}
 
-        {/* Agregar pieza — Del inventario o Nombre libre */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">+ Agregar pieza</p>
-          {/* Tabs */}
-          <div className="flex gap-2 p-1 bg-slate-100 rounded-lg w-fit mb-3">
-            <button type="button" onClick={() => setModoAgregarModal('existente')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${modoAgregarModal === 'existente' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-              📦 Del inventario
-            </button>
-            <button type="button" onClick={() => setModoAgregarModal('libre')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${modoAgregarModal === 'libre' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-              ✨ Nueva (libre)
-            </button>
-          </div>
-
-          {modoAgregarModal === 'existente' && (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <div className="sm:col-span-2">
-                  <Label>Pieza</Label>
-                  <Select value={pickerRefId} onChange={e => {
-                    setPickerRefId(e.target.value);
-                    const r = inventario.find(x => x.id === e.target.value);
-                    if (r) setPickerPrecio(r.precioCompra);
-                  }}>
-                    <option value="">Seleccionar pieza...</option>
-                    {inventario.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.codigo})</option>)}
-                  </Select>
-                </div>
-                <div><Label>Cantidad</Label><Input type="number" min="1" step="1" value={pickerCantidad} onChange={e => setPickerCantidad(Number(e.target.value))} /></div>
-                <div><Label>Precio ($)</Label><Input type="number" min="0" step="0.01" value={pickerPrecio || ''} onChange={e => setPickerPrecio(Number(e.target.value))} /></div>
-              </div>
-              <div className="mt-3 flex justify-end">
-                <Btn type="button" size="sm" variant="ghost" onClick={agregarItem} disabled={!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0}>+ Agregar pieza</Btn>
-              </div>
-            </>
-          )}
-
-          {modoAgregarModal === 'libre' && (
-            <div className="space-y-3">
-              <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-                💡 Agrega una pieza con nombre libre — no necesita estar en el inventario.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <Label>Nombre de la pieza *</Label>
-                  <Input type="text" placeholder="Ej. Empaque de válvula" value={newLibreNombre} onChange={e => setNewLibreNombre(e.target.value)} />
-                </div>
-                <div>
-                  <Label>Cantidad</Label>
-                  <Input type="number" min="1" step="1" placeholder="1" value={newLibreCantidad || ''} onChange={e => setNewLibreCantidad(Number(e.target.value))} />
-                </div>
-                <div>
-                  <Label>Precio compra ($)</Label>
-                  <Input type="number" min="0.01" step="0.01" placeholder="0.00" value={newLibrePrecio || ''} onChange={e => setNewLibrePrecio(Number(e.target.value))} />
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Btn type="button" size="sm" variant="ghost" onClick={agregarLibre}
-                  disabled={!newLibreNombre.trim() || newLibreCantidad <= 0 || newLibrePrecio <= 0}>
-                  + Agregar pieza libre
-                </Btn>
-              </div>
+        {/* Agregar pieza — colapsable, oculto por defecto */}
+        {!mostrarAgregar ? (
+          <button type="button" onClick={() => setMostrarAgregar(true)}
+            className="w-full flex items-center justify-center gap-2 border border-dashed border-slate-300 rounded-xl py-2.5 text-sm text-slate-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+            ＋ Agregar refacción
+          </button>
+        ) : (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Agregar pieza</p>
+              <button type="button" onClick={() => setMostrarAgregar(false)} className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>
             </div>
-          )}
-        </div>
+            {/* Tabs */}
+            <div className="flex gap-2 p-1 bg-slate-100 rounded-lg w-fit mb-3">
+              <button type="button" onClick={() => setModoAgregarModal('existente')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${modoAgregarModal === 'existente' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                📦 Del inventario
+              </button>
+              <button type="button" onClick={() => setModoAgregarModal('libre')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${modoAgregarModal === 'libre' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                ✨ Nueva (libre)
+              </button>
+            </div>
+
+            {modoAgregarModal === 'existente' && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="sm:col-span-2">
+                    <Label>Pieza</Label>
+                    <Select value={pickerRefId} onChange={e => {
+                      setPickerRefId(e.target.value);
+                      const r = inventario.find(x => x.id === e.target.value);
+                      if (r) setPickerPrecio(r.precioCompra);
+                    }}>
+                      <option value="">Seleccionar pieza...</option>
+                      {inventario.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.codigo})</option>)}
+                    </Select>
+                  </div>
+                  <div><Label>Cantidad</Label><Input type="number" min="1" step="1" value={pickerCantidad} onChange={e => setPickerCantidad(Number(e.target.value))} /></div>
+                  <div><Label>Precio ($)</Label><Input type="number" min="0" step="0.01" value={pickerPrecio || ''} onChange={e => setPickerPrecio(Number(e.target.value))} /></div>
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <Btn type="button" size="sm" variant="ghost" onClick={() => { agregarItem(); setMostrarAgregar(false); }} disabled={!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0}>+ Agregar pieza</Btn>
+                </div>
+              </>
+            )}
+
+            {modoAgregarModal === 'libre' && (
+              <div className="space-y-3">
+                <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                  💡 Agrega una pieza con nombre libre — no necesita estar en el inventario.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <Label>Nombre de la pieza *</Label>
+                    <Input type="text" placeholder="Ej. Empaque de válvula" value={newLibreNombre} onChange={e => setNewLibreNombre(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Cantidad</Label>
+                    <Input type="number" min="1" step="1" placeholder="1" value={newLibreCantidad || ''} onChange={e => setNewLibreCantidad(Number(e.target.value))} />
+                  </div>
+                  <div>
+                    <Label>Precio compra ($)</Label>
+                    <Input type="number" min="0.01" step="0.01" placeholder="0.00" value={newLibrePrecio || ''} onChange={e => setNewLibrePrecio(Number(e.target.value))} />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Btn type="button" size="sm" variant="ghost" onClick={() => { agregarLibre(); setMostrarAgregar(false); }}
+                    disabled={!newLibreNombre.trim() || newLibreCantidad <= 0 || newLibrePrecio <= 0}>
+                    + Agregar pieza libre
+                  </Btn>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-3 pt-1">
           <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>Cancelar</Btn>
-          <Btn type="button" variant="primary" fullWidth onClick={handleGuardar} disabled={guardando || !desc.trim() || items.length === 0}>
+          <Btn type="button" variant="primary" fullWidth onClick={handleGuardar} disabled={guardando || items.length === 0}>
             {guardando ? 'Guardando...' : '✓ Guardar cambios'}
           </Btn>
         </div>
