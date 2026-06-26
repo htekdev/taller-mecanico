@@ -354,8 +354,8 @@ export function VistaTrabajo({
   trabajos: Trabajo[];
   facturas: Factura[];
   proveedores: Proveedor[];
-  onGuardar: (t: Omit<Trabajo, 'id' | 'total' | 'iva'>) => void;
-  onEditar: (trabajoId: string, data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => void;
+  onGuardar: (t: Omit<Trabajo, 'id' | 'total' | 'iva'>) => Promise<void>;
+  onEditar: (trabajoId: string, data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => Promise<void>;
   onFinalizar: (trabajoId: string, tipo: 'factura' | 'nota') => void;
   onIrAInventario: () => void;
   onGenerarFactura: (trabajoId: string) => void;
@@ -384,6 +384,9 @@ export function VistaTrabajo({
   const [laborItems, setLaborItems] = useState<ManoDeObraItem[]>([]);
   const [laborConcepto, setLaborConcepto] = useState('');
   const [laborPrecio, setLaborPrecio]     = useState(0);
+  // Save state — prevents double-submit and keeps form data if save fails
+  const [guardandoForm, setGuardandoForm] = useState(false);
+  const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
 
   // ── Servicios externos ──────────────────────────────────────
   const [showExtForm, setShowExtForm]       = useState(false);
@@ -562,7 +565,7 @@ export function VistaTrabajo({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.clienteId || !form.vehiculoId || !form.descripcion) return;
     const kmVal = typeof form.kilometraje === 'string' ? (form.kilometraje.trim() !== '' ? Number(form.kilometraje) : undefined) : (form.kilometraje || undefined);
@@ -601,12 +604,20 @@ export function VistaTrabajo({
       partes: partesSeleccionadas,
       pagos: editandoId ? (trabajoExistente?.pagos ?? []) : [],
     };
-    if (editandoId) {
-      onEditar(editandoId, trabajoData);
-    } else {
-      onGuardar(trabajoData);
+    setGuardandoForm(true);
+    setErrorGuardado(null);
+    try {
+      if (editandoId) {
+        await onEditar(editandoId, trabajoData);
+      } else {
+        await onGuardar(trabajoData);
+      }
+      resetForm(); // only reset AFTER successful save
+    } catch {
+      setErrorGuardado('No se pudo guardar el trabajo. Verifica tu conexión e intenta de nuevo.');
+    } finally {
+      setGuardandoForm(false);
     }
-    resetForm();
   };
 
   const getCliente  = (id: string) => clientes.find(c => c.id === id);
@@ -1446,9 +1457,15 @@ export function VistaTrabajo({
             </div>
           )}
 
+          {errorGuardado && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+              ⚠️ {errorGuardado}
+            </div>
+          )}
+
           <Btn type="submit" variant="primary" fullWidth
-            disabled={!form.clienteId || !form.vehiculoId || !form.descripcion}>
-            ✓ Registrar Trabajo
+            disabled={guardandoForm || !form.clienteId || !form.vehiculoId || !form.descripcion}>
+            {guardandoForm ? '⏳ Guardando...' : '✓ Registrar Trabajo'}
           </Btn>
         </form>
       </div>
