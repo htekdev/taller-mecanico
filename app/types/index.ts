@@ -85,12 +85,18 @@ export interface Proveedor {
   notas?: string;
 }
 
+export interface ItemCompatibilidad {
+  marca: string;    // ej. "Ford", "Isuzu" — obligatoria
+  modelo?: string;  // ej. "F-150", "ELF" — opcional
+}
+
 export interface CompraItem {
   refaccionId: string;
   nombre: string;    // snapshot
   cantidad: number;
   precioCompra: number;
   subtotal: number;
+  compatibilidad?: ItemCompatibilidad[]; // vehículos compatibles con esta pieza
 }
 
 export interface PagoCompra {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { OrdenCompra, Proveedor, Refaccion, CompraItem } from '@/app/types';
+import type { OrdenCompra, Proveedor, Refaccion, CompraItem, ItemCompatibilidad } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { fmt, BADGE_ORDEN } from '@/app/lib/utils';
 
@@ -25,6 +25,12 @@ function ModalEditarOrden({
   const [pickerCantidad, setPickerCantidad] = useState(1);
   const [pickerPrecio, setPickerPrecio] = useState(0);
   const [guardando, setGuardando] = useState(false);
+  // Compatibilidad por pieza: { marca, modelo } en curso por refaccionId
+  const [compatInputs, setCompatInputs] = useState<Record<string, { marca: string; modelo: string }>>({});
+
+  const getCompat = (id: string) => compatInputs[id] ?? { marca: '', modelo: '' };
+  const setCompat = (id: string, f: Partial<{ marca: string; modelo: string }>) =>
+    setCompatInputs(prev => ({ ...prev, [id]: { ...getCompat(id), ...f } }));
 
   const agregarItem = () => {
     const ref = inventario.find(r => r.id === pickerRefId);
@@ -32,12 +38,31 @@ function ModalEditarOrden({
     const subtotal = pickerCantidad * pickerPrecio;
     setItems(prev => [...prev, {
       refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad,
-      precioCompra: pickerPrecio, subtotal,
+      precioCompra: pickerPrecio, subtotal, compatibilidad: [],
     }]);
     setPickerRefId(''); setPickerCantidad(1); setPickerPrecio(0);
   };
 
   const quitarItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
+
+  const agregarVehiculo = (refaccionId: string) => {
+    const { marca, modelo } = getCompat(refaccionId);
+    if (!marca.trim()) return;
+    setItems(prev => prev.map(it =>
+      it.refaccionId === refaccionId
+        ? { ...it, compatibilidad: [...(it.compatibilidad ?? []), { marca: marca.trim(), modelo: modelo.trim() || undefined }] }
+        : it
+    ));
+    setCompatInputs(prev => ({ ...prev, [refaccionId]: { marca: '', modelo: '' } }));
+  };
+
+  const quitarVehiculo = (refaccionId: string, idx: number) => {
+    setItems(prev => prev.map(it =>
+      it.refaccionId === refaccionId
+        ? { ...it, compatibilidad: (it.compatibilidad ?? []).filter((_, i) => i !== idx) }
+        : it
+    ));
+  };
 
   const subtotalSinIVA = items.reduce((s, p) => s + p.subtotal, 0);
   const ivaAmount = conIVA ? Math.round(subtotalSinIVA * 0.16 * 100) / 100 : 0;
@@ -56,7 +81,7 @@ function ModalEditarOrden({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-800">✏️ Editar Orden de Compra</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Solo disponible mientras la orden está pendiente.</p>
+            <p className="text-xs text-slate-500 mt-0.5">Edita los datos de la orden para corregir errores.</p>
           </div>
           <button type="button" onClick={onCerrar} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
         </div>
@@ -83,29 +108,65 @@ function ModalEditarOrden({
         {items.length > 0 && (
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Piezas en la orden</p>
-            <div className="rounded-lg border border-slate-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-100">
-                  <tr>{['Pieza', 'Cant.', 'Precio', 'Subtotal', ''].map((h, i) => <th key={i} className={`px-3 py-2 text-xs font-semibold text-slate-600 uppercase ${i >= 1 && i <= 3 ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {items.map((item, idx) => (
-                    <tr key={idx} className="bg-white">
-                      <td className="px-3 py-2 text-slate-800 font-medium">{item.nombre}</td>
-                      <td className="px-3 py-2 text-right text-slate-700">{item.cantidad}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">${fmt(item.precioCompra)}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(item.subtotal)}</td>
-                      <td className="px-3 py-2 text-center">
-                        <button type="button" onClick={() => quitarItem(idx)} className="text-rose-500 hover:text-rose-700 font-bold text-sm">✕</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-slate-50 border-t-2 border-slate-200">
-                  {conIVA && <tr><td colSpan={3} className="px-3 py-2 text-right text-slate-600 text-sm">IVA (16%):</td><td className="px-3 py-2 text-right text-slate-700">${fmt(ivaAmount)}</td><td/></tr>}
-                  <tr><td colSpan={3} className="px-3 py-2 text-right font-bold text-slate-700">Total:</td><td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(total)}</td><td/></tr>
-                </tfoot>
-              </table>
+            <div className="space-y-2">
+              {items.map((item, idx) => (
+                <div key={idx} className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+                  {/* Fila principal */}
+                  <div className="flex items-center gap-2 px-3 py-2.5">
+                    <span className="flex-1 font-medium text-slate-800 text-sm truncate">{item.nombre}</span>
+                    <span className="text-xs text-slate-500 whitespace-nowrap">×{item.cantidad}</span>
+                    <span className="text-xs text-slate-400 whitespace-nowrap">${fmt(item.precioCompra)}</span>
+                    <span className="text-sm font-semibold text-slate-900 whitespace-nowrap">${fmt(item.subtotal)}</span>
+                    <button type="button" onClick={() => quitarItem(idx)} className="text-rose-500 hover:text-rose-700 font-bold text-sm ml-1 shrink-0">✕</button>
+                  </div>
+                  {/* Fila compatibilidad */}
+                  <div className="border-t border-slate-100 bg-slate-50 px-3 py-2">
+                    {/* Tags existentes */}
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      <span className="text-sm">🚗</span>
+                      {(item.compatibilidad ?? []).length === 0 && (
+                        <span className="text-xs text-slate-400 italic">Sin asignar</span>
+                      )}
+                      {(item.compatibilidad ?? []).map((v, vi) => (
+                        <span key={vi} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                          {v.marca}{v.modelo ? ` ${v.modelo}` : ''}
+                          <button type="button" onClick={() => quitarVehiculo(item.refaccionId, vi)} className="text-indigo-400 hover:text-indigo-600 leading-none ml-0.5">×</button>
+                        </span>
+                      ))}
+                    </div>
+                    {/* Inputs Marca + Modelo */}
+                    <div className="flex gap-2 flex-wrap items-end">
+                      <div className="flex-1 min-w-[100px]">
+                        <p className="text-xs text-slate-500 mb-1">Marca *</p>
+                        <input type="text" placeholder="Ej. Ford" value={getCompat(item.refaccionId).marca}
+                          onChange={e => setCompat(item.refaccionId, { marca: e.target.value })}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(item.refaccionId); } }}
+                          className="w-full text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 bg-white" />
+                      </div>
+                      <div className="flex-1 min-w-[100px]">
+                        <p className="text-xs text-slate-500 mb-1">Modelo <span className="text-slate-400">(opcional)</span></p>
+                        <input type="text" placeholder="Ej. F-150" value={getCompat(item.refaccionId).modelo}
+                          onChange={e => setCompat(item.refaccionId, { modelo: e.target.value })}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(item.refaccionId); } }}
+                          className="w-full text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 bg-white" />
+                      </div>
+                      <button type="button" onClick={() => agregarVehiculo(item.refaccionId)}
+                        disabled={!getCompat(item.refaccionId).marca.trim()}
+                        className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+                        + Agregar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {/* Totales */}
+              <div className="pt-1 text-right space-y-0.5">
+                {conIVA && <>
+                  <p className="text-xs text-slate-500">Subtotal (sin IVA): ${fmt(subtotalSinIVA)}</p>
+                  <p className="text-xs text-amber-700">IVA (16%): +${fmt(ivaAmount)}</p>
+                </>}
+                <p className="text-sm font-extrabold text-slate-900">Total: ${fmt(total)}</p>
+              </div>
             </div>
           </div>
         )}
@@ -144,10 +205,10 @@ function ModalEditarOrden({
   );
 }
 
-// Categor├¡as comunes de refacciones para el selector r├ípido
+// Categorías comunes de refacciones para el selector rápido
 const CATEGORIAS_COMUNES = [
-  'Filtros', 'Frenos', 'Suspensi├│n', 'Motor', 'Transmisi├│n',
-  'El├⌐ctrico', 'Escape', 'Enfriamiento', 'Lubricantes', 'Otro',
+  'Filtros', 'Frenos', 'Suspensión', 'Motor', 'Transmisión',
+  'Eléctrico', 'Escape', 'Enfriamiento', 'Lubricantes', 'Otro',
 ];
 
 export function VistaOrdenesCompra({
@@ -202,13 +263,40 @@ export function VistaOrdenesCompra({
   const [newPrecio, setNewPrecio]         = useState(0);
   const [newCantidad, setNewCantidad]     = useState(1);
 
+  // Compatibilidad por pieza: { marca, modelo } en curso por refaccionId
+  const [compatInputs, setCompatInputs] = useState<Record<string, { marca: string; modelo: string }>>({});
+
+  const getCompat = (id: string) => compatInputs[id] ?? { marca: '', modelo: '' };
+  const setCompat = (id: string, f: Partial<{ marca: string; modelo: string }>) =>
+    setCompatInputs(prev => ({ ...prev, [id]: { ...getCompat(id), ...f } }));
+
   // ── IVA calculations ──────────────────────────────────────────────────────────
   const subtotalPiezas = itemsOrden.reduce((s, i) => s + i.subtotal, 0);
   const ivaCalculado   = formConIVA ? Math.round(subtotalPiezas * 0.16 * 100) / 100 : 0;
   const totalOrden     = subtotalPiezas + ivaCalculado;
   const pickerRef      = inventario.find(r => r.id === pickerRefId);
 
-  // ΓöÇΓöÇ Agregar pieza existente ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Compatibilidad helpers ────────────────────────────────────────────────────
+  const agregarVehiculo = (refaccionId: string) => {
+    const { marca, modelo } = getCompat(refaccionId);
+    if (!marca.trim()) return;
+    setItemsOrden(prev => prev.map(it =>
+      it.refaccionId === refaccionId
+        ? { ...it, compatibilidad: [...(it.compatibilidad ?? []), { marca: marca.trim(), modelo: modelo.trim() || undefined }] }
+        : it
+    ));
+    setCompatInputs(prev => ({ ...prev, [refaccionId]: { marca: '', modelo: '' } }));
+  };
+
+  const quitarVehiculo = (refaccionId: string, idx: number) => {
+    setItemsOrden(prev => prev.map(it =>
+      it.refaccionId === refaccionId
+        ? { ...it, compatibilidad: (it.compatibilidad ?? []).filter((_, i) => i !== idx) }
+        : it
+    ));
+  };
+
+  // ── Agregar pieza existente ───────────────────────────────────────────────
   const agregarItem = () => {
     if (!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0) return;
     const ref = inventario.find(r => r.id === pickerRefId);
@@ -216,12 +304,12 @@ export function VistaOrdenesCompra({
     setItemsOrden(prev => {
       const ex = prev.find(i => i.refaccionId === ref.id);
       if (ex) { const nc = ex.cantidad + pickerCantidad; return prev.map(i => i.refaccionId === ref.id ? { ...i, cantidad: nc, subtotal: nc * i.precioCompra } : i); }
-      return [...prev, { refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad, precioCompra: pickerPrecio, subtotal: pickerCantidad * pickerPrecio }];
+      return [...prev, { refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad, precioCompra: pickerPrecio, subtotal: pickerCantidad * pickerPrecio, compatibilidad: [] }];
     });
     setPickerRefId(''); setPickerCantidad(1); setPickerPrecio(0);
   };
 
-  // ΓöÇΓöÇ Agregar nueva refacci├│n al cat├ílogo + orden ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Agregar nueva refacción al catálogo + orden ───────────────────────────
   const agregarRefaccionNueva = async () => {
     if (!newNombre.trim() || newPrecio <= 0 || newCantidad <= 0) return;
     const categoriaFinal = newCategoria === '__custom__' ? newCategoriaCustom.trim() : newCategoria;
@@ -231,7 +319,7 @@ export function VistaOrdenesCompra({
       categoria:    categoriaFinal,
       unidad:       newUnidad || 'pza',
       precioCompra: newPrecio,
-      stock:        0,          // stock arranca en 0 ΓÇö sube al recibir OC
+      stock:        0,          // stock arranca en 0 — sube al recibir OC
       stockMinimo:  1,
     });
     if (!nuevaRef) return;
@@ -243,9 +331,10 @@ export function VistaOrdenesCompra({
         cantidad:     newCantidad,
         precioCompra: newPrecio,
         subtotal:     newCantidad * newPrecio,
+        compatibilidad: [],
       },
     ]);
-    // Limpiar form nueva refacci├│n
+    // Limpiar form nueva refacción
     setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
     setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
   };
@@ -275,6 +364,7 @@ export function VistaOrdenesCompra({
         cantidad:     newCantidad,
         precioCompra: newPrecio,
         subtotal:     newCantidad * newPrecio,
+        compatibilidad: [],
       }];
       setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
       setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
@@ -323,7 +413,7 @@ export function VistaOrdenesCompra({
 
       {pendientesRecibir > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-5 flex items-center gap-3 text-sm">
-          <span className="text-amber-600 font-semibold">ΓÅ│ {pendientesRecibir} orden{pendientesRecibir !== 1 ? 'es' : ''} pendiente{pendientesRecibir !== 1 ? 's' : ''} de recibir</span>
+          <span className="text-amber-600 font-semibold">⚠️ {pendientesRecibir} orden{pendientesRecibir !== 1 ? 'es' : ''} pendiente{pendientesRecibir !== 1 ? 's' : ''} de recibir</span>
         </div>
       )}
 
@@ -333,7 +423,7 @@ export function VistaOrdenesCompra({
         {proveedores.length === 0 ? (
           <div className="text-center py-4 text-sm text-slate-400">
             <p>Registra un proveedor primero.</p>
-            <button type="button" onClick={onIrAProveedores} className="mt-1 text-indigo-600 font-semibold hover:underline">Ir a Proveedores ΓåÆ</button>
+            <button type="button" onClick={onIrAProveedores} className="mt-1 text-indigo-600 font-semibold hover:underline">Ir a Proveedores →</button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -345,42 +435,42 @@ export function VistaOrdenesCompra({
                 </Select></div>
               <div><Label>Fecha</Label>
                 <Input type="date" value={formFecha} onChange={e => setFormFecha(e.target.value)} required /></div>
-              <div><Label>N┬║ Orden (opcional)</Label>
+              <div><Label>Nº Orden (opcional)</Label>
                 <Input type="text" placeholder="Ej. OC-2026-001" value={formNumOrden} onChange={e => setFormNumOrden(e.target.value)} className="font-mono" /></div>
             </div>
-            <div><Label>Descripci├│n (opcional)</Label>
-              <Input type="text" placeholder="Ej. Reposici├│n mensual filtros" value={formDesc} onChange={e => setFormDesc(e.target.value)} /></div>
+            <div><Label>Descripción (opcional)</Label>
+              <Input type="text" placeholder="Ej. Reposición mensual filtros" value={formDesc} onChange={e => setFormDesc(e.target.value)} /></div>
 
             <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
               <div className="px-4 py-3 bg-slate-700">
                 <span className="text-xs font-bold text-white uppercase tracking-widest">Piezas a Ordenar</span>
-                <span className="ml-3 text-slate-400 text-xs">El inventario aumentar├í cuando marques la OC como recibida</span>
+                <span className="ml-3 text-slate-400 text-xs">El inventario aumentará cuando marques la OC como recibida</span>
               </div>
               <div className="p-4 space-y-3">
 
-                {/* ΓöÇΓöÇ Toggle modo agregar ΓöÇΓöÇ */}
+                {/* ── Toggle modo agregar ── */}
                 <div className="flex gap-2 p-1 bg-slate-100 rounded-lg w-fit">
                   <button
                     type="button"
                     onClick={() => setModoAgregar('existente')}
                     className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${modoAgregar === 'existente' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                   >
-                    ≡ƒôª Del inventario
+                    📦 Del inventario
                   </button>
                   <button
                     type="button"
                     onClick={() => setModoAgregar('nueva')}
                     className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${modoAgregar === 'nueva' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                   >
-                    Γ£¿ Nueva refacci├│n
+                    ✨ Nueva refacción
                   </button>
                 </div>
 
-                {/* ΓöÇΓöÇ Modo: Pieza existente ΓöÇΓöÇ */}
+                {/* ── Modo: Pieza existente ── */}
                 {modoAgregar === 'existente' && (
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                      <div className="sm:col-span-2"><Label>Refacci├│n</Label>
+                      <div className="sm:col-span-2"><Label>Refacción</Label>
                         <Select value={pickerRefId} onChange={e => { setPickerRefId(e.target.value); const r = inventario.find(x => x.id === e.target.value); setPickerPrecio(r?.precioCompra ?? 0); }}>
                           <option value="">Seleccionar pieza...</option>
                           {inventario.map(r => <option key={r.id} value={r.id}>{r.nombre}{r.codigo ? ` (${r.codigo})` : ''}</option>)}
@@ -397,11 +487,11 @@ export function VistaOrdenesCompra({
                   </>
                 )}
 
-                {/* ΓöÇΓöÇ Modo: Nueva refacci├│n ΓöÇΓöÇ */}
+                {/* ── Modo: Nueva refacción ── */}
                 {modoAgregar === 'nueva' && (
                   <div className="border border-indigo-100 rounded-xl bg-indigo-50 p-4 space-y-3">
                     <p className="text-xs text-indigo-700 font-medium">
-                      ≡ƒÆí La refacci├│n se registrar├í autom├íticamente en el cat├ílogo de inventario. El stock comenzar├í en 0 y aumentar├í al marcar la OC como recibida.
+                      💡 La refacción se registrará automáticamente en el catálogo de inventario. El stock comenzará en 0 y aumentará al marcar la OC como recibida.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -409,20 +499,20 @@ export function VistaOrdenesCompra({
                         <Input type="text" placeholder="Ej. Filtro de aceite Bosch" value={newNombre} onChange={e => setNewNombre(e.target.value)} />
                       </div>
                       <div>
-                        <Label>C├│digo (opcional)</Label>
+                        <Label>Código (opcional)</Label>
                         <Input type="text" placeholder="Ej. 0986AF1036" value={newCodigo} onChange={e => setNewCodigo(e.target.value)} className="font-mono" />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
-                        <Label>Categor├¡a</Label>
+                        <Label>Categoría</Label>
                         <Select value={newCategoria} onChange={e => setNewCategoria(e.target.value)}>
-                          <option value="">Sin categor├¡a</option>
+                          <option value="">Sin categoría</option>
                           {CATEGORIAS_COMUNES.map(c => <option key={c} value={c}>{c}</option>)}
                           <option value="__custom__">Otra (escribir)...</option>
                         </Select>
                         {newCategoria === '__custom__' && (
-                          <Input type="text" placeholder="Ej. Direcci├│n hidr├íulica" value={newCategoriaCustom} onChange={e => setNewCategoriaCustom(e.target.value)} className="mt-2" />
+                          <Input type="text" placeholder="Ej. Dirección hidráulica" value={newCategoriaCustom} onChange={e => setNewCategoriaCustom(e.target.value)} className="mt-2" />
                         )}
                       </div>
                       <div>
@@ -466,41 +556,67 @@ export function VistaOrdenesCompra({
                   </div>
                 )}
                 {itemsOrden.length > 0 && (
-                  <div className="rounded-lg border border-slate-200 overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-100">
-                        <tr>{['Pieza','Cant.','Precio','Subtotal',''].map((h,i) => <th key={i} className={`px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide ${i > 0 && i < 4 ? 'text-right' : i === 0 ? 'text-left' : ''}`}>{h}</th>)}</tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {itemsOrden.map(it => (
-                          <tr key={it.refaccionId} className="bg-white">
-                            <td className="px-3 py-2 font-medium text-slate-800">{it.nombre}</td>
-                            <td className="px-3 py-2 text-right text-slate-700">{it.cantidad}</td>
-                            <td className="px-3 py-2 text-right text-slate-600">${fmt(it.precioCompra)}</td>
-                            <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(it.subtotal)}</td>
-                            <td className="px-3 py-2 text-center"><Btn size="sm" variant="danger" onClick={() => setItemsOrden(prev => prev.filter(i => i.refaccionId !== it.refaccionId))}>Γ£ò</Btn></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-slate-50 border-t-2 border-slate-200">
-                        {formConIVA && (
-                          <>
-                            <tr>
-                              <td colSpan={3} className="px-3 py-1.5 text-xs text-slate-600 text-right">Subtotal (sin IVA):</td>
-                              <td className="px-3 py-1.5 text-right text-slate-700">${fmt(subtotalPiezas)}</td><td></td>
-                            </tr>
-                            <tr>
-                              <td colSpan={3} className="px-3 py-1.5 text-xs text-amber-700 text-right">IVA (16%):</td>
-                              <td className="px-3 py-1.5 text-right text-amber-700 font-semibold">+${fmt(ivaCalculado)}</td><td></td>
-                            </tr>
-                          </>
-                        )}
-                        <tr>
-                          <td colSpan={3} className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total OC:</td>
-                          <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(totalOrden)}</td><td></td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                  <div className="space-y-2 mt-1">
+                    {itemsOrden.map(it => (
+                      <div key={it.refaccionId} className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+                        {/* Fila principal */}
+                        <div className="flex items-center gap-2 px-3 py-2.5">
+                          <span className="flex-1 font-medium text-slate-800 text-sm truncate">{it.nombre}</span>
+                          <span className="text-xs text-slate-500 whitespace-nowrap">×{it.cantidad}</span>
+                          <span className="text-xs text-slate-400 whitespace-nowrap">${fmt(it.precioCompra)}</span>
+                          <span className="text-sm font-semibold text-slate-900 whitespace-nowrap">${fmt(it.subtotal)}</span>
+                          <button type="button" onClick={() => setItemsOrden(prev => prev.filter(i => i.refaccionId !== it.refaccionId))} className="text-rose-400 hover:text-rose-600 font-bold text-sm ml-1 shrink-0">✕</button>
+                        </div>
+                        {/* Fila compatibilidad — siempre visible */}
+                        <div className="border-t border-slate-100 bg-slate-50 px-3 py-2">
+                          {/* Tags */}
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            <span className="text-sm">🚗</span>
+                            {(it.compatibilidad ?? []).length === 0 && (
+                              <span className="text-xs text-slate-400 italic">Sin asignar</span>
+                            )}
+                            {(it.compatibilidad ?? []).map((v, vi) => (
+                              <span key={vi} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                                {v.marca}{v.modelo ? ` ${v.modelo}` : ''}
+                                <button type="button" onClick={() => quitarVehiculo(it.refaccionId, vi)} className="text-indigo-400 hover:text-indigo-600 leading-none ml-0.5">×</button>
+                              </span>
+                            ))}
+                          </div>
+                          {/* Inputs Marca + Modelo */}
+                          <div className="flex gap-2 flex-wrap items-end">
+                            <div className="flex-1 min-w-[90px]">
+                              <p className="text-xs text-slate-500 mb-1">Marca *</p>
+                              <input type="text" placeholder="Ej. Ford" value={getCompat(it.refaccionId).marca}
+                                onChange={e => setCompat(it.refaccionId, { marca: e.target.value })}
+                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(it.refaccionId); } }}
+                                className="w-full text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 bg-white" />
+                            </div>
+                            <div className="flex-1 min-w-[90px]">
+                              <p className="text-xs text-slate-500 mb-1">Modelo <span className="text-slate-400">(opcional)</span></p>
+                              <input type="text" placeholder="Ej. F-150" value={getCompat(it.refaccionId).modelo}
+                                onChange={e => setCompat(it.refaccionId, { modelo: e.target.value })}
+                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(it.refaccionId); } }}
+                                className="w-full text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 bg-white" />
+                            </div>
+                            <button type="button" onClick={() => agregarVehiculo(it.refaccionId)}
+                              disabled={!getCompat(it.refaccionId).marca.trim()}
+                              className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+                              + Agregar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {/* Totales */}
+                    <div className="pt-1 text-right space-y-0.5">
+                      {formConIVA && (
+                        <>
+                          <p className="text-xs text-slate-500">Subtotal (sin IVA): ${fmt(subtotalPiezas)}</p>
+                          <p className="text-xs text-amber-700">IVA (16%): +${fmt(ivaCalculado)}</p>
+                        </>
+                      )}
+                      <p className="text-sm font-extrabold text-slate-900">Total OC: ${fmt(totalOrden)}</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -609,16 +725,34 @@ export function VistaOrdenesCompra({
                         <Btn size="sm" variant="danger" onClick={() => onCancelarOrden(orden.id)}>Cancelar</Btn>
                       </>
                     )}
+                    {orden.estado === 'recibida' && (
+                      <Btn size="sm" variant="ghost" onClick={() => setEditandoOrden(orden)}>✏️ Corregir orden</Btn>
+                    )}
                   </div>
                 </div>
                 {isExpandida && (
                   <div className="mt-3 pt-3 border-t border-slate-200">
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Piezas en esta orden</p>
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       {(orden.partes ?? []).map((it, index) => (
-                        <div key={`${orden.id}-${index}`} className="flex justify-between items-center bg-white border border-slate-200 rounded px-3 py-2 text-sm">
-                          <span className="text-slate-700">{it.nombre} × {it.cantidad}</span>
-                          <span className="font-semibold text-slate-800">${fmt(it.subtotal ?? 0)}</span>
+                        <div key={`${orden.id}-${index}`} className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+                          {/* Fila principal */}
+                          <div className="flex justify-between items-center px-3 py-2.5">
+                            <span className="text-slate-700 font-medium text-sm">{it.nombre} × {it.cantidad}</span>
+                            <span className="font-semibold text-slate-800">${fmt(it.subtotal ?? 0)}</span>
+                          </div>
+                          {/* Fila compatibilidad — siempre visible (read-only) */}
+                          <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 flex items-center gap-2 flex-wrap">
+                            <span className="text-sm">🚗</span>
+                            {(it.compatibilidad ?? []).length === 0 ? (
+                              <span className="text-xs text-slate-400 italic">Sin asignar</span>
+                            ) : (
+                              (it.compatibilidad ?? []).map((v, vi) => {
+                                const label = typeof v === 'string' ? v : `${v.marca}${v.modelo ? ` ${v.modelo}` : ''}`;
+                                return <span key={vi} className="bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">{label}</span>;
+                              })
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
