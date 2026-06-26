@@ -18,7 +18,7 @@ export function VistaInventario({
   clientes: Cliente[];
   vehiculos: Vehiculo[];
   proveedores: Proveedor[];
-  onGuardarRefaccion: (r: Omit<Refaccion, 'id'>) => void;
+  onGuardarRefaccion: (r: Omit<Refaccion, 'id'>) => Promise<void>;
   onRecibirStock: (id: string, cantidad: number) => void;
   onActualizarCompatibilidad: (id: string, compatibilidad: CompatibilidadVehiculo[]) => void;
 }) {
@@ -33,6 +33,8 @@ export function VistaInventario({
   const [recibirCantidad, setRecibirCantidad] = useState<Record<string, number>>({});
   const [filtroProveedor, setFiltroProveedor] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [guardandoForm, setGuardandoForm] = useState(false);
+  const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
 
   // ── Estado para edición de compatibilidad de piezas existentes ──
   // Modelo plano: cada entrada es un par (marca, modelo)
@@ -112,15 +114,24 @@ export function VistaInventario({
     setTimeout(() => setSavedId(null), 2000);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nombre || form.precioCompra <= 0) return;
     const compatFinal = compatibilidad.filter(c => c.marca.trim());
-    onGuardarRefaccion({ ...form, compatibilidad: compatFinal.length > 0 ? compatFinal : undefined });
-    setForm({ nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza', precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '', proveedorId: '' });
-    setFormClienteId('');
-    setCompatibilidad([]);
-    setModeloInputs({});
+    setGuardandoForm(true);
+    setErrorGuardado(null);
+    try {
+      await onGuardarRefaccion({ ...form, compatibilidad: compatFinal.length > 0 ? compatFinal : undefined });
+      // only reset AFTER successful save
+      setForm({ nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza', precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '', proveedorId: '' });
+      setFormClienteId('');
+      setCompatibilidad([]);
+      setModeloInputs({});
+    } catch {
+      setErrorGuardado('No se pudo guardar la refacción. Verifica tu conexión e intenta de nuevo.');
+    } finally {
+      setGuardandoForm(false);
+    }
   };
 
   const handleClienteChange = (clienteId: string) => {
@@ -321,8 +332,14 @@ export function VistaInventario({
             ))}
           </div>
 
-          <Btn type="submit" variant="primary" disabled={!form.nombre || form.precioCompra <= 0}>
-            + Agregar al Inventario
+          {errorGuardado && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+              ⚠️ {errorGuardado}
+            </div>
+          )}
+
+          <Btn type="submit" variant="primary" disabled={guardandoForm || !form.nombre || form.precioCompra <= 0}>
+            {guardandoForm ? '⏳ Guardando...' : '+ Agregar al Inventario'}
           </Btn>
         </form>
       </div>
