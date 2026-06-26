@@ -614,8 +614,8 @@ export function VistaTrabajo({
         await onGuardar(trabajoData);
       }
       resetForm(); // only reset AFTER successful save
-    } catch {
-      setErrorGuardado('No se pudo guardar el trabajo. Verifica tu conexión e intenta de nuevo.');
+    } catch (err) {
+      setErrorGuardado(`Error al guardar: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     } finally {
       setGuardandoForm(false);
     }
