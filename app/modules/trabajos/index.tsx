@@ -404,6 +404,7 @@ export function VistaTrabajo({
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'completado'>('todos');
   const [filtroFacturacion, setFiltroFacturacion] = useState<'todos' | 'con_factura' | 'sin_factura'>('todos');
   const [filtroTft, setFiltroTft] = useState<'todos' | 'sin_tft' | 'con_tft'>('todos');
+  const [filtroPendienteRefacciones, setFiltroPendienteRefacciones] = useState(false);
   const [filtroClienteId, setFiltroClienteId] = useState('');
   const [filtroVehiculoId, setFiltroVehiculoId] = useState('');
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
@@ -663,6 +664,7 @@ export function VistaTrabajo({
 
   const trabajosPendientes = trabajosDelTab.filter(t => t.estado === 'pendiente');
   const trabajosPendientesFacturar = trabajosDelTab.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
+  const trabajosSinRefacciones = trabajosDelTab.filter(t => t.pendienteRefacciones === true);
   const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
   const trabajosFiltrados = [...trabajosDelTab]
     .filter(t => {
@@ -672,6 +674,7 @@ export function VistaTrabajo({
       if (filtroFacturacion === 'con_factura' && t.estadoFacturacion !== 'facturado') return false;
       if (filtroFacturacion === 'sin_factura' && t.estadoFacturacion === 'facturado') return false;
       if (esAyuntamientoTab && filtroTft !== 'todos' && (t.tftEstado ?? 'sin_tft') !== filtroTft) return false;
+      if (filtroPendienteRefacciones && !t.pendienteRefacciones) return false;
       return true;
     })
     .sort((a, b) => ordenHistorial === 'desc'
@@ -1492,6 +1495,24 @@ export function VistaTrabajo({
           </div>
         )}
 
+        {/* Banner: trabajos pendientes de refacciones */}
+        {trabajosSinRefacciones.length > 0 && (
+          <button
+            onClick={() => setFiltroPendienteRefacciones(f => !f)}
+            className={`w-full text-left rounded-xl px-5 py-3 mb-4 flex items-center gap-3 text-sm border transition-all ${filtroPendienteRefacciones ? 'bg-orange-100 border-orange-400' : 'bg-orange-50 border-orange-200 hover:bg-orange-100'}`}
+          >
+            <span className="text-2xl">⚠️</span>
+            <div className="flex-1">
+              <span className="text-orange-800 font-semibold">
+                {trabajosSinRefacciones.length} trabajo{trabajosSinRefacciones.length !== 1 ? 's' : ''} pendiente{trabajosSinRefacciones.length !== 1 ? 's' : ''} de refacciones — hay que comprar piezas para poder trabajar
+              </span>
+            </div>
+            <span className={`text-xs font-bold px-2 py-1 rounded-full transition-all ${filtroPendienteRefacciones ? 'bg-orange-500 text-white' : 'bg-orange-200 text-orange-700'}`}>
+              {filtroPendienteRefacciones ? 'Ver todos' : 'Ver solo estos'}
+            </span>
+          </button>
+        )}
+
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-base font-bold text-slate-700">
             Historial de Trabajos
@@ -1634,6 +1655,7 @@ export function VistaTrabajo({
                 const vehiculo = getVehiculo(trabajo.vehiculoId);
                 const isPendiente = trabajo.estado === 'pendiente';
                 const tftEstado = trabajo.tftEstado ?? 'sin_tft';
+                const esPendienteRefacciones = trabajo.pendienteRefacciones === true;
                 const badgeEstado = trabajo.tipoDocumento === 'factura'
                   ? <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">🧾 Factura</span>
                   : trabajo.tipoDocumento === 'nota'
@@ -1642,7 +1664,7 @@ export function VistaTrabajo({
                       ? <span className="text-xs bg-amber-50 text-amber-600 font-semibold px-2 py-0.5 rounded-full border border-amber-200">🕐 En progreso</span>
                       : <span className="text-xs bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">✓ Terminado</span>;
                 return (
-                  <tr key={trabajo.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                  <tr key={trabajo.id} className={`${esPendienteRefacciones ? 'bg-orange-50' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-700 font-medium">
                       {new Date(trabajo.fecha).toLocaleDateString('es-MX')}
                     </td>
@@ -1669,6 +1691,16 @@ export function VistaTrabajo({
                     )}
                     <td className="px-4 py-3 text-slate-700">
                       {trabajo.descripcion}
+                      {esPendienteRefacciones && (
+                        <span className="ml-2 text-xs bg-orange-100 text-orange-700 font-semibold px-1.5 py-0.5 rounded-full border border-orange-200 whitespace-nowrap" title={(trabajo.refaccionesPendientesNombres ?? []).join(', ')}>
+                          ⚠️ Sin refacciones
+                        </span>
+                      )}
+                      {esPendienteRefacciones && (trabajo.refaccionesPendientesNombres ?? []).length > 0 && (
+                        <div className="mt-1 text-xs text-orange-600 font-medium">
+                          Falta: {(trabajo.refaccionesPendientesNombres ?? []).join(', ')}
+                        </div>
+                      )}
                       {trabajo.partes?.length > 0 && (
                         <span className="ml-2 text-xs bg-indigo-100 text-indigo-700 font-semibold px-1.5 py-0.5 rounded-full">
                           {trabajo.partes.length} pieza{trabajo.partes.length !== 1 ? 's' : ''}
