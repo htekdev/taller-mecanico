@@ -1178,7 +1178,7 @@ export function VistaCotizaciones({
     }
 
     if (successCount === legacyData.length) {
-      // All inserted — sync counter and clear localStorage
+      // All inserted — sync counter and FLAG as migrated (NEVER delete localStorage)
       const maxNum = legacyData.reduce((m, e) => {
         const n = parseInt(e.numeroCotizacion.replace('COT-', ''), 10);
         return isNaN(n) ? m : Math.max(m, n);
@@ -1186,10 +1186,9 @@ export function VistaCotizaciones({
       if (maxNum > 0) {
         await supabaseUpsertCounter(tallerId, maxNum);
       }
+      // Set migrated flag — localStorage data stays as backup forever
       const migratedKey = LS_MIGRATED_KEY(tallerId);
       localStorage.setItem(migratedKey, '1');
-      localStorage.removeItem(LS_COT_HISTORY_KEY);
-      localStorage.removeItem(LS_COT_COUNTER_KEY);
 
       // Refresh from Supabase and close modal
       await recargarHistory();

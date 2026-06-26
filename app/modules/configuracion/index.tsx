@@ -262,7 +262,84 @@ export function VistaConfiguracion() {
         </section>
       )}
 
+      {/* ── Datos Locales (debug) ─────────────────────────── */}
+      <LocalStoragePanel />
+
     </div>
+  );
+}
+
+// ── localStorage Debug Panel ──────────────────────────────────
+
+function LocalStoragePanel() {
+  const [entries, setEntries] = useState<{ key: string; value: string; size: number }[]>([]);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const items: { key: string; value: string; size: number }[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        const val = localStorage.getItem(key) ?? '';
+        items.push({ key, value: val, size: val.length });
+      }
+    }
+    items.sort((a, b) => b.size - a.size);
+    setEntries(items);
+  }, []);
+
+  const totalSize = entries.reduce((s, e) => s + e.size, 0);
+  const tallerEntries = entries.filter(e => e.key.startsWith('taller_'));
+
+  return (
+    <section className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mt-6">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <h3 className="text-base font-semibold text-slate-700">
+          💾 Datos Locales del Navegador
+        </h3>
+        <span className="text-xs text-slate-500">
+          {entries.length} claves · {(totalSize / 1024).toFixed(1)} KB
+          {expanded ? ' ▲' : ' ▼'}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="mt-4 space-y-2">
+          {tallerEntries.length === 0 && (
+            <p className="text-sm text-slate-400 italic">No hay datos de Taller Mecánico en localStorage.</p>
+          )}
+          {tallerEntries.map(e => (
+            <div key={e.key} className="border border-slate-100 rounded-lg p-3 bg-slate-50">
+              <div className="flex items-center justify-between mb-1">
+                <code className="text-xs font-mono text-indigo-700 font-bold">{e.key}</code>
+                <span className="text-xs text-slate-400">{(e.size / 1024).toFixed(1)} KB</span>
+              </div>
+              <pre className="text-xs text-slate-600 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
+                {e.value.length > 500 ? e.value.slice(0, 500) + '…' : e.value}
+              </pre>
+            </div>
+          ))}
+          {entries.filter(e => !e.key.startsWith('taller_')).length > 0 && (
+            <details className="mt-3">
+              <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600">
+                + {entries.filter(e => !e.key.startsWith('taller_')).length} otras claves (no-taller)
+              </summary>
+              <div className="mt-2 space-y-1">
+                {entries.filter(e => !e.key.startsWith('taller_')).map(e => (
+                  <div key={e.key} className="text-xs text-slate-500 font-mono truncate">
+                    {e.key} ({(e.size / 1024).toFixed(1)} KB)
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
