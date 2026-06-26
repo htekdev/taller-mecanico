@@ -1,4 +1,8 @@
--- Migration 005: Cotizaciones table (shared across all taller members)
+-- Migration 006: Cotizaciones table (shared across all taller members)
+-- Renamed from 005 → 006 because 005_ayuntamiento_fields.sql already claims
+-- version "005" in schema_migrations. The duplicate version prevented this
+-- migration from ever running on production or preview branches.
+--
 -- Fixes: cotizaciones were stored in localStorage per-browser, so only the
 -- user who created them on a given device could see them. This migrates to
 -- Supabase so all taller members (owner + mechanics) share the same data.
