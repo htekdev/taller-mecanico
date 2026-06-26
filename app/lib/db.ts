@@ -270,7 +270,9 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
       ...(data.inventarioNum !== undefined ? { inventario_num: data.inventarioNum } : {}),
       ...(data.ordenServicioGob !== undefined ? { orden_servicio_gob: data.ordenServicioGob } : {}),
       ...(data.tftNumero !== undefined ? { tft_numero: data.tftNumero } : {}),
-      tft_estado: data.tftEstado ?? 'sin_tft',
+      // Only send tft_estado when explicitly set — avoids "column not found" on DBs
+      // where migration 005 hasn't applied yet (general jobs never need this column)
+      ...(data.tftEstado !== undefined ? { tft_estado: data.tftEstado } : {}),
       ...(data.fechaEntrada !== undefined ? { fecha_entrada: data.fechaEntrada } : {}),
       ...(data.fechaSalida !== undefined ? { fecha_salida: data.fechaSalida } : {}),
       pendiente_refacciones: data.pendienteRefacciones ?? false,
@@ -355,7 +357,8 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
     inventario_num: data.inventarioNum ?? null,
     orden_servicio_gob: data.ordenServicioGob ?? null,
     tft_numero: data.tftNumero ?? null,
-    tft_estado: data.tftEstado ?? 'sin_tft',
+    // Only send tft_estado when explicitly set — avoids "column not found" on production
+    ...(data.tftEstado !== undefined ? { tft_estado: data.tftEstado } : {}),
     fecha_entrada: data.fechaEntrada ?? null,
     fecha_salida: data.fechaSalida ?? null,
     pendiente_refacciones: data.pendienteRefacciones ?? false,
