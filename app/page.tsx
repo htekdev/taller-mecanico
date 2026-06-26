@@ -290,11 +290,15 @@ export default function TallerMecanico() {
     const subtotal = trabajo.manoDeObra + trabajo.refacciones;
     const iva = tipo === 'factura' ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
     const total = subtotal + iva;
+    // throws if DB update fails — prevents optimistic state getting out of sync
     await db.updateTrabajoFinalizar(trabajoId, tipo, iva, total);
+    // Update local state immediately for the current session
     setTrabajos(prev => prev.map(t => t.id === trabajoId
       ? { ...t, estado: 'completado' as const, tipoDocumento: tipo, requiereFactura: tipo === 'factura', iva, total, fechaFinalizacion: new Date().toISOString() }
       : t
     ));
+    // Force a full reload from DB so other sessions see updated state on next load
+    await cargarDatos();
   };
 
   const actualizarTft = async (trabajoId: string, tftNumero: string) => {
