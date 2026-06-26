@@ -1111,7 +1111,13 @@ export function VistaCotizaciones({
   const [reconciliandoId, setReconciliandoId] = useState<string | null>(null);
   const [guardando, setGuardando]       = useState(false);
 
-  // ── Load cotizaciones from Supabase + one-time localStorage migration ──────
+  // ── Migration modal state ──────────────────────────────────────────────────
+  const [showMigrationModal, setShowMigrationModal] = useState(false);
+  const [legacyData, setLegacyData]                 = useState<CotizacionGuardada[]>([]);
+  const [migrating, setMigrating]                   = useState(false);
+  const [migrationError, setMigrationError]         = useState<string | null>(null);
+
+  // ── Load cotizaciones from Supabase ────────────────────────────────────────
   const migrationDone = useRef(false);
 
   const recargarHistory = useCallback(async () => {
@@ -1126,47 +1132,19 @@ export function VistaCotizaciones({
     (async () => {
       setLoading(true);
 
-      // One-time migration: if localStorage has cotizaciones not yet migrated,
-      // push them to Supabase so existing data isn't lost.
+      // Check for localStorage data that hasn't been migrated yet
       const migratedKey = LS_MIGRATED_KEY(tallerId);
       if (!migrationDone.current && typeof window !== 'undefined' && !localStorage.getItem(migratedKey)) {
         migrationDone.current = true;
         const legacy = readLegacyHistory();
         if (legacy.length > 0) {
-          // Migrate each legacy cotización to Supabase — track success count
-          let successCount = 0;
-          for (const entry of legacy) {
-            const result = await db.insertCotizacion(tallerId, {
-              numeroCotizacion: entry.numeroCotizacion,
-              plantilla:        entry.plantilla as CotizacionRow['plantilla'],
-              cliente:          entry.cliente,
-              fecha:            entry.fecha || null,
-              total:            entry.total,
-              cancelada:        entry.cancelada ?? false,
-              editada:          entry.editada ?? false,
-              convertida:       entry.convertida ?? false,
-              form:             entry.form as unknown as Record<string, unknown>,
-            });
-            if (result) successCount++;
-          }
-
-          // ONLY clear localStorage if ALL inserts succeeded.
-          // If Supabase inserts failed (e.g. table doesn't exist), keep localStorage intact.
-          if (successCount === legacy.length) {
-            // Update the counter to match the highest legacy number
-            const maxNum = legacy.reduce((m, e) => {
-              const n = parseInt(e.numeroCotizacion.replace('COT-', ''), 10);
-              return isNaN(n) ? m : Math.max(m, n);
-            }, 0);
-            if (maxNum > 0) {
-              await supabaseUpsertCounter(tallerId, maxNum);
-            }
-            // Mark migration done and clear legacy keys
-            localStorage.setItem(migratedKey, '1');
-            localStorage.removeItem(LS_COT_HISTORY_KEY);
-            localStorage.removeItem(LS_COT_COUNTER_KEY);
-          }
-          // If inserts failed, DON'T mark as migrated — retry next time the table exists
+          // Show the migration modal — DON'T auto-migrate
+          setLegacyData(legacy);
+          setShowMigrationModal(true);
+          // Also show legacy data immediately so user sees their cotizaciones
+          setHistory(legacy);
+          setLoading(false);
+          return;
         } else {
           localStorage.setItem(migratedKey, '1');
         }
@@ -1176,6 +1154,55 @@ export function VistaCotizaciones({
       setLoading(false);
     })();
   }, [tallerId, recargarHistory]);
+
+  /** User clicked "Migrar ahora" — push localStorage → Supabase */
+  const ejecutarMigracion = async () => {
+    if (!tallerId || legacyData.length === 0) return;
+    setMigrating(true);
+    setMigrationError(null);
+
+    let successCount = 0;
+    for (const entry of legacyData) {
+      const result = await db.insertCotizacion(tallerId, {
+        numeroCotizacion: entry.numeroCotizacion,
+        plantilla:        entry.plantilla as CotizacionRow['plantilla'],
+        cliente:          entry.cliente,
+        fecha:            entry.fecha || null,
+        total:            entry.total,
+        cancelada:        entry.cancelada ?? false,
+        editada:          entry.editada ?? false,
+        convertida:       entry.convertida ?? false,
+        form:             entry.form as unknown as Record<string, unknown>,
+      });
+      if (result) successCount++;
+    }
+
+    if (successCount === legacyData.length) {
+      // All inserted — sync counter and clear localStorage
+      const maxNum = legacyData.reduce((m, e) => {
+        const n = parseInt(e.numeroCotizacion.replace('COT-', ''), 10);
+        return isNaN(n) ? m : Math.max(m, n);
+      }, 0);
+      if (maxNum > 0) {
+        await supabaseUpsertCounter(tallerId, maxNum);
+      }
+      const migratedKey = LS_MIGRATED_KEY(tallerId);
+      localStorage.setItem(migratedKey, '1');
+      localStorage.removeItem(LS_COT_HISTORY_KEY);
+      localStorage.removeItem(LS_COT_COUNTER_KEY);
+
+      // Refresh from Supabase and close modal
+      await recargarHistory();
+      setShowMigrationModal(false);
+      setLegacyData([]);
+    } else {
+      setMigrationError(
+        `Solo se pudieron migrar ${successCount} de ${legacyData.length} cotizaciones. ` +
+        `Verifica tu conexión e intenta de nuevo.`
+      );
+    }
+    setMigrating(false);
+  };
 
   const blankForm = useCallback((p: Plantilla): FormCotizacion => ({
     numeroCotizacion: '',
@@ -1326,6 +1353,43 @@ export function VistaCotizaciones({
     const cotizacionReconciliando = reconciliandoId ? history.find(e => e.id === reconciliandoId) ?? null : null;
     return (
       <div>
+        {/* ── Migration Modal ──────────────────────────────────────────── */}
+        {showMigrationModal && (
+          <div className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-5 shadow-lg">
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">☁️</span>
+              <div className="flex-1">
+                <h3 className="font-bold text-amber-900 text-base">
+                  Migrar cotizaciones a la nube
+                </h3>
+                <p className="text-sm text-amber-800 mt-1">
+                  Encontramos <strong>{legacyData.length}</strong> cotizacion{legacyData.length === 1 ? '' : 'es'} guardada{legacyData.length === 1 ? '' : 's'} en este navegador.
+                  Al migrarlas a la nube, todos los miembros del taller podrán verlas desde cualquier dispositivo.
+                </p>
+                {migrationError && (
+                  <p className="text-sm text-red-700 mt-2 font-medium">⚠️ {migrationError}</p>
+                )}
+                <div className="mt-3 flex gap-3">
+                  <button
+                    onClick={ejecutarMigracion}
+                    disabled={migrating}
+                    className="px-4 py-2 rounded-lg bg-amber-600 text-white font-bold text-sm hover:bg-amber-700 disabled:opacity-50 disabled:cursor-wait transition-colors"
+                  >
+                    {migrating ? '⏳ Migrando...' : '🚀 Migrar ahora'}
+                  </button>
+                  <button
+                    onClick={() => setShowMigrationModal(false)}
+                    disabled={migrating}
+                    className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-100 disabled:opacity-50 transition-colors"
+                  >
+                    Después
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <SectionTitle title="Cotizaciones" subtitle="Crea y guarda cotizaciones para tus clientes"/>
         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Nueva Cotización</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
