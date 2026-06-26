@@ -19,13 +19,8 @@
 DROP POLICY IF EXISTS "ver_invitaciones" ON taller_invites;
 
 -- 1. Taller members: full CRUD on their taller's invites (create, cancel, view all)
-drop policy if exists "miembros_gestionar_invitaciones" on public.taller_invites;
-create policy "miembros_gestionar_invitaciones"
-on public.taller_invites
-for all
-to public
-using (is_taller_member(taller_id))
-with check (is_taller_member(taller_id));
+CREATE POLICY "miembros_gestionar_invitaciones" ON taller_invites
+  FOR ALL USING (is_taller_member(taller_id));
 
 -- 2. Invited user: can SELECT their own pending invite (needed by redeemInvite)
 --    This runs BEFORE they are a member, so is_taller_member would be false.
