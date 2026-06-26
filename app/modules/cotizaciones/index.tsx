@@ -1127,16 +1127,32 @@ export function VistaCotizaciones({
     (async () => {
       setLoading(true);
 
+      // Safety check: if migration was flagged "done" but Supabase has zero
+      // cotizaciones AND localStorage still has legacy data, the previous
+      // migration silently failed. Reset the flag so we retry.
+      const migratedKey = LS_MIGRATED_KEY(tallerId);
+      if (typeof window !== 'undefined' && localStorage.getItem(migratedKey)) {
+        const legacyCheck = readLegacyHistory();
+        if (legacyCheck.length > 0) {
+          // localStorage still has data — previous migration must have failed
+          const { data: existingRows } = await db.getCotizaciones(tallerId).then(r => ({ data: r })).catch(() => ({ data: [] }));
+          if (!existingRows || existingRows.length === 0) {
+            // Supabase is empty but localStorage has data → reset flag to retry
+            localStorage.removeItem(migratedKey);
+          }
+        }
+      }
+
       // One-time migration: if localStorage has cotizaciones not yet migrated,
       // push them to Supabase so existing data isn't lost.
-      const migratedKey = LS_MIGRATED_KEY(tallerId);
       if (!migrationDone.current && typeof window !== 'undefined' && !localStorage.getItem(migratedKey)) {
         migrationDone.current = true;
         const legacy = readLegacyHistory();
         if (legacy.length > 0) {
-          // Migrate each legacy cotización to Supabase (ignore errors — best effort)
+          // Migrate each legacy cotización to Supabase — track successes
+          let successCount = 0;
           for (const entry of legacy) {
-            await db.insertCotizacion(tallerId, {
+            const row = await db.insertCotizacion(tallerId, {
               numeroCotizacion: entry.numeroCotizacion,
               plantilla:        entry.plantilla as CotizacionRow['plantilla'],
               cliente:          entry.cliente,
@@ -1147,6 +1163,7 @@ export function VistaCotizaciones({
               convertida:       entry.convertida ?? false,
               form:             entry.form as unknown as Record<string, unknown>,
             });
+            if (row) successCount++;
           }
           // Update the counter to match the highest legacy number
           const maxNum = legacy.reduce((m, e) => {
@@ -1156,11 +1173,14 @@ export function VistaCotizaciones({
           if (maxNum > 0) {
             await supabaseUpsertCounter(tallerId, maxNum);
           }
-          // Mark migration done
-          localStorage.setItem(migratedKey, '1');
-          // Clear legacy keys so they don't take up space
-          localStorage.removeItem(LS_COT_HISTORY_KEY);
-          localStorage.removeItem(LS_COT_COUNTER_KEY);
+          // ONLY clear localStorage if at least some inserts succeeded.
+          // If all failed (e.g. table doesn't exist), keep local data safe.
+          if (successCount > 0) {
+            localStorage.setItem(migratedKey, '1');
+            localStorage.removeItem(LS_COT_HISTORY_KEY);
+            localStorage.removeItem(LS_COT_COUNTER_KEY);
+          }
+          // If none succeeded, do NOT set the flag — retry next time
         } else {
           localStorage.setItem(migratedKey, '1');
         }

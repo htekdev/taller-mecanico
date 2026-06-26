@@ -1021,17 +1021,51 @@ export async function updateCotizacion(
 // Counter — replaces the localStorage taller_cot_counter.
 // Returns the next sequential number and persists it atomically.
 export async function nextCotizacionNumber(tallerId: string): Promise<string> {
-  // Upsert: increment if exists, insert with 1 if not.
-  // Supabase doesn't support atomic increment via upsert directly, so we use
-  // a two-step read+write (safe for single-user or low-concurrency shops).
+  // Determine the highest known cotización number from ALL sources:
+  // 1. The counter table (primary source)
+  // 2. MAX numero_cotizacion in cotizaciones table (fallback if counter was never seeded)
+  // 3. Legacy localStorage counter (fallback if migration lost the counter)
+  // This prevents number resets if the counter row is missing.
+
+  let counterValue = 0;
+
+  // Source 1: counter table
   const { data: existing } = await supabase
     .from('cotizacion_counter')
     .select('last_number')
     .eq('taller_id', tallerId)
     .single();
+  if (existing?.last_number) {
+    counterValue = existing.last_number;
+  }
 
-  const next = (existing?.last_number ?? 0) + 1;
+  // Source 2: MAX from cotizaciones table (in case counter was never seeded)
+  const { data: maxRows } = await supabase
+    .from('cotizaciones')
+    .select('numero_cotizacion')
+    .eq('taller_id', tallerId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (maxRows && maxRows.length > 0) {
+    const maxFromTable = maxRows.reduce((m: number, r: Record<string, unknown>) => {
+      const n = parseInt(String(r.numero_cotizacion).replace('COT-', ''), 10);
+      return isNaN(n) ? m : Math.max(m, n);
+    }, 0);
+    counterValue = Math.max(counterValue, maxFromTable);
+  }
 
+  // Source 3: Legacy localStorage counter (in case Supabase counter was never seeded
+  // but localStorage still has the old value from pre-migration)
+  if (typeof window !== 'undefined') {
+    const legacyCounter = parseInt(localStorage.getItem('taller_cot_counter') ?? '0', 10);
+    if (!isNaN(legacyCounter) && legacyCounter > counterValue) {
+      counterValue = legacyCounter;
+    }
+  }
+
+  const next = counterValue + 1;
+
+  // Persist the new counter value
   await supabase
     .from('cotizacion_counter')
     .upsert({ taller_id: tallerId, last_number: next }, { onConflict: 'taller_id' });
