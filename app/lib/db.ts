@@ -160,6 +160,19 @@ export async function updateRefaccionCompatibilidad(id: string, compatibilidad: 
   await supabase.from('refacciones').update({ compatibilidad: compatibilidad ?? null }).eq('id', id);
 }
 
+/** Update nombre and/or precioCompra on an inventory record — used when correcting a received purchase order. */
+export async function updateRefaccionDetalles(
+  id: string,
+  data: { nombre?: string; precioCompra?: number },
+): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (data.nombre !== undefined) patch.nombre = data.nombre;
+  if (data.precioCompra !== undefined) patch.precio_compra = data.precioCompra;
+  if (Object.keys(patch).length > 0) {
+    await supabase.from('refacciones').update(patch).eq('id', id);
+  }
+}
+
 export async function updateRefacciones(items: Refaccion[]): Promise<void> {
   // Batch update stocks after a work order
   for (const r of items) {

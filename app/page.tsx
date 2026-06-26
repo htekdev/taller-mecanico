@@ -328,6 +328,30 @@ export default function TallerMecanico() {
   ) => {
     await db.updateOrden(ordenId, data);
     setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, ...data } : o));
+
+    // Sync inventory when correcting a received order:
+    // if nombre or precioCompra changed on a real inventory item, update the record
+    const orden = ordenes.find(o => o.id === ordenId);
+    if (orden?.estado === 'recibida') {
+      const invUpdates: { id: string; nombre: string; precioCompra: number }[] = [];
+      for (const part of data.partes) {
+        if (part.refaccionId.startsWith('libre-')) continue; // free-form items not in inventory
+        const inv = inventario.find(r => r.id === part.refaccionId);
+        if (!inv) continue;
+        if (inv.nombre !== part.nombre || inv.precioCompra !== part.precioCompra) {
+          invUpdates.push({ id: part.refaccionId, nombre: part.nombre, precioCompra: part.precioCompra });
+        }
+      }
+      if (invUpdates.length > 0) {
+        await Promise.all(
+          invUpdates.map(u => db.updateRefaccionDetalles(u.id, { nombre: u.nombre, precioCompra: u.precioCompra }))
+        );
+        setInventario(prev => prev.map(r => {
+          const upd = invUpdates.find(u => u.id === r.id);
+          return upd ? { ...r, nombre: upd.nombre, precioCompra: upd.precioCompra } : r;
+        }));
+      }
+    }
   };
   const registrarPagoOrden = async (ordenId: string, pago: Omit<PagoCompra, 'id'>) => {
     const ordenActual = ordenes.find(o => o.id === ordenId);

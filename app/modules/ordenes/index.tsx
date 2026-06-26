@@ -38,13 +38,16 @@ function ModalEditarOrden({
   const setCompat = (id: string, f: Partial<{ marca: string; modelo: string }>) =>
     setCompatInputs(prev => ({ ...prev, [id]: { ...getCompat(id), ...f } }));
 
-  // Edición inline de cantidad y precio de un item existente
+  // Edición inline de cantidad, precio y nombre de un item existente
   const editarCantidad = (idx: number, nc: number) => {
     const n = Math.max(1, nc);
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, cantidad: n, subtotal: n * it.precioCompra } : it));
   };
   const editarPrecio = (idx: number, np: number) => {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, precioCompra: np, subtotal: it.cantidad * np } : it));
+  };
+  const editarNombre = (idx: number, nombre: string) => {
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, nombre } : it));
   };
 
   const agregarItem = () => {
@@ -142,7 +145,9 @@ function ModalEditarOrden({
                 <div key={idx} className="border border-slate-200 rounded-xl bg-white overflow-hidden">
                   {/* Fila principal — editable inline */}
                   <div className="flex items-center gap-2 px-3 py-2.5 flex-wrap">
-                    <span className="flex-1 font-medium text-slate-800 text-sm truncate min-w-[80px]">{item.nombre}</span>
+                    <input type="text" value={item.nombre}
+                      onChange={e => editarNombre(idx, e.target.value)}
+                      className="flex-1 font-medium text-slate-800 text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 min-w-[120px]" />
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-slate-400">Cant:</span>
                       <input type="number" min="1" step="1" value={item.cantidad}
