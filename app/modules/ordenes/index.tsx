@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { OrdenCompra, Proveedor, Refaccion, CompraItem } from '@/app/types';
+import type { OrdenCompra, Proveedor, Refaccion, CompraItem, ItemCompatibilidad } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { fmt, BADGE_ORDEN } from '@/app/lib/utils';
 
@@ -25,8 +25,12 @@ function ModalEditarOrden({
   const [pickerCantidad, setPickerCantidad] = useState(1);
   const [pickerPrecio, setPickerPrecio] = useState(0);
   const [guardando, setGuardando] = useState(false);
-  // Compatibilidad por pieza: texto en curso del input por refaccionId
-  const [compatInputs, setCompatInputs] = useState<Record<string, string>>({});
+  // Compatibilidad por pieza: { marca, modelo } en curso por refaccionId
+  const [compatInputs, setCompatInputs] = useState<Record<string, { marca: string; modelo: string }>>({});
+
+  const getCompat = (id: string) => compatInputs[id] ?? { marca: '', modelo: '' };
+  const setCompat = (id: string, f: Partial<{ marca: string; modelo: string }>) =>
+    setCompatInputs(prev => ({ ...prev, [id]: { ...getCompat(id), ...f } }));
 
   const agregarItem = () => {
     const ref = inventario.find(r => r.id === pickerRefId);
@@ -42,20 +46,20 @@ function ModalEditarOrden({
   const quitarItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
 
   const agregarVehiculo = (refaccionId: string) => {
-    const val = (compatInputs[refaccionId] ?? '').trim();
-    if (!val) return;
+    const { marca, modelo } = getCompat(refaccionId);
+    if (!marca.trim()) return;
     setItems(prev => prev.map(it =>
       it.refaccionId === refaccionId
-        ? { ...it, compatibilidad: [...(it.compatibilidad ?? []), val] }
+        ? { ...it, compatibilidad: [...(it.compatibilidad ?? []), { marca: marca.trim(), modelo: modelo.trim() || undefined }] }
         : it
     ));
-    setCompatInputs(prev => ({ ...prev, [refaccionId]: '' }));
+    setCompatInputs(prev => ({ ...prev, [refaccionId]: { marca: '', modelo: '' } }));
   };
 
-  const quitarVehiculo = (refaccionId: string, vehiculo: string) => {
+  const quitarVehiculo = (refaccionId: string, idx: number) => {
     setItems(prev => prev.map(it =>
       it.refaccionId === refaccionId
-        ? { ...it, compatibilidad: (it.compatibilidad ?? []).filter(v => v !== vehiculo) }
+        ? { ...it, compatibilidad: (it.compatibilidad ?? []).filter((_, i) => i !== idx) }
         : it
     ));
   };
@@ -116,27 +120,41 @@ function ModalEditarOrden({
                     <button type="button" onClick={() => quitarItem(idx)} className="text-rose-500 hover:text-rose-700 font-bold text-sm ml-1 shrink-0">✕</button>
                   </div>
                   {/* Fila compatibilidad */}
-                  <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 flex items-center gap-2 flex-wrap">
-                    <span className="text-sm">🚗</span>
-                    {(item.compatibilidad ?? []).length === 0 && (
-                      <span className="text-xs text-slate-400 italic">Sin asignar</span>
-                    )}
-                    {(item.compatibilidad ?? []).map((v, vi) => (
-                      <span key={vi} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
-                        {v}
-                        <button type="button" onClick={() => quitarVehiculo(item.refaccionId, v)} className="text-indigo-400 hover:text-indigo-600 leading-none ml-0.5">×</button>
-                      </span>
-                    ))}
-                    <div className="flex items-center gap-1 ml-auto">
-                      <input
-                        type="text"
-                        placeholder="Ej. Aveo 2018"
-                        value={compatInputs[item.refaccionId] ?? ''}
-                        onChange={e => setCompatInputs(prev => ({ ...prev, [item.refaccionId]: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(item.refaccionId); } }}
-                        className="text-xs border border-slate-200 rounded px-2 py-1 w-28 focus:outline-none focus:border-indigo-400 bg-white"
-                      />
-                      <button type="button" onClick={() => agregarVehiculo(item.refaccionId)} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded font-semibold hover:bg-indigo-700 shrink-0">+ Auto</button>
+                  <div className="border-t border-slate-100 bg-slate-50 px-3 py-2">
+                    {/* Tags existentes */}
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      <span className="text-sm">🚗</span>
+                      {(item.compatibilidad ?? []).length === 0 && (
+                        <span className="text-xs text-slate-400 italic">Sin asignar</span>
+                      )}
+                      {(item.compatibilidad ?? []).map((v, vi) => (
+                        <span key={vi} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                          {v.marca}{v.modelo ? ` ${v.modelo}` : ''}
+                          <button type="button" onClick={() => quitarVehiculo(item.refaccionId, vi)} className="text-indigo-400 hover:text-indigo-600 leading-none ml-0.5">×</button>
+                        </span>
+                      ))}
+                    </div>
+                    {/* Inputs Marca + Modelo */}
+                    <div className="flex gap-2 flex-wrap items-end">
+                      <div className="flex-1 min-w-[100px]">
+                        <p className="text-xs text-slate-500 mb-1">Marca *</p>
+                        <input type="text" placeholder="Ej. Ford" value={getCompat(item.refaccionId).marca}
+                          onChange={e => setCompat(item.refaccionId, { marca: e.target.value })}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(item.refaccionId); } }}
+                          className="w-full text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 bg-white" />
+                      </div>
+                      <div className="flex-1 min-w-[100px]">
+                        <p className="text-xs text-slate-500 mb-1">Modelo <span className="text-slate-400">(opcional)</span></p>
+                        <input type="text" placeholder="Ej. F-150" value={getCompat(item.refaccionId).modelo}
+                          onChange={e => setCompat(item.refaccionId, { modelo: e.target.value })}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(item.refaccionId); } }}
+                          className="w-full text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 bg-white" />
+                      </div>
+                      <button type="button" onClick={() => agregarVehiculo(item.refaccionId)}
+                        disabled={!getCompat(item.refaccionId).marca.trim()}
+                        className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+                        + Agregar
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -245,8 +263,12 @@ export function VistaOrdenesCompra({
   const [newPrecio, setNewPrecio]         = useState(0);
   const [newCantidad, setNewCantidad]     = useState(1);
 
-  // Compatibilidad por pieza: texto en curso del input, keyed por refaccionId
-  const [compatInputs, setCompatInputs] = useState<Record<string, string>>({});
+  // Compatibilidad por pieza: { marca, modelo } en curso por refaccionId
+  const [compatInputs, setCompatInputs] = useState<Record<string, { marca: string; modelo: string }>>({});
+
+  const getCompat = (id: string) => compatInputs[id] ?? { marca: '', modelo: '' };
+  const setCompat = (id: string, f: Partial<{ marca: string; modelo: string }>) =>
+    setCompatInputs(prev => ({ ...prev, [id]: { ...getCompat(id), ...f } }));
 
   // ── IVA calculations ──────────────────────────────────────────────────────────
   const subtotalPiezas = itemsOrden.reduce((s, i) => s + i.subtotal, 0);
@@ -256,20 +278,20 @@ export function VistaOrdenesCompra({
 
   // ── Compatibilidad helpers ────────────────────────────────────────────────────
   const agregarVehiculo = (refaccionId: string) => {
-    const val = (compatInputs[refaccionId] ?? '').trim();
-    if (!val) return;
+    const { marca, modelo } = getCompat(refaccionId);
+    if (!marca.trim()) return;
     setItemsOrden(prev => prev.map(it =>
       it.refaccionId === refaccionId
-        ? { ...it, compatibilidad: [...(it.compatibilidad ?? []), val] }
+        ? { ...it, compatibilidad: [...(it.compatibilidad ?? []), { marca: marca.trim(), modelo: modelo.trim() || undefined }] }
         : it
     ));
-    setCompatInputs(prev => ({ ...prev, [refaccionId]: '' }));
+    setCompatInputs(prev => ({ ...prev, [refaccionId]: { marca: '', modelo: '' } }));
   };
 
-  const quitarVehiculo = (refaccionId: string, vehiculo: string) => {
+  const quitarVehiculo = (refaccionId: string, idx: number) => {
     setItemsOrden(prev => prev.map(it =>
       it.refaccionId === refaccionId
-        ? { ...it, compatibilidad: (it.compatibilidad ?? []).filter(v => v !== vehiculo) }
+        ? { ...it, compatibilidad: (it.compatibilidad ?? []).filter((_, i) => i !== idx) }
         : it
     ));
   };
@@ -546,27 +568,41 @@ export function VistaOrdenesCompra({
                           <button type="button" onClick={() => setItemsOrden(prev => prev.filter(i => i.refaccionId !== it.refaccionId))} className="text-rose-400 hover:text-rose-600 font-bold text-sm ml-1 shrink-0">✕</button>
                         </div>
                         {/* Fila compatibilidad — siempre visible */}
-                        <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 flex items-center gap-2 flex-wrap">
-                          <span className="text-sm">🚗</span>
-                          {(it.compatibilidad ?? []).length === 0 && (
-                            <span className="text-xs text-slate-400 italic">Sin asignar</span>
-                          )}
-                          {(it.compatibilidad ?? []).map((v, vi) => (
-                            <span key={vi} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
-                              {v}
-                              <button type="button" onClick={() => quitarVehiculo(it.refaccionId, v)} className="text-indigo-400 hover:text-indigo-600 leading-none ml-0.5">×</button>
-                            </span>
-                          ))}
-                          <div className="flex items-center gap-1 ml-auto">
-                            <input
-                              type="text"
-                              placeholder="Ej. Aveo 2018"
-                              value={compatInputs[it.refaccionId] ?? ''}
-                              onChange={e => setCompatInputs(prev => ({ ...prev, [it.refaccionId]: e.target.value }))}
-                              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(it.refaccionId); } }}
-                              className="text-xs border border-slate-200 rounded px-2 py-1 w-28 focus:outline-none focus:border-indigo-400 bg-white"
-                            />
-                            <button type="button" onClick={() => agregarVehiculo(it.refaccionId)} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded font-semibold hover:bg-indigo-700 shrink-0">+ Auto</button>
+                        <div className="border-t border-slate-100 bg-slate-50 px-3 py-2">
+                          {/* Tags */}
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            <span className="text-sm">🚗</span>
+                            {(it.compatibilidad ?? []).length === 0 && (
+                              <span className="text-xs text-slate-400 italic">Sin asignar</span>
+                            )}
+                            {(it.compatibilidad ?? []).map((v, vi) => (
+                              <span key={vi} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                                {v.marca}{v.modelo ? ` ${v.modelo}` : ''}
+                                <button type="button" onClick={() => quitarVehiculo(it.refaccionId, vi)} className="text-indigo-400 hover:text-indigo-600 leading-none ml-0.5">×</button>
+                              </span>
+                            ))}
+                          </div>
+                          {/* Inputs Marca + Modelo */}
+                          <div className="flex gap-2 flex-wrap items-end">
+                            <div className="flex-1 min-w-[90px]">
+                              <p className="text-xs text-slate-500 mb-1">Marca *</p>
+                              <input type="text" placeholder="Ej. Ford" value={getCompat(it.refaccionId).marca}
+                                onChange={e => setCompat(it.refaccionId, { marca: e.target.value })}
+                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(it.refaccionId); } }}
+                                className="w-full text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 bg-white" />
+                            </div>
+                            <div className="flex-1 min-w-[90px]">
+                              <p className="text-xs text-slate-500 mb-1">Modelo <span className="text-slate-400">(opcional)</span></p>
+                              <input type="text" placeholder="Ej. F-150" value={getCompat(it.refaccionId).modelo}
+                                onChange={e => setCompat(it.refaccionId, { modelo: e.target.value })}
+                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarVehiculo(it.refaccionId); } }}
+                                className="w-full text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 bg-white" />
+                            </div>
+                            <button type="button" onClick={() => agregarVehiculo(it.refaccionId)}
+                              disabled={!getCompat(it.refaccionId).marca.trim()}
+                              className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+                              + Agregar
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -708,9 +744,10 @@ export function VistaOrdenesCompra({
                             {(it.compatibilidad ?? []).length === 0 ? (
                               <span className="text-xs text-slate-400 italic">Sin asignar</span>
                             ) : (
-                              (it.compatibilidad ?? []).map((v, vi) => (
-                                <span key={vi} className="bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">{v}</span>
-                              ))
+                              (it.compatibilidad ?? []).map((v, vi) => {
+                                const label = typeof v === 'string' ? v : `${v.marca}${v.modelo ? ` ${v.modelo}` : ''}`;
+                                return <span key={vi} className="bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">{label}</span>;
+                              })
                             )}
                           </div>
                         </div>
