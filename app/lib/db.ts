@@ -248,6 +248,8 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
     tftEstado: (r.tft_estado as Trabajo['tftEstado']) ?? 'sin_tft',
     fechaEntrada: r.fecha_entrada ?? undefined,
     fechaSalida: r.fecha_salida ?? undefined,
+    pendienteRefacciones: r.pendiente_refacciones ?? false,
+    refaccionesPendientesNombres: (r.refacciones_pendientes_nombres as string[]) ?? [],
   }));
 }
 
@@ -271,6 +273,8 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
       tft_estado: data.tftEstado ?? 'sin_tft',
       ...(data.fechaEntrada !== undefined ? { fecha_entrada: data.fechaEntrada } : {}),
       ...(data.fechaSalida !== undefined ? { fecha_salida: data.fechaSalida } : {}),
+      pendiente_refacciones: data.pendienteRefacciones ?? false,
+      refacciones_pendientes_nombres: data.refaccionesPendientesNombres ?? [],
       mano_de_obra: data.manoDeObra,
       mano_de_obra_items: data.manoDeObraItems,
       refacciones_total: data.refacciones,
@@ -305,6 +309,8 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
     tftEstado: (row.tft_estado as Trabajo['tftEstado']) ?? 'sin_tft',
     fechaEntrada: row.fecha_entrada ?? undefined,
     fechaSalida: row.fecha_salida ?? undefined,
+    pendienteRefacciones: row.pendiente_refacciones ?? false,
+    refaccionesPendientesNombres: (row.refacciones_pendientes_nombres as string[]) ?? [],
     manoDeObra: Number(row.mano_de_obra),
     manoDeObraItems: (row.mano_de_obra_items as ManoDeObraItem[]) ?? [],
     refacciones: Number(row.refacciones_total), costoRefacciones: Number(row.costo_refacciones),
@@ -352,6 +358,8 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
     tft_estado: data.tftEstado ?? 'sin_tft',
     fecha_entrada: data.fechaEntrada ?? null,
     fecha_salida: data.fechaSalida ?? null,
+    pendiente_refacciones: data.pendienteRefacciones ?? false,
+    refacciones_pendientes_nombres: data.refaccionesPendientesNombres ?? [],
     mano_de_obra: data.manoDeObra,
     mano_de_obra_items: data.manoDeObraItems,
     refacciones_total: data.refacciones,

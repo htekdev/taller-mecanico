@@ -120,6 +120,10 @@ export interface ConversionTrabajo {
   fecha: string;
   manoDeObraItems: ManoDeObraItem[];
   partes: TrabajoRefaccion[];
+  /** True when job was converted without all parts in inventory */
+  pendienteRefacciones?: boolean;
+  /** Names of parts not yet in inventory at conversion time */
+  refaccionesPendientesNombres?: string[];
 }
 
 // Input to onAgregarRefaccion — refaccion data + optional purchase order info
@@ -746,7 +750,7 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
   inventario: Refaccion[];
   proveedores: Proveedor[];
   onAgregarRefaccion: (data: AgregarRefaccionInput) => Promise<Refaccion | null>;
-  onCrearTrabajo: (partes: TrabajoRefaccion[], manoDeObra: ManoDeObraItem[]) => Promise<void>;
+  onCrearTrabajo: (partes: TrabajoRefaccion[], manoDeObra: ManoDeObraItem[], pendienteRefacciones?: boolean, refaccionesPendientesNombres?: string[]) => Promise<void>;
   onCerrar: () => void;
   onNavegar: () => void;
 }) {
@@ -773,6 +777,7 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
   const [addingItem, setAddingItem] = useState<ItemLinea | null>(null);
   const [creando, setCreando] = useState(false);
   const [exito, setExito] = useState(false);
+  const [exitoConPendientes, setExitoConPendientes] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const refacciones = cotizacion.form.refacciones.filter(i => i.descripcion.trim() !== '');
@@ -797,7 +802,7 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
     setAddingItem(null);
   };
 
-  const handleCrearTrabajo = async () => {
+  const handleCrearTrabajo = async (sinRefacciones = false) => {
     setCreando(true);
     setErrorMsg(null);
     try {
@@ -822,8 +827,12 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
         precio: parseNum(i.precioUnitario) * Math.max(1, parseNum(i.cantidad)),
       }));
 
-      await onCrearTrabajo(partes, manoDeObra);
+      const hayPendientes = sinRefacciones && pendientes.length > 0;
+      const nombresPendientes = hayPendientes ? pendientes.map(i => i.descripcion) : undefined;
+
+      await onCrearTrabajo(partes, manoDeObra, hayPendientes || undefined, nombresPendientes);
       setExito(true);
+      setExitoConPendientes(hayPendientes);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMsg(msg);
@@ -838,12 +847,20 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center space-y-4">
-          <div className="text-5xl">✅</div>
+          <div className="text-5xl">{exitoConPendientes ? '⚠️' : '✅'}</div>
           <h2 className="text-xl font-bold text-slate-800">¡Trabajo Creado!</h2>
           <p className="text-sm text-slate-500">
             El trabajo fue creado a partir de <strong>{cotizacion.numeroCotizacion}</strong>.
             Puedes verlo en la pestaña de Trabajos.
           </p>
+          {exitoConPendientes && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-left">
+              <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-1">⚠️ Pendiente de refacciones</p>
+              <p className="text-xs text-amber-600">
+                Este trabajo quedó marcado como pendiente de refacciones. Aparecerá resaltado en la lista de Trabajos hasta que se completen.
+              </p>
+            </div>
+          )}
           <Btn variant="success" onClick={() => { onCerrar(); onNavegar(); }}>Ir a Trabajos →</Btn>
         </div>
       </div>
@@ -923,7 +940,7 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
           <div className={`px-4 py-3 rounded-xl text-sm font-medium border ${allResolved ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-orange-50 border-orange-200 text-orange-700'}`}>
             {allResolved
               ? '✅ Todas las piezas están en inventario. ¡Listo para crear el trabajo!'
-              : `⚠️ ${pendientes.length} pieza(s) sin registrar en inventario.`}
+              : `⚠️ ${pendientes.length} pieza(s) sin registrar. Puedes agregarlas al inventario o convertir sin ellas.`}
           </div>
 
           {/* Error banner — shown if insertTrabajo throws */}
@@ -935,12 +952,21 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
 
           <div className="flex gap-3">
             <Btn variant="ghost" onClick={onCerrar}>Cancelar</Btn>
-            <button
-              onClick={handleCrearTrabajo}
-              disabled={!allResolved || creando}
-              className={`flex-1 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${allResolved && !creando ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-              {creando ? '⏳ Creando trabajo...' : '🔧 Crear Trabajo'}
-            </button>
+            {allResolved ? (
+              <button
+                onClick={() => handleCrearTrabajo(false)}
+                disabled={creando}
+                className={`flex-1 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${!creando ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                {creando ? '⏳ Creando trabajo...' : '🔧 Crear Trabajo'}
+              </button>
+            ) : (
+              <button
+                onClick={() => handleCrearTrabajo(true)}
+                disabled={creando}
+                className={`flex-1 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${!creando ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-sm' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                {creando ? '⏳ Creando trabajo...' : '⚠️ Convertir sin refacciones'}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1275,7 +1301,7 @@ export function VistaCotizaciones({
     setReconciliandoId(entry.id);
   };
 
-  const handleCrearTrabajo = async (partes: TrabajoRefaccion[], manoDeObra: ManoDeObraItem[]) => {
+  const handleCrearTrabajo = async (partes: TrabajoRefaccion[], manoDeObra: ManoDeObraItem[], pendienteRefacciones?: boolean, refaccionesPendientesNombres?: string[]) => {
     const cot = history.find(e => e.id === reconciliandoId);
     if (!cot || !onConvertirATrabajo) return;
     const descripcionBase = cot.form.trabajo?.trim() || 'Trabajo';
@@ -1288,6 +1314,8 @@ export function VistaCotizaciones({
       fecha:             cot.form.fecha || hoy(),
       manoDeObraItems:   manoDeObra,
       partes,
+      pendienteRefacciones,
+      refaccionesPendientesNombres,
     });
     // Mark cotización as convertida in Supabase
     await db.updateCotizacion(cot.id, { convertida: true });

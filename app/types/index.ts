@@ -190,6 +190,10 @@ export interface Trabajo {
   tftEstado?: 'sin_tft' | 'con_tft';
   fechaEntrada?: string;
   fechaSalida?: string;
+  /** True when job was converted from cotización without all parts in inventory */
+  pendienteRefacciones?: boolean;
+  /** Names of parts that were missing from inventory at conversion time */
+  refaccionesPendientesNombres?: string[];
 }
 
 export interface PricingIntel {
