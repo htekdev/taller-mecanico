@@ -1,19 +1,14 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { Cliente, Vehiculo, Refaccion, Proveedor, TrabajoRefaccion, ManoDeObraItem } from '@/app/types';
 import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
 import { CATEGORIAS, UNIDADES } from '@/app/lib/utils';
-import * as db from '@/app/lib/db';
-import type { CotizacionRow } from '@/app/lib/db';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// Legacy localStorage keys — used only for one-time migration to Supabase.
-const LS_COT_COUNTER_KEY = 'taller_cot_counter';
-const LS_COT_HISTORY_KEY = 'taller_cotizaciones';
-const LS_MIGRATED_KEY    = (tallerId: string) => `taller_cotizaciones_migrated_${tallerId}`;
-
+const COT_COUNTER_KEY   = 'taller_cot_counter';
+const COT_HISTORY_KEY   = 'taller_cotizaciones';
 const NUM_PROVEEDOR_RED = 'P004093';
 
 // Lista de departamentos del Ayuntamiento de Mérida — confirmada por Sofia.
@@ -27,38 +22,24 @@ const DEPARTAMENTOS_AYUNTAMIENTO: string[] = [
 
 const AUTORIZADOS: string[] = ['Héctor Rocha', 'Sofía Rocha'];
 
-// ─── Storage helpers (localStorage → kept only for one-time migration) ────────
+// ─── Storage helpers ──────────────────────────────────────────────────────────
 
-/** Read legacy localStorage history (used once for migration, then cleared). */
-function readLegacyHistory(): CotizacionGuardada[] {
+function assignNextNumber(): string {
+  if (typeof window === 'undefined') return 'COT-001';
+  const current = parseInt(localStorage.getItem(COT_COUNTER_KEY) ?? '0', 10);
+  const next = current + 1;
+  localStorage.setItem(COT_COUNTER_KEY, String(next));
+  return `COT-${String(next).padStart(3, '0')}`;
+}
+
+function loadHistory(): CotizacionGuardada[] {
   if (typeof window === 'undefined') return [];
-  try { return JSON.parse(localStorage.getItem(LS_COT_HISTORY_KEY) ?? '[]') as CotizacionGuardada[]; }
+  try { return JSON.parse(localStorage.getItem(COT_HISTORY_KEY) ?? '[]') as CotizacionGuardada[]; }
   catch { return []; }
 }
 
-/** Map a Supabase CotizacionRow → component CotizacionGuardada. */
-function rowToEntry(row: CotizacionRow): CotizacionGuardada {
-  return {
-    id:                row.id,
-    numeroCotizacion:  row.numeroCotizacion,
-    plantilla:         row.plantilla as Plantilla,
-    cliente:           row.cliente,
-    fecha:             row.fecha ?? '',
-    total:             row.total,
-    savedAt:           row.savedAt,
-    cancelada:         row.cancelada || undefined,
-    editada:           row.editada || undefined,
-    convertida:        row.convertida || undefined,
-    form:              row.form as FormCotizacion,
-  };
-}
-
-/** One-time helper used during localStorage migration to set the counter. */
-async function supabaseUpsertCounter(tallerId: string, lastNumber: number): Promise<void> {
-  const { supabase } = await import('@/app/lib/supabase');
-  await supabase
-    .from('cotizacion_counter')
-    .upsert({ taller_id: tallerId, last_number: lastNumber }, { onConflict: 'taller_id' });
+function persistHistory(list: CotizacionGuardada[]): void {
+  localStorage.setItem(COT_HISTORY_KEY, JSON.stringify(list));
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1082,7 +1063,6 @@ function HistorialCotizaciones({
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export function VistaCotizaciones({
-  tallerId = '',
   clientes = [],
   vehiculos = [],
   inventario = [],
@@ -1103,72 +1083,13 @@ export function VistaCotizaciones({
   const [pantalla, setPantalla]     = useState<Pantalla>('inicio');
   const [plantilla, setPlantilla]   = useState<Plantilla>('general');
   const [history, setHistory]       = useState<CotizacionGuardada[]>([]);
-  const [loading, setLoading]       = useState(true);
   // When editing an existing entry, track its id so we reuse its number
   const [editingId, setEditingId]       = useState<string | null>(null);
   const [viewEntry, setViewEntry]       = useState<CotizacionGuardada | null>(null);
   // Conversion modal: tracks which cotización is being reconciled
   const [reconciliandoId, setReconciliandoId] = useState<string | null>(null);
-  const [guardando, setGuardando]       = useState(false);
 
-  // ── Load cotizaciones from Supabase + one-time localStorage migration ──────
-  const migrationDone = useRef(false);
-
-  const recargarHistory = useCallback(async () => {
-    if (!tallerId) return;
-    const rows = await db.getCotizaciones(tallerId);
-    setHistory(rows.map(rowToEntry));
-  }, [tallerId]);
-
-  useEffect(() => {
-    if (!tallerId) { setLoading(false); return; }
-
-    (async () => {
-      setLoading(true);
-
-      // One-time migration: if localStorage has cotizaciones not yet migrated,
-      // push them to Supabase so existing data isn't lost.
-      const migratedKey = LS_MIGRATED_KEY(tallerId);
-      if (!migrationDone.current && typeof window !== 'undefined' && !localStorage.getItem(migratedKey)) {
-        migrationDone.current = true;
-        const legacy = readLegacyHistory();
-        if (legacy.length > 0) {
-          // Migrate each legacy cotización to Supabase (ignore errors — best effort)
-          for (const entry of legacy) {
-            await db.insertCotizacion(tallerId, {
-              numeroCotizacion: entry.numeroCotizacion,
-              plantilla:        entry.plantilla as CotizacionRow['plantilla'],
-              cliente:          entry.cliente,
-              fecha:            entry.fecha || null,
-              total:            entry.total,
-              cancelada:        entry.cancelada ?? false,
-              editada:          entry.editada ?? false,
-              convertida:       entry.convertida ?? false,
-              form:             entry.form as unknown as Record<string, unknown>,
-            });
-          }
-          // Update the counter to match the highest legacy number
-          const maxNum = legacy.reduce((m, e) => {
-            const n = parseInt(e.numeroCotizacion.replace('COT-', ''), 10);
-            return isNaN(n) ? m : Math.max(m, n);
-          }, 0);
-          if (maxNum > 0) {
-            await supabaseUpsertCounter(tallerId, maxNum);
-          }
-          // Mark migration done
-          localStorage.setItem(migratedKey, '1');
-          // Clear legacy keys so they don't take up space
-          localStorage.removeItem(LS_COT_HISTORY_KEY);
-          localStorage.removeItem(LS_COT_COUNTER_KEY);
-        } else {
-          localStorage.setItem(migratedKey, '1');
-        }
-      }
-
-      await recargarHistory();
-      setLoading(false);
-    })();
-  }, [tallerId, recargarHistory]);
+  useEffect(() => { setHistory(loadHistory()); }, []);
 
   const blankForm = useCallback((p: Plantilla): FormCotizacion => ({
     numeroCotizacion: '',
@@ -1207,66 +1128,46 @@ export function VistaCotizaciones({
   };
 
   // ── Save / Update ──────────────────────────────────────────────────────────
-  const handleGuardar = async () => {
-    if (!tallerId || guardando) return;
-    setGuardando(true);
-    try {
+  const handleGuardar = () => {
     const { total } = calcTotales(form);
     const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de Mérida'
       : plantilla === 'red_ambiental' ? 'Red Ambiental' : form.cliente;
 
+    let savedForm: FormCotizacion;
+    let entry: CotizacionGuardada;
+    const list = loadHistory();
+
     if (editingId) {
       // ── EDIT: reuse original number, mark as editada ──
-      const existing = history.find(e => e.id === editingId)!;
-      const savedForm: FormCotizacion = { ...form, numeroCotizacion: existing.numeroCotizacion };
-      await db.updateCotizacion(editingId, {
-        cliente:  clienteNombre,
-        fecha:    form.fecha || null,
-        total,
-        editada:  true,
-        form:     savedForm as unknown as Record<string, unknown>,
-        savedAt:  new Date().toISOString(),
-      });
-      await recargarHistory();
-      const updated = history.find(e => e.id === editingId);
-      const entry: CotizacionGuardada = updated
-        ? { ...updated, cliente: clienteNombre, fecha: form.fecha, total, form: savedForm, editada: true }
-        : { id: editingId, numeroCotizacion: existing.numeroCotizacion, plantilla, cliente: clienteNombre, fecha: form.fecha, total, savedAt: new Date().toISOString(), form: savedForm, editada: true };
-      setForm(savedForm);
-      setViewEntry(entry);
+      const existing = list.find(e => e.id === editingId)!;
+      savedForm = { ...form, numeroCotizacion: existing.numeroCotizacion };
+      entry = { ...existing, cliente: clienteNombre, fecha: form.fecha, total, form: savedForm, editada: true };
+      const updated = list.map(e => e.id === editingId ? entry : e);
+      persistHistory(updated);
     } else {
-      // ── NEW: assign next sequential number from Supabase counter ──
-      const numero = await db.nextCotizacionNumber(tallerId);
-      const savedForm: FormCotizacion = { ...form, numeroCotizacion: numero };
-      const row = await db.insertCotizacion(tallerId, {
-        numeroCotizacion: numero,
-        plantilla:        plantilla as CotizacionRow['plantilla'],
-        cliente:          clienteNombre,
-        fecha:            form.fecha || null,
-        total,
-        cancelada:        false,
-        editada:          false,
-        convertida:       false,
-        form:             savedForm as unknown as Record<string, unknown>,
-      });
-      await recargarHistory();
-      const entry: CotizacionGuardada = row
-        ? rowToEntry(row)
-        : { id: '', numeroCotizacion: numero, plantilla, cliente: clienteNombre, fecha: form.fecha, total, savedAt: new Date().toISOString(), form: savedForm };
-      setForm(savedForm);
-      setViewEntry(entry);
+      // ── NEW: assign fresh sequential number ──
+      const numero = assignNextNumber();
+      savedForm = { ...form, numeroCotizacion: numero };
+      entry = {
+        id: Date.now().toString(), numeroCotizacion: numero, plantilla,
+        cliente: clienteNombre, fecha: form.fecha, total,
+        savedAt: new Date().toISOString(), form: savedForm,
+      };
+      list.unshift(entry);
+      persistHistory(list);
     }
 
+    setHistory(loadHistory());
+    setForm(savedForm);
+    setViewEntry(entry);
     setPantalla('preview');
-    } finally {
-      setGuardando(false);
-    }
   };
 
   // ── Cancel a quote (soft) ─────────────────────────────────────────────────
-  const handleCancelar = async (id: string) => {
-    await db.updateCotizacion(id, { cancelada: true });
-    await recargarHistory();
+  const handleCancelar = (id: string) => {
+    const list = loadHistory().map(e => e.id === id ? { ...e, cancelada: true } : e);
+    persistHistory(list);
+    setHistory(list);
     if (viewEntry?.id === id) setViewEntry(v => v ? { ...v, cancelada: true } : v);
   };
 
@@ -1289,9 +1190,10 @@ export function VistaCotizaciones({
       manoDeObraItems:   manoDeObra,
       partes,
     });
-    // Mark cotización as convertida in Supabase
-    await db.updateCotizacion(cot.id, { convertida: true });
-    await recargarHistory();
+    // Mark cotización as convertida in localStorage
+    const list = loadHistory().map(e => e.id === cot.id ? { ...e, convertida: true } : e);
+    persistHistory(list);
+    setHistory(list);
   };
 
   // ── Open saved entry for viewing ──────────────────────────────────────────
@@ -1333,19 +1235,12 @@ export function VistaCotizaciones({
             </button>
           ))}
         </div>
-        {loading ? (
-          <div className="mt-8 text-center text-slate-400 py-10">
-            <div className="text-2xl mb-2">⏳</div>
-            <p className="text-sm">Cargando cotizaciones...</p>
-          </div>
-        ) : (
         <HistorialCotizaciones
           history={history}
           onVer={handleVerEntry}
           onCancelar={handleCancelar}
           onConvertir={onConvertirATrabajo ? handleConvertir : undefined}
         />
-        )}
         {cotizacionReconciliando && onAgregarRefaccion && (
           <ModalReconciliacion
             cotizacion={cotizacionReconciliando}
@@ -1529,8 +1424,8 @@ export function VistaCotizaciones({
         {/* Actions */}
         <div className="flex gap-3 flex-wrap items-center">
           <Btn variant="ghost" onClick={() => setPantalla(viewEntry ? 'preview' : 'inicio')}>← Cancelar</Btn>
-          <Btn variant="success" onClick={handleGuardar} disabled={!canSave || guardando}>
-            {guardando ? '⏳ Guardando...' : (isEditing ? '💾 Guardar cambios' : '💾 Guardar Cotización')}
+          <Btn variant="success" onClick={handleGuardar} disabled={!canSave}>
+            {isEditing ? '💾 Guardar cambios' : '💾 Guardar Cotización'}
           </Btn>
           {!canSave && (
             <span className="text-xs text-rose-500">
