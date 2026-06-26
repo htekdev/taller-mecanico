@@ -81,7 +81,7 @@ function ModalEditarOrden({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-800">✏️ Editar Orden de Compra</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Solo disponible mientras la orden está pendiente.</p>
+            <p className="text-xs text-slate-500 mt-0.5">Edita los datos de la orden para corregir errores.</p>
           </div>
           <button type="button" onClick={onCerrar} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
         </div>
@@ -724,6 +724,9 @@ export function VistaOrdenesCompra({
                         <Btn size="sm" variant="success" onClick={() => onRecibirOrden(orden.id)}>✓ Marcar Recibida</Btn>
                         <Btn size="sm" variant="danger" onClick={() => onCancelarOrden(orden.id)}>Cancelar</Btn>
                       </>
+                    )}
+                    {orden.estado === 'recibida' && (
+                      <Btn size="sm" variant="ghost" onClick={() => setEditandoOrden(orden)}>✏️ Corregir orden</Btn>
                     )}
                   </div>
                 </div>
