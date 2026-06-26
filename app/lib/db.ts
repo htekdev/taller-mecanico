@@ -265,18 +265,18 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
       // Only include kilometraje if it has a value — omitting it lets the DB
       // column default to NULL, and avoids "column not found" on older branches
       ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
-      tipo_cliente: data.tipoCliente ?? 'general',
+      // Migration 005 columns — conditional to avoid "column not found" if migration hasn't applied
+      ...(data.tipoCliente !== undefined ? { tipo_cliente: data.tipoCliente } : {}),
       ...(data.departamento !== undefined ? { departamento: data.departamento } : {}),
       ...(data.inventarioNum !== undefined ? { inventario_num: data.inventarioNum } : {}),
       ...(data.ordenServicioGob !== undefined ? { orden_servicio_gob: data.ordenServicioGob } : {}),
       ...(data.tftNumero !== undefined ? { tft_numero: data.tftNumero } : {}),
-      // Only send tft_estado when explicitly set — avoids "column not found" on DBs
-      // where migration 005 hasn't applied yet (general jobs never need this column)
       ...(data.tftEstado !== undefined ? { tft_estado: data.tftEstado } : {}),
       ...(data.fechaEntrada !== undefined ? { fecha_entrada: data.fechaEntrada } : {}),
       ...(data.fechaSalida !== undefined ? { fecha_salida: data.fechaSalida } : {}),
-      pendiente_refacciones: data.pendienteRefacciones ?? false,
-      refacciones_pendientes_nombres: data.refaccionesPendientesNombres ?? [],
+      // Migration 20260626150000 columns — conditional for same reason
+      ...(data.pendienteRefacciones !== undefined ? { pendiente_refacciones: data.pendienteRefacciones } : {}),
+      ...(data.refaccionesPendientesNombres !== undefined ? { refacciones_pendientes_nombres: data.refaccionesPendientesNombres } : {}),
       mano_de_obra: data.manoDeObra,
       mano_de_obra_items: data.manoDeObraItems,
       refacciones_total: data.refacciones,
@@ -351,18 +351,19 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
     vehiculo_id: data.vehiculoId || null,
     fecha: data.fecha,
     descripcion: data.descripcion,
-    kilometraje: data.kilometraje ?? null,
-    tipo_cliente: data.tipoCliente ?? 'general',
-    departamento: data.departamento ?? null,
-    inventario_num: data.inventarioNum ?? null,
-    orden_servicio_gob: data.ordenServicioGob ?? null,
-    tft_numero: data.tftNumero ?? null,
-    // Only send tft_estado when explicitly set — avoids "column not found" on production
+    ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : { kilometraje: null }),
+    // Migration 005 columns — conditional to avoid "column not found" if migration hasn't applied
+    ...(data.tipoCliente !== undefined ? { tipo_cliente: data.tipoCliente } : {}),
+    ...(data.departamento !== undefined ? { departamento: data.departamento } : {}),
+    ...(data.inventarioNum !== undefined ? { inventario_num: data.inventarioNum } : {}),
+    ...(data.ordenServicioGob !== undefined ? { orden_servicio_gob: data.ordenServicioGob } : {}),
+    ...(data.tftNumero !== undefined ? { tft_numero: data.tftNumero } : {}),
     ...(data.tftEstado !== undefined ? { tft_estado: data.tftEstado } : {}),
-    fecha_entrada: data.fechaEntrada ?? null,
-    fecha_salida: data.fechaSalida ?? null,
-    pendiente_refacciones: data.pendienteRefacciones ?? false,
-    refacciones_pendientes_nombres: data.refaccionesPendientesNombres ?? [],
+    ...(data.fechaEntrada !== undefined ? { fecha_entrada: data.fechaEntrada } : {}),
+    ...(data.fechaSalida !== undefined ? { fecha_salida: data.fechaSalida } : {}),
+    // Migration 20260626150000 columns — conditional for same reason
+    ...(data.pendienteRefacciones !== undefined ? { pendiente_refacciones: data.pendienteRefacciones } : {}),
+    ...(data.refaccionesPendientesNombres !== undefined ? { refacciones_pendientes_nombres: data.refaccionesPendientesNombres } : {}),
     mano_de_obra: data.manoDeObra,
     mano_de_obra_items: data.manoDeObraItems,
     refacciones_total: data.refacciones,
