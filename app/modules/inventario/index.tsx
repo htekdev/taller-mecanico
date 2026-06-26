@@ -376,8 +376,8 @@ export function VistaInventario({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-800 text-white">
-                  {['Código','Nombre / Unidad vinculada','Categoría','Precio Compra','Stock','Acciones'].map((h, i) => (
-                    <th key={h} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 3 ? 'text-right' : 'text-left'} ${i === 5 ? 'text-center' : ''}`}>{h}</th>
+                  {['Código','Nombre / Unidad vinculada','Categoría','Proveedor','Precio Compra','Stock','Acciones'].map((h, i) => (
+                    <th key={h} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${i >= 4 ? 'text-right' : 'text-left'} ${i === 6 ? 'text-center' : ''}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -400,13 +400,6 @@ export function VistaInventario({
                               </span>
                             </div>
                           )}
-                          {proveedorNombre(r.proveedorId) && (
-                            <div className="mt-0.5">
-                              <span className="text-xs bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded-full">
-                                🏪 {proveedorNombre(r.proveedorId)}
-                              </span>
-                            </div>
-                          )}
                           {r.compatibilidad && r.compatibilidad.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {r.compatibilidad.map((c, ci) => (
@@ -419,6 +412,15 @@ export function VistaInventario({
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-xs bg-indigo-50 text-indigo-700 font-medium px-2 py-0.5 rounded-full">{r.categoria}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {proveedorNombre(r.proveedorId) ? (
+                            <span className="text-xs bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded-full whitespace-nowrap">
+                              🏪 {proveedorNombre(r.proveedorId)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">Sin proveedor</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right text-slate-700">${fmt(r.precioCompra)} / {r.unidad}</td>
                         <td className="px-4 py-3 text-right">
@@ -439,7 +441,7 @@ export function VistaInventario({
                         </tr>
                       {isExp && (
                         <tr key={`${r.id}-recibir`} className="bg-emerald-50 border-t border-emerald-200">
-                          <td colSpan={6} className="px-4 py-3">
+                          <td colSpan={7} className="px-4 py-3">
                             <div className="flex items-center gap-3 flex-wrap">
                               <span className="text-sm font-semibold text-emerald-800">Recibir existencias de <em>{r.nombre}</em>:</span>
                               <div className="flex items-center gap-2">
@@ -461,7 +463,7 @@ export function VistaInventario({
                       )}
                       {isEditCompat && (
                         <tr key={`${r.id}-compat`} className="bg-indigo-50 border-t border-indigo-200">
-                          <td colSpan={6} className="px-4 py-4">
+                          <td colSpan={7} className="px-4 py-4">
                             <div className="space-y-3">
                               {/* Título */}
                               <div>
