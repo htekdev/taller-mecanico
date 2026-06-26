@@ -259,6 +259,14 @@ export default function TallerMecanico() {
     setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, pagos: nuevos } : t));
   };
 
+  const eliminarPagoTrabajo = async (trabajoId: string, pagoId: string) => {
+    const trabajoActual = trabajos.find(t => t.id === trabajoId);
+    if (!trabajoActual) return;
+    const nuevos = (trabajoActual.pagos ?? []).filter(p => p.id !== pagoId);
+    await db.updateTrabajoPagos(trabajoId, nuevos);
+    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, pagos: nuevos } : t));
+  };
+
   /** Registrar pago a proveedor externo — updates the ManoDeObraItem's pagosServicio array */
   const registrarPagoServicioExterno = async (
     trabajoId: string,
@@ -488,6 +496,14 @@ export default function TallerMecanico() {
     if (!facturaActual) return;
     const nuevoPago: PagoFactura = { ...pago, id: Date.now().toString() };
     const nuevos = [...(facturaActual.pagos ?? []), nuevoPago];
+    await db.updateFacturaPagos(facturaId, nuevos);
+    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, pagos: nuevos } : f));
+  };
+
+  const eliminarPagoFactura = async (facturaId: string, pagoId: string) => {
+    const facturaActual = facturas.find(f => f.id === facturaId);
+    if (!facturaActual) return;
+    const nuevos = (facturaActual.pagos ?? []).filter(p => p.id !== pagoId);
     await db.updateFacturaPagos(facturaId, nuevos);
     setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, pagos: nuevos } : f));
   };
@@ -804,6 +820,8 @@ export default function TallerMecanico() {
             <VistaCuentas facturas={facturas} trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
               onRegistrarPagoFactura={registrarPagoFactura}
               onRegistrarPagoTrabajo={registrarPago}
+              onEliminarPagoFactura={eliminarPagoFactura}
+              onEliminarPagoTrabajo={eliminarPagoTrabajo}
               onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura}
               onCancelarNota={cancelarNota} onReactivarNota={reactivarNota} />
           )}
