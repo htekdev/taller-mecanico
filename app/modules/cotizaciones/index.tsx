@@ -1261,8 +1261,8 @@ export function VistaCotizaciones({
       setForm(savedForm);
       setViewEntry(entry);
     } else {
-      // ── NEW: assign next sequential number from Supabase counter ──
-      const numero = await db.nextCotizacionNumber(tallerId);
+      // ── NEW: use manual number if provided, otherwise auto-assign ──
+      const numero = form.numeroCotizacion.trim() || await db.nextCotizacionNumber(tallerId);
       const savedForm: FormCotizacion = { ...form, numeroCotizacion: numero };
       const row = await db.insertCotizacion(tallerId, {
         numeroCotizacion: numero,
@@ -1415,9 +1415,16 @@ export function VistaCotizaciones({
             </p>
           </div>
         ) : (
-          <div className="flex items-center gap-3 mb-5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
-            <span className="text-amber-500 text-lg">🔢</span>
-            <p className="text-sm text-amber-700">El número <strong>COT-XXX</strong> se asignará automáticamente al guardar.</p>
+          <div className="mb-5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-amber-500 text-lg">🔢</span>
+              <p className="text-sm text-amber-700">Escribe el número o déjalo vacío para asignar automáticamente.</p>
+            </div>
+            <Input
+              placeholder="Ej: COT-004 (vacío = auto)"
+              value={form.numeroCotizacion}
+              onChange={e => set('numeroCotizacion', e.target.value)}
+            />
           </div>
         )}
 
