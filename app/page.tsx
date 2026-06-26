@@ -303,17 +303,41 @@ export default function TallerMecanico() {
     if (nueva) setOrdenes(prev => [...prev, nueva]);
   };
   const recibirOrden = async (ordenId: string) => {
+    if (!taller) return;
     const orden = ordenes.find(o => o.id === ordenId);
     if (!orden || orden.estado !== 'pendiente') return;
     const hoy = new Date().toISOString().split('T')[0];
+
+    // Materialise any libre- parts that may have been added via the edit modal
+    let partesFinal = [...orden.partes];
+    const librePartes = partesFinal.filter(p => p.refaccionId.startsWith('libre-'));
+    if (librePartes.length > 0) {
+      const nuevasRefs: Refaccion[] = [];
+      for (const part of librePartes) {
+        const nueva = await db.insertRefaccion(taller.id, {
+          nombre: part.nombre, codigo: '', categoria: '', unidad: 'pza',
+          precioCompra: part.precioCompra, stock: 0, stockMinimo: 1,
+        });
+        if (nueva) {
+          partesFinal = partesFinal.map(p => p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p);
+          nuevasRefs.push(nueva);
+        }
+      }
+      if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
+      // Persist real IDs in the order before marking received
+      const subtotal = partesFinal.reduce((s, p) => s + p.subtotal, 0);
+      await db.updateOrden(ordenId, { ...orden, partes: partesFinal, subtotalSinIVA: subtotal, ivaAmount: orden.ivaAmount, total: orden.total, conIVA: orden.conIVA });
+      setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, partes: partesFinal } : o));
+    }
+
     await db.updateOrdenEstado(ordenId, 'recibida', hoy);
     setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'recibida' as const, fechaRecibida: hoy } : o));
-    if (orden.partes.length > 0) {
+    if (partesFinal.length > 0) {
       const nuevoInv = inventario.map(r => {
-        const item = orden.partes.find(p => p.refaccionId === r.id);
+        const item = partesFinal.find(p => p.refaccionId === r.id);
         return item ? { ...r, stock: r.stock + item.cantidad } : r;
       });
-      await db.updateRefacciones(nuevoInv.filter(r => orden.partes.some(p => p.refaccionId === r.id)));
+      await db.updateRefacciones(nuevoInv.filter(r => partesFinal.some(p => p.refaccionId === r.id)));
       setInventario(nuevoInv);
     }
   };
@@ -326,18 +350,48 @@ export default function TallerMecanico() {
     ordenId: string,
     data: Pick<OrdenCompra, 'descripcion' | 'numeroOrden' | 'partes' | 'subtotalSinIVA' | 'ivaAmount' | 'total' | 'conIVA'>,
   ) => {
-    await db.updateOrden(ordenId, data);
-    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, ...data } : o));
-
-    // Sync inventory when correcting a received order:
-    // if nombre or precioCompra changed on a real inventory item, update the record
+    if (!taller) return;
     const orden = ordenes.find(o => o.id === ordenId);
+
+    // ── Materialise libre- parts into real inventory records ──────────────────
+    // libre- IDs are temp placeholders for free-form parts added via the edit modal.
+    // Before saving, create a real refaccion record for each and swap the ID.
+    let partesFinal = [...data.partes];
+    const librePartes = partesFinal.filter(p => p.refaccionId.startsWith('libre-'));
+    if (librePartes.length > 0) {
+      const nuevasRefs: Refaccion[] = [];
+      for (const part of librePartes) {
+        // For received orders the goods are already in stock; pending orders start at 0
+        const stockInicial = orden?.estado === 'recibida' ? part.cantidad : 0;
+        const nueva = await db.insertRefaccion(taller.id, {
+          nombre: part.nombre,
+          codigo: '',
+          categoria: '',
+          unidad: 'pza',
+          precioCompra: part.precioCompra,
+          stock: stockInicial,
+          stockMinimo: 1,
+        });
+        if (nueva) {
+          partesFinal = partesFinal.map(p =>
+            p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p
+          );
+          nuevasRefs.push(nueva);
+        }
+      }
+      if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
+    }
+
+    const dataFinal = { ...data, partes: partesFinal };
+    await db.updateOrden(ordenId, dataFinal);
+    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, ...dataFinal } : o));
+
+    // ── Sync nombre/precioCompra back to inventory for received orders ─────────
     if (orden?.estado === 'recibida') {
       const invUpdates: { id: string; nombre: string; precioCompra: number }[] = [];
-      for (const part of data.partes) {
-        if (part.refaccionId.startsWith('libre-')) continue; // free-form items not in inventory
+      for (const part of dataFinal.partes) {
         const inv = inventario.find(r => r.id === part.refaccionId);
-        if (!inv) continue;
+        if (!inv) continue; // newly created libre parts are already correct
         if (inv.nombre !== part.nombre || inv.precioCompra !== part.precioCompra) {
           invUpdates.push({ id: part.refaccionId, nombre: part.nombre, precioCompra: part.precioCompra });
         }
