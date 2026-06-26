@@ -442,6 +442,7 @@ export function VistaInventario({
                       {isExp && (
                         <tr key={`${r.id}-recibir`} className="bg-emerald-50 border-t border-emerald-200">
                           <td colSpan={7} className="px-4 py-3">
+                            <div className="flex items-center gap-3 flex-wrap">
                               <span className="text-sm font-semibold text-emerald-800">Recibir existencias de <em>{r.nombre}</em>:</span>
                               <div className="flex items-center gap-2">
                                 <Input type="number" placeholder="Cantidad" min="1" step="1"
