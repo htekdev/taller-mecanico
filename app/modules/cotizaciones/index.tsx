@@ -1110,6 +1110,7 @@ export function VistaCotizaciones({
   // Conversion modal: tracks which cotización is being reconciled
   const [reconciliandoId, setReconciliandoId] = useState<string | null>(null);
   const [guardando, setGuardando]       = useState(false);
+  const [guardarError, setGuardarError] = useState<string | null>(null);
 
   // ── Load cotizaciones from Supabase + one-time localStorage migration ──────
   const migrationDone = useRef(false);
@@ -1210,6 +1211,7 @@ export function VistaCotizaciones({
   const handleGuardar = async () => {
     if (!tallerId || guardando) return;
     setGuardando(true);
+    setGuardarError(null);
     try {
     const { total } = calcTotales(form);
     const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de Mérida'
@@ -1219,7 +1221,7 @@ export function VistaCotizaciones({
       // ── EDIT: reuse original number, mark as editada ──
       const existing = history.find(e => e.id === editingId)!;
       const savedForm: FormCotizacion = { ...form, numeroCotizacion: existing.numeroCotizacion };
-      await db.updateCotizacion(editingId, {
+      const success = await db.updateCotizacion(editingId, {
         cliente:  clienteNombre,
         fecha:    form.fecha || null,
         total,
@@ -1227,6 +1229,10 @@ export function VistaCotizaciones({
         form:     savedForm as unknown as Record<string, unknown>,
         savedAt:  new Date().toISOString(),
       });
+      if (!success) {
+        setGuardarError('No se pudo guardar la cotización. Verifica tu conexión e intenta de nuevo.');
+        return;
+      }
       await recargarHistory();
       const updated = history.find(e => e.id === editingId);
       const entry: CotizacionGuardada = updated
@@ -1249,15 +1255,21 @@ export function VistaCotizaciones({
         convertida:       false,
         form:             savedForm as unknown as Record<string, unknown>,
       });
+      if (!row) {
+        setGuardarError('No se pudo guardar la cotización. Verifica tu conexión e intenta de nuevo.');
+        return;
+      }
       await recargarHistory();
-      const entry: CotizacionGuardada = row
-        ? rowToEntry(row)
-        : { id: '', numeroCotizacion: numero, plantilla, cliente: clienteNombre, fecha: form.fecha, total, savedAt: new Date().toISOString(), form: savedForm };
+      const entry: CotizacionGuardada = rowToEntry(row);
       setForm(savedForm);
       setViewEntry(entry);
     }
 
     setPantalla('preview');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setGuardarError(`Error al guardar: ${msg}`);
+      console.error('[handleGuardar] error:', msg);
     } finally {
       setGuardando(false);
     }
@@ -1540,6 +1552,12 @@ export function VistaCotizaciones({
             </span>
           )}
         </div>
+        {/* Error banner — shown when save fails */}
+        {guardarError && (
+          <div className="mt-3 p-3 bg-rose-50 border border-rose-300 rounded-lg text-rose-800 text-sm">
+            ❌ {guardarError}
+          </div>
+        )}
       </div>
     );
   }
