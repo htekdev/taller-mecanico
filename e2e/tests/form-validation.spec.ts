@@ -32,20 +32,14 @@ test.describe('Form Validation', () => {
     await showPhaseLabel(page, '🔍 Checking trabajo form validation');
     await expectVisible(page.locator('text=Nuevo Trabajo'), 'Form header');
 
-    // The client select should exist with a required attribute
+    // The client select should exist
     const clientSelect = page.locator('select').first();
     await expectVisible(clientSelect, 'Client select required');
 
-    // Verify submit button exists — "✓ Registrar Trabajo"
+    // Submit button should be DISABLED without a client selected
+    // (the form disables submit when required fields are empty)
     const submitBtn = page.locator('button:has-text("Registrar Trabajo")');
-    await expectVisible(submitBtn, 'Submit button');
-
-    // Try clicking submit without selecting a client — browser validation should block
-    await submitBtn.click();
-    await page.waitForTimeout(1_000);
-
-    // The form should still be on the same page (no navigation away)
-    await expectVisible(page.locator('text=Nuevo Trabajo'), 'Still on form');
+    await expectDisabled(submitBtn, 'Disabled without client');
   });
 
   test('inventario form requires part name and price', async ({ page }) => {

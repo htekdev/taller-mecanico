@@ -45,9 +45,10 @@ test.describe('Órdenes de Compra — Create', () => {
       await proveedorSelect.selectOption({ index: 1 });
       await page.waitForTimeout(2_000);
 
-      await showPhaseLabel(page, '✅ Item options visible');
-      const itemSection = page.locator('text=Existente, text=existente, select, input').first();
-      await expectVisible(itemSection, 'Item options');
+      await showPhaseLabel(page, '✅ Proveedor selected — form active');
+      // After selecting proveedor, the hint changes to "Agrega al menos una pieza"
+      const hint = page.locator('text=Agrega al menos una pieza');
+      await expectVisible(hint, 'Add items hint');
     }
   });
 
