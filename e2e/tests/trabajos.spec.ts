@@ -52,6 +52,11 @@ test.describe('Trabajos', () => {
     if (await finalizeButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await finalizeButton.click();
       await page.waitForTimeout(2_000);
+      // After finalizing, the page should still be functional
+      await expect(page.locator('nav button:has-text("Trabajos")')).toBeVisible();
+    } else {
+      // No trabajo to finalize — verify module rendered correctly
+      await expect(page.locator('text=Nuevo Trabajo')).toBeVisible();
     }
   });
 });

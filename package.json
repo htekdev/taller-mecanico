@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test --config=e2e/playwright.config.ts"
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "validate:assertions": "tsx scripts/validate-assertions.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

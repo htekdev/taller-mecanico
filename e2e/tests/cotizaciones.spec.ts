@@ -43,8 +43,13 @@ test.describe('Cotizaciones', () => {
     const convertButton = page.locator('button:has-text("Convertir")').first();
     if (await convertButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await convertButton.click();
-      // Should navigate to or create a trabajo
       await page.waitForTimeout(3_000);
+      // After conversion, should still be on a functional page
+      const navVisible = page.locator('nav button').first();
+      await expect(navVisible).toBeVisible({ timeout: 5_000 });
+    } else {
+      // No cotizaciones to convert — verify the page rendered correctly
+      await expect(page.locator('h2:has-text("Cotizaciones")')).toBeVisible();
     }
   });
 });
