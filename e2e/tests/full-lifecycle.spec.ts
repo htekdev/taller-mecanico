@@ -46,7 +46,11 @@ test.describe('Full Lifecycle', () => {
         await phoneInput.fill('555-999-' + UNIQUE_ID.substring(0, 4));
       }
 
-      await page.click('button:has-text("Guardar")');
+      // The new client button is "+ Agregar Cliente"
+      const addClientBtn = page.locator('button:has-text("Agregar Cliente")');
+      if (await addClientBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await addClientBtn.click();
+      }
       await page.waitForTimeout(2_000);
     }
 

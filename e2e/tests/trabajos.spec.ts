@@ -52,8 +52,8 @@ test.describe('Trabajos', () => {
       }
     }
 
-    // Verify the save button is available
-    const saveBtn = page.locator('button:has-text("Guardar")');
+    // Verify the submit button is available — text is "✓ Registrar Trabajo"
+    const saveBtn = page.locator('button:has-text("Registrar Trabajo")');
     await expect(saveBtn).toBeVisible({ timeout: 5_000 });
   });
 
