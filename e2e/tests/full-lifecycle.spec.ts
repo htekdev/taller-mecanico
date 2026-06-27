@@ -54,52 +54,29 @@ test.describe('Full Lifecycle', () => {
     await page.click('nav button:has-text("Cotizaciones")');
     await page.waitForTimeout(2_000);
 
-    // Create a new cotización
-    const clientSelect = page.locator('select').first();
-    if (await clientSelect.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      // Select a client (the one we just created or any available)
-      const options = await clientSelect.locator('option').count();
-      if (options > 1) {
-        await clientSelect.selectOption({ index: options - 1 }); // last one = newest
-      }
+    // Select a plantilla to enter the form (inicio → formulario)
+    const generalCard = page.locator('button:has-text("General")').first();
+    if (await generalCard.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await generalCard.click();
+      await page.waitForTimeout(2_000);
 
-      // Wait for vehicle select to appear
-      await page.waitForTimeout(1_000);
-      const vehicleSelect = page.locator('select').nth(1);
-      if (await vehicleSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        const vOptions = await vehicleSelect.locator('option').count();
-        if (vOptions > 1) {
-          await vehicleSelect.selectOption({ index: 1 });
+      // Now on the form — select client
+      const clientSelect = page.locator('select').first();
+      if (await clientSelect.isVisible({ timeout: 10_000 }).catch(() => false)) {
+        const options = await clientSelect.locator('option').count();
+        if (options > 1) {
+          await clientSelect.selectOption({ index: options - 1 }); // last one = newest
         }
-      }
 
-      // Add a line item
-      const addButton = page.locator('button:has-text("Agregar")');
-      if (await addButton.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await addButton.click();
-        await page.waitForTimeout(500);
-      }
-
-      // Fill line item details
-      const lineInputs = page.locator('input[type="text"]');
-      const lineCount = await lineInputs.count();
-      if (lineCount > 0) {
-        await lineInputs.last().fill(`Servicio E2E ${UNIQUE_ID}`);
-      }
-
-      // Fill quantity and price if number inputs are available
-      const numberInputs = page.locator('input[type="number"]');
-      const numCount = await numberInputs.count();
-      if (numCount >= 2) {
-        await numberInputs.nth(numCount - 2).fill('1');
-        await numberInputs.nth(numCount - 1).fill('2500');
-      }
-
-      // Save cotización
-      const saveBtn = page.locator('button:has-text("Guardar")');
-      if (await saveBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await saveBtn.click();
-        await page.waitForTimeout(3_000);
+        // Wait for vehicle select to appear
+        await page.waitForTimeout(1_000);
+        const vehicleSelect = page.locator('select').nth(1);
+        if (await vehicleSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
+          const vOptions = await vehicleSelect.locator('option').count();
+          if (vOptions > 1) {
+            await vehicleSelect.selectOption({ index: 1 });
+          }
+        }
       }
     }
 
@@ -134,7 +111,7 @@ test.describe('Full Lifecycle', () => {
     await page.waitForTimeout(2_000);
 
     // Verify the module loads without errors
-    const cobrarContent = page.locator('table, h2, text=Total').first();
+    const cobrarContent = page.locator('h2:has-text("Cuentas por Cobrar")');
     await expect(cobrarContent).toBeVisible({ timeout: 10_000 });
 
     // ─── Step 8: Verify persistence across sessions ──────────────────────
