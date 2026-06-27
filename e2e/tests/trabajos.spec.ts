@@ -1,27 +1,28 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers';
+import { expectVisible, expectClass, expectEnabled, showPhaseLabel } from './visual-assert';
 
 test.describe('Trabajos', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.click('nav button:has-text("Trabajos")');
-    await expect(page.locator('h2:has-text("Trabajos")')).toBeVisible({ timeout: 10_000 });
+    await expectVisible(page.locator('h2:has-text("Trabajos")'), 'Section loaded');
   });
 
   test('should navigate to trabajos module', async ({ page }) => {
+    await showPhaseLabel(page, '🔍 Verifying active tab');
     const activeTab = page.locator('nav button:has-text("Trabajos")');
-    await expect(activeTab).toHaveClass(/bg-indigo-600/);
+    await expectClass(activeTab, /bg-indigo-600/, 'Active tab');
   });
 
   test('should create a new trabajo', async ({ page }) => {
-    // The form header "Nuevo Trabajo" should be visible
-    await expect(page.locator('text=Nuevo Trabajo')).toBeVisible({ timeout: 10_000 });
+    await showPhaseLabel(page, '📝 New trabajo form');
+    await expectVisible(page.locator('text=Nuevo Trabajo'), 'Form header');
 
-    // Select client — wait for options to load from Supabase
+    await showPhaseLabel(page, '👤 Selecting client');
     const clientSelect = page.locator('select').first();
-    await expect(clientSelect).toBeVisible({ timeout: 10_000 });
+    await expectVisible(clientSelect, 'Client select');
 
-    // Wait for client options to populate (async load from DB)
     await page.waitForFunction(
       () => document.querySelectorAll('select')[0]?.options.length > 1,
       { timeout: 15_000 }
@@ -32,7 +33,6 @@ test.describe('Trabajos', () => {
       await clientSelect.selectOption({ index: 1 });
     }
 
-    // Wait for vehicle select to appear after client selection
     await page.waitForTimeout(1_500);
     const vehicleSelect = page.locator('select').nth(1);
     if (await vehicleSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -42,21 +42,21 @@ test.describe('Trabajos', () => {
       }
     }
 
-    // Verify the submit button is available — text is "✓ Registrar Trabajo"
+    await showPhaseLabel(page, '✅ Submit button ready');
     const saveBtn = page.locator('button:has-text("Registrar Trabajo")');
-    await expect(saveBtn).toBeVisible({ timeout: 5_000 });
+    await expectVisible(saveBtn, 'Registrar Trabajo');
   });
 
   test('should finalize a trabajo', async ({ page }) => {
+    await showPhaseLabel(page, '🏁 Testing finalize flow');
     const finalizeButton = page.locator('button:has-text("Finalizar")').first();
     if (await finalizeButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await expectVisible(finalizeButton, 'Finalize button');
       await finalizeButton.click();
       await page.waitForTimeout(2_000);
-      // After finalizing, the page should still be functional
-      await expect(page.locator('nav button:has-text("Trabajos")')).toBeVisible();
+      await expectVisible(page.locator('nav button:has-text("Trabajos")'), 'Page stable');
     } else {
-      // No trabajo to finalize — verify module rendered correctly
-      await expect(page.locator('text=Nuevo Trabajo')).toBeVisible();
+      await expectVisible(page.locator('text=Nuevo Trabajo'), 'Module rendered');
     }
   });
 });

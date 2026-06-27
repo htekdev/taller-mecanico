@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers';
+import { expectVisible, expectClass, showPhaseLabel } from './visual-assert';
 
 test.describe('Órdenes de Compra', () => {
   test.beforeEach(async ({ page }) => {
@@ -9,14 +10,15 @@ test.describe('Órdenes de Compra', () => {
   });
 
   test('should navigate to órdenes de compra module', async ({ page }) => {
+    await showPhaseLabel(page, '🔍 Verifying active tab');
     const activeTab = page.locator('nav button:has-text("Órdenes de Compra")');
-    await expect(activeTab).toHaveClass(/bg-indigo-600/);
+    await expectClass(activeTab, /bg-indigo-600/, 'Active tab');
   });
 
   test('should display orders list', async ({ page }) => {
-    // The module renders a SectionTitle and either order cards or the form
+    await showPhaseLabel(page, '📋 Checking orders display');
     const sectionTitle = page.locator('h2:has-text("Órdenes de Compra")');
-    await expect(sectionTitle).toBeVisible({ timeout: 10_000 });
+    await expectVisible(sectionTitle, 'Section title');
   });
 });
 
@@ -28,14 +30,16 @@ test.describe('Proveedores', () => {
   });
 
   test('should navigate to proveedores module', async ({ page }) => {
+    await showPhaseLabel(page, '🔍 Verifying active tab');
     const activeTab = page.locator('nav button:has-text("Proveedores")');
-    await expect(activeTab).toHaveClass(/bg-indigo-600/);
+    await expectClass(activeTab, /bg-indigo-600/, 'Active tab');
   });
 
   test('should display proveedores list', async ({ page }) => {
+    await showPhaseLabel(page, '📋 Checking proveedores display');
     const table = page.locator('table').first();
     const emptyState = page.locator('text=No hay proveedores');
-    await expect(table.or(emptyState)).toBeVisible({ timeout: 10_000 });
+    await expectVisible(table.or(emptyState), 'Proveedores content');
   });
 });
 
@@ -47,13 +51,14 @@ test.describe('Cuentas por Cobrar', () => {
   });
 
   test('should navigate to cuentas por cobrar module', async ({ page }) => {
+    await showPhaseLabel(page, '🔍 Verifying active tab');
     const activeTab = page.locator('nav button:has-text("Por Cobrar")');
-    await expect(activeTab).toHaveClass(/bg-indigo-600/);
+    await expectClass(activeTab, /bg-indigo-600/, 'Active tab');
   });
 
   test('should display accounts receivable list', async ({ page }) => {
-    // The module shows a SectionTitle "Cuentas por Cobrar"
+    await showPhaseLabel(page, '💰 Checking cuentas por cobrar');
     const sectionTitle = page.locator('h2:has-text("Cuentas por Cobrar")');
-    await expect(sectionTitle).toBeVisible({ timeout: 10_000 });
+    await expectVisible(sectionTitle, 'Section title');
   });
 });
