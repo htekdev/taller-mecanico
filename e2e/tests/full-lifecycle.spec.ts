@@ -1,4 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { login, navigateTo, expectSectionTitle } from './helpers';
 
 /**
  * Full Lifecycle E2E Test — Taller Mecánico
@@ -15,17 +16,7 @@ import { test, expect, Page } from '@playwright/test';
  * 9. Verify data persists across sessions (logout/login)
  */
 
-const TEST_EMAIL = process.env.E2E_TEST_EMAIL || 'sofia@test.com';
-const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD || 'Test1234!';
 const UNIQUE_ID = Date.now().toString(36);
-
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.fill('input[type="email"]', TEST_EMAIL);
-  await page.fill('input[type="password"]', TEST_PASSWORD);
-  await page.click('button[type="submit"]');
-  await expect(page.locator('nav button:has-text("Clientes")')).toBeVisible({ timeout: 15_000 });
-}
 
 test.describe('Full Lifecycle', () => {
   test('complete business flow: cotización → trabajo → cobro', async ({ page }) => {

@@ -1,7 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
-
-const TEST_EMAIL = process.env.E2E_TEST_EMAIL || 'sofia@test.com';
-const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD || 'Test1234!';
+import { test, expect } from '@playwright/test';
+import { login } from './helpers';
 
 test.describe('Authentication', () => {
   test('should show login page', async ({ page }) => {
@@ -20,12 +18,8 @@ test.describe('Authentication', () => {
   });
 
   test('should login successfully with valid credentials', async ({ page }) => {
-    await page.goto('/login');
-    await page.fill('input[type="email"]', TEST_EMAIL);
-    await page.fill('input[type="password"]', TEST_PASSWORD);
-    await page.click('button[type="submit"]');
-    // After login, should see the dashboard nav tabs
-    await expect(page.locator('nav button:has-text("Clientes")')).toBeVisible({ timeout: 15_000 });
+    await login(page);
+    await expect(page.locator('nav button:has-text("Clientes")')).toBeVisible();
   });
 
   test('should logout and return to login', async ({ page }) => {
@@ -35,11 +29,3 @@ test.describe('Authentication', () => {
     await expect(page.locator('button:has-text("Entrar al Sistema"), button:has-text("Iniciar Sesión")').first()).toBeVisible({ timeout: 15_000 });
   });
 });
-
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.fill('input[type="email"]', TEST_EMAIL);
-  await page.fill('input[type="password"]', TEST_PASSWORD);
-  await page.click('button[type="submit"]');
-  await expect(page.locator('nav button:has-text("Clientes")')).toBeVisible({ timeout: 15_000 });
-}

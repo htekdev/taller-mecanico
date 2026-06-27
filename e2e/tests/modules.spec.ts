@@ -1,15 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
-
-const TEST_EMAIL = process.env.E2E_TEST_EMAIL || 'sofia@test.com';
-const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD || 'Test1234!';
-
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.fill('input[type="email"]', TEST_EMAIL);
-  await page.fill('input[type="password"]', TEST_PASSWORD);
-  await page.click('button[type="submit"]');
-  await expect(page.locator('nav button:has-text("Clientes")')).toBeVisible({ timeout: 15_000 });
-}
+import { test, expect } from '@playwright/test';
+import { login } from './helpers';
 
 test.describe('Órdenes de Compra', () => {
   test.beforeEach(async ({ page }) => {
