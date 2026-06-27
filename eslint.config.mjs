@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // E2E tests and utility scripts (not part of the Next.js app)
+    "e2e/**",
+    "scripts/**",
   ]),
   // Rule overrides — downgrade pre-existing issues to warnings so CI doesn't block.
   // These issues exist in app code prior to the test suite PR and will be addressed

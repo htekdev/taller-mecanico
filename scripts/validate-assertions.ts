@@ -60,7 +60,7 @@ function extractTests(filePath: string): TestBlock[] {
     // Find the test body by counting braces
     let braceCount = 0;
     let started = false;
-    let bodyLines: string[] = [];
+    const bodyLines: string[] = [];
 
     for (let j = i; j < lines.length; j++) {
       const line = lines[j];

@@ -41,5 +41,4 @@ test.describe('Inventario', () => {
       await expect(page.locator('h2:has-text("Inventario")')).toBeVisible();
     }
   });
-  });
 });
