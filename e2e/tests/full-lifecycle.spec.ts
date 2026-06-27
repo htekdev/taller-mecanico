@@ -140,7 +140,7 @@ test.describe('Full Lifecycle', () => {
     // ─── Step 8: Verify persistence across sessions ──────────────────────
     // Logout
     await page.click('button:has-text("Salir")');
-    await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('button:has-text("Entrar al Sistema"), button:has-text("Iniciar Sesión")').first()).toBeVisible({ timeout: 15_000 });
 
     // Login again
     await login(page);

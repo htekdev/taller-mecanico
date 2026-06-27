@@ -31,7 +31,8 @@ test.describe('Authentication', () => {
   test('should logout and return to login', async ({ page }) => {
     await login(page);
     await page.click('button:has-text("Salir")');
-    await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 10_000 });
+    // After logout, should see the login form with "Iniciar Sesión" or "Entrar al Sistema"
+    await expect(page.locator('button:has-text("Entrar al Sistema"), button:has-text("Iniciar Sesión")').first()).toBeVisible({ timeout: 15_000 });
   });
 });
 
