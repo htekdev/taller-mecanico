@@ -61,3 +61,17 @@ jobs:
           name: coverage-report
           path: coverage/
           retention-days: 14
+
+  test-quality:
+    name: E2E Test Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm install
+      - name: Validate assertion quality
+        run: npx tsx scripts/validate-assertions.ts

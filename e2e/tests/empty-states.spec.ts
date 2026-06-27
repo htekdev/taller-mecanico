@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login, navigateTo, expectSectionTitle } from './helpers';
+import { expectVisible, showPhaseLabel } from './visual-assert';
 
 /**
  * Empty State Tests — Taller Mecánico
@@ -15,33 +16,30 @@ test.describe('Empty States', () => {
 
   test('cotizaciones shows section title and plantilla cards when empty', async ({ page }) => {
     await navigateTo(page, 'Cotizaciones');
+    await showPhaseLabel(page, '📋 Empty state: Cotizaciones');
     await expectSectionTitle(page, 'Cotizaciones');
 
-    // The inicio screen should show "Nueva Cotización" heading and plantilla cards
-    await expect(page.locator('text=Nueva Cotización')).toBeVisible({ timeout: 5_000 });
-    // At least one plantilla card should be visible
-    await expect(page.locator('button:has-text("General")').first()).toBeVisible({ timeout: 5_000 });
+    await expectVisible(page.locator('text=Nueva Cotización'), 'Nueva heading');
+    await expectVisible(page.locator('button:has-text("General")').first(), 'Plantilla card');
   });
 
   test('trabajos shows form even with no existing jobs', async ({ page }) => {
     await navigateTo(page, 'Trabajos');
+    await showPhaseLabel(page, '📋 Empty state: Trabajos');
     await expectSectionTitle(page, 'Trabajos');
 
-    // The "Nuevo Trabajo" form heading should always be visible
-    await expect(page.locator('text=Nuevo Trabajo')).toBeVisible({ timeout: 10_000 });
-
-    // Client select should be present (even if options are loading)
+    await expectVisible(page.locator('text=Nuevo Trabajo'), 'Form header');
     const clientSelect = page.locator('select').first();
-    await expect(clientSelect).toBeVisible({ timeout: 10_000 });
+    await expectVisible(clientSelect, 'Client select');
   });
 
   test('inventario shows form and table/empty when no parts', async ({ page }) => {
     await navigateTo(page, 'Inventario');
+    await showPhaseLabel(page, '📋 Empty state: Inventario');
     await expectSectionTitle(page, 'Inventario');
 
-    // The add-to-inventory form should be visible
     const submitBtn = page.locator('button:has-text("Agregar al Inventario")');
-    await expect(submitBtn).toBeVisible({ timeout: 5_000 });
+    await expectVisible(submitBtn, 'Add part button');
   });
 
   test('proveedores loads without error', async ({ page }) => {

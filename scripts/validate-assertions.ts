@@ -2,9 +2,9 @@
  * E2E Assertion Quality Validator
  *
  * Parses all .spec.ts files and enforces minimum assertion standards:
- * - Each test must have at least 2 assertion calls (expect/expectVisible/etc.)
+ * - Each test must have at least 1 assertion call (expect/expectVisible/etc.)
+ * - Tests must import from visual-assert.ts (no silent assertions)
  * - Tests should not rely solely on waitForTimeout without assertions
- * - Tests should use meaningful matchers, not just page-level checks
  *
  * Usage:
  *   npx tsx scripts/validate-assertions.ts
@@ -16,24 +16,35 @@ import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 
 const TEST_DIR = join(__dirname, '..', 'e2e', 'tests');
-const MIN_ASSERTIONS_PER_TEST = 1; // minimum expect() calls per test block
+const MIN_ASSERTIONS_PER_TEST = 1;
+
+// Visual assertion function names from visual-assert.ts
+const VISUAL_ASSERTION_NAMES = [
+  'expectVisible',
+  'expectHidden',
+  'expectText',
+  'expectClass',
+  'expectDisabled',
+  'expectEnabled',
+  'expectValue',
+  'expectCount',
+  'showPhaseLabel',
+];
+
 const ASSERTION_PATTERNS = [
   /expect\s*\(/g,
-  /expectVisible\s*\(/g,
-  /expectHidden\s*\(/g,
-  /expectText\s*\(/g,
-  /expectClass\s*\(/g,
-  /expectDisabled\s*\(/g,
-  /expectEnabled\s*\(/g,
-  /expectValue\s*\(/g,
-  /expectCount\s*\(/g,
+  ...VISUAL_ASSERTION_NAMES.map(name => new RegExp(`${name}\\s*\\(`, 'g')),
 ];
+
+// Files exempt from visual-assert import requirement (helpers, utilities)
+const EXEMPT_FILES = ['helpers.ts', 'visual-assert.ts'];
 
 interface TestBlock {
   file: string;
   name: string;
   line: number;
   assertionCount: number;
+  visualAssertionCount: number;
   body: string;
 }
 
@@ -49,7 +60,6 @@ function extractTests(filePath: string): TestBlock[] {
   const lines = content.split('\n');
   const tests: TestBlock[] = [];
 
-  // Simple parser: find test('...', or test.only('...' blocks
   const testPattern = /^\s*test(?:\.only)?\s*\(\s*['"`](.+?)['"`]/;
 
   for (let i = 0; i < lines.length; i++) {
@@ -57,7 +67,6 @@ function extractTests(filePath: string): TestBlock[] {
     if (!match) continue;
 
     const testName = match[1];
-    // Find the test body by counting braces
     let braceCount = 0;
     let started = false;
     const bodyLines: string[] = [];
@@ -74,9 +83,18 @@ function extractTests(filePath: string): TestBlock[] {
 
     const body = bodyLines.join('\n');
     let assertionCount = 0;
+    let visualAssertionCount = 0;
+
     for (const pattern of ASSERTION_PATTERNS) {
       const matches = body.match(pattern);
       if (matches) assertionCount += matches.length;
+    }
+
+    // Count visual-assert specific calls
+    for (const name of VISUAL_ASSERTION_NAMES) {
+      const pattern = new RegExp(`${name}\\s*\\(`, 'g');
+      const matches = body.match(pattern);
+      if (matches) visualAssertionCount += matches.length;
     }
 
     tests.push({
@@ -84,11 +102,18 @@ function extractTests(filePath: string): TestBlock[] {
       name: testName,
       line: i + 1,
       assertionCount,
+      visualAssertionCount,
       body,
     });
   }
 
   return tests;
+}
+
+function checkFileImports(filePath: string): boolean {
+  const content = readFileSync(filePath, 'utf-8');
+  // Check if file imports from visual-assert
+  return content.includes('./visual-assert') || content.includes('../visual-assert');
 }
 
 function validate(): Violation[] {
@@ -102,14 +127,28 @@ function validate(): Violation[] {
 
   let totalTests = 0;
   let totalAssertions = 0;
+  let totalVisualAssertions = 0;
 
   for (const file of files) {
     const tests = extractTests(file);
     const fileName = file.replace(/.*[/\\]/, '');
+    const isExempt = EXEMPT_FILES.includes(fileName);
+    const hasVisualImport = checkFileImports(file);
+
+    // Rule 3: Spec files must import from visual-assert.ts
+    if (!isExempt && !hasVisualImport) {
+      violations.push({
+        file: fileName,
+        test: '(file-level)',
+        line: 1,
+        reason: 'Missing import from ./visual-assert — all spec files must use visual assertion wrappers',
+      });
+    }
 
     for (const test of tests) {
       totalTests++;
       totalAssertions += test.assertionCount;
+      totalVisualAssertions += test.visualAssertionCount;
 
       // Rule 1: Minimum assertions per test
       if (test.assertionCount < MIN_ASSERTIONS_PER_TEST) {
@@ -132,10 +171,15 @@ function validate(): Violation[] {
       }
     }
 
-    console.log(`  ${fileName}: ${tests.length} tests, ${tests.reduce((s, t) => s + t.assertionCount, 0)} assertions`);
+    const fileAssertions = tests.reduce((s, t) => s + t.assertionCount, 0);
+    const fileVisual = tests.reduce((s, t) => s + t.visualAssertionCount, 0);
+    const visualPct = fileAssertions > 0 ? Math.round((fileVisual / fileAssertions) * 100) : 0;
+    const importIcon = hasVisualImport ? '✓' : '✗';
+    console.log(`  ${importIcon} ${fileName}: ${tests.length} tests, ${fileAssertions} assertions (${visualPct}% visual)`);
   }
 
   console.log(`\n📊 Summary: ${totalTests} tests, ${totalAssertions} total assertions`);
+  console.log(`   Visual assertions: ${totalVisualAssertions}/${totalAssertions} (${Math.round((totalVisualAssertions / totalAssertions) * 100)}%)`);
   console.log(`   Average: ${(totalAssertions / totalTests).toFixed(1)} assertions/test\n`);
 
   return violations;

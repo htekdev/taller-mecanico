@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login, navigateTo, expectSectionTitle } from './helpers';
+import { expectVisible, showPhaseLabel } from './visual-assert';
 
 /**
  * Cancel/Delete Flow Tests — Taller Mecánico
@@ -16,22 +17,23 @@ test.describe('Cancel and Delete Flows', () => {
 
   test('should cancel a cotización', async ({ page }) => {
     await navigateTo(page, 'Cotizaciones');
+    await showPhaseLabel(page, '❌ Testing cancel cotización');
     await expectSectionTitle(page, 'Cotizaciones');
 
-    // Look for an existing cotización with a "Cancelar" action
     const cancelBtn = page.locator('button:has-text("Cancelar")').first();
     if (await cancelBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await expectVisible(cancelBtn, 'Cancel button');
       await cancelBtn.click();
       await page.waitForTimeout(2_000);
 
-      // After cancellation, the entry should show a "Cancelada" badge
       const cancelBadge = page.locator('text=Cancelada').first();
-      await expect(cancelBadge).toBeVisible({ timeout: 5_000 });
+      await expectVisible(cancelBadge, 'Cancelada badge');
     }
   });
 
   test('should cancel and reactivate a trabajo', async ({ page }) => {
     await navigateTo(page, 'Trabajos');
+    await showPhaseLabel(page, '❌ Testing cancel/reactivate trabajo');
     await expectSectionTitle(page, 'Trabajos');
 
     // Look for the cancel button (red circle with ✕ or "Cancelar trabajo" title)
@@ -61,11 +63,11 @@ test.describe('Cancel and Delete Flows', () => {
 
   test('should remove a line item from cotización form', async ({ page }) => {
     await navigateTo(page, 'Cotizaciones');
+    await showPhaseLabel(page, '🗑️ Testing line item removal');
     await expectSectionTitle(page, 'Cotizaciones');
 
-    // Open the form
     const generalCard = page.locator('button:has-text("General")').first();
-    await expect(generalCard).toBeVisible({ timeout: 10_000 });
+    await expectVisible(generalCard, 'General plantilla');
     await generalCard.click();
     await page.waitForTimeout(2_000);
 

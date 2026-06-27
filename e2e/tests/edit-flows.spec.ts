@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login, navigateTo, openCotizacionForm, selectClient, selectVehicle, expectSectionTitle } from './helpers';
+import { expectVisible, showPhaseLabel } from './visual-assert';
 
 /**
  * Edit Flow Tests — Taller Mecánico
@@ -15,6 +16,7 @@ test.describe('Edit Flows', () => {
 
   test('should edit an existing cotización', async ({ page }) => {
     await navigateTo(page, 'Cotizaciones');
+    await showPhaseLabel(page, '✏️ Testing edit cotización');
     await expectSectionTitle(page, 'Cotizaciones');
 
     // Look for an existing cotización in the history list — click to view it
@@ -42,6 +44,7 @@ test.describe('Edit Flows', () => {
 
   test('should edit an existing trabajo', async ({ page }) => {
     await navigateTo(page, 'Trabajos');
+    await showPhaseLabel(page, '✏️ Testing edit trabajo');
     await expectSectionTitle(page, 'Trabajos');
 
     // Look for a trabajo in the list that has an "Editar" button
@@ -63,6 +66,7 @@ test.describe('Edit Flows', () => {
 
   test('should edit an inventory part compatibility', async ({ page }) => {
     await navigateTo(page, 'Inventario');
+    await showPhaseLabel(page, '✏️ Testing edit inventory');
     await expectSectionTitle(page, 'Inventario');
 
     // Expand a part row to see details
