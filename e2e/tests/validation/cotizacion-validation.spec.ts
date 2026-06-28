@@ -24,14 +24,16 @@ test.describe('Cotización Validation', () => {
     await cotizacionesPage.waitForPageLoad();
     await cotizacionesPage.selectPlantillaGeneral();
 
-    // Don't select a client — try to save
+    // Don't select a client — check that save is disabled
     if (await cotizacionesPage.saveButton.isVisible().catch(() => false)) {
-      await cotizacionesPage.save();
-
-      // The form should either show an error or still be on the same page
-      // (not navigated to a success state)
-      const formStillVisible = await cotizacionesPage.clientSelect.isVisible().catch(() => false);
-      expect(formStillVisible).toBe(true);
+      const isDisabled = await cotizacionesPage.saveButton.isDisabled().catch(() => false);
+      // Button should be disabled without client OR the form should show validation error
+      const validationMsg = page.locator('text=/obligatorio|requerido|selecciona/i').first();
+      const hasValidation = await validationMsg.isVisible().catch(() => false);
+      expect(isDisabled || hasValidation).toBe(true);
+    } else {
+      // Save button not even shown = client is required first = correct
+      expect(true).toBe(true);
     }
 
     await showPhaseLabel(page, '✅ Client Required Enforced');

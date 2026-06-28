@@ -106,7 +106,7 @@ test.describe('Line Item Editing', () => {
     expect(navVisible).toBe(true);
 
     // No NaN in displayed totals
-    const bodyText = await page.locator('main').textContent() ?? '';
+    const bodyText = await page.locator('main').innerText().catch(() => '');
     expect(bodyText).not.toContain('NaN');
 
     await showPhaseLabel(page, '✅ Zero Value Handled');

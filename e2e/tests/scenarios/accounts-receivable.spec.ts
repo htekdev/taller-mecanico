@@ -28,10 +28,11 @@ test.describe('Accounts Receivable (CxC)', () => {
     await cuentasCobrarPage.waitForPageLoad();
     await expectVisible(cuentasCobrarPage.sectionTitle, 'CxC section loaded');
 
-    // Verify the module rendered without errors
-    const errorVisible = await page.locator('.bg-rose-50, .text-red-600').first()
-      .isVisible().catch(() => false);
-    expect(errorVisible).toBe(false);
+    // Verify the module rendered without critical errors
+    // Note: .bg-rose-50 is also used for warning badges, so only check actual error text
+    const errorBanner = page.locator('.bg-rose-50:has-text("Error"), .bg-rose-50:has-text("error"), .text-red-600:has-text("Error")').first();
+    const hasCriticalError = await errorBanner.isVisible().catch(() => false);
+    expect(hasCriticalError).toBe(false);
 
     await showPhaseLabel(page, '✅ CxC Module Healthy');
   });

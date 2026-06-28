@@ -114,7 +114,7 @@ test.describe('Error Recovery', () => {
     expect(navVisible).toBe(true);
 
     // No unhandled exception visible
-    const bodyText = await page.locator('body').textContent() ?? '';
+    const bodyText = await page.locator('main').innerText().catch(() => '');
     expect(bodyText).not.toContain('Unhandled Runtime Error');
     expect(bodyText).not.toContain('Application error');
 

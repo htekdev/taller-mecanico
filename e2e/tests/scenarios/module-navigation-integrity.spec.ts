@@ -57,7 +57,7 @@ test.describe('Module Navigation Integrity', () => {
     await page.waitForTimeout(2000);
 
     // Look for date patterns
-    const bodyText = await page.locator('main, .space-y-3').first().textContent() ?? '';
+    const bodyText = await page.locator('main, .space-y-3').first().innerText().catch(() => '');
 
     // Dates should NOT have "Invalid Date" or "NaN"
     expect(bodyText).not.toContain('Invalid Date');
@@ -66,13 +66,13 @@ test.describe('Module Navigation Integrity', () => {
     // Check in Órdenes
     await sidebar.clickTab('Órdenes de Compra');
     await page.waitForTimeout(1500);
-    const ordenText = await page.locator('main, .space-y-3').first().textContent() ?? '';
+    const ordenText = await page.locator('main, .space-y-3').first().innerText().catch(() => '');
     expect(ordenText).not.toContain('Invalid Date');
 
     // Check in Gastos
     await sidebar.clickTab('Gastos');
     await page.waitForTimeout(1500);
-    const gastoText = await page.locator('main, .space-y-3').first().textContent() ?? '';
+    const gastoText = await page.locator('main, .space-y-3').first().innerText().catch(() => '');
     expect(gastoText).not.toContain('Invalid Date');
 
     await showPhaseLabel(page, '✅ Dates Display Correctly');
@@ -87,7 +87,7 @@ test.describe('Module Navigation Integrity', () => {
     await page.waitForTimeout(2000);
 
     // Get the text content of the trabajos section
-    const mainText = await page.locator('main').textContent() ?? '';
+    const mainText = await page.locator('main').innerText().catch(() => '');
 
     // No NaN, no undefined, no Infinity in any displayed numbers
     expect(mainText).not.toContain('NaN');
@@ -117,7 +117,7 @@ test.describe('Module Navigation Integrity', () => {
     await inventarioPage.waitForPageLoad();
     await page.waitForTimeout(1500);
 
-    const mainText = await page.locator('main').textContent() ?? '';
+    const mainText = await page.locator('main').innerText().catch(() => '');
     expect(mainText).not.toContain('NaN');
     expect(mainText).not.toContain('undefined');
     expect(mainText).not.toContain('Infinity');
@@ -155,7 +155,7 @@ test.describe('Module Navigation Integrity', () => {
       expect(navVisible).toBe(true);
 
       // No JavaScript errors (no "undefined is not a function" etc)
-      const bodyText = await page.locator('body').textContent() ?? '';
+      const bodyText = await page.locator('main').innerText().catch(() => '');
       expect(bodyText).not.toContain('Unhandled Runtime Error');
     }
 

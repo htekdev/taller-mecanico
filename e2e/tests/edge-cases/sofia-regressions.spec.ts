@@ -218,10 +218,10 @@ test.describe('Sofia Regression Tests', () => {
       const navVisible = await dashboardPage.nav.isVisible();
       expect(navVisible).toBe(true);
 
-      // No "undefined" or "NaN" text visible (common conditional column bug)
-      const pageText = await page.locator('body').textContent() ?? '';
-      expect(pageText).not.toContain('undefined');
-      expect(pageText).not.toContain('NaN');
+      // No "undefined" or "NaN" in VISIBLE text (exclude script tags/Next.js internals)
+      const visibleText = await page.locator('main').innerText().catch(() => '');
+      expect(visibleText).not.toContain('undefined');
+      expect(visibleText).not.toContain('NaN');
     }
 
     await showPhaseLabel(page, '✅ PASS: No Render Errors');

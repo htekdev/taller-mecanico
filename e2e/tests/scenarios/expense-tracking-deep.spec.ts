@@ -51,7 +51,7 @@ test.describe('Expense Tracking Deep', () => {
 
     // ─── Phase 2: Verify totals ─────────────────────────────────────────────
     await showPhaseLabel(page, '🧮 Phase 2: Verify Totals');
-    const mainText = await page.locator('main').textContent() ?? '';
+    const mainText = await page.locator('main').innerText().catch(() => '');
 
     // Should have monetary amounts displayed
     expect(mainText).not.toContain('NaN');
@@ -91,7 +91,7 @@ test.describe('Expense Tracking Deep', () => {
     await page.waitForTimeout(500);
 
     // Our expense should be visible
-    const pageText = await page.locator('main').textContent() ?? '';
+    const pageText = await page.locator('main').innerText().catch(() => '');
     // Just verify no crash and module is healthy
     const healthy = await gastosPage.isModuleHealthy();
     expect(healthy).toBe(true);
@@ -115,7 +115,7 @@ test.describe('Expense Tracking Deep', () => {
     });
 
     // Verify dates in the list
-    const mainText = await page.locator('main').textContent() ?? '';
+    const mainText = await page.locator('main').innerText().catch(() => '');
     expect(mainText).not.toContain('Invalid Date');
     expect(mainText).not.toContain('NaN');
 

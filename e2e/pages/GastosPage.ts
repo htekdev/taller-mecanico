@@ -25,15 +25,16 @@ export class GastosPage extends BasePage {
   constructor(page: Page) {
     super(page);
     this.sectionTitle = page.locator('h2:has-text("Gastos")');
-    this.categoriaSelect = page.locator('select:has(option:has-text("operativo"))').first();
+    this.categoriaSelect = page.locator('select').first();
     this.subcategoriaSelect = page.locator('select').nth(1);
-    this.conceptoInput = page.locator('input[placeholder*="concepto" i]').first();
-    this.montoInput = page.locator('input[type="number"], input[placeholder*="monto" i]').first();
+    // Concepto input is after "Concepto" label — use nth input (not type=number, not type=date)
+    this.conceptoInput = page.locator('input:not([type="number"]):not([type="date"]):not([type="hidden"])').nth(1);
+    this.montoInput = page.locator('input[type="number"]').first();
     this.fechaInput = page.locator('input[type="date"]').first();
-    this.notasInput = page.locator('textarea, input[placeholder*="notas" i]').first();
-    this.guardarButton = page.getByRole('button', { name: /guardar|agregar gasto/i });
+    this.notasInput = page.locator('input[placeholder*="Referencia" i], input[placeholder*="notas" i]').first();
+    this.guardarButton = page.getByRole('button', { name: /guardar/i });
     this.cancelarButton = page.getByRole('button', { name: /cancelar/i });
-    this.nuevoGastoButton = page.getByRole('button', { name: /nuevo gasto|agregar/i }).first();
+    this.nuevoGastoButton = page.getByRole('button', { name: /nuevo gasto|agregar primer gasto/i }).first();
     this.filtroCategoriaSelect = page.locator('select:has(option:has-text("Todos"))').first();
     this.gastosList = page.locator('.space-y-2, .divide-y').first();
     this.totalMensual = page.locator('text=/Total.*\\$[\\d,.]+/').first();
@@ -58,7 +59,8 @@ export class GastosPage extends BasePage {
     }
 
     if (data.categoria && await this.categoriaSelect.isVisible().catch(() => false)) {
-      await this.categoriaSelect.selectOption({ label: data.categoria });
+      // Category options have value=key (e.g., 'operativo') and label='🏠 Operativos'
+      await this.categoriaSelect.selectOption({ value: data.categoria });
       await this.page.waitForTimeout(300);
     }
 

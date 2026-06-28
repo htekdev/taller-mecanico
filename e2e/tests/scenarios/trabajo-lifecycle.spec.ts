@@ -172,10 +172,12 @@ test.describe('Trabajo Lifecycle', () => {
       await page.waitForTimeout(2000);
 
       // Either it succeeds (data complete) or shows a clear error (correct behavior)
-      const pageContent = await page.content();
-      const hasError = pageContent.includes('error') || pageContent.includes('Error') ||
-                       pageContent.includes('rose-') || pageContent.includes('red-');
-      const hasSuccess = pageContent.includes('terminado') || pageContent.includes('finalizado');
+      const visibleText = await page.locator('main').innerText().catch(() => '');
+      const pageHtml = await page.content();
+      const hasError = pageHtml.includes('rose-') || pageHtml.includes('red-') ||
+                       visibleText.toLowerCase().includes('error');
+      const hasSuccess = visibleText.toLowerCase().includes('terminado') ||
+                        visibleText.toLowerCase().includes('finalizado');
 
       // One of these must be true — no silent failure
       expect(hasError || hasSuccess).toBe(true);

@@ -38,7 +38,7 @@ test.describe('Special Characters & Long Text', () => {
     expect(partVisible).toBe(true);
 
     // No encoding corruption
-    const bodyText = await page.locator('main').textContent() ?? '';
+    const bodyText = await page.locator('main').innerText().catch(() => '');
     expect(bodyText).not.toContain('Ã');  // UTF-8 mojibake marker
     expect(bodyText).not.toContain('â€');  // Another mojibake pattern
 

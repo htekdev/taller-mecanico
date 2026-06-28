@@ -4,6 +4,32 @@ import type { Page } from '@playwright/test';
  * Helper utilities for E2E tests.
  */
 
+/**
+ * Get visible text from the main content area (excludes script tags, RSC payloads).
+ * Use this instead of `page.locator('body').textContent()` which includes Next.js internals.
+ */
+export async function getVisibleText(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    // Get only visible text from main content, exclude script/style tags
+    const main = document.querySelector('main') || document.body;
+    const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        const tag = parent.tagName.toLowerCase();
+        if (tag === 'script' || tag === 'style' || tag === 'noscript') return NodeFilter.FILTER_REJECT;
+        if (parent.closest('[hidden]') || parent.closest('[style*="display: none"]')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    let text = '';
+    while (walker.nextNode()) {
+      text += walker.currentNode.textContent;
+    }
+    return text;
+  });
+}
+
 /** Login with test credentials — convenience for tests that don't use the LoginPage POM directly. */
 export async function quickLogin(page: Page) {
   const email = process.env.E2E_TEST_EMAIL || 'sofia@test.com';

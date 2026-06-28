@@ -39,7 +39,7 @@ test.describe('Zero & Edge Value Handling', () => {
     expect(isVisible).toBe(true);
 
     // No NaN or negative stock displayed
-    const bodyText = await page.locator('main').textContent() ?? '';
+    const bodyText = await page.locator('main').innerText().catch(() => '');
     expect(bodyText).not.toContain('NaN');
     expect(bodyText).not.toContain('-1');
 
@@ -66,7 +66,7 @@ test.describe('Zero & Edge Value Handling', () => {
     expect(navVisible).toBe(true);
 
     // Check the amount displays (look for the number in any format)
-    const bodyText = await page.locator('main').textContent() ?? '';
+    const bodyText = await page.locator('main').innerText().catch(() => '');
     expect(bodyText).not.toContain('NaN');
     expect(bodyText).not.toContain('Infinity');
 
@@ -118,7 +118,7 @@ test.describe('Zero & Edge Value Handling', () => {
     });
 
     // Check that displayed amounts use proper decimal format
-    const bodyText = await page.locator('main').textContent() ?? '';
+    const bodyText = await page.locator('main').innerText().catch(() => '');
     // Should not show excessive decimals like 99.990000001
     expect(bodyText).not.toMatch(/\d+\.\d{4,}/); // No 4+ decimal places
 

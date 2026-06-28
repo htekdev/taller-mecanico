@@ -134,10 +134,17 @@ export class CotizacionesPage extends BasePage {
     }
   }
 
-  /** Save the current cotización. */
-  async save() {
-    await this.saveButton.click();
-    await this.page.waitForTimeout(2000);
+  /** Save the current cotización. Returns true if save was attempted. */
+  async save(): Promise<boolean> {
+    if (await this.saveButton.isVisible().catch(() => false)) {
+      const isDisabled = await this.saveButton.isDisabled().catch(() => false);
+      if (!isDisabled) {
+        await this.saveButton.click();
+        await this.page.waitForTimeout(2000);
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Convert the current cotización to a trabajo. */

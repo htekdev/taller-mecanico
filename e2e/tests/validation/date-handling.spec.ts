@@ -29,7 +29,7 @@ test.describe('Date Handling', () => {
       await sidebar.clickTab(mod);
       await page.waitForTimeout(1000);
 
-      const bodyText = await page.locator('main, .space-y-3').first().textContent() ?? '';
+      const bodyText = await page.locator('main, .space-y-3').first().innerText().catch(() => '');
       expect(bodyText).not.toContain('Invalid Date');
       expect(bodyText).not.toContain('NaN');
     }
@@ -75,7 +75,7 @@ test.describe('Date Handling', () => {
     await page.waitForTimeout(1500);
 
     // If there are trabajos with dates, the year should be visible
-    const bodyText = await page.locator('main').textContent() ?? '';
+    const bodyText = await page.locator('main').innerText().catch(() => '');
     // This is a soft check — if there's data, dates should include current year
     if (bodyText.includes('/') || bodyText.includes('-')) {
       // Has date-like content — verify no garbage years

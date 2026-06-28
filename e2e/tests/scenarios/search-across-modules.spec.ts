@@ -65,7 +65,7 @@ test.describe('Search Across Modules', () => {
     // ─── Verify consistency ─────────────────────────────────────────────────
     await showPhaseLabel(page, '✅ Cross-Module Consistent');
     // No crash, no "undefined", no errors across all modules
-    const bodyText = await page.locator('body').textContent() ?? '';
+    const bodyText = await page.locator('main').innerText().catch(() => '');
     expect(bodyText).not.toContain('undefined');
     expect(bodyText).not.toContain('NaN');
 

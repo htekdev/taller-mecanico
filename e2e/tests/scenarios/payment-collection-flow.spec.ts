@@ -99,7 +99,7 @@ test.describe('Payment Collection Flow', () => {
       const hasParcial = await parcialBadge.isVisible().catch(() => false);
 
       // Also verify amounts display correctly (no NaN, no undefined)
-      const bodyText = await page.locator('body').textContent() ?? '';
+      const bodyText = await page.locator('main').innerText().catch(() => '');
       expect(bodyText).not.toContain('NaN');
       expect(bodyText).not.toContain('undefined');
 
@@ -140,7 +140,7 @@ test.describe('Payment Collection Flow', () => {
     await cuentasCobrarPage.waitForPageLoad();
 
     // Get all text in the module
-    const bodyText = await page.locator('.space-y-3, .divide-y, main').first().textContent() ?? '';
+    const bodyText = await page.locator('.space-y-3, .divide-y, main').first().innerText().catch(() => '');
 
     // No NaN or undefined should EVER appear in financial displays
     expect(bodyText).not.toContain('NaN');

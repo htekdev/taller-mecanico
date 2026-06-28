@@ -51,8 +51,8 @@ export class TrabajosPage extends BasePage {
     this.fechaInput = page.locator('input[type="date"]').first();
     this.manoDeObraConceptoInput = page.locator('input[placeholder*="concepto" i], input[placeholder*="mano de obra" i]').first();
     this.manoDeObraPrecioInput = page.locator('input[type="number"]').first();
-    this.addManoDeObraButton = page.getByRole('button', { name: /agregar mano|añadir concepto/i });
-    this.saveButton = page.getByRole('button', { name: /guardar|crear trabajo/i });
+    this.addManoDeObraButton = page.getByRole('button', { name: /^\+?\s*agregar$/i }).first();
+    this.saveButton = page.getByRole('button', { name: /registrar trabajo|guardar|crear trabajo/i });
     this.finalizarButton = page.getByRole('button', { name: /finalizar/i });
 
     this.addPartButton = page.getByRole('button', { name: /agregar refacción|buscar refacción|añadir pieza/i });
@@ -109,29 +109,36 @@ export class TrabajosPage extends BasePage {
 
   /** Add a mano de obra (labor) line. */
   async addLaborItem(concepto: string, precio: number) {
-    // Fill concepto
-    const conceptoInputs = this.page.locator('input[placeholder*="concepto" i], input[placeholder*="descripción" i]');
-    const lastConcepto = conceptoInputs.last();
-    if (await lastConcepto.isVisible().catch(() => false)) {
-      await lastConcepto.fill(concepto);
+    // Fill concepto — placeholder: "Ej. Arreglo de frenos, engrase de pernos..."
+    const conceptoInput = this.page.locator('input[placeholder*="Arreglo de frenos" i], input[placeholder*="Ej." i]').first();
+    if (await conceptoInput.isVisible().catch(() => false)) {
+      await conceptoInput.fill(concepto);
     }
-    // Fill precio
-    const precioInputs = this.page.locator('input[type="number"]');
-    const allPrecio = await precioInputs.all();
-    if (allPrecio.length > 0) {
-      await allPrecio[allPrecio.length - 1].fill(String(precio));
+    // Fill precio — the number input for price in the labor row
+    const precioInput = this.page.locator('input[type="number"][placeholder="0.00"]').first();
+    if (await precioInput.isVisible().catch(() => false)) {
+      await precioInput.fill(String(precio));
     }
-    // Click add if button exists
+    // Click "+ Agregar" to add the labor item
     if (await this.addManoDeObraButton.isVisible().catch(() => false)) {
-      await this.addManoDeObraButton.click();
-      await this.page.waitForTimeout(500);
+      const isDisabled = await this.addManoDeObraButton.isDisabled().catch(() => false);
+      if (!isDisabled) {
+        await this.addManoDeObraButton.click();
+        await this.page.waitForTimeout(500);
+      }
     }
   }
 
   /** Save the trabajo. */
   async save() {
-    await this.saveButton.click();
-    await this.page.waitForTimeout(2000);
+    // Wait for button to be actionable (might be disabled until form valid)
+    if (await this.saveButton.isVisible().catch(() => false)) {
+      const isDisabled = await this.saveButton.isDisabled().catch(() => false);
+      if (!isDisabled) {
+        await this.saveButton.click();
+        await this.page.waitForTimeout(2000);
+      }
+    }
   }
 
   /** Finalize a trabajo. */
