@@ -20,11 +20,12 @@ test.describe('Date Handling', () => {
   test('no Invalid Date text across all modules', async ({
     page, dashboardPage, sidebar
   }) => {
+    test.slow(); // Multi-module navigation needs extra time
     const modules = ['Trabajos', 'Órdenes de Compra', 'Gastos', 'Por Cobrar'] as const;
 
     for (const mod of modules) {
       await sidebar.clickTab(mod);
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState('networkidle').catch(() => {});
 
       const bodyText = await page.locator('main').innerText().catch(() => '');
       expect(bodyText).not.toContain('Invalid Date');
