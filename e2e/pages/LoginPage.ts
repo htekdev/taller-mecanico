@@ -58,7 +58,35 @@ export class LoginPage extends BasePage {
   async loginAsTestUser() {
     const email = process.env.E2E_TEST_EMAIL || 'sofia@test.com';
     const password = process.env.E2E_TEST_PASSWORD || 'Test1234!';
-    await this.goto();
+
+    await this.page.goto('/login');
+    await this.page.waitForLoadState('domcontentloaded');
+
+    // Check if we're already logged in (redirected to dashboard)
+    const navButton = this.page.locator('nav button').first();
+    const emailField = this.emailInput;
+
+    // Race: either we see the login form OR we're already on the dashboard
+    const firstVisible = await Promise.race([
+      emailField.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'login' as const),
+      navButton.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'dashboard' as const),
+    ]).catch(() => 'timeout' as const);
+
+    if (firstVisible === 'dashboard') {
+      // Already logged in — skip login
+      return;
+    }
+
+    if (firstVisible === 'timeout') {
+      // Neither appeared — try navigating to root
+      await this.page.goto('/');
+      await this.page.waitForLoadState('domcontentloaded');
+      const navAfter = this.page.locator('nav button').first();
+      await navAfter.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+      return;
+    }
+
+    // On login page — fill and submit
     await this.login(email, password);
     // Wait for redirect to dashboard (nav appears)
     await this.page.locator('nav button').first().waitFor({ state: 'visible', timeout: 20_000 });

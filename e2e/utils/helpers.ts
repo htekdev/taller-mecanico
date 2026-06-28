@@ -10,10 +10,29 @@ export async function quickLogin(page: Page) {
   const password = process.env.E2E_TEST_PASSWORD || 'Test1234!';
 
   await page.goto('/login');
-  await page.locator('input[type="email"]').fill(email);
+  await page.waitForLoadState('domcontentloaded');
+
+  // Check if already logged in
+  const navButton = page.locator('nav button').first();
+  const emailField = page.locator('input[type="email"]');
+
+  const firstVisible = await Promise.race([
+    emailField.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'login' as const),
+    navButton.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'dashboard' as const),
+  ]).catch(() => 'timeout' as const);
+
+  if (firstVisible === 'dashboard') return;
+  if (firstVisible === 'timeout') {
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+    await navButton.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+    return;
+  }
+
+  await emailField.fill(email);
   await page.locator('input[type="password"]').fill(password);
   await page.locator('button[type="submit"]').click();
-  await page.locator('nav button').first().waitFor({ state: 'visible', timeout: 20_000 });
+  await navButton.waitFor({ state: 'visible', timeout: 20_000 });
 }
 
 /** Navigate to a module via the sidebar nav. */
