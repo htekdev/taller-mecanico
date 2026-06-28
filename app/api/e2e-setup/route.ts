@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
   if (existing) {
     // User exists — ensure password is set correctly
-    await adminClient.auth.admin.updateUser(existing.id, {
+    await adminClient.auth.admin.updateUserById(existing.id, {
       password,
       email_confirm: true,
     });
