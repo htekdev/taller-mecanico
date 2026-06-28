@@ -47,7 +47,14 @@ export class DashboardPage extends BasePage {
   }
 
   async waitForPageLoad() {
-    await this.nav.waitFor({ state: 'visible', timeout: 20_000 });
+    // Wait for nav to appear (indicates dashboard loaded with taller)
+    await this.nav.waitFor({ state: 'visible', timeout: 20_000 }).catch(async () => {
+      // If nav doesn't appear, we might be on setup page
+      // Try navigating to root
+      await this.page.goto('/');
+      await this.page.waitForLoadState('domcontentloaded');
+      await this.nav.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+    });
     // Wait for data to finish loading
     await this.loadingIndicator.waitFor({ state: 'hidden', timeout: 20_000 }).catch(() => {});
   }

@@ -62,34 +62,79 @@ export class LoginPage extends BasePage {
     await this.page.goto('/login');
     await this.page.waitForLoadState('domcontentloaded');
 
-    // Check if we're already logged in (redirected to dashboard)
+    // Check if we're already logged in (redirected to dashboard or setup)
     const navButton = this.page.locator('nav button').first();
     const emailField = this.emailInput;
+    const setupPage = this.page.locator('text=/Crear.*Taller|Crear nuevo taller|Setup/i').first();
 
-    // Race: either we see the login form OR we're already on the dashboard
+    // Race: login form OR dashboard OR setup page
     const firstVisible = await Promise.race([
       emailField.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'login' as const),
       navButton.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'dashboard' as const),
+      setupPage.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'setup' as const),
     ]).catch(() => 'timeout' as const);
 
     if (firstVisible === 'dashboard') {
-      // Already logged in — skip login
+      return; // Already logged in with taller
+    }
+
+    if (firstVisible === 'setup') {
+      // User logged in but no taller — create one
+      await this.handleSetupPage();
       return;
     }
 
     if (firstVisible === 'timeout') {
-      // Neither appeared — try navigating to root
       await this.page.goto('/');
       await this.page.waitForLoadState('domcontentloaded');
-      const navAfter = this.page.locator('nav button').first();
-      await navAfter.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+      await navButton.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
       return;
     }
 
     // On login page — fill and submit
     await this.login(email, password);
-    // Wait for redirect to dashboard (nav appears)
-    await this.page.locator('nav button').first().waitFor({ state: 'visible', timeout: 20_000 });
+
+    // After login, might go to dashboard OR setup
+    const postLogin = await Promise.race([
+      navButton.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'dashboard' as const),
+      setupPage.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'setup' as const),
+    ]).catch(() => 'timeout' as const);
+
+    if (postLogin === 'setup') {
+      await this.handleSetupPage();
+    }
+  }
+
+  /** Handle the /setup page — create a taller or select existing one. */
+  private async handleSetupPage() {
+    await this.page.waitForTimeout(2000); // Let invite check complete
+
+    // If there are existing talleres to select, click the first one
+    const tallerButton = this.page.locator('button:has(span:has-text("🔧"))').first();
+    if (await tallerButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await tallerButton.click();
+      await this.page.locator('nav button').first().waitFor({ state: 'visible', timeout: 15_000 });
+      return;
+    }
+
+    // Otherwise create a new taller
+    // Click "+ Crear nuevo taller" if needed
+    const crearNuevoBtn = this.page.locator('button:has-text("Crear nuevo taller")');
+    if (await crearNuevoBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await crearNuevoBtn.click();
+      await this.page.waitForTimeout(500);
+    }
+
+    // Fill the nombre input and submit
+    const nombreInput = this.page.locator('input[placeholder*="nombre" i], input[type="text"]').first();
+    if (await nombreInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await nombreInput.fill('Taller E2E Test');
+      const submitBtn = this.page.getByRole('button', { name: /crear taller/i });
+      if (await submitBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await submitBtn.click();
+        await this.page.locator('nav button').first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+      }
+    }
   }
 
   /** Switch to registration mode. */

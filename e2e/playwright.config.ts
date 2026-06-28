@@ -28,14 +28,14 @@ export default defineConfig({
   /* Fail CI if test.only is left in source */
   forbidOnly: !!process.env.CI,
 
-  /* Retry failed tests in CI */
-  retries: process.env.CI ? 2 : 0,
+  /* Retry failed tests in CI — just 1 retry to keep CI fast */
+  retries: process.env.CI ? 1 : 0,
 
   /* Single worker in CI to avoid resource contention with shared DB */
   workers: process.env.CI ? 1 : 2,
 
-  /* Global test timeout — generous for lifecycle scenarios */
-  timeout: 90_000,
+  /* Global test timeout — reduced for faster CI feedback */
+  timeout: 45_000,
 
   /* Expect timeout */
   expect: { timeout: 10_000 },
