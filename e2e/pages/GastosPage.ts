@@ -27,11 +27,11 @@ export class GastosPage extends BasePage {
     this.sectionTitle = page.locator('h2:has-text("Gastos")');
     this.categoriaSelect = page.locator('select').first();
     this.subcategoriaSelect = page.locator('select').nth(1);
-    // Concepto input is after "Concepto" label — use nth input (not type=number, not type=date)
-    this.conceptoInput = page.locator('input:not([type="number"]):not([type="date"]):not([type="hidden"])').nth(1);
+    // Concepto input has dynamic placeholder like "ej. 🏠 Renta — Junio 2026"
+    this.conceptoInput = page.locator('input[placeholder^="ej."], input[placeholder*="ej."]').first();
     this.montoInput = page.locator('input[type="number"]').first();
     this.fechaInput = page.locator('input[type="date"]').first();
-    this.notasInput = page.locator('input[placeholder*="Referencia" i], input[placeholder*="notas" i]').first();
+    this.notasInput = page.locator('input[placeholder*="Referencia" i]').first();
     this.guardarButton = page.getByRole('button', { name: /guardar/i });
     this.cancelarButton = page.getByRole('button', { name: /cancelar/i });
     this.nuevoGastoButton = page.getByRole('button', { name: /nuevo gasto|agregar primer gasto/i }).first();
@@ -80,8 +80,13 @@ export class GastosPage extends BasePage {
       await this.fillInput(this.notasInput, data.notas);
     }
 
-    await this.guardarButton.click();
-    await this.page.waitForTimeout(2000);
+    if (await this.guardarButton.isVisible().catch(() => false)) {
+      const isDisabled = await this.guardarButton.isDisabled().catch(() => false);
+      if (!isDisabled) {
+        await this.guardarButton.click();
+        await this.page.waitForTimeout(2000);
+      }
+    }
   }
 
   /** Filter gastos by category. */

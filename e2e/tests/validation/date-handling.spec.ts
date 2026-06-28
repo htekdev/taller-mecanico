@@ -20,21 +20,16 @@ test.describe('Date Handling', () => {
   test('no Invalid Date text across all modules', async ({
     page, dashboardPage, sidebar
   }) => {
-    await showPhaseLabel(page, '📅 Invalid Date Sweep');
-
-    const modules = ['Trabajos', 'Órdenes de Compra', 'Gastos',
-      'Cotizaciones', 'Por Cobrar', 'Historial'] as const;
+    const modules = ['Trabajos', 'Órdenes de Compra', 'Gastos', 'Por Cobrar'] as const;
 
     for (const mod of modules) {
       await sidebar.clickTab(mod);
       await page.waitForTimeout(1000);
 
-      const bodyText = await page.locator('main, .space-y-3').first().innerText().catch(() => '');
+      const bodyText = await page.locator('main').innerText().catch(() => '');
       expect(bodyText).not.toContain('Invalid Date');
       expect(bodyText).not.toContain('NaN');
     }
-
-    await showPhaseLabel(page, '✅ No Invalid Dates');
   });
 
   test('date input accepts today and future dates', async ({

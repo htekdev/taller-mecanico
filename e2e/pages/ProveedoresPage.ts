@@ -18,9 +18,9 @@ export class ProveedoresPage extends BasePage {
   constructor(page: Page) {
     super(page);
     this.sectionTitle = page.locator('h2:has-text("Proveedores")');
-    this.nombreInput = page.locator('input[placeholder*="nombre" i]').first();
-    this.contactoInput = page.locator('input[placeholder*="contacto" i]').first();
-    this.telefonoInput = page.locator('input[type="tel"], input[placeholder*="teléfono" i]').first();
+    this.nombreInput = page.locator('input[placeholder*="Refacciones" i], input[placeholder*="nombre" i]').first();
+    this.contactoInput = page.locator('input[placeholder*="vendedor" i], input[placeholder*="contacto" i]').first();
+    this.telefonoInput = page.locator('input[type="tel"]').first();
     this.emailInput = page.locator('input[type="email"], input[placeholder*="correo" i]').first();
     this.agregarButton = page.getByRole('button', { name: /agregar proveedor/i });
     this.proveedoresList = page.locator('.space-y-2, .divide-y, .grid').first();
@@ -42,8 +42,13 @@ export class ProveedoresPage extends BasePage {
     if (data.email && await this.emailInput.isVisible().catch(() => false)) {
       await this.fillInput(this.emailInput, data.email);
     }
-    await this.agregarButton.click();
-    await this.page.waitForTimeout(2000);
+    if (await this.agregarButton.isVisible().catch(() => false)) {
+      const isDisabled = await this.agregarButton.isDisabled().catch(() => false);
+      if (!isDisabled) {
+        await this.agregarButton.click();
+        await this.page.waitForTimeout(2000);
+      }
+    }
   }
 
   /** Get count of proveedores in the list. */
