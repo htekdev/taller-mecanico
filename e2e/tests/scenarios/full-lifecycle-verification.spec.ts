@@ -3,7 +3,7 @@ import { expectVisible, expectText, showPhaseLabel } from '../visual-assert';
 import { TestData } from '../../utils/test-data';
 
 /**
- * Full Business Cycle — End-to-end flow across all modules.
+ * Full Lifecycle Verification — End-to-end flow across all modules.
  *
  * This is THE definitive test: it exercises the complete workflow
  * that Sofia performs daily:
@@ -24,7 +24,7 @@ import { TestData } from '../../utils/test-data';
  * 14. Module stability sweep — all modules render without crash
  */
 
-test.describe('Full Business Cycle', () => {
+test.describe('Full Lifecycle Verification', () => {
   test('complete daily workflow: client → cotización → trabajo → payment → expense', async ({
     page, loginPage, dashboardPage, cotizacionesPage, trabajosPage,
     inventarioPage, cuentasCobrarPage, ordenesCompraPage, gastosPage, sidebar
@@ -126,6 +126,6 @@ test.describe('Full Business Cycle', () => {
       expect(navVisible).toBe(true);
     }
 
-    await showPhaseLabel(page, '🎉 COMPLETE: Full Business Cycle Passed!');
+    await showPhaseLabel(page, '🎉 COMPLETE: Full Lifecycle Verification Passed!');
   });
 });
