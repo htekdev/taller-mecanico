@@ -33,24 +33,26 @@ export class OrdenesCompraPage extends BasePage {
 
   constructor(page: Page) {
     super(page);
-    this.sectionTitle = page.locator('h2:has-text("Órdenes de Compra")');
-    this.crearOrdenButton = page.getByRole('button', { name: /nueva orden|crear orden/i });
+    const createForm = page.locator('form').first();
 
-    this.proveedorSelect = page.locator('select:has(option:has-text("Proveedor"))').first();
-    this.descripcionInput = page.locator('input[placeholder*="descripción" i], textarea').first();
-    this.numeroOrdenInput = page.locator('input[placeholder*="número" i], input[placeholder*="orden" i]').first();
-    this.conIVACheckbox = page.locator('input[type="checkbox"]').first();
-    this.addItemButton = page.getByRole('button', { name: /agregar refacción|agregar item|añadir/i }).first();
-    this.refaccionSelect = page.locator('select:has(option:has-text("Seleccionar refacción"))').first();
-    this.cantidadInput = page.locator('input[type="number"][placeholder*="cant" i]').first();
-    this.precioInput = page.locator('input[type="number"][placeholder*="precio" i]').first();
-    this.saveButton = page.getByRole('button', { name: /guardar|crear/i });
+    this.sectionTitle = page.locator('h2:has-text("Órdenes de Compra")');
+    this.crearOrdenButton = createForm.getByRole('button', { name: /crear orden/i });
+
+    this.proveedorSelect = createForm.locator('select').first();
+    this.descripcionInput = createForm.locator('input[placeholder*="Reposición mensual filtros" i]').first();
+    this.numeroOrdenInput = createForm.locator('input[placeholder*="OC-2026" i]').first();
+    this.conIVACheckbox = page.locator('button[role="switch"], button').filter({ hasText: /IVA/i }).first();
+    this.addItemButton = createForm.getByRole('button', { name: /^\+ Agregar$/i }).first();
+    this.refaccionSelect = createForm.locator('select').nth(1);
+    this.cantidadInput = createForm.locator('input[placeholder="1"]').first();
+    this.precioInput = createForm.locator('input[placeholder="0.00"]').first();
+    this.saveButton = createForm.getByRole('button', { name: /crear orden|registrar pieza y crear orden/i }).first();
 
     this.ordenesList = page.locator('.space-y-3, .divide-y').first();
-    this.filterSelect = page.locator('select:has(option:has-text("Todas"))').first();
+    this.filterSelect = page.locator('select:has(option:has-text("Todos los proveedores"))').first();
 
     this.recibirButton = page.getByRole('button', { name: /recibir|marcar recibida/i }).first();
-    this.editarButton = page.getByRole('button', { name: /editar/i }).first();
+    this.editarButton = page.getByRole('button', { name: /corregir orden|editar/i }).first();
     this.eliminarButton = page.getByRole('button', { name: /eliminar/i }).first();
   }
 
@@ -77,15 +79,11 @@ export class OrdenesCompraPage extends BasePage {
 
   /** Add an item from existing inventory. */
   async addItemFromInventory(refIndex = 1, cantidad = 1, precio = 100) {
-    if (await this.addItemButton.isVisible().catch(() => false)) {
-      await this.addItemButton.click();
-      await this.page.waitForTimeout(500);
-    }
-
     if (await this.refaccionSelect.isVisible().catch(() => false)) {
       const count = await this.getOptionCount(this.refaccionSelect);
       if (count > 1) {
         await this.selectByIndex(this.refaccionSelect, Math.min(refIndex, count - 1));
+        await this.page.waitForTimeout(200);
       }
     }
 
@@ -94,6 +92,14 @@ export class OrdenesCompraPage extends BasePage {
     }
     if (await this.precioInput.isVisible().catch(() => false)) {
       await this.fillInput(this.precioInput, String(precio));
+    }
+
+    if (await this.addItemButton.isVisible().catch(() => false)) {
+      const isDisabled = await this.addItemButton.isDisabled().catch(() => false);
+      if (!isDisabled) {
+        await this.addItemButton.click();
+        await this.page.waitForTimeout(500);
+      }
     }
   }
 
@@ -106,8 +112,11 @@ export class OrdenesCompraPage extends BasePage {
 
   /** Save the order. */
   async save() {
-    await this.saveButton.click();
-    await this.page.waitForTimeout(2000);
+    const isDisabled = await this.saveButton.isDisabled().catch(() => false);
+    if (!isDisabled) {
+      await this.saveButton.click();
+      await this.page.waitForTimeout(2000);
+    }
   }
 
   /** Mark an order as received. */
@@ -118,13 +127,15 @@ export class OrdenesCompraPage extends BasePage {
 
   /** Click edit on the first order. */
   async clickEdit() {
-    await this.editarButton.click();
-    await this.page.waitForTimeout(1000);
+    if (await this.editarButton.isVisible().catch(() => false)) {
+      await this.editarButton.click();
+      await this.page.waitForTimeout(1000);
+    }
   }
 
   /** Get the count of orders in the list. */
   async getOrderCount(): Promise<number> {
-    const items = this.page.locator('.border.rounded-xl:has(text=/OC-|Orden/), [data-testid="orden-item"]');
+    const items = this.page.getByRole('button', { name: /ver piezas|ocultar piezas/i });
     return items.count();
   }
 

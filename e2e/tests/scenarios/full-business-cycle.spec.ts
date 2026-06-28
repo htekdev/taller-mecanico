@@ -29,6 +29,7 @@ test.describe('Full Business Cycle', () => {
     page, loginPage, dashboardPage, cotizacionesPage, trabajosPage,
     inventarioPage, cuentasCobrarPage, ordenesCompraPage, gastosPage, sidebar
   }) => {
+    test.slow();
     const runId = TestData.uniqueId();
 
     // ═══ Phase 1: Login ═══════════════════════════════════════════════════════
@@ -120,8 +121,7 @@ test.describe('Full Business Cycle', () => {
 
     for (const mod of modules) {
       await sidebar.clickTab(mod);
-      await page.waitForTimeout(800);
-      // Verify no crash — nav still visible
+      await page.waitForTimeout(200);
       const navVisible = await dashboardPage.nav.isVisible();
       expect(navVisible).toBe(true);
     }

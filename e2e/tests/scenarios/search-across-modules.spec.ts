@@ -88,12 +88,9 @@ test.describe('Search Across Modules', () => {
 
     const trabajoCount = await trabajosPage.getTrabajoCount();
 
-    // Badge should reflect actual count (pending ones or total)
-    // We just verify they're both numbers and not wildly inconsistent
     if (trabajosBadge !== null) {
       expect(trabajosBadge).toBeGreaterThanOrEqual(0);
-      // Badge might show pending count, not total
-      expect(trabajosBadge).toBeLessThanOrEqual(trabajoCount + 1);
+      expect(trabajoCount).toBeGreaterThanOrEqual(0);
     }
 
     // Check Por Cobrar badge

@@ -29,13 +29,9 @@ test.describe('Inventory Validation', () => {
       await inventarioPage.precioCompraInput.fill('100');
     }
 
-    // Click add — should fail since nombre is empty
-    if (await inventarioPage.agregarButton.isVisible().catch(() => false)) {
-      await inventarioPage.agregarButton.click();
-      await page.waitForTimeout(1000);
-    }
+    const isDisabled = await inventarioPage.agregarButton.isDisabled();
+    expect(isDisabled).toBe(true);
 
-    // Form should still be active (nombre input still visible and empty)
     const nombreVisible = await inventarioPage.nombreInput.isVisible().catch(() => false);
     expect(nombreVisible).toBe(true);
 
@@ -74,13 +70,9 @@ test.describe('Inventory Validation', () => {
     // Fill name
     await inventarioPage.nombreInput.fill('Price Test Part');
 
-    // Set price to 0
     await inventarioPage.precioCompraInput.fill('0');
-    await inventarioPage.agregarButton.click();
-    await page.waitForTimeout(1000);
+    expect(await inventarioPage.agregarButton.isDisabled()).toBe(true);
 
-    // This might succeed (0 price is sometimes allowed for internal parts)
-    // or fail — both are acceptable, we just verify no crash
     const navVisible = await page.locator('nav').isVisible();
     expect(navVisible).toBe(true);
 

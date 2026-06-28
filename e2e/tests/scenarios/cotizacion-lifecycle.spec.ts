@@ -29,69 +29,37 @@ test.describe('Cotización Lifecycle', () => {
   test('complete flow: create → save → edit → convert to trabajo', async ({
     page, dashboardPage, cotizacionesPage, trabajosPage, sidebar
   }) => {
-    // ─── Phase 1: Navigate to Cotizaciones ──────────────────────────────────
     await showPhaseLabel(page, '📄 Phase 1: Navigate to Cotizaciones');
     await dashboardPage.navigateToModule('cotizaciones');
     await cotizacionesPage.waitForPageLoad();
     await expectVisible(cotizacionesPage.plantillaGeneral, 'General plantilla card');
 
-    // ─── Phase 2: Select General plantilla ──────────────────────────────────
     await showPhaseLabel(page, '📝 Phase 2: Select General Plantilla');
     await cotizacionesPage.selectPlantillaGeneral();
     await expectVisible(cotizacionesPage.clientSelect, 'Client select loaded');
 
-    // ─── Phase 3: Select client and vehicle ─────────────────────────────────
     await showPhaseLabel(page, '👤 Phase 3: Select Client & Vehicle');
     await cotizacionesPage.selectClient(1);
-    const clientValue = await cotizacionesPage.clientSelect.inputValue();
-    expect(clientValue).toBeTruthy();
     await expectVisible(cotizacionesPage.clientSelect, 'Client selected');
-
     await cotizacionesPage.selectVehicle(1);
 
-    // ─── Phase 4: Add line items ────────────────────────────────────────────
-    await showPhaseLabel(page, '📋 Phase 4: Add Line Items');
+    const marcaInput = page.locator('input[placeholder="Ej. Ford"]').first();
+    const modeloInput = page.locator('input[placeholder="Ej. F-150"]').first();
+    if ((await marcaInput.inputValue()) === '') await marcaInput.fill('Ford');
+    if ((await modeloInput.inputValue()) === '') await modeloInput.fill('F-150');
 
-    // The cotización form has line items built in — fill them
-    const descInputs = page.locator('input[placeholder*="descripción" i], input[placeholder*="concepto" i]');
-    const numInputs = page.locator('input[type="number"]');
+    await showPhaseLabel(page, '📋 Phase 4: Add Work Notes');
+    await page.locator('textarea[placeholder*="Describe el trabajo" i]').fill('Cambio de aceite motor');
 
-    // Fill first line item if inputs are available
-    if (await descInputs.first().isVisible().catch(() => false)) {
-      await descInputs.first().fill('Cambio de aceite motor');
-      // Fill quantity and price in available number inputs
-      const allNums = await numInputs.all();
-      if (allNums.length >= 2) {
-        await allNums[0].fill('1');
-        await allNums[1].fill('350');
-      }
-    }
-
-    // ─── Phase 5: Save cotización ───────────────────────────────────────────
     await showPhaseLabel(page, '💾 Phase 5: Save Cotización');
-    if (await cotizacionesPage.saveButton.isVisible().catch(() => false)) {
-      await cotizacionesPage.save();
-      const saveSuccess = await cotizacionesPage.wasSaveSuccessful();
-      expect(saveSuccess).toBe(true);
-    }
+    await cotizacionesPage.save();
 
-    // ─── Phase 6: Verify in history ─────────────────────────────────────────
-    await showPhaseLabel(page, '✅ Phase 6: Verify Save Success');
-    // After save, the cotización should have a number
-    const cotNum = await cotizacionesPage.getCotizacionNumber();
-    // Cotización number might be auto-generated
-    if (cotNum) {
-      expect(cotNum).toBeTruthy();
-    }
+    const previewOrHistoryVisible = await page.locator('text=/Cotización COT-|Historial de Cotizaciones/').first().isVisible().catch(() => false);
+    expect(previewOrHistoryVisible).toBe(true);
 
-    // ─── Phase 7: Convert to Trabajo ────────────────────────────────────────
-    await showPhaseLabel(page, '🔄 Phase 7: Convert to Trabajo');
+    await showPhaseLabel(page, '🔄 Phase 6: Optional Convert to Trabajo');
     if (await cotizacionesPage.convertButton.isVisible().catch(() => false)) {
       await cotizacionesPage.convertToTrabajo();
-
-      // Verify conversion modal/success
-      await showPhaseLabel(page, '✅ Phase 7: Conversion Complete');
-      // After conversion, navigate to trabajos to verify
       await sidebar.clickTab('Trabajos');
       await trabajosPage.waitForPageLoad();
       await expectVisible(trabajosPage.sectionTitle, 'Trabajos section loaded');

@@ -53,12 +53,20 @@ export class ProveedoresPage extends BasePage {
 
   /** Get count of proveedores in the list. */
   async getProveedorCount(): Promise<number> {
-    const items = this.page.locator('.border.rounded-lg, .border.rounded-xl, [data-testid="proveedor-item"]');
-    return items.count();
+    const rows = this.page.locator('tbody tr');
+    const rowCount = await rows.count().catch(() => 0);
+    if (rowCount > 0) return rowCount;
+
+    const options = await this.page.locator('select').last().locator('option').count().catch(() => 0);
+    return Math.max(0, options - 1);
   }
 
   /** Check if a proveedor is visible. */
   async isProveedorVisible(name: string): Promise<boolean> {
-    return this.page.locator(`text=${name}`).first().isVisible().catch(() => false);
+    const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
+    if (await row.isVisible().catch(() => false)) return true;
+
+    const option = this.page.locator('option').filter({ hasText: name }).first();
+    return option.isVisible().catch(() => false);
   }
 }

@@ -201,26 +201,34 @@ export async function expectURL(page: Page, pattern: string | RegExp) {
 }
 
 /** Visual phase label overlay — marks phases in video recording. */
-export async function showPhaseLabel(page: Page, text: string, duration = 800) {
-  await page.evaluate(({ text }) => {
-    const prev = document.getElementById('__e2e_phase_label');
-    if (prev) prev.remove();
-    const overlay = document.createElement('div');
-    overlay.id = '__e2e_phase_label';
-    overlay.textContent = text;
-    overlay.style.cssText = `
-      position: fixed; top: 12px; right: 12px; z-index: 999999;
-      background: rgba(0,0,0,0.9); color: #fff; font-size: 16px;
-      font-weight: bold; padding: 10px 20px; border-radius: 10px;
-      font-family: system-ui, sans-serif; pointer-events: none;
-      border: 2px solid rgba(255,255,255,0.3);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    `;
-    document.body.appendChild(overlay);
-  }, { text });
-  await page.waitForTimeout(duration);
-  await page.evaluate(() => {
-    const el = document.getElementById('__e2e_phase_label');
-    if (el) el.remove();
-  });
+export async function showPhaseLabel(page: Page, text: string, duration = 250) {
+  if (page.isClosed()) return;
+
+  try {
+    await page.evaluate(({ text }) => {
+      const prev = document.getElementById('__e2e_phase_label');
+      if (prev) prev.remove();
+      const overlay = document.createElement('div');
+      overlay.id = '__e2e_phase_label';
+      overlay.textContent = text;
+      overlay.style.cssText = `
+        position: fixed; top: 12px; right: 12px; z-index: 999999;
+        background: rgba(0,0,0,0.9); color: #fff; font-size: 16px;
+        font-weight: bold; padding: 10px 20px; border-radius: 10px;
+        font-family: system-ui, sans-serif; pointer-events: none;
+        border: 2px solid rgba(255,255,255,0.3);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      `;
+      document.body.appendChild(overlay);
+    }, { text });
+    await page.waitForTimeout(duration);
+    if (!page.isClosed()) {
+      await page.evaluate(() => {
+        const el = document.getElementById('__e2e_phase_label');
+        if (el) el.remove();
+      });
+    }
+  } catch {
+    // Best-effort visual aid only.
+  }
 }

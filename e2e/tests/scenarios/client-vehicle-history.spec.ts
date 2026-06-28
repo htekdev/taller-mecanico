@@ -27,119 +27,53 @@ test.describe('Client Vehicle History', () => {
     const runId = TestData.uniqueId();
     const clientName = `Cliente Multi-Vehículo ${runId}`;
 
-    // ─── Phase 1: Navigate to Clientes ──────────────────────────────────────
     await showPhaseLabel(page, '👤 Phase 1: Add Client');
     await dashboardPage.navigateToModule('clientes');
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1000);
 
-    // Fill client name
-    const nameInput = page.locator('input[placeholder="Nombre completo"]');
-    if (await nameInput.isVisible().catch(() => false)) {
-      await nameInput.fill(clientName);
+    await page.locator('input[placeholder="Nombre completo"]').fill(clientName);
+    await page.locator('input[type="tel"]').first().fill('999-555-' + runId.slice(0, 4));
+    await page.getByRole('button', { name: /agregar cliente/i }).click();
+    await page.waitForTimeout(1000);
 
-      // Fill phone
-      const phoneInput = page.locator('input[type="tel"]');
-      if (await phoneInput.isVisible().catch(() => false)) {
-        await phoneInput.fill('999-555-' + runId.slice(0, 4));
-      }
+    const clientCard = page.getByRole('button', { name: new RegExp(clientName, 'i') }).first();
+    await clientCard.click();
+    await page.waitForTimeout(500);
 
-      // Add client
-      const addBtn = page.getByRole('button', { name: /agregar cliente/i });
-      await addBtn.click();
-      await page.waitForTimeout(2000);
-    }
-
-    // ─── Phase 2: Add first vehicle ─────────────────────────────────────────
     await showPhaseLabel(page, '🚗 Phase 2: Add Vehicle 1');
-    // Look for "Agregar Vehículo" form/button
-    const addVehBtn = page.getByRole('button', { name: /agregar vehículo|nuevo vehículo/i }).first();
-    if (await addVehBtn.isVisible().catch(() => false)) {
-      await addVehBtn.click();
-      await page.waitForTimeout(500);
-    }
+    const vehicleForm = page.locator('form').filter({ has: page.locator('input[placeholder="Ej. Ford"]') }).first();
+    await vehicleForm.locator('input[placeholder="Ej. Ford"]').fill('Toyota');
+    await vehicleForm.locator('input[placeholder="Ej. F-150"]').fill('Corolla');
+    await vehicleForm.locator('input[placeholder="Ej. 2020"]').fill('2020');
+    await vehicleForm.locator('input[placeholder="Ej. ABC-123"]').fill(`E2E-${runId.slice(0, 3)}`);
+    await vehicleForm.getByRole('button', { name: /^\+ Agregar$/ }).click();
+    await page.waitForTimeout(1000);
 
-    // Fill vehicle details
-    const marcaInput = page.locator('input[placeholder*="marca" i], input[placeholder*="Toyota" i]').first();
-    if (await marcaInput.isVisible().catch(() => false)) {
-      await marcaInput.fill('Toyota');
-      const modeloInput = page.locator('input[placeholder*="modelo" i], input[placeholder*="Corolla" i]').first();
-      if (await modeloInput.isVisible().catch(() => false)) {
-        await modeloInput.fill('Corolla');
-      }
-      const anioInput = page.locator('input[placeholder*="año" i], input[type="number"]').first();
-      if (await anioInput.isVisible().catch(() => false)) {
-        await anioInput.fill('2020');
-      }
-      const placaInput = page.locator('input[placeholder*="placa" i]').first();
-      if (await placaInput.isVisible().catch(() => false)) {
-        await placaInput.fill(`E2E-${runId.slice(0, 3)}`);
-      }
-
-      // Save vehicle
-      const saveVehBtn = page.getByRole('button', { name: /guardar|agregar/i }).last();
-      if (await saveVehBtn.isVisible().catch(() => false)) {
-        await saveVehBtn.click();
-        await page.waitForTimeout(2000);
-      }
-    }
-
-    // ─── Phase 3: Add second vehicle ────────────────────────────────────────
     await showPhaseLabel(page, '🚗 Phase 3: Add Vehicle 2');
-    if (await addVehBtn.isVisible().catch(() => false)) {
-      await addVehBtn.click();
-      await page.waitForTimeout(500);
-    }
+    await vehicleForm.locator('input[placeholder="Ej. Ford"]').fill('Honda');
+    await vehicleForm.locator('input[placeholder="Ej. F-150"]').fill('Civic');
+    await vehicleForm.locator('input[placeholder="Ej. 2020"]').fill('2018');
+    await vehicleForm.locator('input[placeholder="Ej. ABC-123"]').fill(`HON-${runId.slice(0, 3)}`);
+    await vehicleForm.getByRole('button', { name: /^\+ Agregar$/ }).click();
+    await page.waitForTimeout(1000);
 
-    if (await marcaInput.isVisible().catch(() => false)) {
-      await marcaInput.fill('Honda');
-      const modeloInput = page.locator('input[placeholder*="modelo" i]').first();
-      if (await modeloInput.isVisible().catch(() => false)) {
-        await modeloInput.fill('Civic');
-      }
-    }
-
-    // ─── Phase 4: Create cotización with Vehicle 1 ──────────────────────────
-    await showPhaseLabel(page, '📄 Phase 4: Cotización for Vehicle 1');
+    await showPhaseLabel(page, '📄 Phase 4: Cotización for Vehicles');
     await sidebar.clickTab('Cotizaciones');
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1000);
 
     const generalBtn = page.getByRole('button', { name: /general/i }).first();
-    if (await generalBtn.isVisible().catch(() => false)) {
-      await generalBtn.click();
-      await page.waitForTimeout(2000);
+    await generalBtn.click();
+    await page.waitForTimeout(1000);
 
-      // Select our client
-      const clientSelect = page.locator('select').first();
-      if (await clientSelect.isVisible().catch(() => false)) {
-        // Find our client in the options
-        const options = await clientSelect.locator('option').allTextContents();
-        const clientIdx = options.findIndex(o => o.includes(clientName));
-        if (clientIdx >= 0) {
-          await clientSelect.selectOption({ index: clientIdx });
-          await page.waitForTimeout(1000);
+    const clientSelect = page.locator('select').first();
+    await clientSelect.selectOption({ label: clientName });
+    await page.waitForTimeout(500);
 
-          // Select first vehicle
-          const vehSelect = page.locator('select').nth(1);
-          if (await vehSelect.isVisible().catch(() => false)) {
-            const vehOpts = await vehSelect.locator('option').count();
-            if (vehOpts > 1) {
-              await vehSelect.selectOption({ index: 1 });
-              await page.waitForTimeout(500);
+    const vehSelect = page.locator('select').nth(1);
+    const vehicleOptions = await vehSelect.locator('option').allTextContents();
+    expect(vehicleOptions.some(option => option.includes('Toyota'))).toBe(true);
+    expect(vehicleOptions.some(option => option.includes('Honda'))).toBe(true);
 
-              // Verify vehicle name shows Toyota
-              const selectedVeh = await vehSelect.locator('option:checked').textContent();
-              if (selectedVeh) {
-                expect(selectedVeh.toLowerCase()).toContain('toyota');
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // ─── Phase 5: Verify vehicle linkage ────────────────────────────────────
-    await showPhaseLabel(page, '✅ Phase 5: Vehicle Linkage Verified');
-    // Page is stable, no crash, vehicle selection works
     const navVisible = await dashboardPage.nav.isVisible();
     expect(navVisible).toBe(true);
 

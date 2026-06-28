@@ -56,9 +56,17 @@ export class CotizacionesPage extends BasePage {
   }
 
   async waitForPageLoad() {
-    // Wait for either the plantilla selection or the form to be visible
-    await this.page.locator('h2:has-text("Cotizaciones"), button:has-text("General")').first()
-      .waitFor({ state: 'visible', timeout: 15_000 });
+    const startSurface = this.page.locator('h2:has-text("Cotizaciones")').first();
+    const templateButton = this.page.getByRole('button', { name: /general/i }).first();
+    const historyTitle = this.page.getByText('Historial de Cotizaciones').first();
+    const previewTitle = this.page.locator('text=/Cotización COT-/').first();
+
+    await Promise.race([
+      startSurface.waitFor({ state: 'visible', timeout: 15_000 }),
+      templateButton.waitFor({ state: 'visible', timeout: 15_000 }),
+      historyTitle.waitFor({ state: 'visible', timeout: 15_000 }),
+      previewTitle.waitFor({ state: 'visible', timeout: 15_000 }),
+    ]);
   }
 
   /** Select the "General" plantilla to open the form. */

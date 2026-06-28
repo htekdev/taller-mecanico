@@ -99,7 +99,7 @@ export class GastosPage extends BasePage {
 
   /** Get count of visible expenses. */
   async getExpenseCount(): Promise<number> {
-    const items = this.page.locator('.border.rounded-lg:has(text=/\\$/), .border.rounded-xl:has(text=/\\$/), [data-testid="gasto-item"]');
+    const items = this.page.locator('[data-testid="gasto-item"], .border.border-slate-200.rounded-xl.overflow-hidden');
     return items.count();
   }
 

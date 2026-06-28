@@ -27,11 +27,12 @@ test.describe('Proveedor CRUD', () => {
     await expectVisible(proveedoresPage.sectionTitle, 'Proveedores section');
 
     const prov = TestData.proveedor();
+    const beforeCount = await proveedoresPage.getProveedorCount();
     await proveedoresPage.addProveedor(prov);
 
-    // Verify proveedor was added
     const isVisible = await proveedoresPage.isProveedorVisible(prov.nombre);
     expect(isVisible).toBe(true);
+    expect(await proveedoresPage.getProveedorCount()).toBeGreaterThanOrEqual(beforeCount + 1);
 
     await showPhaseLabel(page, '✅ Proveedor Added');
   });
@@ -44,11 +45,12 @@ test.describe('Proveedor CRUD', () => {
     await proveedoresPage.waitForPageLoad();
 
     const nombre = `Proveedor Min ${TestData.uniqueId()}`;
+    const beforeCount = await proveedoresPage.getProveedorCount();
     await proveedoresPage.addProveedor({ nombre });
 
-    // Should be added even with just name
     const isVisible = await proveedoresPage.isProveedorVisible(nombre);
     expect(isVisible).toBe(true);
+    expect(await proveedoresPage.getProveedorCount()).toBeGreaterThanOrEqual(beforeCount + 1);
 
     await showPhaseLabel(page, '✅ Minimal Proveedor OK');
   });
