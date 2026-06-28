@@ -1,0 +1,59 @@
+import type { Page, Locator } from '@playwright/test';
+import { BasePage } from './BasePage';
+
+/**
+ * ProveedoresPage — Manages the suppliers (Proveedores) module.
+ *
+ * Covers: viewing suppliers, adding new suppliers.
+ */
+export class ProveedoresPage extends BasePage {
+  readonly sectionTitle: Locator;
+  readonly nombreInput: Locator;
+  readonly contactoInput: Locator;
+  readonly telefonoInput: Locator;
+  readonly emailInput: Locator;
+  readonly agregarButton: Locator;
+  readonly proveedoresList: Locator;
+
+  constructor(page: Page) {
+    super(page);
+    this.sectionTitle = page.locator('h2:has-text("Proveedores")');
+    this.nombreInput = page.locator('input[placeholder*="nombre" i]').first();
+    this.contactoInput = page.locator('input[placeholder*="contacto" i]').first();
+    this.telefonoInput = page.locator('input[type="tel"], input[placeholder*="teléfono" i]').first();
+    this.emailInput = page.locator('input[type="email"], input[placeholder*="correo" i]').first();
+    this.agregarButton = page.getByRole('button', { name: /agregar proveedor/i });
+    this.proveedoresList = page.locator('.space-y-2, .divide-y, .grid').first();
+  }
+
+  async waitForPageLoad() {
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 15_000 });
+  }
+
+  /** Add a new proveedor. */
+  async addProveedor(data: { nombre: string; contacto?: string; telefono?: string; email?: string }) {
+    await this.fillInput(this.nombreInput, data.nombre);
+    if (data.contacto && await this.contactoInput.isVisible().catch(() => false)) {
+      await this.fillInput(this.contactoInput, data.contacto);
+    }
+    if (data.telefono && await this.telefonoInput.isVisible().catch(() => false)) {
+      await this.fillInput(this.telefonoInput, data.telefono);
+    }
+    if (data.email && await this.emailInput.isVisible().catch(() => false)) {
+      await this.fillInput(this.emailInput, data.email);
+    }
+    await this.agregarButton.click();
+    await this.page.waitForTimeout(2000);
+  }
+
+  /** Get count of proveedores in the list. */
+  async getProveedorCount(): Promise<number> {
+    const items = this.page.locator('.border.rounded-lg, .border.rounded-xl, [data-testid="proveedor-item"]');
+    return items.count();
+  }
+
+  /** Check if a proveedor is visible. */
+  async isProveedorVisible(name: string): Promise<boolean> {
+    return this.page.locator(`text=${name}`).first().isVisible().catch(() => false);
+  }
+}
