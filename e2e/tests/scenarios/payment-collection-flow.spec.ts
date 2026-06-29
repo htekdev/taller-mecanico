@@ -26,6 +26,9 @@ test.describe('Payment Collection Flow', () => {
   test('partial and full payment lifecycle with balance verification', async ({
     page, dashboardPage, trabajosPage, cuentasCobrarPage, sidebar
   }) => {
+    // Extra time: creates trabajo, finalizes, registers 2 payments across modules.
+    // On fresh preview DBs (cold start) this complex chain needs more headroom.
+    test.slow();
     // ─── Phase 1: Create trabajo with known amounts ─────────────────────────
     await showPhaseLabel(page, '🔧 Phase 1: Create Trabajo');
     await dashboardPage.navigateToModule('trabajos');

@@ -2,6 +2,7 @@
 -- Comprehensive idempotent migration to ensure ALL production tables and
 -- columns exist. This consolidates migrations 004, 005, and 20260626150000
 -- which were never applied to the fzondawpxhkojszrwgck production project.
+-- Safe to re-run: all statements use IF NOT EXISTS / IF EXISTS.
 --
 -- Safe to re-run: all statements use IF NOT EXISTS / IF EXISTS.
 -- ══════════════════════════════════════════════════════════════════════════════
