@@ -63,7 +63,9 @@ export default defineConfig({
     /* Base URL — override via BASE_URL env var for preview deployments */
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
 
-    /* Timeouts */
+    /* Timeouts — 30s per action so cold Vercel preview starts don't flake.
+       test.slow() triples the overall test timeout (30→90s) for heavy tests;
+       keeping actionTimeout at 30s gives each action enough headroom. */
     actionTimeout: 30_000,
     navigationTimeout: 60_000,
   },
