@@ -1067,3 +1067,66 @@ export async function nextCotizacionNumber(tallerId: string): Promise<string> {
 
   return `COT-${String(next).padStart(3, '0')}`;
 }
+
+// ── Departamentos Ayuntamiento ─────────────────────────────────────────────
+//
+// Replaces the per-device localStorage key 'taller_departamentos_ayuntamiento'.
+// All taller members share the same ordered list stored in Supabase.
+
+const DEFAULT_DEPARTAMENTOS_AYUNTAMIENTO: string[] = [
+  'Obras públicas mantenimiento vial',
+  'Servicios públicos aseo urbano poniente',
+  'Servicios públicos aseo urbano oriente',
+];
+
+/** Load all department names for a taller, ordered by sort_order. Seeds defaults on first call. */
+export async function getDepartamentosAyuntamiento(tallerId: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('departamentos_ayuntamiento')
+    .select('nombre')
+    .eq('taller_id', tallerId)
+    .order('sort_order', { ascending: true });
+
+  if (!data || data.length === 0) {
+    // First access — seed the three default departments
+    await supabase.from('departamentos_ayuntamiento').insert(
+      DEFAULT_DEPARTAMENTOS_AYUNTAMIENTO.map((nombre, i) => ({
+        taller_id: tallerId,
+        nombre,
+        sort_order: i,
+      }))
+    );
+    return [...DEFAULT_DEPARTAMENTOS_AYUNTAMIENTO];
+  }
+
+  return data.map(r => r.nombre as string);
+}
+
+/** Append a new department name. Assigns sort_order = max + 1. */
+export async function addDepartamentoAyuntamiento(tallerId: string, nombre: string): Promise<void> {
+  const { data: existing } = await supabase
+    .from('departamentos_ayuntamiento')
+    .select('sort_order')
+    .eq('taller_id', tallerId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  const nextOrder = existing && existing.length > 0
+    ? (existing[0].sort_order as number) + 1
+    : 0;
+
+  await supabase.from('departamentos_ayuntamiento').insert({
+    taller_id: tallerId,
+    nombre,
+    sort_order: nextOrder,
+  });
+}
+
+/** Remove a department by name. If it was selected in a form, the caller should clear that field. */
+export async function deleteDepartamentoAyuntamiento(tallerId: string, nombre: string): Promise<void> {
+  await supabase
+    .from('departamentos_ayuntamiento')
+    .delete()
+    .eq('taller_id', tallerId)
+    .eq('nombre', nombre);
+}
