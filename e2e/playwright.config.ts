@@ -1,15 +1,18 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Taller Mecánico E2E Test Configuration
+ * Taller Mecánico — Comprehensive POM-Based E2E Test Configuration
  *
- * Video recording is ON by default for all tests — Hector requires
- * video evidence for every test run.
+ * Features:
+ * - Page Object Model architecture (e2e/pages/)
+ * - Custom fixtures with all POMs pre-instantiated
+ * - Visual assertion highlighting in recorded videos
+ * - Scenarios, validation, and edge-case test categories
  *
  * Usage:
- *   BASE_URL=https://preview.vercel.app npx playwright test
- *   npx playwright test                  # uses localhost:3000
- *   npx playwright test --ui             # interactive mode
+ *   BASE_URL=https://preview.vercel.app npx playwright test --config=e2e/playwright.config.ts
+ *   npx playwright test --config=e2e/playwright.config.ts
+ *   npx playwright test --config=e2e/playwright.config.ts --ui
  */
 export default defineConfig({
   testDir: './tests',
@@ -18,29 +21,34 @@ export default defineConfig({
   /* Global setup: provisions test user in target environment before tests run */
   globalSetup: require.resolve('./global-setup'),
 
-  /* Run tests in parallel */
-  fullyParallel: true,
+  /* Run tests in files in parallel, but tests within a file sequentially
+     (lifecycle tests have sequential dependencies) */
+  fullyParallel: false,
 
   /* Fail CI if test.only is left in source */
   forbidOnly: !!process.env.CI,
 
-  /* Retry failed tests in CI */
-  retries: process.env.CI ? 2 : 0,
+  /* NO retries in CI — get fast feedback, fix failures properly */
+  retries: 0,
 
-  /* Single worker in CI to avoid resource contention */
-  workers: process.env.CI ? 1 : undefined,
+  /* Single worker in CI to avoid resource contention with shared DB */
+  workers: process.env.CI ? 1 : 2,
 
-  /* Global test timeout */
-  timeout: 60_000,
+  /* Global test timeout — 30s for fast feedback */
+  timeout: 30_000,
 
-  /* Reporters: HTML for humans, JSON for S3 upload script */
+  /* Expect timeout */
+  expect: { timeout: 10_000 },
+
+  /* Reporters: HTML for humans, JSON for CI/upload */
   reporter: [
     ['html', { outputFolder: '../playwright-report', open: 'never' }],
     ['json', { outputFile: './results/report.json' }],
+    ['list'],
   ],
 
   use: {
-    /* ALWAYS record video — Hector wants video evidence for every test */
+    /* ALWAYS record video — visual assertions need video evidence */
     video: 'on',
 
     /* Screenshot every test (pass or fail) */
@@ -56,7 +64,7 @@ export default defineConfig({
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
 
     /* Timeouts */
-    actionTimeout: 10_000,
+    actionTimeout: 15_000,
     navigationTimeout: 30_000,
   },
 
