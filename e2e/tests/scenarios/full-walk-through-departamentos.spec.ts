@@ -92,8 +92,8 @@ test('full-walk-through-departamentos-ayuntamiento', async ({
             if (await deleteBtn.isVisible().catch(() => false)) {
               await deleteBtn.click();
               await page.waitForTimeout(2000); // wait for Supabase delete
-              // toHaveCount(0) avoids strict-mode violation; confirms DOM removal
-              await expect(page.locator(`text=${deptName}`)).toHaveCount(0);
+              // getByText+exact avoids partial-text matches that include parent containers
+              await expect(page.getByText(deptName, { exact: true })).toHaveCount(0);
               await showPhaseLabel(page, '✅ Department deleted from Supabase');
             }
           }
@@ -123,7 +123,7 @@ test('full-walk-through-departamentos-ayuntamiento', async ({
     await page.waitForTimeout(1500);
 
     // deptName should be gone (deleted in phase 6)
-    await expect(page.locator(`text=${deptName}`)).toHaveCount(0);
+    await expect(page.getByText(deptName, { exact: true })).toHaveCount(0);
     await showPhaseLabel(page, '✅ Departamentos — Supabase migration working');
   }
 
