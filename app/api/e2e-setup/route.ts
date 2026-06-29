@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     if (talleres && talleres.length > 0) {
       // Add user as member of first taller
-      await adminClient.from('miembros').upsert(
+      await adminClient.from('taller_members').upsert(
         { taller_id: talleres[0].id, user_id: data.user.id, role: 'owner' },
         { onConflict: 'taller_id,user_id' }
       );
