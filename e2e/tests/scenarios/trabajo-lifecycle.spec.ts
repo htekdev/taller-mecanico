@@ -90,6 +90,9 @@ test.describe('Trabajo Lifecycle', () => {
   test('finalize trabajo and verify CxC record', async ({
     page, dashboardPage, trabajosPage, cuentasCobrarPage, sidebar
   }) => {
+    // Extra time needed: finalizar triggers DB writes + navigation to CxC
+    // On fresh preview DBs (cold start) this chain can exceed default 30s timeout.
+    test.slow();
     await showPhaseLabel(page, '🔧 Finalize Trabajo Flow');
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
