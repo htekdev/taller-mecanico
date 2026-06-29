@@ -18,6 +18,8 @@ test('full-walk-through-departamentos-ayuntamiento', async ({
 }) => {
   // Extra time: involves Supabase reads/writes on fresh preview DB
   test.slow();
+  // Unique name avoids strict-mode violations from prior test-run DB state
+  const deptName = `Test Dept ${Date.now()}`;
 
   // ── Phase 1: Login ─────────────────────────────────────────────────────────
   await showPhaseLabel(page, '🔑 Phase 1: Login');
@@ -70,27 +72,28 @@ test('full-walk-through-departamentos-ayuntamiento', async ({
       await showPhaseLabel(page, '➕ Phase 5: Add Department');
       const nuevoDeptoInput = page.locator('input[placeholder*="Nuevo departamento"]');
       if (await nuevoDeptoInput.isVisible().catch(() => false)) {
-        await nuevoDeptoInput.fill('Parques y jardines');
+        await nuevoDeptoInput.fill(deptName);
         await page.waitForTimeout(500);
         const agregarBtn = page.getByRole('button', { name: /^agregar$/i });
         if (await agregarBtn.isVisible().catch(() => false)) {
           await agregarBtn.click();
           await page.waitForTimeout(2000); // wait for Supabase write
 
-          // Verify new department appears
-          const newDepto = page.locator('text=Parques y jardines');
+          // Verify new department appears (first() avoids strict-mode if there are matches from prior runs)
+          const newDepto = page.locator(`text=${deptName}`).first();
           if (await newDepto.isVisible().catch(() => false)) {
             await expectVisible(newDepto, 'New department added to Supabase');
             await page.waitForTimeout(500);
 
             // ── Phase 6: Delete the department ─────────────────────────────
             await showPhaseLabel(page, '🗑️ Phase 6: Delete Department');
-            const deptoRow = page.locator('div').filter({ hasText: 'Parques y jardines' }).first();
+            const deptoRow = page.locator('div').filter({ hasText: deptName }).first();
             const deleteBtn = deptoRow.getByRole('button', { name: '✕' });
             if (await deleteBtn.isVisible().catch(() => false)) {
               await deleteBtn.click();
               await page.waitForTimeout(2000); // wait for Supabase delete
-              await expect(page.locator('text=Parques y jardines')).not.toBeVisible();
+              // toHaveCount(0) avoids strict-mode violation; confirms DOM removal
+              await expect(page.locator(`text=${deptName}`)).toHaveCount(0);
               await showPhaseLabel(page, '✅ Department deleted from Supabase');
             }
           }
@@ -119,8 +122,8 @@ test('full-walk-through-departamentos-ayuntamiento', async ({
     await gearBtn2.click();
     await page.waitForTimeout(1500);
 
-    // Parques should be gone (deleted in phase 6)
-    await expect(page.locator('text=Parques y jardines')).not.toBeVisible();
+    // deptName should be gone (deleted in phase 6)
+    await expect(page.locator(`text=${deptName}`)).toHaveCount(0);
     await showPhaseLabel(page, '✅ Departamentos — Supabase migration working');
   }
 
