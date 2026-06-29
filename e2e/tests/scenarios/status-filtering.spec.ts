@@ -45,6 +45,8 @@ test.describe('Status Filtering', () => {
   test('filter trabajos shows all when "Todos" selected', async ({
     page, dashboardPage, trabajosPage
   }) => {
+    // Extra time: Trabajos loads from Supabase; fresh preview DBs take longer.
+    test.slow();
     await showPhaseLabel(page, '🔍 Filter: Todos');
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
