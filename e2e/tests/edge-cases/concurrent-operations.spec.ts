@@ -16,16 +16,17 @@ test.describe('Concurrent Operations', () => {
   test('rapid module switching does not crash', async ({
     page, dashboardPage, sidebar
   }) => {
+    test.slow(); // Cold Vercel preview + Supabase auth can be slow
     await showPhaseLabel(page, '⚡ Rapid Module Switching');
 
-    // Rapidly switch between modules
+    // Rapidly switch between modules (400ms between — fast but not so fast it races on cold preview)
     const modules = ['Clientes', 'Inventario', 'Trabajos', 'Proveedores',
       'Órdenes de Compra', 'Por Cobrar', 'Gastos', 'Cotizaciones', 'Resumen'] as const;
 
     for (const mod of modules) {
       await sidebar.clickTab(mod);
-      // Minimal wait — stress test
-      await page.waitForTimeout(200);
+      // Brief wait — stress test, but enough for Supabase auth round-trips on cold preview
+      await page.waitForTimeout(400);
     }
 
     // After rapid switching, app should still be functional

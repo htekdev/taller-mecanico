@@ -10,58 +10,62 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
  * Fix: columns are now conditional (only sent when non-default), matching the pattern
  *      already used for tft_estado, departamento, etc.
  *
- * This walk-through:
- * 1. Logs in
- * 2. Navigates to Trabajos
- * 3. Fills the "Registrar Trabajo" form (mano de obra only — no refacciones needed)
- * 4. Submits → verifies NO error banner appears
- * 5. Verifies the new job appears in the list
+ * Walk-through:
+ * 1. Login
+ * 2. Navigate to Trabajos via dashboard
+ * 3. Select client + vehicle (required to enable the submit button)
+ * 4. Fill description
+ * 5. Submit → verify NO error banner appears
+ * 6. Verify Historial shows the job
  */
 
-test('change-proof-guardar-trabajo', async ({ page, loginPage }) => {
+test('change-proof-guardar-trabajo', async ({ page, loginPage, dashboardPage, trabajosPage }) => {
   test.slow(); // Auth + Supabase save on cold preview can be slow
 
+  // ── Login ─────────────────────────────────────────────────────────────────
   await showPhaseLabel(page, '🔐 Login');
   await loginPage.loginAsTestUser();
+  await dashboardPage.waitForPageLoad();
 
   // ── Navigate to Trabajos ──────────────────────────────────────────────────
   await showPhaseLabel(page, '🔧 Abriendo módulo Trabajos');
-  const nav = page.locator('nav');
-  await nav.waitFor({ state: 'visible', timeout: 45_000 });
-
-  const trabajosTab = nav.getByRole('button', { name: 'Trabajos' });
-  await trabajosTab.click();
+  await dashboardPage.navigateToModule('trabajos');
+  await trabajosPage.waitForPageLoad();
   await page.waitForTimeout(1000);
 
-  // ── Show the Registrar Trabajo form ──────────────────────────────────────
-  await showPhaseLabel(page, '📋 Formulario Registrar Trabajo');
-  await page.mouse.wheel(0, 300);
-  await page.waitForTimeout(800);
+  // ── Select client + vehicle (required fields) ─────────────────────────────
+  await showPhaseLabel(page, '👤 Seleccionando cliente y vehículo');
 
-  // Fill Descripción (required field)
-  const descripcionInput = page.locator('textarea, input[placeholder*="descripci" i]').first();
-  if (await descripcionInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await descripcionInput.fill('Servicio de prueba — verificación arreglo PR #102');
-    await page.waitForTimeout(500);
-  }
+  // Select client (must have options; waits up to 15s internally)
+  await trabajosPage.selectClient(1);
 
-  // Fill mano de obra amount (to have a non-zero total)
-  const manoDeObraInput = page.locator('input[type="number"]').first();
-  if (await manoDeObraInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await manoDeObraInput.fill('500');
+  // Select vehicle (depends on selected client; appears after client selection)
+  await trabajosPage.selectVehicle(1);
+
+  // ── Fill description (required field) ─────────────────────────────────────
+  await showPhaseLabel(page, '📝 Llenando descripción del trabajo');
+
+  // The actual descripcion placeholder is "Ej. Servicio completo frenos y aceite..."
+  const descInput = page.locator([
+    'input[placeholder*="Ej." i]',
+    'input[placeholder*="Servicio completo" i]',
+    'input[placeholder*="frenos" i]',
+    'textarea[placeholder*="descripci" i]',
+  ].join(', ')).first();
+
+  if (await descInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await descInput.fill('Prueba PR #102 — verificación arreglo insertTrabajo sin error');
     await page.waitForTimeout(500);
   }
 
   await showPhaseLabel(page, '💾 Guardando trabajo...');
-  await page.mouse.wheel(0, 200);
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(400);
 
-  // ── Submit the form ───────────────────────────────────────────────────────
-  const submitBtn = page.getByRole('button', { name: /registrar trabajo/i });
-  if (await submitBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await submitBtn.click();
-    await page.waitForTimeout(3000); // Wait for Supabase response
-  }
+  // ── Submit via POM save() — checks disabled state before clicking ─────────
+  // Button is: disabled={guardandoForm || !clienteId || !vehiculoId || !descripcion}
+  // After selecting client, vehicle, and filling description it should be enabled.
+  await trabajosPage.save();
+  await page.waitForTimeout(3000); // Wait for Supabase response
 
   // ── Verify: NO error banner ───────────────────────────────────────────────
   await showPhaseLabel(page, '✅ Verificando: sin error "No se pudo guardar"');
@@ -72,21 +76,17 @@ test('change-proof-guardar-trabajo', async ({ page, loginPage }) => {
   // The fix works if no error banner is shown
   expect(errorVisible, 'Error "No se pudo guardar el trabajo" debe estar AUSENTE').toBe(false);
 
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(800);
 
-  // ── Verify: Historial de Trabajos count increased ─────────────────────────
+  // ── Verify: Historial de Trabajos is visible ──────────────────────────────
   await showPhaseLabel(page, '📊 Historial actualizado');
-  await page.mouse.wheel(0, 400);
+  await page.mouse.wheel(0, 500);
   await page.waitForTimeout(1000);
 
-  // Look for historial section
   const historial = page.locator('text=/Historial de Trabajos/');
   if (await historial.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await expectVisible(page, historial, '✅ Historial de Trabajos visible — trabajo guardado correctamente');
+    await expectVisible(historial, '✅ Historial de Trabajos visible — trabajo guardado correctamente');
   }
-
-  await page.mouse.wheel(0, 300);
-  await page.waitForTimeout(800);
 
   await showPhaseLabel(page, '🎉 PR #102 verificado — insertTrabajo funciona sin error');
   await page.waitForTimeout(1500);
