@@ -265,7 +265,9 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
       // Only include kilometraje if it has a value — omitting it lets the DB
       // column default to NULL, and avoids "column not found" on older branches
       ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
-      tipo_cliente: data.tipoCliente ?? 'general',
+      // Migration 005 columns — only send non-default values so INSERT doesn't fail
+      // when migrations haven't been applied to production yet (general jobs are the default)
+      ...(data.tipoCliente === 'ayuntamiento' ? { tipo_cliente: 'ayuntamiento' } : {}),
       ...(data.departamento !== undefined ? { departamento: data.departamento } : {}),
       ...(data.inventarioNum !== undefined ? { inventario_num: data.inventarioNum } : {}),
       ...(data.ordenServicioGob !== undefined ? { orden_servicio_gob: data.ordenServicioGob } : {}),
@@ -275,8 +277,9 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
       ...(data.tftEstado !== undefined ? { tft_estado: data.tftEstado } : {}),
       ...(data.fechaEntrada !== undefined ? { fecha_entrada: data.fechaEntrada } : {}),
       ...(data.fechaSalida !== undefined ? { fecha_salida: data.fechaSalida } : {}),
-      pendiente_refacciones: data.pendienteRefacciones ?? false,
-      refacciones_pendientes_nombres: data.refaccionesPendientesNombres ?? [],
+      // Migration 20260626150000 columns — only send non-default values
+      ...(data.pendienteRefacciones ? { pendiente_refacciones: data.pendienteRefacciones } : {}),
+      ...(data.refaccionesPendientesNombres?.length ? { refacciones_pendientes_nombres: data.refaccionesPendientesNombres } : {}),
       mano_de_obra: data.manoDeObra,
       mano_de_obra_items: data.manoDeObraItems,
       refacciones_total: data.refacciones,
@@ -351,18 +354,20 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
     vehiculo_id: data.vehiculoId || null,
     fecha: data.fecha,
     descripcion: data.descripcion,
-    kilometraje: data.kilometraje ?? null,
-    tipo_cliente: data.tipoCliente ?? 'general',
-    departamento: data.departamento ?? null,
-    inventario_num: data.inventarioNum ?? null,
-    orden_servicio_gob: data.ordenServicioGob ?? null,
-    tft_numero: data.tftNumero ?? null,
+    ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : { kilometraje: null }),
+    // Migration 005 columns — conditional so UPDATE works even without the columns in production
+    ...(data.tipoCliente === 'ayuntamiento' ? { tipo_cliente: 'ayuntamiento' } : {}),
+    ...(data.departamento !== undefined ? { departamento: data.departamento } : {}),
+    ...(data.inventarioNum !== undefined ? { inventario_num: data.inventarioNum } : {}),
+    ...(data.ordenServicioGob !== undefined ? { orden_servicio_gob: data.ordenServicioGob } : {}),
+    ...(data.tftNumero !== undefined ? { tft_numero: data.tftNumero } : {}),
     // Only send tft_estado when explicitly set — avoids "column not found" on production
     ...(data.tftEstado !== undefined ? { tft_estado: data.tftEstado } : {}),
-    fecha_entrada: data.fechaEntrada ?? null,
-    fecha_salida: data.fechaSalida ?? null,
-    pendiente_refacciones: data.pendienteRefacciones ?? false,
-    refacciones_pendientes_nombres: data.refaccionesPendientesNombres ?? [],
+    ...(data.fechaEntrada !== undefined ? { fecha_entrada: data.fechaEntrada } : {}),
+    ...(data.fechaSalida !== undefined ? { fecha_salida: data.fechaSalida } : {}),
+    // Migration 20260626150000 columns — conditional
+    ...(data.pendienteRefacciones ? { pendiente_refacciones: data.pendienteRefacciones } : {}),
+    ...(data.refaccionesPendientesNombres?.length ? { refacciones_pendientes_nombres: data.refaccionesPendientesNombres } : {}),
     mano_de_obra: data.manoDeObra,
     mano_de_obra_items: data.manoDeObraItems,
     refacciones_total: data.refacciones,
