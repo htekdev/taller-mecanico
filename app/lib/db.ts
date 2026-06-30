@@ -265,9 +265,10 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
       // Only include kilometraje if it has a value — omitting it lets the DB
       // column default to NULL, and avoids "column not found" on older branches
       ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
-      // Migration 005 columns — only send non-default values so INSERT doesn't fail
-      // when migrations haven't been applied to production yet (general jobs are the default)
-      ...(data.tipoCliente === 'ayuntamiento' ? { tipo_cliente: 'ayuntamiento' } : {}),
+      ...(data.numeroOrden !== undefined ? { numero_orden: data.numeroOrden } : {}),
+      // Only send tipo_cliente when non-default — avoids "column not found" on DBs
+      // where migration 005 hasn't applied yet (general jobs never need this column)
+      ...(data.tipoCliente && data.tipoCliente !== 'general' ? { tipo_cliente: data.tipoCliente } : {}),
       ...(data.departamento !== undefined ? { departamento: data.departamento } : {}),
       ...(data.inventarioNum !== undefined ? { inventario_num: data.inventarioNum } : {}),
       ...(data.ordenServicioGob !== undefined ? { orden_servicio_gob: data.ordenServicioGob } : {}),
@@ -277,9 +278,12 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
       ...(data.tftEstado !== undefined ? { tft_estado: data.tftEstado } : {}),
       ...(data.fechaEntrada !== undefined ? { fecha_entrada: data.fechaEntrada } : {}),
       ...(data.fechaSalida !== undefined ? { fecha_salida: data.fechaSalida } : {}),
-      // Migration 20260626150000 columns — only send non-default values
-      ...(data.pendienteRefacciones ? { pendiente_refacciones: data.pendienteRefacciones } : {}),
-      ...(data.refaccionesPendientesNombres?.length ? { refacciones_pendientes_nombres: data.refaccionesPendientesNombres } : {}),
+      // Only send pendiente_refacciones when true — avoids "column not found" on DBs
+      // where migration 20260626150000 hasn't applied yet
+      ...(data.pendienteRefacciones ? { pendiente_refacciones: true } : {}),
+      ...((data.refaccionesPendientesNombres ?? []).length > 0
+        ? { refacciones_pendientes_nombres: data.refaccionesPendientesNombres }
+        : {}),
       mano_de_obra: data.manoDeObra,
       mano_de_obra_items: data.manoDeObraItems,
       refacciones_total: data.refacciones,
@@ -306,6 +310,7 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
     id: row.id, clienteId: row.cliente_id ?? '', vehiculoId: row.vehiculo_id ?? '',
     fecha: row.fecha, descripcion: row.descripcion,
     kilometraje: row.kilometraje ?? undefined,
+    numeroOrden: row.numero_orden ?? undefined,
     tipoCliente: (row.tipo_cliente as Trabajo['tipoCliente']) ?? 'general',
     departamento: row.departamento ?? undefined,
     inventarioNum: row.inventario_num ?? undefined,
