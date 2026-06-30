@@ -33,47 +33,56 @@ test('full-walk-through-columnas-condicionales-save', async ({
   const trabajoDescEdited = `${trabajoDesc} EDITADO`;
 
   // ── Phase 1: Login ──────────────────────────────────────────────────────
-  await showPhaseLabel(page, '🔑 Phase 1: Login');
+  await showPhaseLabel(page, '🔑 Phase 1: Login', 1500);
   await loginPage.loginAsTestUser();
   await dashboardPage.waitForPageLoad();
+  await page.waitForTimeout(2000); // let dashboard fully render
   await expectVisible(dashboardPage.nav, 'Dashboard cargado');
+  await page.waitForTimeout(2000);
 
   // ── Phase 2: Navigate to Trabajos ───────────────────────────────────────
-  await showPhaseLabel(page, '🔧 Phase 2: Módulo Trabajos');
+  await showPhaseLabel(page, '🔧 Phase 2: Módulo Trabajos', 1500);
   await sidebar.clickTab('Trabajos');
   await trabajosPage.waitForPageLoad();
+  await page.waitForTimeout(3000); // 3s page settle
   await expectVisible(trabajosPage.sectionTitle, 'Sección Trabajos visible');
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(2000);
 
   // ── Phase 3: Create a new trabajo (tests INSERT with conditional columns) ─
-  await showPhaseLabel(page, '➕ Phase 3: Nuevo Trabajo (prueba INSERT)');
+  await showPhaseLabel(page, '➕ Phase 3: Nuevo Trabajo (prueba INSERT)', 1500);
+  await page.waitForTimeout(2000);
 
   const nuevoBtn = trabajosPage.nuevoTrabajoButton;
   if (await nuevoBtn.isVisible().catch(() => false)) {
     await nuevoBtn.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000); // form open animation
   }
 
   // Select client
   await trabajosPage.selectClient(1);
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(2000);
 
   // Select vehicle
   await trabajosPage.selectVehicle(1);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(2000);
 
   // Fill description
   await trabajosPage.fillDescription(trabajoDesc);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(2000);
 
-  // Add labor item — any tipo_cliente value would have been sent before the fix
+  // Add labor item — exercises tipo_cliente path that was broken before fix
   await trabajosPage.addLaborItem('Revisión general', 500);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(2000);
+
+  // Scroll to show full form
+  await page.mouse.wheel(0, 200);
+  await page.waitForTimeout(1500);
 
   // ── Phase 4: Save — THE KEY ACTION ──────────────────────────────────────
-  await showPhaseLabel(page, '💾 Phase 4: Guardando — ¿Error o Éxito?');
+  await showPhaseLabel(page, '💾 Phase 4: Guardando — ¿Error o Éxito?', 1500);
+  await page.waitForTimeout(2000);
   await trabajosPage.save();
-  await page.waitForTimeout(2500); // wait for Supabase INSERT response
+  await page.waitForTimeout(3000); // wait for Supabase INSERT response
 
   // Verify NO error toast appeared
   const errorToast = page.locator('.bg-rose-50, .text-red-600, [class*="error"], [class*="toast-error"]').first();
@@ -85,49 +94,56 @@ test('full-walk-through-columnas-condicionales-save', async ({
 
   if (isInList) {
     await expectVisible(trabajoInList, '✅ INSERT exitoso — trabajo guardado sin error de columnas');
+    await page.waitForTimeout(2000);
   } else {
-    // Try scrolling to find it
     await page.mouse.wheel(0, 500);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1500);
     await expectVisible(
       page.locator(`text=${trabajoDesc}`).first(),
       '✅ Trabajo encontrado en lista tras guardar'
     );
+    await page.waitForTimeout(2000);
   }
 
-  await page.waitForTimeout(500);
-
-  // Verify no error state
   expect(hasError).toBe(false); // No error toast = INSERT worked with conditional columns
 
+  // Scroll back to top to find the trabajo
+  await page.mouse.wheel(0, -500);
+  await page.waitForTimeout(1500);
+
   // ── Phase 5: Edit the trabajo (tests UPDATE with conditional columns) ────
-  await showPhaseLabel(page, '✏️ Phase 5: Editar Trabajo (prueba UPDATE)');
+  await showPhaseLabel(page, '✏️ Phase 5: Editar Trabajo (prueba UPDATE)', 1500);
+  await page.waitForTimeout(2000);
 
   const trabajoCard = page.locator('div').filter({ hasText: trabajoDesc }).first();
   const editBtn = trabajoCard.getByRole('button', { name: /editar/i }).first();
   if (await editBtn.isVisible().catch(() => false)) {
     await editBtn.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000); // edit panel opens
 
     // Edit the description to prove UPDATE path works
     const descInput = page.locator('textarea[placeholder*="descripción" i], input[placeholder*="descripción" i]').first();
     if (await descInput.isVisible().catch(() => false)) {
       await descInput.clear();
       await descInput.fill(trabajoDescEdited);
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(2000);
     }
 
+    // Scroll to show save button
+    await page.mouse.wheel(0, 200);
+    await page.waitForTimeout(1500);
+
     // Save the edit (UPDATE path with conditional columns)
-    await showPhaseLabel(page, '💾 Guardando edición (UPDATE con columnas condicionales)...');
+    await showPhaseLabel(page, '💾 Guardando edición (UPDATE con columnas condicionales)...', 1500);
+    await page.waitForTimeout(2000);
     const saveEditBtn = page.getByRole('button', { name: /guardar|actualizar/i }).first();
     if (await saveEditBtn.isVisible().catch(() => false)) {
       const isDisabled = await saveEditBtn.isDisabled().catch(() => false);
       if (!isDisabled) {
         await saveEditBtn.click();
-        await page.waitForTimeout(2500);
+        await page.waitForTimeout(3000); // wait for Supabase UPDATE
       }
     } else {
-      // Try general save
       await trabajosPage.save();
     }
 
@@ -135,21 +151,25 @@ test('full-walk-through-columnas-condicionales-save', async ({
     const errorAfterEdit = await page.locator('.bg-rose-50, .text-red-600').first()
       .isVisible().catch(() => false);
     expect(errorAfterEdit).toBe(false);
+    await page.waitForTimeout(2000);
   }
 
-  await page.waitForTimeout(500);
+  await page.mouse.wheel(0, -300);
+  await page.waitForTimeout(1500);
 
   // ── Phase 6: Reload and verify persistence ──────────────────────────────
-  await showPhaseLabel(page, '🔄 Phase 6: Reload — Verificar Persistencia');
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await showPhaseLabel(page, '🔄 Phase 6: Reload — Verificar Persistencia en DB', 1500);
   await page.waitForTimeout(2000);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(3000); // full reload visible on camera
 
   await loginPage.loginAsTestUser();
   await dashboardPage.waitForPageLoad();
+  await page.waitForTimeout(3000);
 
   await sidebar.clickTab('Trabajos');
   await trabajosPage.waitForPageLoad();
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(3000); // Supabase data loads fresh
 
   // The trabajo (edited or original) should be in DB
   const persistedCheck = page.locator(`text=${trabajoDescEdited}`).first();
@@ -160,15 +180,20 @@ test('full-walk-through-columnas-condicionales-save', async ({
 
   if (persistedVisible) {
     await expectVisible(persistedCheck, '✅ UPDATE persistido — trabajo editado visible tras reload');
+    await page.waitForTimeout(2000);
   } else if (originalVisible) {
     await expectVisible(originalCheck, '✅ Trabajo persiste en DB tras reload');
+    await page.waitForTimeout(2000);
   } else {
-    // Scroll and try again
     await page.mouse.wheel(0, 800);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1500);
     const anyMatch = page.locator(`text=${trabajoDesc.substring(0, 20)}`).first();
     await expectVisible(anyMatch, '✅ Trabajo persiste en DB');
+    await page.waitForTimeout(2000);
   }
 
-  await showPhaseLabel(page, '🎉 Columnas condicionales — INSERT y UPDATE funcionan', 600);
+  await page.mouse.wheel(0, 200);
+  await page.waitForTimeout(1500);
+  await showPhaseLabel(page, '🎉 Columnas condicionales — INSERT y UPDATE funcionan', 2000);
+  await page.waitForTimeout(2000);
 });
