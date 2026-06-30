@@ -1636,13 +1636,13 @@ export function VistaTrabajo({
             <thead>
               <tr className="bg-slate-800 text-white">
                 {[
-                  'Fecha', 'Estado', 'Cliente', 'Unidad', 'Placas', 'Km',
+                  'No. Orden', 'Fecha', 'Estado', 'Cliente', 'Unidad', 'Placas', 'Kilometraje',
                   ...(esAyuntamientoTab ? ['Depto', 'Inv.'] : []),
                   'Descripción', 'Refacciones', 'Mano de Obra', 'Total',
                   ...(esAyuntamientoTab ? ['TFT'] : []),
                   '',
                 ].map((h, i) => {
-                  const alignRight = (!esAyuntamientoTab && i >= 7 && i <= 9) || (esAyuntamientoTab && i >= 9 && i <= 11);
+                  const alignRight = (!esAyuntamientoTab && i >= 8 && i <= 10) || (esAyuntamientoTab && i >= 10 && i <= 12);
                   return (
                     <th key={i} className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${alignRight ? 'text-right' : 'text-left'}`}>{h}</th>
                   );
@@ -1665,6 +1665,11 @@ export function VistaTrabajo({
                       : <span className="text-xs bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">✓ Terminado</span>;
                 return (
                   <tr key={trabajo.id} className={`${esPendienteRefacciones ? 'bg-orange-50' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {trabajo.numeroOrden
+                        ? <span className="text-xs font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{trabajo.numeroOrden}</span>
+                        : <span className="text-slate-300">—</span>}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-700 font-medium">
                       {new Date(trabajo.fecha).toLocaleDateString('es-MX')}
                     </td>

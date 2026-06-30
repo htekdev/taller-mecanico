@@ -391,7 +391,7 @@ export async function updateTrabajoFinalizar(
   iva: number,
   total: number,
 ): Promise<void> {
-  await supabase.from('trabajos').update({
+  const { error } = await supabase.from('trabajos').update({
     estado: 'completado',
     tipo_documento: tipo,
     requiere_factura: tipo === 'factura',
@@ -399,6 +399,7 @@ export async function updateTrabajoFinalizar(
     total,
     fecha_finalizacion: new Date().toISOString(),
   }).eq('id', trabajoId);
+  if (error) throw new Error(`No se pudo finalizar el trabajo: ${error.message}`);
 }
 
 export async function updateTrabajoTft(trabajoId: string, tftNumero: string): Promise<void> {
