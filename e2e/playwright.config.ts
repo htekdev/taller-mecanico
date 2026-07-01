@@ -34,7 +34,9 @@ export default defineConfig({
   /* Single worker in CI to avoid resource contention with shared DB */
   workers: process.env.CI ? 1 : 2,
 
-  /* Global test timeout — 60s for Vercel preview cold-start tolerance */
+  /* Global test timeout — 60s to handle cold Vercel preview starts in CI.
+     Tests that take 30-40s against a cold preview were hitting the 30s limit.
+     test.slow() still available for 180s on heavy multi-step flows. */
   timeout: 60_000,
 
   /* Expect timeout */
@@ -63,7 +65,9 @@ export default defineConfig({
     /* Base URL — override via BASE_URL env var for preview deployments */
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
 
-    /* Timeouts */
+    /* Timeouts — 30s per action so cold Vercel preview starts don't flake.
+       test.slow() triples the overall test timeout (30→90s) for heavy tests;
+       keeping actionTimeout at 30s gives each action enough headroom. */
     actionTimeout: 30_000,
     navigationTimeout: 60_000,
   },

@@ -785,7 +785,7 @@ export default function TallerMecanico() {
               onActualizarCompatibilidad={actualizarCompatibilidad} />
           )}
           {vista === 'trabajos' && (
-            <VistaTrabajo clientes={clientes} vehiculos={vehiculos} inventario={inventario}
+            <VistaTrabajo tallerId={taller?.id ?? ''} clientes={clientes} vehiculos={vehiculos} inventario={inventario}
               trabajos={trabajos} facturas={facturas} proveedores={proveedores}
               onGuardar={guardarTrabajo}
               onEditar={editarTrabajo}

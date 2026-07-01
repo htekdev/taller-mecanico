@@ -1,37 +1,15 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel, Proveedor } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt, getMontoPagado } from '@/app/lib/utils';
 import { getPricingIntel } from '@/app/lib/pricing';
-
-// ─── Departamentos localStorage ───────────────────────────────────────────────
-
-const DEPTOS_KEY = 'taller_departamentos_ayuntamiento';
-const DEFAULT_DEPTOS: string[] = [
-  'Obras públicas mantenimiento vial',
-  'Servicios públicos aseo urbano poniente',
-  'Servicios públicos aseo urbano oriente',
-];
-
-function loadDepartamentos(): string[] {
-  try {
-    const raw = localStorage.getItem(DEPTOS_KEY);
-    if (!raw) {
-      saveDepartamentos(DEFAULT_DEPTOS);
-      return [...DEFAULT_DEPTOS];
-    }
-    const parsed = JSON.parse(raw) as string[];
-    return Array.isArray(parsed) ? parsed : [...DEFAULT_DEPTOS];
-  } catch {
-    return [...DEFAULT_DEPTOS];
-  }
-}
-
-function saveDepartamentos(deptos: string[]): void {
-  try { localStorage.setItem(DEPTOS_KEY, JSON.stringify(deptos)); } catch { /* noop */ }
-}
+import {
+  getDepartamentosAyuntamiento,
+  addDepartamentoAyuntamiento,
+  deleteDepartamentoAyuntamiento,
+} from '@/app/lib/db';
 
 // ─── PDF helpers (Ayuntamiento) ───────────────────────────────────────────────
 
@@ -327,10 +305,11 @@ function ModalFinalizacion({
   );
 }
 
-// DEPARTAMENTOS_AYUNTAMIENTO is now managed via localStorage (see loadDepartamentos/saveDepartamentos above)
+// DEPARTAMENTOS_AYUNTAMIENTO is now managed via Supabase (getDepartamentosAyuntamiento / addDepartamentoAyuntamiento / deleteDepartamentoAyuntamiento)
 
 // ── Main Component ──────────────────────────────────────────────────────────
 export function VistaTrabajo({
+  tallerId,
   clientes,
   vehiculos,
   inventario,
@@ -348,6 +327,7 @@ export function VistaTrabajo({
   onActualizarTft,
   onIrAFacturas,
 }: {
+  tallerId: string;
   clientes: Cliente[];
   vehiculos: Vehiculo[];
   inventario: Refaccion[];
@@ -416,10 +396,17 @@ export function VistaTrabajo({
   const [departamentos, setDepartamentos] = useState<string[]>([]);
   const [showDeptoManager, setShowDeptoManager] = useState(false);
   const [nuevoDepto, setNuevoDepto] = useState('');
+  const [cargandoDeptos, setCargandoDeptos] = useState(false);
 
+  // Load from Supabase on mount (or when tallerId changes)
   useEffect(() => {
-    setDepartamentos(loadDepartamentos());
-  }, []);
+    if (!tallerId) return;
+    setCargandoDeptos(true);
+    getDepartamentosAyuntamiento(tallerId)
+      .then(setDepartamentos)
+      .catch(() => setDepartamentos([]))
+      .finally(() => setCargandoDeptos(false));
+  }, [tallerId]);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
   const totalManoDeObra       = laborItems.reduce((s, l) => s + l.precio, 0);
@@ -701,22 +688,33 @@ export function VistaTrabajo({
   };
 
   // ── Departamentos CRUD handlers ────────────────────────────────────────────
-  const agregarDepto = () => {
+  const agregarDepto = useCallback(async () => {
     const trimmed = nuevoDepto.trim();
-    if (!trimmed || departamentos.includes(trimmed)) return;
-    const updated = [...departamentos, trimmed];
-    setDepartamentos(updated);
-    saveDepartamentos(updated);
+    if (!trimmed || departamentos.includes(trimmed) || !tallerId) return;
+    // Optimistic update
+    setDepartamentos(prev => [...prev, trimmed]);
     setNuevoDepto('');
-  };
+    try {
+      await addDepartamentoAyuntamiento(tallerId, trimmed);
+    } catch {
+      // Rollback on failure
+      setDepartamentos(prev => prev.filter(d => d !== trimmed));
+      setNuevoDepto(trimmed);
+    }
+  }, [nuevoDepto, departamentos, tallerId]);
 
-  const eliminarDepto = (depto: string) => {
-    const updated = departamentos.filter(d => d !== depto);
-    setDepartamentos(updated);
-    saveDepartamentos(updated);
-    // Clear form selection if the deleted depto was selected
+  const eliminarDepto = useCallback(async (depto: string) => {
+    if (!tallerId) return;
+    // Optimistic update
+    setDepartamentos(prev => prev.filter(d => d !== depto));
     if (form.departamento === depto) setForm(f => ({ ...f, departamento: '' }));
-  };
+    try {
+      await deleteDepartamentoAyuntamiento(tallerId, depto);
+    } catch {
+      // Rollback on failure — reload from Supabase
+      getDepartamentosAyuntamiento(tallerId).then(setDepartamentos).catch(() => {});
+    }
+  }, [tallerId, form.departamento]);
 
   return (
     <div>
@@ -770,24 +768,28 @@ export function VistaTrabajo({
           {showDeptoManager && (
             <div className="mt-2 border border-rose-200 bg-rose-50 rounded-xl p-4 space-y-3">
               <p className="text-xs font-bold text-rose-700 uppercase tracking-widest">Gestión de Departamentos</p>
-              <div className="space-y-1">
-                {departamentos.map(d => (
-                  <div key={d} className="flex items-center justify-between bg-white border border-rose-100 rounded-lg px-3 py-2 text-sm">
-                    <span className="text-slate-700">{d}</span>
-                    <button
-                      type="button"
-                      onClick={() => eliminarDepto(d)}
-                      className="text-xs text-rose-400 hover:text-rose-700 font-bold ml-2 transition-colors"
-                      title="Eliminar departamento"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-                {departamentos.length === 0 && (
-                  <p className="text-xs text-rose-400 italic px-1">Sin departamentos registrados.</p>
-                )}
-              </div>
+              {cargandoDeptos ? (
+                <p className="text-xs text-rose-400 italic px-1">Cargando departamentos...</p>
+              ) : (
+                <div className="space-y-1">
+                  {departamentos.map(d => (
+                    <div key={d} className="flex items-center justify-between bg-white border border-rose-100 rounded-lg px-3 py-2 text-sm">
+                      <span className="text-slate-700">{d}</span>
+                      <button
+                        type="button"
+                        onClick={() => eliminarDepto(d)}
+                        className="text-xs text-rose-400 hover:text-rose-700 font-bold ml-2 transition-colors"
+                        title="Eliminar departamento"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {departamentos.length === 0 && (
+                    <p className="text-xs text-rose-400 italic px-1">Sin departamentos registrados.</p>
+                  )}
+                </div>
+              )}
               <div className="flex gap-2">
                 <Input
                   type="text"
