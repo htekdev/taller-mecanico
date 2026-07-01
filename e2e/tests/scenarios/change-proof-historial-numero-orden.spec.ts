@@ -55,7 +55,9 @@ test('change-proof-historial-numero-orden', async ({ page, loginPage }) => {
   await showPhaseLabel(page, '💾 Enviando formulario...');
   const submitBtn = page.getByRole('button', { name: /registrar trabajo/i });
   if (await submitBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await submitBtn.click();
+    await submitBtn.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500); // Let any loading overlay clear
+    await submitBtn.click({ timeout: 15_000 });
     await page.waitForTimeout(4000); // Wait for Supabase
   }
 
