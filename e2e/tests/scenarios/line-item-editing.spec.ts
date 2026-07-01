@@ -15,6 +15,7 @@ import { TestData } from '../../utils/test-data';
 
 test.describe('Line Item Editing', () => {
   test.beforeEach(async ({ loginPage }) => {
+    test.slow(); // Auth + navigation on Vercel preview can be slow
     await loginPage.loginAsTestUser();
   });
 

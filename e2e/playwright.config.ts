@@ -34,8 +34,8 @@ export default defineConfig({
   /* Single worker in CI to avoid resource contention with shared DB */
   workers: process.env.CI ? 1 : 2,
 
-  /* Global test timeout — 30s for fast feedback */
-  timeout: 30_000,
+  /* Global test timeout — 60s for Vercel preview cold-start tolerance */
+  timeout: 60_000,
 
   /* Expect timeout */
   expect: { timeout: 10_000 },
@@ -64,8 +64,8 @@ export default defineConfig({
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
 
     /* Timeouts */
-    actionTimeout: 15_000,
-    navigationTimeout: 30_000,
+    actionTimeout: 30_000,
+    navigationTimeout: 60_000,
   },
 
   projects: [
