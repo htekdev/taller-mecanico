@@ -42,7 +42,9 @@ export class TrabajosPage extends BasePage {
 
   constructor(page: Page) {
     super(page);
-    this.sectionTitle = page.locator('h2:has-text("Trabajos")');
+    // "Nuevo Trabajo" button is always visible when the Trabajos module is loaded
+    // (no h2 with "Trabajos" text exists in the module — button is the reliable page-load marker)
+    this.sectionTitle = page.getByRole('button', { name: /nuevo trabajo/i });
     this.nuevoTrabajoButton = page.getByRole('button', { name: /nuevo trabajo/i });
 
     this.clientSelect = page.locator('select').first();
