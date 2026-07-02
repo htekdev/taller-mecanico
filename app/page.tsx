@@ -307,17 +307,24 @@ export default function TallerMecanico() {
     const subtotal = trabajo.manoDeObra + trabajo.refacciones;
     const iva = tipo === 'factura' ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
     const total = subtotal + iva;
+    // Phase 1: Save — must succeed before updating local state
     try {
       await db.updateTrabajoFinalizar(trabajoId, tipo, iva, total);
       setTrabajos(prev => prev.map(t => t.id === trabajoId
         ? { ...t, estado: 'completado' as const, tipoDocumento: tipo, requiereFactura: tipo === 'factura', iva, total, fechaFinalizacion: new Date().toISOString() }
         : t
       ));
-      // Reload from DB to confirm the save and sync all fields
-      await cargarDatos();
     } catch (err) {
       console.error('[finalizarTrabajo] FAILED:', err);
       alert('No se pudo finalizar el trabajo. Verifica tu conexión e intenta de nuevo.');
+      return;
+    }
+    // Phase 2: Reload from DB to confirm and sync all fields — best-effort,
+    // a reload failure does NOT mean the save failed (estado is already 'completado' in DB)
+    try {
+      await cargarDatos();
+    } catch {
+      // State already updated above; reload failure is non-critical
     }
   };
 
