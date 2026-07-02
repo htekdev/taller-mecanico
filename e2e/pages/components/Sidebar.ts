@@ -14,7 +14,8 @@ export class Sidebar {
 
   /** Click a nav tab by its label text. */
   async clickTab(label: string) {
-    await this.nav.getByRole('button', { name: label }).click();
+    // Use 60s timeout for sidebar navigation — cold Vercel preview can be slow
+    await this.nav.getByRole('button', { name: label }).click({ timeout: 60_000 });
     await this.page.waitForTimeout(500);
   }
 

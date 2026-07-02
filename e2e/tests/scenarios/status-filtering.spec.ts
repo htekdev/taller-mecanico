@@ -51,7 +51,7 @@ test.describe('Status Filtering', () => {
 
     const filterSelect = page.locator('select:has(option:has-text("Todos"))').first();
     if (await filterSelect.isVisible().catch(() => false)) {
-      await filterSelect.selectOption({ label: 'Todos' });
+      await filterSelect.selectOption({ label: 'Todos' }, { timeout: 60_000 });
       await page.waitForTimeout(500);
 
       // All items should be visible
