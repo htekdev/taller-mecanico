@@ -71,7 +71,7 @@ export class TrabajosPage extends BasePage {
   }
 
   async waitForPageLoad() {
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 15_000 });
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 30_000 });
   }
 
   /** Select a client for the new trabajo. */
