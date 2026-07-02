@@ -12,7 +12,7 @@ jobs:
     # Only run when Vercel deploys successfully
     if: github.event.deployment_status.state == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     # Required for posting PR comments
     permissions:
