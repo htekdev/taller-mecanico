@@ -63,8 +63,8 @@ export default defineConfig({
     /* Base URL — override via BASE_URL env var for preview deployments */
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
 
-    /* Timeouts */
-    actionTimeout: 30_000,
+    /* Timeouts — 60s for cold Vercel preview tolerance */
+    actionTimeout: 60_000,
     navigationTimeout: 60_000,
   },
 
