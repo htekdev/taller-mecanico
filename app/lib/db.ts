@@ -326,35 +326,41 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
 }
 
 export async function updateTrabajoPagos(trabajoId: string, pagos: Pago[]): Promise<void> {
-  await supabase.from('trabajos').update({ pagos }).eq('id', trabajoId);
+  const { error } = await supabase.from('trabajos').update({ pagos }).eq('id', trabajoId);
+  if (error) throw new Error(`updateTrabajoPagos: ${error.message}`);
 }
 
 /** Update mano_de_obra_items JSONB — used when registering payments to external service providers */
 export async function updateTrabajoManoDeObraItems(trabajoId: string, items: ManoDeObraItem[]): Promise<void> {
   const manoDeObra = items.reduce((s, i) => s + i.precio, 0);
-  await supabase.from('trabajos').update({
+  const { error } = await supabase.from('trabajos').update({
     mano_de_obra_items: items,
     mano_de_obra: manoDeObra,
   }).eq('id', trabajoId);
+  if (error) throw new Error(`updateTrabajoManoDeObraItems: ${error.message}`);
 }
 
 export async function updateTrabajoFactura(trabajoId: string, facturaId: string): Promise<void> {
-  await supabase.from('trabajos').update({ factura_id: facturaId, estado_facturacion: 'facturado' }).eq('id', trabajoId);
+  const { error } = await supabase.from('trabajos').update({ factura_id: facturaId, estado_facturacion: 'facturado' }).eq('id', trabajoId);
+  if (error) throw new Error(`updateTrabajoFactura: ${error.message}`);
 }
 
 /** Reset facturación — allows re-invoicing after a factura was cancelled */
 export async function resetFacturacionTrabajo(trabajoId: string): Promise<void> {
-  await supabase.from('trabajos').update({ factura_id: null, estado_facturacion: 'sin_facturar' }).eq('id', trabajoId);
+  const { error } = await supabase.from('trabajos').update({ factura_id: null, estado_facturacion: 'sin_facturar' }).eq('id', trabajoId);
+  if (error) throw new Error(`resetFacturacionTrabajo: ${error.message}`);
 }
 
 /** Editar trabajo pendiente — actualiza todos los campos en la DB */
 export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<void> {
-  await supabase.from('trabajos').update({
+  const { error } = await supabase.from('trabajos').update({
     cliente_id: data.clienteId || null,
     vehiculo_id: data.vehiculoId || null,
     fecha: data.fecha,
     descripcion: data.descripcion,
-    ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : { kilometraje: null }),
+    // Only send kilometraje when it has a value — avoids "column not found" on DBs
+    // where migration 20260706120000 hasn't been applied yet (migration 20260701220000 adds it)
+    ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
     // Migration 005 columns — conditional so UPDATE works even without the columns in production
     ...(data.tipoCliente === 'ayuntamiento' ? { tipo_cliente: 'ayuntamiento' } : {}),
     ...(data.departamento !== undefined ? { departamento: data.departamento } : {}),
@@ -382,23 +388,42 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
     estado_facturacion: data.estadoFacturacion,
     estado: data.estado,
   }).eq('id', trabajoId);
+  if (error) throw new Error(`updateTrabajo: ${error.message}`);
 }
 
-/** Finalizar trabajo — sets estado=completado, tipoDocumento, IVA, total, fechaFinalizacion */
+/** Finalizar trabajo — sets estado=completado, tipoDocumento, IVA, total, fechaFinalizacion
+ *
+ * Two-phase update to be robust against partially-migrated production schemas:
+ *   Phase 1: Update the columns guaranteed to exist in all schema versions (estado, iva, total, requiere_factura).
+ *            Throws on failure — this is the critical part.
+ *   Phase 2: Update tipo_documento + fecha_finalizacion (added in migration 20260701220000).
+ *            Best-effort: error is thrown so the caller knows it failed, but if columns don't
+ *            exist yet the app still finishes the job correctly (estado=completado is set in phase 1).
+ */
 export async function updateTrabajoFinalizar(
   trabajoId: string,
   tipo: 'factura' | 'nota',
   iva: number,
   total: number,
 ): Promise<void> {
-  await supabase.from('trabajos').update({
+  // Phase 1 — critical columns (always exist)
+  const { error: err1 } = await supabase.from('trabajos').update({
     estado: 'completado',
-    tipo_documento: tipo,
     requiere_factura: tipo === 'factura',
     iva,
     total,
+  }).eq('id', trabajoId);
+  if (err1) throw new Error(`updateTrabajoFinalizar (estado): ${err1.message}`);
+
+  // Phase 2 — tipo_documento + fecha_finalizacion (added in 20260701220000 migration)
+  // Silently ignore if columns don't exist yet (42703 = undefined_column)
+  const { error: err2 } = await supabase.from('trabajos').update({
+    tipo_documento: tipo,
     fecha_finalizacion: new Date().toISOString(),
   }).eq('id', trabajoId);
+  if (err2 && err2.code !== '42703') {
+    throw new Error(`updateTrabajoFinalizar (tipo_documento): ${err2.message}`);
+  }
 }
 
 export async function updateTrabajoTft(trabajoId: string, tftNumero: string): Promise<void> {
