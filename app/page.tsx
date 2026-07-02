@@ -226,6 +226,7 @@ export default function TallerMecanico() {
     const existing = trabajos.find(t => t.id === trabajoId);
     if (!existing) return;
     const updated = { ...existing, ...data, iva, total };
+    // updateTrabajo now throws on DB error — propagates to handleSubmit's catch block
     await db.updateTrabajo(trabajoId, updated);
     setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, ...updated } : t));
 
@@ -255,16 +256,27 @@ export default function TallerMecanico() {
     if (!trabajoActual) return;
     const nuevoPago: Pago = { ...pago, id: Date.now().toString() };
     const nuevos = [...(trabajoActual.pagos ?? []), nuevoPago];
-    await db.updateTrabajoPagos(trabajoId, nuevos);
-    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, pagos: nuevos } : t));
+    // Update DB FIRST — only update local state on success to avoid phantom payments
+    try {
+      await db.updateTrabajoPagos(trabajoId, nuevos);
+      setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, pagos: nuevos } : t));
+    } catch (err) {
+      console.error('[registrarPago] FAILED:', err);
+      alert('No se pudo guardar el pago. Verifica tu conexión e intenta de nuevo.');
+    }
   };
 
   const eliminarPagoTrabajo = async (trabajoId: string, pagoId: string) => {
     const trabajoActual = trabajos.find(t => t.id === trabajoId);
     if (!trabajoActual) return;
     const nuevos = (trabajoActual.pagos ?? []).filter(p => p.id !== pagoId);
-    await db.updateTrabajoPagos(trabajoId, nuevos);
-    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, pagos: nuevos } : t));
+    try {
+      await db.updateTrabajoPagos(trabajoId, nuevos);
+      setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, pagos: nuevos } : t));
+    } catch (err) {
+      console.error('[eliminarPagoTrabajo] FAILED:', err);
+      alert('No se pudo eliminar el pago. Verifica tu conexión e intenta de nuevo.');
+    }
   };
 
   /** Registrar pago a proveedor externo — updates the ManoDeObraItem's pagosServicio array */
@@ -281,8 +293,13 @@ export default function TallerMecanico() {
         ? { ...item, pagosServicio: [...(item.pagosServicio ?? []), nuevoPago] }
         : item
     );
-    await db.updateTrabajoManoDeObraItems(trabajoId, updatedItems);
-    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, manoDeObraItems: updatedItems } : t));
+    try {
+      await db.updateTrabajoManoDeObraItems(trabajoId, updatedItems);
+      setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, manoDeObraItems: updatedItems } : t));
+    } catch (err) {
+      console.error('[registrarPagoServicioExterno] FAILED:', err);
+      alert('No se pudo registrar el pago al proveedor. Verifica tu conexión e intenta de nuevo.');
+    }
   };
   const finalizarTrabajo = async (trabajoId: string, tipo: 'factura' | 'nota') => {
     const trabajo = trabajos.find(t => t.id === trabajoId);
@@ -290,11 +307,18 @@ export default function TallerMecanico() {
     const subtotal = trabajo.manoDeObra + trabajo.refacciones;
     const iva = tipo === 'factura' ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
     const total = subtotal + iva;
-    await db.updateTrabajoFinalizar(trabajoId, tipo, iva, total);
-    setTrabajos(prev => prev.map(t => t.id === trabajoId
-      ? { ...t, estado: 'completado' as const, tipoDocumento: tipo, requiereFactura: tipo === 'factura', iva, total, fechaFinalizacion: new Date().toISOString() }
-      : t
-    ));
+    // DB-first: save must succeed before updating local state
+    try {
+      await db.updateTrabajoFinalizar(trabajoId, tipo, iva, total);
+      // Optimistic update — correct state is confirmed by the successful DB write above
+      setTrabajos(prev => prev.map(t => t.id === trabajoId
+        ? { ...t, estado: 'completado' as const, tipoDocumento: tipo, requiereFactura: tipo === 'factura', iva, total, fechaFinalizacion: new Date().toISOString() }
+        : t
+      ));
+    } catch (err) {
+      console.error('[finalizarTrabajo] FAILED:', err);
+      alert('No se pudo finalizar el trabajo. Verifica tu conexión e intenta de nuevo.');
+    }
   };
 
   const actualizarTft = async (trabajoId: string, tftNumero: string) => {
