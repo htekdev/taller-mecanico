@@ -35,14 +35,40 @@ test('change-proof-historial-numero-orden', async ({ page, loginPage }) => {
   // ── 3. Fill and submit the Nuevo Trabajo form ─────────────────────────────
   await showPhaseLabel(page, '📝 Registrando nuevo trabajo (número de orden: OT-VIDEO-01)');
 
-  // Número de Orden field
+  // ── 3a. Select client (REQUIRED — submit button stays disabled without this) ──
+  await page.waitForFunction(
+    () => {
+      const sel = document.querySelector('select');
+      return sel && (sel as HTMLSelectElement).options.length > 1;
+    },
+    { timeout: 15_000 }
+  ).catch(() => {});
+
+  const clientSelect = page.locator('select').first();
+  const clientOptCount = await clientSelect.locator('option').count().catch(() => 0);
+  if (clientOptCount > 1) {
+    await clientSelect.selectOption({ index: 1 });
+    await page.waitForTimeout(1500); // wait for vehicle options to load
+  }
+
+  // ── 3b. Select vehicle (required when client has vehicles) ───────────────
+  const vehicleSelect = page.locator('select').nth(1);
+  if (await vehicleSelect.isEnabled({ timeout: 5_000 }).catch(() => false)) {
+    const vCount = await vehicleSelect.locator('option').count().catch(() => 0);
+    if (vCount > 1) {
+      await vehicleSelect.selectOption({ index: 1 });
+      await page.waitForTimeout(800);
+    }
+  }
+
+  // ── 3c. Número de Orden (optional) ───────────────────────────────────────
   const ordenInput = page.locator('input[placeholder*="001" i], input[placeholder*="OT" i]').first();
   if (await ordenInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await ordenInput.fill('OT-VIDEO-01');
     await page.waitForTimeout(400);
   }
 
-  // Descripción (required)
+  // ── 3d. Descripción (required) ────────────────────────────────────────────
   const descInput = page.locator('input[placeholder*="descripci" i], input[placeholder*="Ej. Servicio" i]').first();
   if (await descInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await descInput.fill(UNIQUE_DESC);
