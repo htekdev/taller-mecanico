@@ -34,6 +34,13 @@ export class CuentasCobrarPage extends BasePage {
   }
 
   async waitForPageLoad() {
+    // Wait for the Supabase global loading state to clear first.
+    // After mutations (e.g. finalizar trabajo), cargarDatos() sets cargando=true
+    // which hides ALL module content behind a loading div. Only after cargando=false
+    // does the section content (including h2) appear.
+    const loadingOverlay = this.page.locator('text=Cargando datos del taller');
+    await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 }).catch(() => {});
+    // Then wait for the section title
     await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 });
   }
 
