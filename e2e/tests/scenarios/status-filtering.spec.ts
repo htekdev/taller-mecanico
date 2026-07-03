@@ -50,17 +50,12 @@ test.describe('Status Filtering', () => {
     await trabajosPage.waitForPageLoad();
 
     const filterSelect = page.locator('select:has(option:has-text("Todos"))').first();
-    try {
-      // Wait up to 30s for the select to appear, then force-select to bypass
-      // re-render flakiness (element flickers visible/hidden during React updates).
-      await filterSelect.waitFor({ state: 'visible', timeout: 30_000 });
-      await filterSelect.selectOption({ label: 'Todos' }, { force: true });
+    if (await filterSelect.isVisible().catch(() => false)) {
+      await filterSelect.selectOption({ label: 'Todos' }, { timeout: 60_000 });
       await page.waitForTimeout(500);
 
       // All items should be visible
       await expectVisible(trabajosPage.sectionTitle, 'All items shown');
-    } catch {
-      // No filter UI present in this build — skip gracefully
     }
 
     await showPhaseLabel(page, '✅ Todos Filter Works');
