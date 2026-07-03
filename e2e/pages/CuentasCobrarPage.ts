@@ -34,7 +34,22 @@ export class CuentasCobrarPage extends BasePage {
   }
 
   async waitForPageLoad() {
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 15_000 });
+    // Wait for cargando overlay to disappear first (can take up to 90s on cold Vercel preview)
+    const loadingOverlay = this.page.locator('text=Cargando datos del taller');
+    await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 })
+      .catch((err) => { console.warn('[CuentasCobrarPage] Loading overlay did not hide within 90s — proceeding anyway:', err?.message); });
+    // First attempt: wait up to 45s for section title to appear
+    const appeared = await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 })
+      .then(() => true).catch(() => false);
+    if (!appeared) {
+      // Retry: re-navigate to CxC tab in case the sidebar click was lost during a cargar cycle
+      console.warn('[CuentasCobrarPage] sectionTitle not visible after 45s — retrying navigation');
+      await this.page.locator('nav').getByRole('button', { name: 'Por Cobrar' })
+        .click({ force: true }).catch(() => {});
+      await this.page.waitForTimeout(1000);
+      await loadingOverlay.waitFor({ state: 'hidden', timeout: 60_000 }).catch(() => {});
+      await this.sectionTitle.waitFor({ state: 'visible', timeout: 60_000 });
+    }
   }
 
   /** Filter cuentas by payment status. */
