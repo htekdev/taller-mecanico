@@ -356,7 +356,7 @@ export function VistaTrabajo({
   proveedores: Proveedor[];
   onGuardar: (t: Omit<Trabajo, 'id' | 'total' | 'iva'>) => Promise<void>;
   onEditar: (trabajoId: string, data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => Promise<void>;
-  onFinalizar: (trabajoId: string, tipo: 'factura' | 'nota') => void;
+  onFinalizar: (trabajoId: string, tipo: 'factura' | 'nota') => Promise<void>;
   onIrAInventario: () => void;
   onGenerarFactura: (trabajoId: string) => void;
   onRefacturar: (trabajoId: string) => void;
@@ -694,7 +694,7 @@ export function VistaTrabajo({
   const finalizarDesdeFila = (trabajo: Trabajo) => {
     if (trabajo.tipoCliente === 'ayuntamiento') {
       const confirmar = window.confirm('¿Finalizar este trabajo del Ayuntamiento como factura?');
-      if (confirmar) onFinalizar(trabajo.id, 'factura');
+      if (confirmar) onFinalizar(trabajo.id, 'factura').catch(() => alert('❌ No se pudo finalizar el trabajo. Verifica tu conexión e intenta de nuevo.'));
       return;
     }
     setFinalizandoId(trabajo.id);
@@ -726,7 +726,7 @@ export function VistaTrabajo({
           cliente={getCliente(trabajoFinalizando.clienteId)}
           vehiculo={getVehiculo(trabajoFinalizando.vehiculoId)}
           onConfirmar={(tipo) => {
-            onFinalizar(finalizandoId!, tipo);
+            onFinalizar(finalizandoId!, tipo).catch(() => alert('❌ No se pudo finalizar el trabajo. Verifica tu conexión e intenta de nuevo.'));
             setFinalizandoId(null);
           }}
           onCancelar={() => setFinalizandoId(null)}
