@@ -12,14 +12,21 @@ export class Sidebar {
     this.nav = page.locator('nav');
   }
 
-  /** Click a nav tab by its label text. */
+  /** Click a nav tab by its label text.
+   *  Waits for any loading overlay to clear before clicking (actionability enforced).
+   *  Does NOT use force:true — if the nav is genuinely blocked, the test should fail.
+   */
   async clickTab(label: string) {
     const btn = this.nav.getByRole('button', { name: label });
-    // Wait up to 60s for the button to appear (cold Vercel preview can be slow).
-    // Use force: true to bypass Playwright's "stable" check — the app has frequent
-    // React re-renders that prevent the stability requirement from ever being met.
-    await btn.waitFor({ state: 'visible', timeout: 60_000 });
-    await btn.click({ force: true });
+    // Wait up to 90s for the button to be visible in the DOM (cold Vercel preview startup)
+    await btn.waitFor({ state: 'visible', timeout: 90_000 });
+    // Wait for loading overlay to clear before clicking — don't force through a real block
+    const loadingOverlay = this.page.locator('text=Cargando datos del taller');
+    const overlayVisible = await loadingOverlay.isVisible({ timeout: 1_000 }).catch(() => false);
+    if (overlayVisible) {
+      await loadingOverlay.waitFor({ state: 'hidden', timeout: 60_000 });
+    }
+    await btn.click();
     await this.page.waitForTimeout(500);
   }
 
