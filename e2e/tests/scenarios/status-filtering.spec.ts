@@ -26,17 +26,13 @@ test.describe('Status Filtering', () => {
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
 
-    // Trabajos uses a BUTTON GROUP for status filtering (Todos / 🕐 En progreso / ✓ Terminados)
-    // Look for button with text matching "En progreso" or "Pendiente"
     const pendienteBtn = page.locator('button').filter({ hasText: /En progreso|Pendiente/i }).first();
     const btnVisible = await pendienteBtn.waitFor({ state: 'visible', timeout: 45_000 })
       .then(() => true).catch(() => false);
 
-    // Fallback: select-based filter (if UI ever changes to a select)
     const filterSelect = page.locator('select:has(option:has-text("Pendiente"))').first();
     const selectVisible = !btnVisible && await filterSelect.isVisible().catch(() => false);
 
-    // Hard assertion — at least one filter UI must be present
     expect(btnVisible || selectVisible, 'El filtro de estado "Pendiente" debe estar visible').toBe(true);
 
     if (btnVisible) {
