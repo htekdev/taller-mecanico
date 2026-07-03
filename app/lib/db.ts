@@ -224,6 +224,7 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
     vehiculoId: r.vehiculo_id ?? '',
     fecha: r.fecha,
     descripcion: r.descripcion,
+    numeroOrden: r.numero_orden ?? undefined,
     kilometraje: r.kilometraje ?? undefined,
     manoDeObra: Number(r.mano_de_obra),
     manoDeObraItems: (r.mano_de_obra_items as ManoDeObraItem[]) ?? [],
@@ -253,76 +254,119 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
   }));
 }
 
+/** Build the core payload for inserting a Trabajo row.
+ *  New columns (kilometraje, numero_orden) are sent only when provided
+ *  so that the INSERT succeeds even if a migration hasn't been applied yet. */
+function buildInsertTrabajoPayload(tallerId: string, data: Omit<Trabajo, 'id'>) {
+  return {
+    taller_id: tallerId,
+    cliente_id: data.clienteId || null,
+    vehiculo_id: data.vehiculoId || null,
+    fecha: data.fecha,
+    descripcion: data.descripcion,
+    // New optional columns — only include when the user actually supplied a value
+    // so the INSERT never fails with "column not found" on an older DB schema.
+    ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
+    ...(data.numeroOrden ? { numero_orden: data.numeroOrden } : {}),
+    // Migration 005 columns
+    ...(data.tipoCliente === 'ayuntamiento' ? { tipo_cliente: 'ayuntamiento' } : {}),
+    ...(data.departamento !== undefined ? { departamento: data.departamento } : {}),
+    ...(data.inventarioNum !== undefined ? { inventario_num: data.inventarioNum } : {}),
+    ...(data.ordenServicioGob !== undefined ? { orden_servicio_gob: data.ordenServicioGob } : {}),
+    ...(data.tftNumero !== undefined ? { tft_numero: data.tftNumero } : {}),
+    ...(data.tftEstado !== undefined ? { tft_estado: data.tftEstado } : {}),
+    ...(data.fechaEntrada !== undefined ? { fecha_entrada: data.fechaEntrada } : {}),
+    ...(data.fechaSalida !== undefined ? { fecha_salida: data.fechaSalida } : {}),
+    // Migration 20260626150000 columns
+    ...(data.pendienteRefacciones ? { pendiente_refacciones: data.pendienteRefacciones } : {}),
+    ...(data.refaccionesPendientesNombres?.length ? { refacciones_pendientes_nombres: data.refaccionesPendientesNombres } : {}),
+    mano_de_obra: data.manoDeObra,
+    mano_de_obra_items: data.manoDeObraItems,
+    refacciones_total: data.refacciones,
+    costo_refacciones: data.costoRefacciones,
+    requiere_factura: data.requiereFactura,
+    folio_fiscal: data.folioFiscal ?? null,
+    iva: data.iva,
+    total: data.total,
+    partes: data.partes,
+    pagos: data.pagos,
+    factura_id: data.facturaId ?? null,
+    estado_facturacion: data.estadoFacturacion,
+    estado: data.estado,
+  };
+}
+
+/** Map a raw Supabase trabajos row to the Trabajo type */
+function mapTrabajoRow(row: Record<string, unknown>): Trabajo {
+  return {
+    id: row.id as string,
+    clienteId: (row.cliente_id as string) ?? '',
+    vehiculoId: (row.vehiculo_id as string) ?? '',
+    fecha: row.fecha as string,
+    descripcion: row.descripcion as string,
+    numeroOrden: (row.numero_orden as string | null) ?? undefined,
+    kilometraje: row.kilometraje != null ? Number(row.kilometraje) : undefined,
+    tipoCliente: (row.tipo_cliente as Trabajo['tipoCliente']) ?? 'general',
+    departamento: (row.departamento as string | null) ?? undefined,
+    inventarioNum: (row.inventario_num as string | null) ?? undefined,
+    ordenServicioGob: (row.orden_servicio_gob as string | null) ?? undefined,
+    tftNumero: (row.tft_numero as string | null) ?? undefined,
+    tftEstado: (row.tft_estado as Trabajo['tftEstado']) ?? 'sin_tft',
+    fechaEntrada: (row.fecha_entrada as string | null) ?? undefined,
+    fechaSalida: (row.fecha_salida as string | null) ?? undefined,
+    pendienteRefacciones: (row.pendiente_refacciones as boolean | null) ?? false,
+    refaccionesPendientesNombres: (row.refacciones_pendientes_nombres as string[]) ?? [],
+    manoDeObra: Number(row.mano_de_obra),
+    manoDeObraItems: (row.mano_de_obra_items as ManoDeObraItem[]) ?? [],
+    refacciones: Number(row.refacciones_total),
+    costoRefacciones: Number(row.costo_refacciones),
+    requiereFactura: row.requiere_factura as boolean,
+    folioFiscal: (row.folio_fiscal as string | null) ?? undefined,
+    iva: Number(row.iva),
+    total: Number(row.total),
+    partes: (row.partes as TrabajoRefaccion[]) ?? [],
+    pagos: (row.pagos as Pago[]) ?? [],
+    facturaId: (row.factura_id as string | null) ?? undefined,
+    tipoDocumento: (row.tipo_documento as Trabajo['tipoDocumento']) ?? undefined,
+    fechaFinalizacion: (row.fecha_finalizacion as string | null) ?? undefined,
+    estadoFacturacion: row.estado_facturacion as Trabajo['estadoFacturacion'],
+    estado: row.estado as Trabajo['estado'],
+  };
+}
+
 export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>): Promise<Trabajo | null> {
+  const payload = buildInsertTrabajoPayload(tallerId, data);
   const { data: row, error } = await supabase
     .from('trabajos')
-    .insert({
-      taller_id: tallerId,
-      cliente_id: data.clienteId || null,
-      vehiculo_id: data.vehiculoId || null,
-      fecha: data.fecha,
-      descripcion: data.descripcion,
-      // Only include kilometraje if it has a value — omitting it lets the DB
-      // column default to NULL, and avoids "column not found" on older branches
-      ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
-      // Migration 005 columns — only send non-default values so INSERT doesn't fail
-      // when migrations haven't been applied to production yet (general jobs are the default)
-      ...(data.tipoCliente === 'ayuntamiento' ? { tipo_cliente: 'ayuntamiento' } : {}),
-      ...(data.departamento !== undefined ? { departamento: data.departamento } : {}),
-      ...(data.inventarioNum !== undefined ? { inventario_num: data.inventarioNum } : {}),
-      ...(data.ordenServicioGob !== undefined ? { orden_servicio_gob: data.ordenServicioGob } : {}),
-      ...(data.tftNumero !== undefined ? { tft_numero: data.tftNumero } : {}),
-      // Only send tft_estado when explicitly set — avoids "column not found" on DBs
-      // where migration 005 hasn't applied yet (general jobs never need this column)
-      ...(data.tftEstado !== undefined ? { tft_estado: data.tftEstado } : {}),
-      ...(data.fechaEntrada !== undefined ? { fecha_entrada: data.fechaEntrada } : {}),
-      ...(data.fechaSalida !== undefined ? { fecha_salida: data.fechaSalida } : {}),
-      // Migration 20260626150000 columns — only send non-default values
-      ...(data.pendienteRefacciones ? { pendiente_refacciones: data.pendienteRefacciones } : {}),
-      ...(data.refaccionesPendientesNombres?.length ? { refacciones_pendientes_nombres: data.refaccionesPendientesNombres } : {}),
-      mano_de_obra: data.manoDeObra,
-      mano_de_obra_items: data.manoDeObraItems,
-      refacciones_total: data.refacciones,
-      costo_refacciones: data.costoRefacciones,
-      requiere_factura: data.requiereFactura,
-      folio_fiscal: data.folioFiscal ?? null,
-      iva: data.iva,
-      total: data.total,
-      partes: data.partes,
-      pagos: data.pagos,
-      factura_id: data.facturaId ?? null,
-      estado_facturacion: data.estadoFacturacion,
-      estado: data.estado,
-    })
+    .insert(payload)
     .select()
     .single();
+
+  // Fallback: if new optional columns don't exist in DB yet (42703 = undefined_column),
+  // retry without kilometraje and numero_orden so the job is never lost.
+  // This handles the window between deploying the code and running supabase db push.
+  if (error?.code === '42703') {
+    const { kilometraje: _km, numero_orden: _no, ...payloadWithoutNewCols } = payload as Record<string, unknown>;
+    console.warn('[insertTrabajo] Columnas nuevas no encontradas en DB — reintentando sin kilometraje/numero_orden:', error.message);
+    const { data: fallbackRow, error: fallbackError } = await supabase
+      .from('trabajos')
+      .insert(payloadWithoutNewCols)
+      .select()
+      .single();
+    if (fallbackError || !fallbackRow) {
+      const msg = fallbackError?.message ?? 'Unknown Supabase error (fallback)';
+      console.error('[insertTrabajo] FALLBACK FAILED:', msg, fallbackError);
+      throw new Error(`insertTrabajo: ${msg}`);
+    }
+    return mapTrabajoRow(fallbackRow as Record<string, unknown>);
+  }
 
   if (error || !row) {
     const msg = error?.message ?? error?.details ?? 'Unknown Supabase error';
     console.error('[insertTrabajo] FAILED:', msg, error);
     throw new Error(`insertTrabajo: ${msg}`);
   }
-  return {
-    id: row.id, clienteId: row.cliente_id ?? '', vehiculoId: row.vehiculo_id ?? '',
-    fecha: row.fecha, descripcion: row.descripcion,
-    kilometraje: row.kilometraje ?? undefined,
-    tipoCliente: (row.tipo_cliente as Trabajo['tipoCliente']) ?? 'general',
-    departamento: row.departamento ?? undefined,
-    inventarioNum: row.inventario_num ?? undefined,
-    ordenServicioGob: row.orden_servicio_gob ?? undefined,
-    tftNumero: row.tft_numero ?? undefined,
-    tftEstado: (row.tft_estado as Trabajo['tftEstado']) ?? 'sin_tft',
-    fechaEntrada: row.fecha_entrada ?? undefined,
-    fechaSalida: row.fecha_salida ?? undefined,
-    pendienteRefacciones: row.pendiente_refacciones ?? false,
-    refaccionesPendientesNombres: (row.refacciones_pendientes_nombres as string[]) ?? [],
-    manoDeObra: Number(row.mano_de_obra),
-    manoDeObraItems: (row.mano_de_obra_items as ManoDeObraItem[]) ?? [],
-    refacciones: Number(row.refacciones_total), costoRefacciones: Number(row.costo_refacciones),
-    requiereFactura: row.requiere_factura, iva: Number(row.iva), total: Number(row.total),
-    partes: (row.partes as TrabajoRefaccion[]) ?? [], pagos: (row.pagos as Pago[]) ?? [],
-    estadoFacturacion: row.estado_facturacion, estado: row.estado,
-  };
+  return mapTrabajoRow(row as Record<string, unknown>);
 }
 
 export async function updateTrabajoPagos(trabajoId: string, pagos: Pago[]): Promise<void> {
@@ -353,14 +397,15 @@ export async function resetFacturacionTrabajo(trabajoId: string): Promise<void> 
 
 /** Editar trabajo pendiente — actualiza todos los campos en la DB */
 export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<void> {
-  const { error } = await supabase.from('trabajos').update({
+  const updatePayload: Record<string, unknown> = {
     cliente_id: data.clienteId || null,
     vehiculo_id: data.vehiculoId || null,
     fecha: data.fecha,
     descripcion: data.descripcion,
-    // Only send kilometraje when it has a value — avoids "column not found" on DBs
-    // where migration 20260706120000 hasn't been applied yet (migration 20260701220000 adds it)
-    ...(data.kilometraje !== undefined ? { kilometraje: data.kilometraje } : {}),
+    // New columns — always include them so explicit clears persist as NULL.
+    // If production is missing these columns, the 42703 fallback strips them and retries.
+    kilometraje: data.kilometraje ?? null,
+    numero_orden: data.numeroOrden?.trim() || null,
     // Migration 005 columns — conditional so UPDATE works even without the columns in production
     ...(data.tipoCliente === 'ayuntamiento' ? { tipo_cliente: 'ayuntamiento' } : {}),
     ...(data.departamento !== undefined ? { departamento: data.departamento } : {}),
@@ -387,8 +432,26 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
     factura_id: data.facturaId ?? null,
     estado_facturacion: data.estadoFacturacion,
     estado: data.estado,
-  }).eq('id', trabajoId);
-  if (error) throw new Error(`updateTrabajo: ${error.message}`);
+  };
+
+  const { error } = await supabase.from('trabajos').update(updatePayload).eq('id', trabajoId);
+
+  // Fallback: if new optional columns don't exist in DB yet, retry without them
+  if (error?.code === '42703') {
+    const { kilometraje: _km, numero_orden: _no, ...payloadWithoutNewCols } = updatePayload;
+    console.warn('[updateTrabajo] Columnas nuevas no encontradas — reintentando sin kilometraje/numero_orden:', error.message);
+    const { error: fallbackError } = await supabase.from('trabajos').update(payloadWithoutNewCols).eq('id', trabajoId);
+    if (fallbackError) {
+      console.error('[updateTrabajo] FALLBACK FAILED:', fallbackError.message, fallbackError);
+      throw new Error(`updateTrabajo: ${fallbackError.message}`);
+    }
+    return;
+  }
+
+  if (error) {
+    console.error('[updateTrabajo] FAILED:', error.message, error);
+    throw new Error(`updateTrabajo: ${error.message}`);
+  }
 }
 
 /** Finalizar trabajo — sets estado=completado, tipoDocumento, IVA, total, fechaFinalizacion
