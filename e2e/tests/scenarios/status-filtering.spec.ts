@@ -49,13 +49,29 @@ test.describe('Status Filtering', () => {
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
 
-    const filterSelect = page.locator('select:has(option:has-text("Todos"))').first();
-    if (await filterSelect.isVisible().catch(() => false)) {
-      await filterSelect.selectOption({ label: 'Todos' });
+    // Status filter in Trabajos is a button group (not a <select>).
+    // Try clicking the "Todos" button first; fall back to select-based logic.
+    const todosButton = page.locator('button').filter({ hasText: /^Todos$/ }).first();
+    const buttonVisible = await todosButton.waitFor({ state: 'visible', timeout: 30_000 })
+      .then(() => true).catch(() => false);
+    if (buttonVisible) {
+      await todosButton.click();
       await page.waitForTimeout(500);
-
-      // All items should be visible
       await expectVisible(trabajosPage.sectionTitle, 'All items shown');
+    } else {
+      // Fallback: select-based filter (dynamic lookup to avoid exact-label mismatch)
+      const filterSelect = page.locator('select:has(option:has-text("Todos"))').first();
+      const selectVisible = await filterSelect.waitFor({ state: 'visible', timeout: 30_000 })
+        .then(() => true).catch(() => false);
+      if (selectVisible) {
+        const options = await filterSelect.locator('option').allTextContents();
+        const todosOpt = options.find(o => o.trim() === 'Todos');
+        if (todosOpt) {
+          await filterSelect.selectOption({ label: todosOpt });
+          await page.waitForTimeout(500);
+        }
+        await expectVisible(trabajosPage.sectionTitle, 'All items shown');
+      }
     }
 
     await showPhaseLabel(page, '✅ Todos Filter Works');
