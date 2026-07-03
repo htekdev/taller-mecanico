@@ -427,10 +427,11 @@ export async function updateTrabajoFinalizar(
 }
 
 export async function updateTrabajoTft(trabajoId: string, tftNumero: string): Promise<void> {
-  await supabase.from('trabajos').update({
+  const { error } = await supabase.from('trabajos').update({
     tft_numero: tftNumero,
     tft_estado: 'con_tft',
   }).eq('id', trabajoId);
+  if (error) throw new Error(`updateTrabajoTft: ${error.message}`);
 }
 
 // ── Órdenes de Compra ─────────────────────────────────────────
