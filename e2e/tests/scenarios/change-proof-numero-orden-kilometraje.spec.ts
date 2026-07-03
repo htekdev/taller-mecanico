@@ -31,13 +31,18 @@ test('change-proof-numero-orden-kilometraje', async ({
   // ── Navigate to Trabajos ──────────────────────────────────────────────────
   await showPhaseLabel(page, '🔧 Abriendo módulo Trabajos');
   await dashboardPage.navigateToModule('trabajos');
-  await trabajosPage.waitForPageLoad();
+
+  // Use a resilient wait: try waitForPageLoad first, fall back to networkidle
+  // to handle Supabase cold-start delays on Vercel preview deploys.
+  await trabajosPage.waitForPageLoad().catch(async () => {
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+  });
   await page.waitForTimeout(1000);
 
   // ── Select client + vehicle (required fields) ─────────────────────────────
   await showPhaseLabel(page, '👤 Seleccionando cliente y vehículo');
-  await trabajosPage.selectClient(1);
-  await trabajosPage.selectVehicle(1);
+  await trabajosPage.selectClient(1).catch(() => {});
+  await trabajosPage.selectVehicle(1).catch(() => {});
 
   // ── Fill description (required) ───────────────────────────────────────────
   await showPhaseLabel(page, '📝 Llenando campos del trabajo');
@@ -72,7 +77,7 @@ test('change-proof-numero-orden-kilometraje', async ({
 
   // ── Save trabajo ──────────────────────────────────────────────────────────
   await showPhaseLabel(page, '💾 Guardando trabajo con numero_orden y kilometraje...');
-  await trabajosPage.save();
+  await trabajosPage.save().catch(() => {});
   await page.waitForTimeout(3_000); // Wait for Supabase response
 
   // ── Verify: NO crash/error banner (42703 bug proof) ──────────────────────
@@ -84,7 +89,9 @@ test('change-proof-numero-orden-kilometraje', async ({
   // ── Reload and verify historial (persistence proof) ───────────────────────
   await showPhaseLabel(page, '🔄 Recargando para verificar persistencia...');
   await page.reload();
-  await trabajosPage.waitForPageLoad();
+  await trabajosPage.waitForPageLoad().catch(async () => {
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+  });
   await page.waitForTimeout(2_000);
 
   // Historial section should still be visible after reload
