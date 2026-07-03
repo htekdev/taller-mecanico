@@ -37,7 +37,7 @@ export default defineConfig({
   /* Global test timeout — 60s to handle cold Vercel preview starts in CI.
      Tests that take 30-40s against a cold preview were hitting the 30s limit.
      test.slow() still available for 180s on heavy multi-step flows. */
-  timeout: 60_000,
+  timeout: 120_000,
 
   /* Expect timeout */
   expect: { timeout: 10_000 },
