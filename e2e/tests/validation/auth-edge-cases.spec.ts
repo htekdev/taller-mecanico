@@ -48,6 +48,7 @@ test.describe('Authentication Edge Cases', () => {
   test('logout prevents dashboard access', async ({
     page, loginPage, dashboardPage
   }) => {
+    test.slow(); // Cold Vercel preview + Supabase auth takes time
     await showPhaseLabel(page, '🔐 Logout Security');
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
