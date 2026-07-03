@@ -35,7 +35,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : 2,
 
   /* Global test timeout — 60s for Vercel preview cold-start tolerance */
-  timeout: 60_000,
+  timeout: 120_000,
 
   /* Expect timeout */
   expect: { timeout: 10_000 },
