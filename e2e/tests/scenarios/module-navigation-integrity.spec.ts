@@ -151,7 +151,7 @@ test.describe('Module Navigation Integrity', () => {
 
     // The badge might show 🕐 prefix — extract just the number
     // Badge should approximately match pending count
-    if (badge !== null && pendienteCount > 0) {
+    if (badge !== null) {
       // Allow ±1 difference (timing)
       // Badge is valid if present
       expect(badge).toBeGreaterThanOrEqual(0);
