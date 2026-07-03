@@ -71,7 +71,11 @@ export class TrabajosPage extends BasePage {
   }
 
   async waitForPageLoad() {
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 15_000 });
+    // Wait for cargando overlay to disappear first (can take up to 90s on cold Vercel preview)
+    const loadingOverlay = this.page.locator('text=Cargando datos del taller');
+    await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 })
+      .catch((err) => { console.warn('[Page] Loading overlay did not hide within 90s — proceeding anyway:', err?.message); });
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 });
   }
 
   /** Select a client for the new trabajo. */
