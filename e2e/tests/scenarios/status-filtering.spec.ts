@@ -49,7 +49,6 @@ test.describe('Status Filtering', () => {
       await page.waitForTimeout(500);
     }
 
-    // Verify section remains stable after filter
     await expectVisible(trabajosPage.sectionTitle, 'Filtered view stable');
     await showPhaseLabel(page, '✅ Pendiente Filter Works');
   });
@@ -61,8 +60,6 @@ test.describe('Status Filtering', () => {
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
 
-    // Status filter in Trabajos is a button group (not a <select>).
-    // Try clicking the "Todos" button first; fall back to select-based logic.
     const todosButton = page.locator('button').filter({ hasText: /^Todos$/ }).first();
     const buttonVisible = await todosButton.waitFor({ state: 'visible', timeout: 45_000 })
       .then(() => true).catch(() => false);
@@ -71,7 +68,6 @@ test.describe('Status Filtering', () => {
     const selectVisible = !buttonVisible && await filterSelect.waitFor({ state: 'visible', timeout: 5_000 })
       .then(() => true).catch(() => false);
 
-    // Hard assertion — filter UI must exist
     expect(buttonVisible || selectVisible, 'El filtro "Todos" debe estar visible (botón o select)').toBe(true);
 
     if (buttonVisible) {
@@ -97,35 +93,28 @@ test.describe('Status Filtering', () => {
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();
 
-    // Ordenes uses a BUTTON GROUP for status filtering ("Todas / Pendiente / Parcial / Pagado")
-    // The "Todas" button label is feminine — unique to the Ordenes module.
     const todasBtn = page.locator('button').filter({ hasText: /Todas/i }).first();
     const btnVisible = await todasBtn.waitFor({ state: 'visible', timeout: 45_000 })
       .then(() => true).catch(() => false);
 
-    // Soft check — ordenes filter may not exist in all builds
     if (!btnVisible) {
       console.warn('[INFO] Órdenes status filter not found — skipping filter interaction test');
       await showPhaseLabel(page, '✅ Órdenes Filter Works (no filter UI in this build)');
       return;
     }
 
-    if (btnVisible) {
-      // Click through a couple of filter options to verify cycling works
+    await todasBtn.click();
+    await page.waitForTimeout(300);
+
+    const pendienteBtn = page.locator('button').filter({ hasText: /Pendiente/i }).first();
+    if (await pendienteBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await pendienteBtn.click();
+      await page.waitForTimeout(300);
       await todasBtn.click();
       await page.waitForTimeout(300);
-
-      const pendienteBtn = page.locator('button').filter({ hasText: /Pendiente/i }).first();
-      if (await pendienteBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await pendienteBtn.click();
-        await page.waitForTimeout(300);
-        await todasBtn.click();
-        await page.waitForTimeout(300);
-      }
-
-      await expectVisible(ordenesCompraPage.sectionTitle, 'Filter cycling stable');
     }
 
+    await expectVisible(ordenesCompraPage.sectionTitle, 'Filter cycling stable');
     await showPhaseLabel(page, '✅ Órdenes Filter Works');
   });
 
@@ -136,30 +125,24 @@ test.describe('Status Filtering', () => {
     await dashboardPage.navigateToModule('cuentas');
     await cuentasCobrarPage.waitForPageLoad();
 
-    // CxC uses a BUTTON GROUP for status filtering ("Todos / Pendiente / Parcial / Pagado")
-    // Count suffix makes it like "Todos (5)" — match the "Todos" prefix specifically.
     const todosBtn = page.locator('button').filter({ hasText: /^Todos/ }).first();
     const btnVisible = await todosBtn.waitFor({ state: 'visible', timeout: 45_000 })
       .then(() => true).catch(() => false);
 
-    // Hard assertion — CxC must have a payment status filter
     expect(btnVisible, 'El filtro de estado de CxC debe estar visible').toBe(true);
 
-    if (btnVisible) {
+    await todosBtn.click();
+    await page.waitForTimeout(300);
+
+    const pendienteBtn = page.locator('button').filter({ hasText: /Pendiente/i }).first();
+    if (await pendienteBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await pendienteBtn.click();
+      await page.waitForTimeout(300);
       await todosBtn.click();
       await page.waitForTimeout(300);
-
-      const pendienteBtn = page.locator('button').filter({ hasText: /Pendiente/i }).first();
-      if (await pendienteBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await pendienteBtn.click();
-        await page.waitForTimeout(300);
-        await todosBtn.click();
-        await page.waitForTimeout(300);
-      }
-
-      await expectVisible(cuentasCobrarPage.sectionTitle, 'CxC filter stable');
     }
 
+    await expectVisible(cuentasCobrarPage.sectionTitle, 'CxC filter stable');
     await showPhaseLabel(page, '✅ CxC Filter Works');
   });
 });
