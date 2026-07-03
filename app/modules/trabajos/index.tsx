@@ -262,7 +262,8 @@ function ModalFinalizacion({
       >
         <button
           onClick={onCancelar}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all text-lg font-bold"
+          disabled={disabled}
+          className={`absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all text-lg font-bold${disabled ? ' opacity-40 cursor-not-allowed' : ''}`}
           aria-label="Cerrar"
         >&#x2715;</button>
 
@@ -322,7 +323,8 @@ function ModalFinalizacion({
 
         <button
           onClick={onCancelar}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400 transition-all text-slate-700 font-semibold text-sm"
+          disabled={disabled}
+          className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 transition-all text-slate-700 font-semibold text-sm${disabled ? ' border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed' : ' border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400'}`}
         >
           &#8592; Regresar — el trabajo sigue en progreso
         </button>
