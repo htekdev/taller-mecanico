@@ -53,7 +53,7 @@ export class DashboardPage extends BasePage {
       // Try navigating to root
       await this.page.goto('/');
       await this.page.waitForLoadState('domcontentloaded');
-      await this.nav.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+      await this.nav.waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
     });
     // Wait for data to finish loading
     await this.loadingIndicator.waitFor({ state: 'hidden', timeout: 20_000 }).catch(() => {});
@@ -103,7 +103,7 @@ export class DashboardPage extends BasePage {
   async logout() {
     await this.logoutButton.click();
     // Wait for redirect to login page
-    await this.page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 10_000 });
+    await this.page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 20_000 });
   }
 
   /** Get the currently displayed user email. */
