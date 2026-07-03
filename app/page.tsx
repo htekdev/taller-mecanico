@@ -292,15 +292,17 @@ export default function TallerMecanico() {
     const total = subtotal + iva;
     try {
       await db.updateTrabajoFinalizar(trabajoId, tipo, iva, total);
-      setTrabajos(prev => prev.map(t => t.id === trabajoId
-        ? { ...t, estado: 'completado' as const, tipoDocumento: tipo, requiereFactura: tipo === 'factura', iva, total, fechaFinalizacion: new Date().toISOString() }
-        : t
-      ));
-      await cargarDatos();
     } catch (err) {
-      console.error('[finalizarTrabajo] Error:', err);
-      throw err;
+      console.error('[finalizarTrabajo] Error al actualizar DB:', err);
+      throw err; // Only fires if the actual UPDATE failed — user sees error correctly
     }
+    // Success path: update optimistic state + refresh outside the throw-path
+    // cargarDatos failure must NOT be reported as a finalization failure (it wasn't)
+    setTrabajos(prev => prev.map(t => t.id === trabajoId
+      ? { ...t, estado: 'completado' as const, tipoDocumento: tipo, requiereFactura: tipo === 'factura', iva, total, fechaFinalizacion: new Date().toISOString() }
+      : t
+    ));
+    await cargarDatos().catch(e => console.warn('[finalizarTrabajo] Refresh falló (datos pueden estar desactualizados):', e));
   };
 
   const actualizarTft = async (trabajoId: string, tftNumero: string) => {

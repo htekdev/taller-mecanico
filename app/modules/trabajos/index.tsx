@@ -238,12 +238,14 @@ function ModalFinalizacion({
   vehiculo,
   onConfirmar,
   onCancelar,
+  disabled = false,
 }: {
   trabajo: Trabajo;
   cliente?: Cliente;
   vehiculo?: Vehiculo;
   onConfirmar: (tipo: 'factura' | 'nota') => void;
   onCancelar: () => void;
+  disabled?: boolean;
 }) {
   const subtotal = trabajo.manoDeObra + trabajo.refacciones;
   const ivaFactura = Math.round(subtotal * 0.16 * 100) / 100;
@@ -288,7 +290,8 @@ function ModalFinalizacion({
           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest text-center">¿Cómo se va a cobrar?</p>
           <button
             onClick={() => onConfirmar('nota')}
-            className="w-full flex items-center gap-4 px-4 py-4 rounded-xl border-2 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left group"
+            disabled={disabled}
+            className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl border-2 transition-all text-left group ${disabled ? 'border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed' : 'border-slate-200 hover:border-indigo-400 hover:bg-indigo-50'}`}
           >
             <span className="text-3xl">&#128196;</span>
             <div className="flex-1">
@@ -302,7 +305,8 @@ function ModalFinalizacion({
           </button>
           <button
             onClick={() => onConfirmar('factura')}
-            className="w-full flex items-center gap-4 px-4 py-4 rounded-xl border-2 border-slate-200 hover:border-amber-400 hover:bg-amber-50 transition-all text-left group"
+            disabled={disabled}
+            className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl border-2 transition-all text-left group ${disabled ? 'border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed' : 'border-slate-200 hover:border-amber-400 hover:bg-amber-50'}`}
           >
             <span className="text-3xl">&#129534;</span>
             <div className="flex-1">
@@ -399,6 +403,7 @@ export function VistaTrabajo({
   const [pickerCantidad, setPickerCantidad]   = useState(1);
   const [pickerPrecioVenta, setPickerPrecioVenta] = useState(0);
   const [finalizandoId, setFinalizandoId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'general' | 'ayuntamiento'>('general');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'completado'>('todos');
@@ -691,10 +696,13 @@ export function VistaTrabajo({
     setTftNumeroDraft('');
   };
 
-  const finalizarDesdeFila = (trabajo: Trabajo) => {
+  const finalizarDesdeFila = async (trabajo: Trabajo) => {
     if (trabajo.tipoCliente === 'ayuntamiento') {
       const confirmar = window.confirm('¿Finalizar este trabajo del Ayuntamiento como factura?');
-      if (confirmar) onFinalizar(trabajo.id, 'factura').catch(() => alert('❌ No se pudo finalizar el trabajo. Verifica tu conexión e intenta de nuevo.'));
+      if (confirmar) {
+        try { await onFinalizar(trabajo.id, 'factura'); }
+        catch { alert('❌ No se pudo finalizar el trabajo. Verifica tu conexión e intenta de nuevo.'); }
+      }
       return;
     }
     setFinalizandoId(trabajo.id);
@@ -725,11 +733,19 @@ export function VistaTrabajo({
           trabajo={trabajoFinalizando}
           cliente={getCliente(trabajoFinalizando.clienteId)}
           vehiculo={getVehiculo(trabajoFinalizando.vehiculoId)}
-          onConfirmar={(tipo) => {
-            onFinalizar(finalizandoId!, tipo).catch(() => alert('❌ No se pudo finalizar el trabajo. Verifica tu conexión e intenta de nuevo.'));
-            setFinalizandoId(null);
+          disabled={isSubmitting}
+          onConfirmar={async (tipo) => {
+            setIsSubmitting(true);
+            try {
+              await onFinalizar(finalizandoId!, tipo);
+              setFinalizandoId(null);
+            } catch {
+              alert('❌ No se pudo finalizar el trabajo. Verifica tu conexión e intenta de nuevo.');
+            } finally {
+              setIsSubmitting(false);
+            }
           }}
-          onCancelar={() => setFinalizandoId(null)}
+          onCancelar={() => { if (!isSubmitting) setFinalizandoId(null); }}
         />
       )}
       <SectionTitle title="Registro de Trabajos" subtitle="Selecciona cliente, unidad y las refacciones usadas del inventario." />
