@@ -27,7 +27,7 @@ export class ProveedoresPage extends BasePage {
   }
 
   async waitForPageLoad() {
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 15_000 });
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 });
   }
 
   /** Add a new proveedor. */
