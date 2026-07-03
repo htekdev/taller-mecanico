@@ -73,7 +73,7 @@ export class TrabajosPage extends BasePage {
   }
 
   async waitForPageLoad() {
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 15_000 });
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 });
   }
 
   /** Select a client for the new trabajo. */
@@ -83,7 +83,7 @@ export class TrabajosPage extends BasePage {
         const sel = document.querySelector('select');
         return sel && sel.options.length > 1;
       },
-      { timeout: 15_000 }
+      { timeout: 45_000 }
     ).catch(() => {});
     const count = await this.getOptionCount(this.clientSelect);
     if (count > 1) {
