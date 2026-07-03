@@ -152,6 +152,36 @@ test('full-walk-through-finalizar-trabajo-persistencia', async ({
   await page.mouse.wheel(0, -300);
   await page.waitForTimeout(1500);
 
+  // ── HARD PERSISTENCE ASSERTION (PR #94 regression proof) ────────────────
+  // This is the CRITICAL check: the trabajo MUST show "terminado" after reload.
+  // Before the fix: updateTrabajoFinalizar() silently ignored DB errors →
+  //   local state showed "terminado" but DB still had "pendiente" → on reload, reverts.
+  // After the fix: DB error surfaces → user sees error → data is consistent.
+  await showPhaseLabel(page, '🔍 Verificando persistencia: ¿trabajo sigue "terminado" post-reload?', 2000);
+
+  // Find the trabajo row by its unique description and verify terminado badge
+  const trabajoRow = page.locator(`text="${trabajoDesc}"`).first();
+  if (await trabajoRow.isVisible({ timeout: 8000 }).catch(() => false)) {
+    // Found the trabajo — now check for terminado badge nearby
+    const terminadoBadge = page.locator(`text=/✓ Terminado/`).first();
+    await expect(terminadoBadge).toBeVisible({
+      timeout: 10000,
+      message: `REGRESSION: Trabajo "${trabajoDesc}" must show "✓ Terminado" after page reload. ` +
+               `If this fails, the DB persistence fix (updateTrabajoFinalizar error handling) is broken.`
+    });
+    await expectVisible(terminadoBadge, '✅ PERSISTENCIA VERIFICADA: "✓ Terminado" visible post-reload desde DB');
+  } else {
+    // Trabajo not in view — scroll to find it
+    await page.mouse.wheel(0, 500);
+    await page.waitForTimeout(1000);
+    const terminadoBadge = page.locator('text=/✓ Terminado/').first();
+    await expect(terminadoBadge).toBeVisible({
+      timeout: 10000,
+      message: `REGRESSION: "✓ Terminado" badge not found after reload. DB persistence broken.`
+    });
+    await expectVisible(terminadoBadge, '✅ PERSISTENCIA VERIFICADA: "✓ Terminado" post-reload');
+  }
+
   await showPhaseLabel(page, '✅ Fix PR #94: updateTrabajoFinalizar ahora verifica errores Supabase', 2000);
   await page.waitForTimeout(2000);
   await showPhaseLabel(page, '🎉 Prueba completa — Error handling verificado', 2000);
