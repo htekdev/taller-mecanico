@@ -358,7 +358,15 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
       console.error('[insertTrabajo] FALLBACK FAILED:', msg, fallbackError);
       throw new Error(`insertTrabajo: ${msg}`);
     }
-    return mapTrabajoRow(fallbackRow as Record<string, unknown>);
+    // Preserve user-entered values that couldn't be saved to DB yet.
+    // The fallback saved the job without new columns — reflect that in the returned object
+    // so the UI shows what the user entered (not undefined) even though DB doesn't have them.
+    const fallbackResult = mapTrabajoRow(fallbackRow as Record<string, unknown>);
+    return {
+      ...fallbackResult,
+      numeroOrden: data.numeroOrden,
+      kilometraje: data.kilometraje,
+    };
   }
 
   if (error || !row) {
