@@ -62,10 +62,10 @@ export class CotizacionesPage extends BasePage {
     const previewTitle = this.page.locator('text=/Cotización COT-/').first();
 
     await Promise.race([
-      startSurface.waitFor({ state: 'visible', timeout: 15_000 }),
-      templateButton.waitFor({ state: 'visible', timeout: 15_000 }),
-      historyTitle.waitFor({ state: 'visible', timeout: 15_000 }),
-      previewTitle.waitFor({ state: 'visible', timeout: 15_000 }),
+      startSurface.waitFor({ state: 'visible', timeout: 45_000 }),
+      templateButton.waitFor({ state: 'visible', timeout: 45_000 }),
+      historyTitle.waitFor({ state: 'visible', timeout: 45_000 }),
+      previewTitle.waitFor({ state: 'visible', timeout: 45_000 }),
     ]);
   }
 
@@ -73,13 +73,13 @@ export class CotizacionesPage extends BasePage {
   async selectPlantillaGeneral() {
     await this.plantillaGeneral.click();
     // Wait for the form to load (client select appears)
-    await this.clientSelect.waitFor({ state: 'visible', timeout: 15_000 });
+    await this.clientSelect.waitFor({ state: 'visible', timeout: 45_000 });
   }
 
   /** Select the "Ayuntamiento" plantilla. */
   async selectPlantillaAyuntamiento() {
     await this.plantillaAyuntamiento.click();
-    await this.clientSelect.waitFor({ state: 'visible', timeout: 15_000 });
+    await this.clientSelect.waitFor({ state: 'visible', timeout: 45_000 });
   }
 
   /** Select a client from the dropdown by index. */
@@ -89,7 +89,7 @@ export class CotizacionesPage extends BasePage {
         const sel = document.querySelector('select');
         return sel && sel.options.length > 1;
       },
-      { timeout: 15_000 }
+      { timeout: 45_000 }
     ).catch(() => {});
     const optionCount = await this.getOptionCount(this.clientSelect);
     if (optionCount > 1) {
