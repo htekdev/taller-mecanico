@@ -50,8 +50,12 @@ test.describe('Status Filtering', () => {
     await trabajosPage.waitForPageLoad();
 
     const filterSelect = page.locator('select:has(option:has-text("Todos"))').first();
-    if (await filterSelect.isVisible().catch(() => false)) {
-      await filterSelect.selectOption({ label: 'Todos' }, { timeout: 60_000 });
+    // Wait up to 60s for the select to become visible (handles post-navigation data loading)
+    const selectVisible = await filterSelect.waitFor({ state: 'visible', timeout: 60_000 })
+      .then(() => true).catch(() => false);
+    if (selectVisible) {
+      // Element is confirmed visible and stable — selectOption uses default actionTimeout
+      await filterSelect.selectOption({ label: 'Todos' });
       await page.waitForTimeout(500);
 
       // All items should be visible
