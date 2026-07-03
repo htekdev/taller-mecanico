@@ -18,9 +18,9 @@ export class LoginPage extends BasePage {
 
   constructor(page: Page) {
     super(page);
-    this.emailInput = page.locator('input[type="email"]');
-    this.passwordInput = page.locator('input[type="password"]');
-    this.submitButton = page.locator('button[type="submit"]');
+    this.emailInput = page.locator('input[type="email"]').first();
+    this.passwordInput = page.locator('input[type="password"]').first();
+    this.submitButton = page.locator('button[type="submit"]').first();
     this.loginTab = page.getByRole('button', { name: 'Iniciar Sesión' });
     this.registroTab = page.getByRole('button', { name: 'Crear Cuenta' });
     this.errorMessage = page.locator('.bg-rose-50');
