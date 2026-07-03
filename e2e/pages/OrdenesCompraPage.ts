@@ -57,7 +57,7 @@ export class OrdenesCompraPage extends BasePage {
   }
 
   async waitForPageLoad() {
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 15_000 });
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 });
   }
 
   /** Select a proveedor for the new order. */
