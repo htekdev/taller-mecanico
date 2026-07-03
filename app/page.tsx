@@ -45,6 +45,7 @@ export default function TallerMecanico() {
   const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
   const [cargando, setCargando] = useState(true);
   const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: boolean } | null>(null);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   // ── Cargar datos desde Supabase ──
   const cargarDatos = useCallback(async () => {
@@ -262,7 +263,7 @@ export default function TallerMecanico() {
       setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, pagos: nuevos } : t));
     } catch (err) {
       console.error('[registrarPago] FAILED:', err);
-      alert('No se pudo guardar el pago. Verifica tu conexión e intenta de nuevo.');
+      setErrorBanner('No se pudo guardar el pago. Verifica tu conexión e intenta de nuevo.');
     }
   };
 
@@ -275,7 +276,7 @@ export default function TallerMecanico() {
       setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, pagos: nuevos } : t));
     } catch (err) {
       console.error('[eliminarPagoTrabajo] FAILED:', err);
-      alert('No se pudo eliminar el pago. Verifica tu conexión e intenta de nuevo.');
+      setErrorBanner('No se pudo eliminar el pago. Verifica tu conexión e intenta de nuevo.');
     }
   };
 
@@ -298,7 +299,7 @@ export default function TallerMecanico() {
       setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, manoDeObraItems: updatedItems } : t));
     } catch (err) {
       console.error('[registrarPagoServicioExterno] FAILED:', err);
-      alert('No se pudo registrar el pago al proveedor. Verifica tu conexión e intenta de nuevo.');
+      setErrorBanner('No se pudo registrar el pago al proveedor. Verifica tu conexión e intenta de nuevo.');
     }
   };
   const finalizarTrabajo = async (trabajoId: string, tipo: 'factura' | 'nota') => {
@@ -317,16 +318,21 @@ export default function TallerMecanico() {
       ));
     } catch (err) {
       console.error('[finalizarTrabajo] FAILED:', err);
-      alert('No se pudo finalizar el trabajo. Verifica tu conexión e intenta de nuevo.');
+      setErrorBanner('No se pudo finalizar el trabajo. Verifica tu conexión e intenta de nuevo.');
     }
   };
 
   const actualizarTft = async (trabajoId: string, tftNumero: string) => {
-    await db.updateTrabajoTft(trabajoId, tftNumero);
-    setTrabajos(prev => prev.map(t => t.id === trabajoId
-      ? { ...t, tftNumero, tftEstado: 'con_tft' as const }
-      : t
-    ));
+    try {
+      await db.updateTrabajoTft(trabajoId, tftNumero);
+      setTrabajos(prev => prev.map(t => t.id === trabajoId
+        ? { ...t, tftNumero, tftEstado: 'con_tft' as const }
+        : t
+      ));
+    } catch (err) {
+      console.error('[actualizarTft] FAILED:', err);
+      setErrorBanner('No se pudo guardar el número TFT. Verifica tu conexión e intenta de nuevo.');
+    }
   };
   const guardarProveedor = async (data: Omit<Proveedor, 'id'>) => {
     if (!taller) return;
@@ -707,6 +713,16 @@ export default function TallerMecanico() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Error banner — replaces alert() for mobile-friendly error display */}
+      {errorBanner && (
+        <div role="alert" aria-live="assertive"
+          className="fixed bottom-4 left-4 right-4 z-50 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg px-4 py-3 shadow-lg flex items-start gap-3">
+          <span className="flex-1 text-sm font-medium">{errorBanner}</span>
+          <button onClick={() => setErrorBanner(null)}
+            className="text-rose-600 text-sm underline min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Cerrar mensaje de error">Cerrar</button>
+        </div>
+      )}
       <header className="bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-4">
           <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center text-2xl shadow-inner flex-shrink-0">🔧</div>
