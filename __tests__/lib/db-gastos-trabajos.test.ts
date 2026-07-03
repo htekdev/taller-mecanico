@@ -561,10 +561,17 @@ describe('updateGasto', () => {
     expect(payload).not.toHaveProperty('concepto');
   });
 
-  it('sends notas: null when notas is explicitly null', async () => {
+  it('includes notas in patch when provided as a string', async () => {
     const { update } = mockUpdateChain();
-    await updateGasto('g1', { notas: null });
-    expect(update).toHaveBeenCalledWith({ notas: null });
+    await updateGasto('g1', { notas: 'Nota actualizada' });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ notas: 'Nota actualizada' }));
+  });
+
+  it('omits notas from patch when not included in update data', async () => {
+    const { update } = mockUpdateChain();
+    await updateGasto('g1', { monto: 500 }); // no notas
+    const payload = update.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('notas');
   });
 
   it('resolves without error', async () => {
