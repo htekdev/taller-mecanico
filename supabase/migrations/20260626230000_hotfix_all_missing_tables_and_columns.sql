@@ -4,7 +4,9 @@
 -- which were never applied to the fzondawpxhkojszrwgck production project.
 -- Safe to re-run: all statements use IF NOT EXISTS / IF EXISTS.
 --
--- Safe to re-run: all statements use IF NOT EXISTS / IF EXISTS.
+-- NOTE: columns for ayuntamiento and pendiente_refacciones below are also
+-- present in 20260626220000 and 20260626150000 on main. Consolidated here
+-- as a safety net in case those were not applied to the production project.
 -- ══════════════════════════════════════════════════════════════════════════════
 
 -- ── 1. gastos table (was migration 004_gastos.sql) ───────────────────────────

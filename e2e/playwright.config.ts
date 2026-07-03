@@ -34,13 +34,15 @@ export default defineConfig({
   /* Single worker in CI to avoid resource contention with shared DB */
   workers: process.env.CI ? 1 : 2,
 
-  /* Global test timeout — 60s to handle cold Vercel preview starts in CI.
-     Tests that take 30-40s against a cold preview were hitting the 30s limit.
-     test.slow() still available for 180s on heavy multi-step flows. */
-  timeout: 60_000,
+  /* Global test timeout — 90s to handle cold Vercel preview starts in CI.
+     Supabase preview branches can take 40-50s for cargarDatos on accumulated
+     test data, leaving only ~10s for the test body with the old 60s limit.
+     90s gives sufficient headroom: 45s login + 45s test body.
+     test.slow() still available for 270s on heavy multi-step flows. */
+  timeout: 90_000,
 
   /* Expect timeout */
-  expect: { timeout: 10_000 },
+  expect: { timeout: 15_000 },
 
   /* Reporters: HTML for humans, JSON for CI/upload */
   reporter: [

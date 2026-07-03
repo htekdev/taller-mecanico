@@ -96,8 +96,8 @@ export class LoginPage extends BasePage {
 
     // After login, might go to dashboard OR setup
     const postLogin = await Promise.race([
-      navButton.waitFor({ state: 'visible', timeout: 45_000 }).then(() => 'dashboard' as const),
-      setupPage.waitFor({ state: 'visible', timeout: 45_000 }).then(() => 'setup' as const),
+      navButton.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'dashboard' as const),
+      setupPage.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'setup' as const),
     ]).catch(() => 'timeout' as const);
 
     if (postLogin === 'setup') {

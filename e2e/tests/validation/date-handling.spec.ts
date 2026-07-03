@@ -25,7 +25,11 @@ test.describe('Date Handling', () => {
 
     for (const mod of modules) {
       await sidebar.clickTab(mod);
-      await page.waitForLoadState('networkidle').catch(() => {});
+      // Use domcontentloaded instead of networkidle — Supabase realtime
+      // subscriptions keep the network busy indefinitely, so networkidle
+      // never fires and this test would run until timeout
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.waitForTimeout(1500);
 
       const bodyText = await page.locator('main').innerText().catch(() => '');
       expect(bodyText).not.toContain('Invalid Date');
