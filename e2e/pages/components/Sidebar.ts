@@ -14,8 +14,12 @@ export class Sidebar {
 
   /** Click a nav tab by its label text. */
   async clickTab(label: string) {
-    // Use 60s timeout for sidebar navigation — cold Vercel preview can be slow
-    await this.nav.getByRole('button', { name: label }).click({ timeout: 60_000 });
+    const btn = this.nav.getByRole('button', { name: label });
+    // Wait up to 60s for the button to appear (cold Vercel preview can be slow).
+    // Use force: true to bypass Playwright's "stable" check — the app has frequent
+    // React re-renders that prevent the stability requirement from ever being met.
+    await btn.waitFor({ state: 'visible', timeout: 60_000 });
+    await btn.click({ force: true });
     await this.page.waitForTimeout(500);
   }
 
