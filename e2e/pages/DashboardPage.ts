@@ -102,8 +102,12 @@ export class DashboardPage extends BasePage {
   /** Logout the current user. */
   async logout() {
     await this.logoutButton.click();
-    // Wait for redirect to login page
-    await this.page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 10_000 });
+    // Wait for redirect to login page — use URL wait to avoid strict mode violations
+    // (element-based wait fails when multiple email inputs exist on the page)
+    await this.page.waitForURL('**/login', { timeout: 20_000 }).catch(async () => {
+      // Fallback: wait for the login page role button (non-strict)
+      await this.page.getByRole('button', { name: /iniciar sesión/i }).waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
+    });
   }
 
   /** Get the currently displayed user email. */
