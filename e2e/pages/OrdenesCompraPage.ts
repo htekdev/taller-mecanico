@@ -116,6 +116,18 @@ export class OrdenesCompraPage extends BasePage {
     return items.count();
   }
 
+  /** Alias for getOrdenCount — used by purchase-orders.spec.ts */
+  async getOrderCount(): Promise<number> {
+    return this.getOrdenCount();
+  }
+
+  async clickEdit() {
+    if (await this.editarButton.isVisible().catch(() => false)) {
+      await this.editarButton.click();
+      await this.page.waitForTimeout(500);
+    }
+  }
+
   async clickRecibirFirst() {
     if (await this.recibirButton.isVisible().catch(() => false)) {
       await this.recibirButton.click();
