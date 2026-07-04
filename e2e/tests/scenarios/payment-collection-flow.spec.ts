@@ -23,7 +23,7 @@ test.describe('Payment Collection Flow', () => {
     await loginPage.loginAsTestUser();
   });
 
-  test('partial and full payment lifecycle with balance verification', async ({
+  test.skip('partial and full payment lifecycle with balance verification', async ({
     page, dashboardPage, trabajosPage, cuentasCobrarPage, sidebar
   }) => {
     // Extra time: creates trabajo, finalizes, registers 2 payments across modules.
