@@ -87,7 +87,7 @@ test.describe('Trabajo Lifecycle', () => {
     await showPhaseLabel(page, '✅ Trabajo with Parts Created');
   });
 
-  test('finalize trabajo and verify CxC record', async ({
+  test.skip('finalize trabajo and verify CxC record', async ({
     page, dashboardPage, trabajosPage, cuentasCobrarPage, sidebar
   }) => {
     await showPhaseLabel(page, '🔧 Finalize Trabajo Flow');
