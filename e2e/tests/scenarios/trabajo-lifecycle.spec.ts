@@ -213,8 +213,8 @@ test.describe('Trabajo Lifecycle', () => {
                        visibleText.toLowerCase().includes('error');
       const hasSuccess = visibleText.toLowerCase().includes('terminado') ||
                         visibleText.toLowerCase().includes('finalizado');
-      const hasModal = await page.getByRole('button', { name: /^nota$/i }).isVisible().catch(() => false) ||
-                       await page.getByRole('button', { name: /^factura$/i }).isVisible().catch(() => false);
+      const hasModal = await page.locator('button').filter({ hasText: 'Sin IVA' }).first().isVisible().catch(() => false) ||
+                       await page.locator('button').filter({ hasText: 'IVA 16' }).first().isVisible().catch(() => false);
 
       // One of these must be true — no silent failure
       expect(hasError || hasSuccess || hasModal).toBe(true);
