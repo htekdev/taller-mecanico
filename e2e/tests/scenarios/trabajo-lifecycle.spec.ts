@@ -110,7 +110,13 @@ test.describe('Trabajo Lifecycle', () => {
       const finalizarBtns = page.getByRole('button', { name: /finalizar/i });
       if (await finalizarBtns.first().isVisible().catch(() => false)) {
         await finalizarBtns.first().click();
-        await page.waitForTimeout(2000);
+
+        // Dismiss Nota/Factura modal if it appears (blocks CxC navigation if left open)
+        const notaBtn = page.getByRole('button', { name: /^nota$/i });
+        if (await notaBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await notaBtn.click();
+        }
+        await page.waitForTimeout(2000); // wait for Supabase UPDATE to complete
 
         // Check result
         const error = await trabajosPage.getFinalizarError();
