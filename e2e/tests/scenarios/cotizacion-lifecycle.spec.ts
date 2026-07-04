@@ -82,7 +82,7 @@ test.describe('Cotización Lifecycle', () => {
       await cotizacionesPage.selectClient(1);
 
       // Verify department-specific fields are visible
-      const deptoSelect = page.locator('select:has(option:has-text("Obras públicas"))');
+      const deptoSelect = page.locator('[data-testid="departamento-select"]');
       if (await deptoSelect.isVisible().catch(() => false)) {
         await expectVisible(deptoSelect, 'Department select available');
       }
@@ -111,3 +111,4 @@ test.describe('Cotización Lifecycle', () => {
     await showPhaseLabel(page, '✅ Form preserved on error');
   });
 });
+
