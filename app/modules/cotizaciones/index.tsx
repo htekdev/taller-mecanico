@@ -34,7 +34,8 @@ function loadDepartamentos(): string[] {
     if (!raw) return [...DEFAULT_DEPTOS];
     const parsed = JSON.parse(raw) as string[];
     return Array.isArray(parsed) && parsed.length > 0 ? parsed : [...DEFAULT_DEPTOS];
-  } catch {
+  } catch (e) {
+    console.error('[Cotizaciones] Error leyendo departamentos de localStorage:', e);
     return [...DEFAULT_DEPTOS];
   }
 }
@@ -1152,10 +1153,10 @@ export function VistaCotizaciones({
   const [guardando, setGuardando]       = useState(false);
 
   // ── Departamentos — loaded from localStorage (shared with Trabajos module) ──
-  const [departamentos, setDepartamentos] = useState<string[]>([]);
+  // Lazy initializer: runs synchronously on first render → zero flash on mount.
+  const [departamentos, setDepartamentos] = useState<string[]>(() => loadDepartamentos());
   useEffect(() => {
-    setDepartamentos(loadDepartamentos());
-    // Re-sync if another tab updates the key (e.g., user adds depto in Trabajos)
+    // State already populated synchronously; only keep cross-tab listener.
     const onStorage = (e: StorageEvent) => {
       if (e.key === DEPTOS_KEY) setDepartamentos(loadDepartamentos());
     };
