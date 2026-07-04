@@ -6,9 +6,9 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
  *
  * Verifies:
  * 1. Module navigates and loads without crashing
- * 2. Key Spanish section headings are visible
- * 3. Month selector renders
- * 4. P&L section structure is present
+ * 2. Key Spanish section headings are visible in the CONTENT area (not nav)
+ * 3. Module is reachable from other tabs
+ * 4. No debug artifacts in production
  */
 
 test.describe('Resumen Financiero', () => {
@@ -21,9 +21,7 @@ test.describe('Resumen Financiero', () => {
   }) => {
     await showPhaseLabel(page, '📊 Phase 1: Navigate to Resumen');
     await dashboardPage.navigateToModule('resumen');
-
-    // Wait for module content to render
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
     // Verify no fatal error / crash state
     const errorText = page.getByText(/error al cargar|algo salió mal|fatal error/i);
@@ -41,24 +39,31 @@ test.describe('Resumen Financiero', () => {
   }) => {
     await showPhaseLabel(page, '📋 Phase 1: Check Spanish Labels');
     await dashboardPage.navigateToModule('resumen');
-    await page.waitForTimeout(2000);
+    await dashboardPage.waitForPageLoad();
 
-    // The module must show at least one known Spanish financial heading
-    const headings = [
-      page.getByText(/Resumen|Estado de Resultados|Ingresos|Utilidad|Por Cobrar/i).first(),
+    // The module must show at least one known Spanish financial heading in the main content area.
+    // Scope to page.locator('main') to avoid false-positive matches on nav tab labels.
+    // NOTE: Do NOT include bare "Resumen" — it matches the nav tab "Resumen" which is always visible.
+    const mainContent = page.locator('main');
+    const contentHeadings = [
+      mainContent.getByText(/Estado de Resultados/i).first(),
+      mainContent.getByText(/Ingresos/i).first(),
+      mainContent.getByText(/Utilidad/i).first(),
+      mainContent.getByText(/Por Cobrar/i).first(),
+      mainContent.getByText(/Resumen (Financiero|del Mes|Mensual)/i).first(),
     ];
 
     let foundAny = false;
-    for (const heading of headings) {
+    for (const heading of contentHeadings) {
       const visible = await heading.isVisible().catch(() => false);
       if (visible) { foundAny = true; break; }
     }
 
-    expect(foundAny).toBe(true);
+    expect(foundAny, 'At least one financial section heading must be visible in main content').toBe(true);
     await showPhaseLabel(page, '✅ Spanish Financial Labels Present');
   });
 
-  test('resumen tab is accessible from all other modules', async ({
+  test('resumen tab is accessible from trabajos module', async ({
     page, dashboardPage,
   }) => {
     await showPhaseLabel(page, '🔀 Phase 1: Navigate from Trabajos → Resumen');
@@ -69,7 +74,7 @@ test.describe('Resumen Financiero', () => {
 
     // Navigate to Resumen
     await dashboardPage.navigateToModule('resumen');
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
     // Verify we're on Resumen (nav tab is active)
     const tab = dashboardPage.getTabLocator('resumen');
@@ -83,7 +88,7 @@ test.describe('Resumen Financiero', () => {
   }) => {
     await showPhaseLabel(page, '🔍 Phase 1: Check No Debug Content');
     await dashboardPage.navigateToModule('resumen');
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
     // Should not show raw debug errors or uncaught exceptions
     const unhandledError = page.getByText(/unhandled|uncaught|undefined is not|cannot read/i);
