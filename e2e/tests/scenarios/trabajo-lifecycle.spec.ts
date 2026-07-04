@@ -134,7 +134,7 @@ test.describe('Trabajo Lifecycle', () => {
             await notaBtn.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
           }
           await page.waitForTimeout(500); // Brief settle after modal close
-        }        }
+        }
 
         // Check result
         const error = await trabajosPage.getFinalizarError();
