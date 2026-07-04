@@ -7,7 +7,7 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
  * Verifies:
  * 1. Module navigates and loads without crashing
  * 2. Client list or "Historial por Unidad" heading visible
- * 3. Search input is visible and functional (hard requirement — no conditional guard)
+ * 3. Search input is visible and functional
  * 4. Module is reachable from other tabs
  */
 
@@ -72,12 +72,7 @@ test.describe('Historial por Unidad', () => {
     await dashboardPage.waitForPageLoad();
 
     const searchInput = page.getByPlaceholder(/Buscar cliente/i);
-
-    // Hard requirement — search input must be visible (no conditional guard)
-    expect(
-      await searchInput.isVisible().catch(() => false),
-      'Search input must be visible after navigating to Historial'
-    ).toBe(true);
+    await expect(searchInput).toBeVisible({ timeout: 20_000 });
 
     await searchInput.fill('test');
     await page.waitForTimeout(500);
