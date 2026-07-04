@@ -37,7 +37,7 @@ export class CuentasCobrarPage extends BasePage {
     // guardarTrabajo triggers a full 8-table cargarDatos() reload which can take
     // 2+ minutes on a cold Vercel preview — wait long enough for it to complete.
     const loadingOverlay = this.page.locator('text=Cargando datos del taller');
-    await loadingOverlay.waitFor({ state: 'hidden', timeout: 150_000 }).catch(() => {});
+    await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 }).catch(() => {});
     // Once overlay is gone, section title should appear immediately.
     await this.sectionTitle.waitFor({ state: 'visible', timeout: 30_000 });
   }
