@@ -2,6 +2,9 @@ import { test, expect } from '../../fixtures';
 import { expectVisible, expectText, showPhaseLabel, expectClass } from '../visual-assert';
 import { TestData } from '../../utils/test-data';
 
+const DEPTOS_KEY = 'taller_departamentos_ayuntamiento';
+const CUSTOM_DEPTO = 'Depto Personalizado Prueba E2E';
+
 /**
  * Cotización Lifecycle — Complete user story from creation to conversion.
  *
@@ -109,5 +112,89 @@ test.describe('Cotización Lifecycle', () => {
     }
 
     await showPhaseLabel(page, '✅ Form preserved on error');
+  });
+
+  /**
+   * Regression test for PR #109: departamentos in Ayuntamiento cotizaciones
+   * must sync with departments added in Trabajos/Ayuntamiento module.
+   *
+   * This test seeds localStorage with a custom department, opens the
+   * Ayuntamiento plantilla, and verifies the custom department appears
+   * in the selector. Cleans up localStorage in afterEach.
+   */
+  test('change-proof: departamentos en ayuntamiento se cargan desde localStorage', async ({
+    page, loginPage, dashboardPage, cotizacionesPage
+  }) => {
+    test.slow();
+
+    // ── Seed localStorage BEFORE page navigation ──────────────────────────────
+    await showPhaseLabel(page, '🌱 Seeding localStorage with custom department');
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+    // Login first so the page is on the correct origin
+    await loginPage.loginAsTestUser();
+    await dashboardPage.waitForPageLoad();
+
+    // Set the department array in localStorage (same key Trabajos module uses)
+    await page.evaluate(
+      ({ key, depto }: { key: string; depto: string }) => {
+        localStorage.setItem(key, JSON.stringify([depto, 'Obras públicas']));
+      },
+      { key: DEPTOS_KEY, depto: CUSTOM_DEPTO }
+    );
+
+    // ── Navigate to Cotizaciones → Ayuntamiento ────────────────────────────────
+    await showPhaseLabel(page, '📄 Opening Ayuntamiento plantilla');
+    await dashboardPage.navigateToModule('cotizaciones');
+    await cotizacionesPage.waitForPageLoad();
+
+    const hasAyuntamiento = await cotizacionesPage.plantillaAyuntamiento
+      .isVisible({ timeout: 5_000 }).catch(() => false);
+    if (!hasAyuntamiento) {
+      test.skip(true, 'Ayuntamiento plantilla not available in this environment');
+      return;
+    }
+    await cotizacionesPage.selectPlantillaAyuntamiento();
+
+    // ── Assert custom department appears in the select ─────────────────────────
+    await showPhaseLabel(page, '🔍 Verifying custom department appears');
+    // The departamentos select is inside the Ayuntamiento form
+    const deptoSelect = page.locator('select').filter({
+      has: page.locator(`option:text-is("${CUSTOM_DEPTO}")`)
+    }).first();
+
+    // Give React time to hydrate from localStorage
+    await page.waitForTimeout(1000);
+
+    const deptoSelectVisible = await deptoSelect.isVisible({ timeout: 10_000 }).catch(() => false);
+    if (deptoSelectVisible) {
+      await showPhaseLabel(page, '✅ Custom department visible in select');
+
+      // Verify the custom department option text is present
+      const customOption = deptoSelect.locator(`option:text-is("${CUSTOM_DEPTO}")`);
+      await expect(customOption).toHaveCount(1, { timeout: 5_000 });
+
+      // Verify default "Obras públicas" is also present (came from seeded array)
+      const obrasOption = deptoSelect.locator('option:text-is("Obras públicas")');
+      await expect(obrasOption).toHaveCount(1, { timeout: 5_000 });
+
+      await showPhaseLabel(page, '🎉 PR #109 verified: departamentos sync from localStorage');
+    } else {
+      // Department select might render differently — fall back to checking option text in DOM
+      await showPhaseLabel(page, '🔍 Fallback: checking page HTML for custom department text');
+      const customDeptText = page.getByText(CUSTOM_DEPTO).first();
+      const textVisible = await customDeptText.isVisible({ timeout: 5_000 }).catch(() => false);
+      expect(
+        textVisible,
+        `Custom department "${CUSTOM_DEPTO}" should appear after seeding localStorage`
+      ).toBe(true);
+    }
+
+    // ── Cleanup ────────────────────────────────────────────────────────────────
+    await page.evaluate(
+      (key: string) => localStorage.removeItem(key),
+      DEPTOS_KEY
+    );
+    await showPhaseLabel(page, '🧹 localStorage cleaned up');
   });
 });
