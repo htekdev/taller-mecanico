@@ -37,11 +37,8 @@ test('change-proof-numero-orden-kilometraje', async ({ page, loginPage, dashboar
   await trabajosPage.selectVehicle(1);
 
   await showPhaseLabel(page, '📝 Llenando descripción');
-  const descInput = page.locator([
-    'input[placeholder*="Ej." i]',
-    'input[placeholder*="Servicio completo" i]',
-    'textarea[placeholder*="descripci" i]',
-  ].join(', ')).first();
+  // Specific locator — CANNOT use 'Ej.' alone (numeroOrden also uses 'Ej.' and appears first in DOM)
+  const descInput = page.locator('input[placeholder*="Servicio completo" i], input[placeholder*="frenos y aceite" i]').first();
 
   await expect(descInput).toBeVisible({ timeout: 10_000 });
   await descInput.fill(descriptionText);

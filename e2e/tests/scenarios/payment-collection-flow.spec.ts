@@ -34,8 +34,11 @@ test.describe('Payment Collection Flow', () => {
     await trabajosPage.selectClient(1);
     await trabajosPage.selectVehicle(1);
 
-    // Add labor: $1500
-    const conceptoInput = page.locator('input[placeholder*="concepto" i], input[placeholder*="descripción" i]').first();
+    // Fill description (required: "Ej. Servicio completo frenos y aceite...")
+    await trabajosPage.fillDescription(TestData.trabajoDescription());
+
+    // Add labor: $1500 — using the mano de obra section (specific concepto locator)
+    const conceptoInput = page.locator('input[placeholder*="Arreglo de frenos" i], input[placeholder*="engrase" i]').first();
     if (await conceptoInput.isVisible().catch(() => false)) {
       await conceptoInput.fill('Servicio completo E2E');
     }
