@@ -6,6 +6,7 @@ import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
 import { CATEGORIAS, UNIDADES } from '@/app/lib/utils';
 import * as db from '@/app/lib/db';
 import type { CotizacionRow } from '@/app/lib/db';
+import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -19,8 +20,6 @@ const NUM_PROVEEDOR_RED = 'P004093';
 // ─── Departamentos localStorage — same key as Trabajos module ─────────────────
 // Departments are managed dynamically from the Trabajos/Ayuntamiento tab.
 // Cotizaciones reads from the SAME localStorage key so they stay in sync.
-
-import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
 
 function loadDepartamentos(): string[] {
   if (typeof window === 'undefined') return [...DEFAULT_DEPTOS];
@@ -1612,3 +1611,4 @@ export function VistaCotizaciones({
     />
   );
 }
+
