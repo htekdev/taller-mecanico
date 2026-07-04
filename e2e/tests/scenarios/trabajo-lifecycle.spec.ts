@@ -111,7 +111,15 @@ test.describe('Trabajo Lifecycle', () => {
       const finalizarBtns = page.getByRole('button', { name: /finalizar/i });
       if (await finalizarBtns.first().isVisible().catch(() => false)) {
         await finalizarBtns.first().click();
-        await page.waitForTimeout(2000);
+
+        // Dismiss the Nota/Factura modal if it appeared.
+        // The button's accessible text is full content — match via filter({ hasText: 'Sin IVA' })
+        // which uniquely targets the Nota button in the ¿Cómo se va a cobrar? modal.
+        const notaBtn = page.locator('button').filter({ hasText: 'Sin IVA' });
+        if (await notaBtn.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
+          await notaBtn.first().click();
+        }
+        await page.waitForTimeout(2000); // wait for Supabase UPDATE to complete
 
         // Check result
         const error = await trabajosPage.getFinalizarError();
