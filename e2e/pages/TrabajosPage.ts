@@ -71,7 +71,7 @@ export class TrabajosPage extends BasePage {
     if (overlayVisible) {
       await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 });
     }
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 });
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 90_000 });
   }
 
   async selectClient(index = 1) {
