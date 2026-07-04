@@ -1153,8 +1153,9 @@ export function VistaCotizaciones({
   const [guardando, setGuardando]       = useState(false);
 
   // ── Departamentos — loaded from localStorage (shared with Trabajos module) ──
-  // Initialize with SSR-safe defaults. Lazy initializer avoids double-render on
-  // pure client mounts; useEffect re-reads on hydration (SSR → client window).
+  // Start with SSR-safe static defaults so server and client render the same
+  // initial HTML (avoids hydration mismatch). useEffect reads localStorage after
+  // hydration to load any custom departments the user has added.
   const [departamentos, setDepartamentos] = useState<string[]>(DEFAULT_DEPTOS);
   useEffect(() => {
     // Re-read on mount: during SSR, window is undefined → DEFAULT_DEPTOS was used.
