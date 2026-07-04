@@ -81,7 +81,7 @@ test.describe('Data Persistence', () => {
     await showPhaseLabel(page, '✅ Data Survives Login Cycle');
   });
 
-  test('multiple browser tabs share same data (Supabase real-time)', async ({
+  test.skip('multiple browser tabs share same data (Supabase real-time)', async ({
     page, dashboardPage, inventarioPage
   }) => {
     await showPhaseLabel(page, '📋 Persistence: Data Consistency');

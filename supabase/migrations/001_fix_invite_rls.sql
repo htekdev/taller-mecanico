@@ -19,12 +19,14 @@
 DROP POLICY IF EXISTS "ver_invitaciones" ON taller_invites;
 
 -- 1. Taller members: full CRUD on their taller's invites (create, cancel, view all)
+DROP POLICY IF EXISTS "miembros_gestionar_invitaciones" ON taller_invites;
 CREATE POLICY "miembros_gestionar_invitaciones" ON taller_invites
   FOR ALL USING (is_taller_member(taller_id));
 
 -- 2. Invited user: can SELECT their own pending invite (needed by redeemInvite)
 --    This runs BEFORE they are a member, so is_taller_member would be false.
 --    We use auth.email() to match the invite email safely.
+DROP POLICY IF EXISTS "invitado_ver_su_invitacion" ON taller_invites;
 CREATE POLICY "invitado_ver_su_invitacion" ON taller_invites
   FOR SELECT USING (lower(email) = lower(auth.email()));
 
@@ -32,5 +34,6 @@ CREATE POLICY "invitado_ver_su_invitacion" ON taller_invites
 --    After the INSERT into taller_members, the user becomes a member,
 --    so policy #1 would also allow this — but this policy ensures it works
 --    even if the membership insert races or fails.
+DROP POLICY IF EXISTS "invitado_redimir_invitacion" ON taller_invites;
 CREATE POLICY "invitado_redimir_invitacion" ON taller_invites
   FOR UPDATE USING (lower(email) = lower(auth.email()));
