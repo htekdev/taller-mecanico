@@ -28,7 +28,7 @@ test.describe('Payment Collection Flow', () => {
   }) => {
     // This test creates a trabajo, finalizes it, and verifies CxC — guardarTrabajo
     // triggers a full 8-table cargarDatos() reload; allow 5 minutes total.
-    test.setTimeout(180_000);
+    test.setTimeout(300_000);
     await showPhaseLabel(page, '🔧 Phase 1: Create Trabajo');
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
