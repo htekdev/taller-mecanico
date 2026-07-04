@@ -49,7 +49,7 @@ test('change-proof-numero-orden-kilometraje', async ({ page, loginPage, dashboar
   await showPhaseLabel(page, '🔢 Llenando número de orden');
   const numeroOrdenInput = page
     .getByLabel(/Número de Orden/i)
-    .or(page.getByPlaceholder(/Orden/i))
+    .or(page.getByPlaceholder(/numero.*orden|OT-/i))
     .first();
   await expect(numeroOrdenInput).toBeVisible({ timeout: 10_000 });
   await numeroOrdenInput.fill(numeroOrdenValue);
@@ -96,7 +96,7 @@ test('change-proof-numero-orden-kilometraje', async ({ page, loginPage, dashboar
 
   const persistedNumeroOrdenInput = page
     .getByLabel(/Número de Orden/i)
-    .or(page.getByPlaceholder(/Orden/i))
+    .or(page.getByPlaceholder(/numero.*orden|OT-/i))
     .first();
   const persistedKilometrajeInput = page.locator([
     'input[placeholder*="kilom" i]',

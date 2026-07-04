@@ -445,6 +445,7 @@ describe('updateTrabajo', () => {
     // Fallback payload should not include kilometraje or numero_orden
     const fallbackPayload = updateFallback.mock.calls[0][0] as Record<string, unknown>;
     expect(fallbackPayload).not.toHaveProperty('numero_orden');
+    expect(fallbackPayload).not.toHaveProperty('kilometraje');
   });
 
   it('throws when 42703 fallback also fails', async () => {
