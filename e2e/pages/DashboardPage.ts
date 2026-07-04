@@ -48,15 +48,15 @@ export class DashboardPage extends BasePage {
 
   async waitForPageLoad() {
     // Wait for nav to appear (indicates dashboard loaded with taller)
-    await this.nav.waitFor({ state: 'visible', timeout: 20_000 }).catch(async () => {
+    await this.nav.waitFor({ state: 'visible', timeout: 45_000 }).catch(async () => {
       // If nav doesn't appear, we might be on setup page
       // Try navigating to root
       await this.page.goto('/');
       await this.page.waitForLoadState('domcontentloaded');
-      await this.nav.waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+      await this.nav.waitFor({ state: 'visible', timeout: 45_000 }).catch(() => {});
     });
     // Wait for data to finish loading
-    await this.loadingIndicator.waitFor({ state: 'hidden', timeout: 20_000 }).catch(() => {});
+    await this.loadingIndicator.waitFor({ state: 'hidden', timeout: 30_000 }).catch(() => {});
   }
 
   /** Navigate to the dashboard directly (assumes logged in). */
@@ -73,6 +73,8 @@ export class DashboardPage extends BasePage {
     // Wait for the tab to become active
     await tab.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
     // Small delay for module content to render
+    // Wait for module content to load (Supabase data fetch may be slow on cold start)
+    await this.loadingIndicator.waitFor({ state: 'hidden', timeout: 60_000 }).catch(() => {});
     await this.page.waitForTimeout(500);
   }
 
