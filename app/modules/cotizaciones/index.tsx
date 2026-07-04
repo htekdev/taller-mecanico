@@ -20,12 +20,7 @@ const NUM_PROVEEDOR_RED = 'P004093';
 // Departments are managed dynamically from the Trabajos/Ayuntamiento tab.
 // Cotizaciones reads from the SAME localStorage key so they stay in sync.
 
-const DEPTOS_KEY = 'taller_departamentos_ayuntamiento';
-const DEFAULT_DEPTOS: string[] = [
-  'Obras públicas mantenimiento vial',
-  'Servicios públicos aseo urbano poniente',
-  'Servicios públicos aseo urbano oriente',
-];
+import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
 
 function loadDepartamentos(): string[] {
   if (typeof window === 'undefined') return [...DEFAULT_DEPTOS];

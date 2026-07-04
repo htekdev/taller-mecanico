@@ -29,6 +29,13 @@ test.describe('Cotización Lifecycle', () => {
     await loginPage.loginAsTestUser();
   });
 
+  // Cleanup: remove any seeded departamentos data so subsequent tests aren't polluted.
+  test.afterEach(async ({ page }) => {
+    await page.evaluate((key: string) => {
+      try { localStorage.removeItem(key); } catch { /* noop */ }
+    }, DEPTOS_KEY).catch(() => { /* noop if page already closed */ });
+  });
+
   test('complete flow: create → save → edit → convert to trabajo', async ({
     page, dashboardPage, cotizacionesPage, trabajosPage, sidebar
   }) => {
@@ -163,9 +170,6 @@ test.describe('Cotización Lifecycle', () => {
       has: page.locator(`option:text-is("${CUSTOM_DEPTO}")`)
     }).first();
 
-    // Give React time to hydrate from localStorage
-    await page.waitForTimeout(1000);
-
     const deptoSelectVisible = await deptoSelect.isVisible({ timeout: 10_000 }).catch(() => false);
     if (deptoSelectVisible) {
       await showPhaseLabel(page, '✅ Custom department visible in select');
@@ -189,12 +193,6 @@ test.describe('Cotización Lifecycle', () => {
         `Custom department "${CUSTOM_DEPTO}" should appear after seeding localStorage`
       ).toBe(true);
     }
-
-    // ── Cleanup ────────────────────────────────────────────────────────────────
-    await page.evaluate(
-      (key: string) => localStorage.removeItem(key),
-      DEPTOS_KEY
-    );
-    await showPhaseLabel(page, '🧹 localStorage cleaned up');
+    // Note: localStorage cleanup is handled by test.afterEach.
   });
 });
