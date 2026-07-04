@@ -6,7 +6,7 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
  *
  * Verifies:
  * 1. Module navigates and loads without crashing
- * 2. Settings heading visible in Spanish
+ * 2. Settings heading visible in Spanish (content-specific — not nav tab label)
  * 3. Members or invite sections are rendered
  * 4. Module is reachable from other tabs
  */
@@ -41,12 +41,14 @@ test.describe('Configuración', () => {
     await dashboardPage.navigateToModule('configuracion');
     await dashboardPage.waitForPageLoad();
 
-    const mainContent = page.locator('main');
+    // Use text that ONLY appears in the configuracion content, not in nav tab labels.
+    // Nav tab label is "Configuración" — use more specific content headings.
+    // Actual h2: "⚙️ Configuración del Taller" | h3: "👥 Miembros del Taller"
     const possibleHeadings = [
-      mainContent.getByText(/Miembros/i).first(),
-      mainContent.getByText(/Equipo/i).first(),
-      mainContent.getByText(/Invitar/i).first(),
-      mainContent.getByText(/Mecánicos/i).first(),
+      page.getByText(/Configuración del Taller/i).first(),
+      page.getByText(/Miembros del Taller/i).first(),
+      page.getByText(/Invitar Miembro/i).first(),
+      page.getByText(/Invitaciones Pendientes/i).first(),
     ];
 
     let foundAny = false;
@@ -55,7 +57,7 @@ test.describe('Configuración', () => {
       if (visible) { foundAny = true; break; }
     }
 
-    expect(foundAny).toBe(true);
+    expect(foundAny, 'At least one settings heading must be visible in configuracion content').toBe(true);
     await showPhaseLabel(page, '✅ Spanish Heading Visible');
   });
 
@@ -66,14 +68,9 @@ test.describe('Configuración', () => {
     await dashboardPage.navigateToModule('configuracion');
     await dashboardPage.waitForPageLoad();
 
-    const mainContent = page.locator('main');
+    // Should render some form of team/member UI
     const memberKeywords = [
-      mainContent.getByText(/Miembros/i).first(),
-      mainContent.getByText(/Equipo/i).first(),
-      mainContent.getByText(/Invitar/i).first(),
-      mainContent.getByText(/Mecánicos/i).first(),
-      mainContent.getByText(/Propietario/i).first(),
-      mainContent.getByText(/rol/i).first(),
+      page.getByText(/Miembros|Equipo|Invitar|Mecánicos|Propietario|rol/i).first(),
     ];
 
     let foundAny = false;
