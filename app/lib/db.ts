@@ -342,15 +342,22 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
     .select()
     .single();
 
-  // Fallback: if new optional columns don't exist in DB yet (42703 = undefined_column),
-  // retry without kilometraje and numero_orden so the job is never lost.
+  // Fallback: if any new optional column doesn't exist in DB yet (42703 = undefined_column),
+  // strip ALL migration-gated columns and retry with just the core fields.
   // This handles the window between deploying the code and running supabase db push.
   if (error?.code === '42703') {
-    const { kilometraje: _km, numero_orden: _no, ...payloadWithoutNewCols } = payload as Record<string, unknown>;
-    console.warn('[insertTrabajo] Columnas nuevas no encontradas en DB — reintentando sin kilometraje/numero_orden:', error.message);
+    const {
+      kilometraje: _km, numero_orden: _no,
+      departamento: _dep, inventario_num: _inv, orden_servicio_gob: _osg,
+      tft_numero: _tn, tft_estado: _te, tipo_cliente: _tc,
+      fecha_entrada: _fe, fecha_salida: _fs,
+      pendiente_refacciones: _pr, refacciones_pendientes_nombres: _rpn,
+      ...corePayload
+    } = payload as Record<string, unknown>;
+    console.warn('[insertTrabajo] Columna no encontrada en DB — reintentando con campos core únicamente:', error.message);
     const { data: fallbackRow, error: fallbackError } = await supabase
       .from('trabajos')
-      .insert(payloadWithoutNewCols)
+      .insert(corePayload)
       .select()
       .single();
     if (fallbackError || !fallbackRow) {
@@ -414,16 +421,16 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
     // If production is missing these columns, the 42703 fallback strips them and retries.
     kilometraje: data.kilometraje ?? null,
     numero_orden: data.numeroOrden?.trim() || null,
-    // Migration 005 columns — conditional so UPDATE works even without the columns in production
+    // Migration 005 columns — only include when explicitly set (not empty string defaults)
     ...(data.tipoCliente === 'ayuntamiento' ? { tipo_cliente: 'ayuntamiento' } : {}),
-    ...(data.departamento !== undefined ? { departamento: data.departamento } : {}),
-    ...(data.inventarioNum !== undefined ? { inventario_num: data.inventarioNum } : {}),
-    ...(data.ordenServicioGob !== undefined ? { orden_servicio_gob: data.ordenServicioGob } : {}),
-    ...(data.tftNumero !== undefined ? { tft_numero: data.tftNumero } : {}),
-    // Only send tft_estado when explicitly set — avoids "column not found" on production
-    ...(data.tftEstado !== undefined ? { tft_estado: data.tftEstado } : {}),
-    ...(data.fechaEntrada !== undefined ? { fecha_entrada: data.fechaEntrada } : {}),
-    ...(data.fechaSalida !== undefined ? { fecha_salida: data.fechaSalida } : {}),
+    ...(data.departamento ? { departamento: data.departamento } : {}),
+    ...(data.inventarioNum ? { inventario_num: data.inventarioNum } : {}),
+    ...(data.ordenServicioGob ? { orden_servicio_gob: data.ordenServicioGob } : {}),
+    ...(data.tftNumero ? { tft_numero: data.tftNumero } : {}),
+    // 'sin_tft' is the default sentinel — omit from payload; DB returns NULL → reads as 'sin_tft'
+    ...(data.tftEstado && data.tftEstado !== 'sin_tft' ? { tft_estado: data.tftEstado } : {}),
+    ...(data.fechaEntrada ? { fecha_entrada: data.fechaEntrada } : {}),
+    ...(data.fechaSalida ? { fecha_salida: data.fechaSalida } : {}),
     // Migration 20260626150000 columns — conditional
     ...(data.pendienteRefacciones ? { pendiente_refacciones: data.pendienteRefacciones } : {}),
     ...(data.refaccionesPendientesNombres?.length ? { refacciones_pendientes_nombres: data.refaccionesPendientesNombres } : {}),
@@ -444,11 +451,19 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
 
   const { error } = await supabase.from('trabajos').update(updatePayload).eq('id', trabajoId);
 
-  // Fallback: if new optional columns don't exist in DB yet, retry without them
+  // Fallback: if any new optional column doesn't exist in DB yet, strip ALL migration-gated
+  // columns and retry with just the core fields.
   if (error?.code === '42703') {
-    const { kilometraje: _km, numero_orden: _no, ...payloadWithoutNewCols } = updatePayload;
-    console.warn('[updateTrabajo] Columnas nuevas no encontradas — reintentando sin kilometraje/numero_orden:', error.message);
-    const { error: fallbackError } = await supabase.from('trabajos').update(payloadWithoutNewCols).eq('id', trabajoId);
+    const {
+      kilometraje: _km, numero_orden: _no,
+      departamento: _dep, inventario_num: _inv, orden_servicio_gob: _osg,
+      tft_numero: _tn, tft_estado: _te, tipo_cliente: _tc,
+      fecha_entrada: _fe, fecha_salida: _fs,
+      pendiente_refacciones: _pr, refacciones_pendientes_nombres: _rpn,
+      ...corePayload
+    } = updatePayload as Record<string, unknown>;
+    console.warn('[updateTrabajo] Columna no encontrada — reintentando con campos core únicamente:', error.message);
+    const { error: fallbackError } = await supabase.from('trabajos').update(corePayload).eq('id', trabajoId);
     if (fallbackError) {
       console.error('[updateTrabajo] FALLBACK FAILED:', fallbackError.message, fallbackError);
       throw new Error(`updateTrabajo: ${fallbackError.message}`);
