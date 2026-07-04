@@ -41,6 +41,9 @@ test.describe('Trabajo Lifecycle', () => {
     // Select vehicle
     await trabajosPage.selectVehicle(1);
 
+    // Fill description — required field: "Ej. Servicio completo frenos y aceite..."
+    await trabajosPage.fillDescription(TestData.trabajoDescription());
+
     // Add labor item
     const labor = TestData.laborItem();
     await trabajosPage.addLaborItem(labor.concepto, labor.precio);
@@ -77,6 +80,9 @@ test.describe('Trabajo Lifecycle', () => {
     await trabajosPage.selectClient(1);
     await trabajosPage.selectVehicle(1);
 
+    // Fill description — required field
+    await trabajosPage.fillDescription(TestData.trabajoDescription());
+
     // Add labor
     const labor = TestData.laborItem();
     await trabajosPage.addLaborItem(labor.concepto, labor.precio);
@@ -90,8 +96,9 @@ test.describe('Trabajo Lifecycle', () => {
   test.skip('finalize trabajo and verify CxC record', async ({
     page, dashboardPage, trabajosPage, cuentasCobrarPage, sidebar
   }) => {
+    // This test finalizes a trabajo (DB write + re-fetch) then navigates to CxC
+    // (another DB fetch). Two cold Vercel preview round-trips can exceed 90s.
     test.setTimeout(180_000);
-    await showPhaseLabel(page, '🔧 Finalize Trabajo Flow');
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
 
