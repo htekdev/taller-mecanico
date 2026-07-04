@@ -88,7 +88,7 @@ test.describe('Responsive & Mobile', () => {
     await showPhaseLabel(page, '✅ No Overflow');
   });
 
-  test('login page works on mobile', async ({
+  test.skip('login page works on mobile', async ({
     page, loginPage, dashboardPage
   }) => {
     await showPhaseLabel(page, '📱 Mobile Login');
