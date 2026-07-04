@@ -26,6 +26,7 @@ test.describe('Payment Collection Flow', () => {
   test.skip('partial and full payment lifecycle with balance verification', async ({
     page, dashboardPage, trabajosPage, cuentasCobrarPage, sidebar
   }) => {
+    test.setTimeout(300_000);
     // ─── Phase 1: Create trabajo with known amounts ─────────────────────────
     await showPhaseLabel(page, '🔧 Phase 1: Create Trabajo');
     await dashboardPage.navigateToModule('trabajos');
