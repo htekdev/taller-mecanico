@@ -18,7 +18,9 @@ export class LoginPage extends BasePage {
 
   constructor(page: Page) {
     super(page);
-    this.emailInput = page.locator('input[type="email"]').first();
+    // Use placeholder to scope to the login form email — avoids strict mode violation
+    // when a member invitation email input is also visible on screen (correo2@ejemplo.com).
+    this.emailInput = page.getByPlaceholder('correo@ejemplo.com');
     this.passwordInput = page.locator('input[type="password"]').first();
     this.submitButton = page.locator('button[type="submit"]').first();
     this.loginTab = page.getByRole('button', { name: 'Iniciar Sesión' });
