@@ -10,8 +10,6 @@ import { BasePage } from './BasePage';
 export class OrdenesCompraPage extends BasePage {
   readonly sectionTitle: Locator;
   readonly crearOrdenButton: Locator;
-
-  // ─── Form ──────────────────────────────────────────────────────────────────
   readonly proveedorSelect: Locator;
   readonly descripcionInput: Locator;
   readonly numeroOrdenInput: Locator;
@@ -21,12 +19,8 @@ export class OrdenesCompraPage extends BasePage {
   readonly cantidadInput: Locator;
   readonly precioInput: Locator;
   readonly saveButton: Locator;
-
-  // ─── List ──────────────────────────────────────────────────────────────────
   readonly ordenesList: Locator;
   readonly filterSelect: Locator;
-
-  // ─── Actions ───────────────────────────────────────────────────────────────
   readonly recibirButton: Locator;
   readonly editarButton: Locator;
   readonly eliminarButton: Locator;
@@ -59,12 +53,10 @@ export class OrdenesCompraPage extends BasePage {
   async waitForPageLoad() {
     // Wait for cargando overlay to disappear first (can take up to 90s on cold Vercel preview)
     const loadingOverlay = this.page.locator('text=Cargando datos del taller');
-    await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 })
-      .catch((err) => { console.warn('[Page] Loading overlay did not hide within 90s — proceeding anyway:', err?.message); });
+    await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 }).catch(() => {});
     await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 });
   }
 
-  /** Select a proveedor for the new order. */
   async selectProveedor(index = 1) {
     if (await this.proveedorSelect.isVisible().catch(() => false)) {
       const count = await this.getOptionCount(this.proveedorSelect);
@@ -74,14 +66,12 @@ export class OrdenesCompraPage extends BasePage {
     }
   }
 
-  /** Fill the order description. */
   async fillDescription(text: string) {
     if (await this.descripcionInput.isVisible().catch(() => false)) {
       await this.fillInput(this.descripcionInput, text);
     }
   }
 
-  /** Add an item from existing inventory. */
   async addItemFromInventory(refIndex = 1, cantidad = 1, precio = 100) {
     if (await this.refaccionSelect.isVisible().catch(() => false)) {
       const count = await this.getOptionCount(this.refaccionSelect);
@@ -107,14 +97,12 @@ export class OrdenesCompraPage extends BasePage {
     }
   }
 
-  /** Toggle IVA checkbox. */
   async toggleIVA() {
     if (await this.conIVACheckbox.isVisible().catch(() => false)) {
       await this.conIVACheckbox.click();
     }
   }
 
-  /** Save the order. */
   async save() {
     const isDisabled = await this.saveButton.isDisabled().catch(() => false);
     if (!isDisabled) {
@@ -123,34 +111,27 @@ export class OrdenesCompraPage extends BasePage {
     }
   }
 
-  /** Mark an order as received. */
-  async markAsReceived() {
-    await this.recibirButton.click();
-    await this.page.waitForTimeout(2000);
-  }
-
-  /** Click edit on the first order. */
-  async clickEdit() {
-    if (await this.editarButton.isVisible().catch(() => false)) {
-      await this.editarButton.click();
-      await this.page.waitForTimeout(1000);
-    }
-  }
-
-  /** Get the count of orders in the list. */
-  async getOrderCount(): Promise<number> {
-    const items = this.page.getByRole('button', { name: /ver piezas|ocultar piezas/i });
+  async getOrdenCount(): Promise<number> {
+    const items = this.page.locator('.border.rounded-xl:has(button), [data-testid="orden-item"]');
     return items.count();
   }
 
-  /** Get the status badge of the first order. */
-  async getFirstOrderStatus(): Promise<string> {
-    const badge = this.page.locator('.rounded-full, .badge').first();
-    return this.getText(badge);
+  /** Alias for getOrdenCount — used by purchase-orders.spec.ts */
+  async getOrderCount(): Promise<number> {
+    return this.getOrdenCount();
   }
 
-  /** Check if proveedor is visible in the order list. */
-  async isProveedorVisible(name: string): Promise<boolean> {
-    return this.page.locator(`text=${name}`).first().isVisible().catch(() => false);
+  async clickEdit() {
+    if (await this.editarButton.isVisible().catch(() => false)) {
+      await this.editarButton.click();
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  async clickRecibirFirst() {
+    if (await this.recibirButton.isVisible().catch(() => false)) {
+      await this.recibirButton.click();
+      await this.page.waitForTimeout(1000);
+    }
   }
 }

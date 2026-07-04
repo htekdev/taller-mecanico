@@ -25,8 +25,8 @@ test.describe('Date Handling', () => {
 
     for (const mod of modules) {
       await sidebar.clickTab(mod);
-      await page.waitForLoadState('domcontentloaded').catch(() => {});
-      await page.waitForTimeout(1500);
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(1500).catch(() => {});
 
       const bodyText = await page.locator('main').innerText().catch(() => '');
       expect(bodyText).not.toContain('Invalid Date');

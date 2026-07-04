@@ -35,8 +35,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : 2,
 
   /* Global test timeout — 90s for Vercel preview cold-start tolerance.
-     Scenario tests do multi-step flows (login → navigate → interact → verify)
-     and cold Vercel preview can add 30-40s to any navigation step. */
+     Some operations (sidebar.clickTab, selectOption) use explicit 60s action timeouts;
+     the 90s global budget gives them room without the overall test timing out. */
   timeout: 90_000,
 
   /* Expect timeout */

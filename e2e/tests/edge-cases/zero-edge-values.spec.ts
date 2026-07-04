@@ -84,8 +84,11 @@ test.describe('Zero & Edge Value Handling', () => {
     await trabajosPage.selectClient(1);
     await trabajosPage.selectVehicle(1);
 
-    // Add labor with $0 (free diagnostic)
-    const conceptoInput = page.locator('input[placeholder*="concepto" i], input[placeholder*="descripción" i]').first();
+    // Fill description (required field) — must come before addLaborItem
+    await trabajosPage.fillDescription(TestData.trabajoDescription());
+
+    // Add labor with $0 (free diagnostic) — uses mano de obra concepto field
+    const conceptoInput = page.locator('input[placeholder*="Arreglo de frenos" i], input[placeholder*="engrase" i]').first();
     if (await conceptoInput.isVisible().catch(() => false)) {
       await conceptoInput.fill('Diagnóstico gratuito');
     }

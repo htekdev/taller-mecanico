@@ -45,13 +45,9 @@ test('change-proof-guardar-trabajo', async ({ page, loginPage, dashboardPage, tr
   // ── Fill description (required field) ─────────────────────────────────────
   await showPhaseLabel(page, '📝 Llenando descripción del trabajo');
 
-  // The actual descripcion placeholder is "Ej. Servicio completo frenos y aceite..."
-  const descInput = page.locator([
-    'input[placeholder*="Ej." i]',
-    'input[placeholder*="Servicio completo" i]',
-    'input[placeholder*="frenos" i]',
-    'textarea[placeholder*="descripci" i]',
-  ].join(', ')).first();
+  // Specific locator — placeholder is "Ej. Servicio completo frenos y aceite..."
+  // CANNOT use "Ej." alone — numeroOrden also starts with "Ej." and appears first in DOM.
+  const descInput = page.locator('input[placeholder*="Servicio completo" i], input[placeholder*="frenos y aceite" i]').first();
 
   if (await descInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await descInput.fill('Prueba PR #102 — verificación arreglo insertTrabajo sin error');

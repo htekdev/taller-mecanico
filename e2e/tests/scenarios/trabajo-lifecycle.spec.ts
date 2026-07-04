@@ -41,6 +41,9 @@ test.describe('Trabajo Lifecycle', () => {
     // Select vehicle
     await trabajosPage.selectVehicle(1);
 
+    // Fill description — required field: "Ej. Servicio completo frenos y aceite..."
+    await trabajosPage.fillDescription(TestData.trabajoDescription());
+
     // Add labor item
     const labor = TestData.laborItem();
     await trabajosPage.addLaborItem(labor.concepto, labor.precio);
@@ -76,6 +79,9 @@ test.describe('Trabajo Lifecycle', () => {
     // Fill form
     await trabajosPage.selectClient(1);
     await trabajosPage.selectVehicle(1);
+
+    // Fill description — required field
+    await trabajosPage.fillDescription(TestData.trabajoDescription());
 
     // Add labor
     const labor = TestData.laborItem();

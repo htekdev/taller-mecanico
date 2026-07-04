@@ -36,23 +36,10 @@ export class CuentasCobrarPage extends BasePage {
   async waitForPageLoad() {
     // Wait for cargando overlay to disappear first (can take up to 90s on cold Vercel preview)
     const loadingOverlay = this.page.locator('text=Cargando datos del taller');
-    await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 })
-      .catch((err) => { console.warn('[CuentasCobrarPage] Loading overlay did not hide within 90s — proceeding anyway:', err?.message); });
-    // First attempt: wait up to 45s for section title to appear
-    const appeared = await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 })
-      .then(() => true).catch(() => false);
-    if (!appeared) {
-      // Retry: re-navigate to CxC tab in case the sidebar click was lost during a cargar cycle
-      console.warn('[CuentasCobrarPage] sectionTitle not visible after 45s — retrying navigation');
-      await this.page.locator('nav').getByRole('button', { name: 'Por Cobrar' })
-        .click({ force: true }).catch(() => {});
-      await this.page.waitForTimeout(1000);
-      await loadingOverlay.waitFor({ state: 'hidden', timeout: 60_000 }).catch(() => {});
-      await this.sectionTitle.waitFor({ state: 'visible', timeout: 60_000 });
-    }
+    await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 }).catch(() => {});
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 });
   }
 
-  /** Filter cuentas by payment status. */
   async filterByStatus(status: 'Pendiente' | 'Parcial' | 'Pagado' | 'Todos') {
     if (await this.filterSelect.isVisible().catch(() => false)) {
       await this.filterSelect.selectOption({ label: status });
@@ -60,13 +47,11 @@ export class CuentasCobrarPage extends BasePage {
     }
   }
 
-  /** Get the count of visible accounts. */
   async getAccountCount(): Promise<number> {
     const items = this.page.locator('.border.rounded-xl:has(button), [data-testid="cuenta-item"]');
     return items.count();
   }
 
-  /** Register a payment on the first visible account. */
   async registerPayment(monto: number, metodo: 'Efectivo' | 'Transferencia' | 'Tarjeta' = 'Efectivo') {
     await this.registrarPagoButton.click();
     await this.page.waitForTimeout(500);
@@ -83,17 +68,14 @@ export class CuentasCobrarPage extends BasePage {
     await this.page.waitForTimeout(2000);
   }
 
-  /** Check if a client name appears in the cuentas list. */
   async hasClientAccount(clientName: string): Promise<boolean> {
     return this.page.locator(`text=${clientName}`).first().isVisible().catch(() => false);
   }
 
-  /** Get the displayed saldo (balance) for first visible account. */
   async getFirstAccountBalance(): Promise<string> {
     return this.getText(this.totalPendiente);
   }
 
-  /** Check payment status badge of first account. */
   async getFirstAccountStatus(): Promise<string> {
     const badge = this.page.locator('.rounded-full:has-text("Pendiente"), .rounded-full:has-text("Parcial"), .rounded-full:has-text("Pagado")').first();
     return this.getText(badge);

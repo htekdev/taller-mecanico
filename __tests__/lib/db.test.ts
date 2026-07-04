@@ -12,7 +12,7 @@ import {
   getClientes, insertCliente, updateCliente,
   getVehiculos, insertVehiculo,
   getRefacciones, insertRefaccion, updateRefaccionStock, updateRefaccionCompatibilidad,
-  getTrabajos, insertTrabajo, updateTrabajoPagos, updateTrabajoFactura,
+  getTrabajos, insertTrabajo, updateTrabajo, updateTrabajoPagos, updateTrabajoFactura,
   getOrdenes, updateOrdenEstado, updateOrdenPagos,
   getFacturas, updateFacturaPagos,
   cancelarFactura, reactivarFactura, cancelarNota, reactivarNota,
@@ -334,15 +334,131 @@ describe('getTrabajos', () => {
 
 // ── insertTrabajo ───────────────────────────────────────────────────────────
 
+const baseTrabajoInput = {
+  clienteId: 'c1', vehiculoId: 'v1', fecha: '2026-06-01', descripcion: 'Test trabajo',
+  manoDeObra: 200, manoDeObraItems: [], refacciones: 0, costoRefacciones: 0,
+  requiereFactura: false, iva: 0, total: 200, partes: [], pagos: [],
+  estadoFacturacion: 'sin_facturar' as const, estado: 'pendiente' as const,
+};
+
+const baseTrabajoRow = {
+  id: 'w1', taller_id: 't1', cliente_id: 'c1', vehiculo_id: 'v1',
+  fecha: '2026-06-01', descripcion: 'Test trabajo',
+  mano_de_obra: 200, mano_de_obra_items: [], refacciones_total: 0, costo_refacciones: 0,
+  requiere_factura: false, folio_fiscal: null, iva: 0, total: 200, partes: [], pagos: [],
+  estado_facturacion: 'sin_facturar', estado: 'pendiente',
+  numero_orden: null, kilometraje: null, tipo_cliente: 'general',
+  tft_estado: 'sin_tft', pendiente_refacciones: false, refacciones_pendientes_nombres: [],
+};
+
 describe('insertTrabajo', () => {
   it('throws with Supabase error message on failure', async () => {
     mockInsertChain(null, { message: 'DB error' });
-    await expect(insertTrabajo('t1', {
-      clienteId: 'c1', vehiculoId: 'v1', fecha: '2026-06-01', descripcion: 'Test',
-      manoDeObra: 200, manoDeObraItems: [], refacciones: 0, costoRefacciones: 0,
-      requiereFactura: false, iva: 0, total: 200, partes: [], pagos: [],
-      estadoFacturacion: 'sin_facturar', estado: 'pendiente',
-    })).rejects.toThrow('insertTrabajo: DB error');
+    await expect(insertTrabajo('t1', baseTrabajoInput)).rejects.toThrow('insertTrabajo: DB error');
+  });
+
+  it('returns mapped Trabajo on success', async () => {
+    mockInsertChain(baseTrabajoRow);
+    const result = await insertTrabajo('t1', baseTrabajoInput);
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe('w1');
+    expect(result?.clienteId).toBe('c1');
+    expect(result?.manoDeObra).toBe(200);
+    expect(result?.estado).toBe('pendiente');
+  });
+
+  it('includes kilometraje and numero_orden in payload when provided', async () => {
+    const rowWithNewCols = { ...baseTrabajoRow, kilometraje: 50000, numero_orden: 'OC-001' };
+    mockInsertChain(rowWithNewCols);
+    const result = await insertTrabajo('t1', { ...baseTrabajoInput, kilometraje: 50000, numeroOrden: 'OC-001' });
+    expect(result?.kilometraje).toBe(50000);
+    expect(result?.numeroOrden).toBe('OC-001');
+  });
+
+  it('retries without new columns on 42703 error (column not found in DB)', async () => {
+    // First attempt returns 42703; fallback attempt succeeds
+    const single42703 = vi.fn().mockResolvedValue({ data: null, error: { code: '42703', message: 'column "kilometraje" does not exist' } });
+    const select42703 = vi.fn().mockReturnValue({ single: single42703 });
+    const insert42703 = vi.fn().mockReturnValue({ select: select42703 });
+
+    const singleFallback = vi.fn().mockResolvedValue({ data: baseTrabajoRow, error: null });
+    const selectFallback = vi.fn().mockReturnValue({ single: singleFallback });
+    const insertFallback = vi.fn().mockReturnValue({ select: selectFallback });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockFrom.mockReturnValueOnce({ insert: insert42703 } as any).mockReturnValue({ insert: insertFallback } as any);
+
+    const result = await insertTrabajo('t1', { ...baseTrabajoInput, kilometraje: 50000, numeroOrden: 'OC-001' });
+    expect(result?.id).toBe('w1');
+    // Second insert call should not include kilometraje or numero_orden
+    const fallbackPayload = insertFallback.mock.calls[0][0] as Record<string, unknown>;
+    expect(fallbackPayload).not.toHaveProperty('kilometraje');
+    expect(fallbackPayload).not.toHaveProperty('numero_orden');
+  });
+
+  it('throws on 42703 when fallback also fails', async () => {
+    const single42703 = vi.fn().mockResolvedValue({ data: null, error: { code: '42703', message: 'column not found' } });
+    const select42703 = vi.fn().mockReturnValue({ single: single42703 });
+    const insert42703 = vi.fn().mockReturnValue({ select: select42703 });
+
+    const singleFallbackFail = vi.fn().mockResolvedValue({ data: null, error: { message: 'Fallback also failed' } });
+    const selectFallbackFail = vi.fn().mockReturnValue({ single: singleFallbackFail });
+    const insertFallbackFail = vi.fn().mockReturnValue({ select: selectFallbackFail });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockFrom.mockReturnValueOnce({ insert: insert42703 } as any).mockReturnValue({ insert: insertFallbackFail } as any);
+
+    await expect(insertTrabajo('t1', baseTrabajoInput)).rejects.toThrow('insertTrabajo: Fallback also failed');
+  });
+});
+
+// ── updateTrabajo ───────────────────────────────────────────────────────────
+
+const baseTrabajoFull = { id: 'w1', ...baseTrabajoInput };
+
+describe('updateTrabajo', () => {
+  it('updates all trabajo fields without error', async () => {
+    const { update, eq } = mockUpdateChain();
+    await updateTrabajo('w1', baseTrabajoFull);
+    expect(mockFrom).toHaveBeenCalledWith('trabajos');
+    expect(eq).toHaveBeenCalledWith('id', 'w1');
+    expect(update).toHaveBeenCalled();
+  });
+
+  it('throws with error message on DB failure', async () => {
+    mockUpdateChain({ message: 'Update failed' });
+    await expect(updateTrabajo('w1', baseTrabajoFull)).rejects.toThrow('updateTrabajo: Update failed');
+  });
+
+  it('retries without new columns on 42703 error', async () => {
+    // First update: 42703; fallback: success
+    const eq42703 = vi.fn().mockResolvedValue({ error: { code: '42703', message: 'column not found' } });
+    const update42703 = vi.fn().mockReturnValue({ eq: eq42703 });
+
+    const eqFallback = vi.fn().mockResolvedValue({ error: null });
+    const updateFallback = vi.fn().mockReturnValue({ eq: eqFallback });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockFrom.mockReturnValueOnce({ update: update42703 } as any).mockReturnValue({ update: updateFallback } as any);
+
+    await expect(updateTrabajo('w1', { ...baseTrabajoFull, kilometraje: 10000 })).resolves.toBeUndefined();
+    // Fallback payload should not include kilometraje or numero_orden
+    const fallbackPayload = updateFallback.mock.calls[0][0] as Record<string, unknown>;
+    expect(fallbackPayload).not.toHaveProperty('numero_orden');
+    expect(fallbackPayload).not.toHaveProperty('kilometraje');
+  });
+
+  it('throws when 42703 fallback also fails', async () => {
+    const eq42703 = vi.fn().mockResolvedValue({ error: { code: '42703', message: 'column not found' } });
+    const update42703 = vi.fn().mockReturnValue({ eq: eq42703 });
+
+    const eqFallbackFail = vi.fn().mockResolvedValue({ error: { message: 'Fallback update failed' } });
+    const updateFallbackFail = vi.fn().mockReturnValue({ eq: eqFallbackFail });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockFrom.mockReturnValueOnce({ update: update42703 } as any).mockReturnValue({ update: updateFallbackFail } as any);
+
+    await expect(updateTrabajo('w1', baseTrabajoFull)).rejects.toThrow('updateTrabajo: Fallback update failed');
   });
 });
 
