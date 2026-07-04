@@ -114,20 +114,3 @@ export class DashboardPage extends BasePage {
       // Fallback: wait for the login page role button (non-strict)
       await this.page.getByRole('button', { name: /iniciar sesión/i }).waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
     });
-  }
-
-  /** Get the currently displayed user email. */
-  async getUserEmail(): Promise<string> {
-    return this.getText(this.userEmail);
-  }
-
-  /** Check if data is still loading. */
-  async isLoading(): Promise<boolean> {
-    return this.isVisible(this.loadingIndicator);
-  }
-
-  /** Get the tab locator for a given module. */
-  getTabLocator(module: ModuleKey): Locator {
-    return this.nav.getByRole('button', { name: MODULE_LABELS[module] });
-  }
-}
