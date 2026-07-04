@@ -40,8 +40,7 @@ export class CuentasCobrarPage extends BasePage {
     await this.page.locator('[data-testid="app-content-loaded"]')
       .waitFor({ state: 'visible', timeout: 150_000 }).catch(() => {});
     // Once app content is loaded, section title should appear immediately.
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 30_000 });
-  }
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 30_000 });  }
 
   async filterByStatus(status: 'Pendiente' | 'Parcial' | 'Pagado' | 'Todos') {
     if (await this.filterSelect.isVisible().catch(() => false)) {
