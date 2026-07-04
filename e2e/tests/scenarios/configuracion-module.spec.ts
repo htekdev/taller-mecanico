@@ -104,7 +104,7 @@ test.describe('Configuración', () => {
     await showPhaseLabel(page, '🔀 Phase 1: Navigate Inventario → Configuración');
 
     await dashboardPage.navigateToModule('inventario');
-    await page.waitForTimeout(500);
+    await dashboardPage.waitForPageLoad();
 
     await dashboardPage.navigateToModule('configuracion');
     await dashboardPage.waitForPageLoad();

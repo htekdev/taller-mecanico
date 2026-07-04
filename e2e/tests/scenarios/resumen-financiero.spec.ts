@@ -68,7 +68,7 @@ test.describe('Resumen Financiero', () => {
 
     // Start at a different module
     await dashboardPage.navigateToModule('trabajos');
-    await page.waitForTimeout(500);
+    await dashboardPage.waitForPageLoad();
 
     // Navigate to Resumen
     await dashboardPage.navigateToModule('resumen');

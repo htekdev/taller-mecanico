@@ -75,7 +75,8 @@ test.describe('Historial por Unidad', () => {
     await expect(searchInput).toBeVisible({ timeout: 20_000 });
 
     await searchInput.fill('test');
-    await page.waitForTimeout(500);
+    // Wait for input to reflect the typed value (debounce sync)
+    await expect(searchInput).toHaveValue('test');
 
     // App should not crash after typing
     const errorText = page.getByText(/error al cargar|algo salió mal|fatal error/i);
@@ -84,7 +85,7 @@ test.describe('Historial por Unidad', () => {
 
     // Clear search
     await searchInput.fill('');
-    await page.waitForTimeout(300);
+    await expect(searchInput).toHaveValue('');
 
     await showPhaseLabel(page, '✅ Search Works Without Crash');
   });
@@ -95,7 +96,7 @@ test.describe('Historial por Unidad', () => {
     await showPhaseLabel(page, '🔀 Phase 1: Navigate Gastos → Historial');
 
     await dashboardPage.navigateToModule('gastos');
-    await page.waitForTimeout(500);
+    await dashboardPage.waitForPageLoad();
 
     await dashboardPage.navigateToModule('historial');
     await dashboardPage.waitForPageLoad();
