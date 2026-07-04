@@ -1495,6 +1495,7 @@ export function VistaCotizaciones({
             <div>
               <Label>Departamento <span className="text-rose-500">*</span></Label>
               <select value={form.departamento} onChange={e => set('departamento', e.target.value)}
+                data-testid="departamento-select"
                 className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
                 <option value="" disabled>— Seleccionar departamento —</option>
                 {departamentos.map(d => (
@@ -1611,4 +1612,5 @@ export function VistaCotizaciones({
     />
   );
 }
+
 
