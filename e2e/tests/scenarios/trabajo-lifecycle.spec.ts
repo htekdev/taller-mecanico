@@ -97,8 +97,9 @@ test.describe('Trabajo Lifecycle', () => {
     page, dashboardPage, trabajosPage, cuentasCobrarPage, sidebar
   }) => {
     // This test finalizes a trabajo (DB write + re-fetch) then navigates to CxC
-    // (another DB fetch). Two cold Vercel preview round-trips can exceed 90s.
-    test.setTimeout(180_000);
+    // (another DB fetch). Two cold Vercel preview round-trips can exceed 90s each.
+    // Budget: 90s login/nav + 240s trabajos load + 30s finalize + 240s CxC load ≈ 600s max.
+    test.setTimeout(300_000);
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
 
@@ -201,16 +202,22 @@ test.describe('Trabajo Lifecycle', () => {
       await finalizarBtns.first().click();
       await page.waitForTimeout(2000);
 
-      // Either it succeeds (data complete) or shows a clear error (correct behavior)
+      // Either it succeeds (data complete) or shows a clear error (correct behavior).
+      // Success states:
+      //   1. Error banner appears (rose-/red- class, or text containing 'error')
+      //   2. Status changes to 'terminado' or 'finalizado'
+      //   3. Nota/Factura modal appears (= complete data, billing choice required)
       const visibleText = await page.locator('main').innerText().catch(() => '');
       const pageHtml = await page.content();
       const hasError = pageHtml.includes('rose-') || pageHtml.includes('red-') ||
                        visibleText.toLowerCase().includes('error');
       const hasSuccess = visibleText.toLowerCase().includes('terminado') ||
                         visibleText.toLowerCase().includes('finalizado');
+      const hasModal = await page.getByRole('button', { name: /^nota$/i }).isVisible().catch(() => false) ||
+                       await page.getByRole('button', { name: /^factura$/i }).isVisible().catch(() => false);
 
       // One of these must be true — no silent failure
-      expect(hasError || hasSuccess).toBe(true);
+      expect(hasError || hasSuccess || hasModal).toBe(true);
     }
 
     await showPhaseLabel(page, '✅ Error handling verified');
