@@ -1,8 +1,8 @@
 import { test, expect } from '../../fixtures';
 import { expectVisible, expectText, showPhaseLabel, expectClass } from '../visual-assert';
 import { TestData } from '../../utils/test-data';
+import { DEPTOS_KEY } from '../../../app/lib/departamentos-constants';
 
-const DEPTOS_KEY = 'taller_departamentos_ayuntamiento';
 const CUSTOM_DEPTO = 'Depto Personalizado Prueba E2E';
 
 /**
