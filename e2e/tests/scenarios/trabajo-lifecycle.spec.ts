@@ -112,9 +112,10 @@ test.describe('Trabajo Lifecycle', () => {
         await finalizarBtns.first().click();
 
         // Dismiss Nota/Factura modal if it appears (blocks CxC navigation if left open)
-        const notaBtn = page.getByRole('button', { name: /^nota$/i });
-        if (await notaBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await notaBtn.click();
+        // NOTE: button accessible text is full content, match via filter({ hasText: 'Sin IVA' })
+        const notaBtn = page.locator('button').filter({ hasText: 'Sin IVA' });
+        if (await notaBtn.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+          await notaBtn.first().click();
         }
         await page.waitForTimeout(2000); // wait for Supabase UPDATE to complete
 
