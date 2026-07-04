@@ -16,14 +16,24 @@ const LS_MIGRATED_KEY    = (tallerId: string) => `taller_cotizaciones_migrated_$
 
 const NUM_PROVEEDOR_RED = 'P004093';
 
-// Lista de departamentos del Ayuntamiento de Mérida — confirmada por Sofia.
-// Para agregar nuevos departamentos, añadir una entrada a este arreglo.
-const DEPARTAMENTOS_AYUNTAMIENTO: string[] = [
-  '— Seleccionar departamento —',
-  'Obras públicas mantenimiento vial',
-  'Servicios públicos aseo urbano poniente',
-  'Servicios públicos aseo urbano oriente',
-];
+// ─── Departamentos localStorage — same key as Trabajos module ─────────────────
+// Departments are managed dynamically from the Trabajos/Ayuntamiento tab.
+// Cotizaciones reads from the SAME localStorage key so they stay in sync.
+
+import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
+
+function loadDepartamentos(): string[] {
+  if (typeof window === 'undefined') return [...DEFAULT_DEPTOS];
+  try {
+    const raw = localStorage.getItem(DEPTOS_KEY);
+    if (!raw) return [...DEFAULT_DEPTOS];
+    const parsed = JSON.parse(raw) as string[];
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [...DEFAULT_DEPTOS];
+  } catch (e) {
+    console.error('[Cotizaciones] Error leyendo departamentos de localStorage:', e);
+    return [...DEFAULT_DEPTOS];
+  }
+}
 
 const AUTORIZADOS: string[] = ['Héctor Rocha', 'Sofía Rocha'];
 
@@ -1137,6 +1147,22 @@ export function VistaCotizaciones({
   const [reconciliandoId, setReconciliandoId] = useState<string | null>(null);
   const [guardando, setGuardando]       = useState(false);
 
+  // ── Departamentos — loaded from localStorage (shared with Trabajos module) ──
+  // Start with SSR-safe static defaults so server and client render the same
+  // initial HTML (avoids hydration mismatch). useEffect reads localStorage after
+  // hydration to load any custom departments the user has added.
+  const [departamentos, setDepartamentos] = useState<string[]>(DEFAULT_DEPTOS);
+  useEffect(() => {
+    // Re-read on mount: during SSR, window is undefined → DEFAULT_DEPTOS was used.
+    // After hydration, reload from localStorage so custom departments appear immediately.
+    setDepartamentos(loadDepartamentos());
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === DEPTOS_KEY) setDepartamentos(loadDepartamentos());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   // ── Load cotizaciones from Supabase + one-time localStorage migration ──────
   const migrationDone = useRef(false);
 
@@ -1338,7 +1364,7 @@ export function VistaCotizaciones({
   const canSave =
     form.marca.trim() !== '' && form.modelo.trim() !== '' &&
     (plantilla !== 'ayuntamiento' || form.inventario.trim() !== '') &&
-    (plantilla !== 'ayuntamiento' || (form.departamento !== '' && !form.departamento.startsWith('—')));
+    (plantilla !== 'ayuntamiento' || (form.departamento !== ''));
 
   // ══════════════════════════════════════════════════════════════════════════
   // Pantalla: INICIO
@@ -1471,8 +1497,9 @@ export function VistaCotizaciones({
               <Label>Departamento <span className="text-rose-500">*</span></Label>
               <select value={form.departamento} onChange={e => set('departamento', e.target.value)}
                 className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                {DEPARTAMENTOS_AYUNTAMIENTO.map(d => (
-                  <option key={d} value={d} disabled={d.startsWith('—')}>{d}</option>
+                <option value="" disabled>— Seleccionar departamento —</option>
+                {departamentos.map(d => (
+                  <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             </div>
