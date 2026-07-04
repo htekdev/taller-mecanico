@@ -38,10 +38,9 @@ export class CuentasCobrarPage extends BasePage {
     // because the overlay check is best-effort — if it times out we proceed
     // and rely on the section title wait below.
     const loadingOverlay = this.page.locator('text=Cargando datos del taller');
-    await loadingOverlay.waitFor({ state: 'hidden', timeout: 30_000 }).catch(() => {});
-    // Wait up to 90s for the CxC heading. Tests that navigate here after heavy
-    // DB operations (finalizar trabajo → CxC) use test.setTimeout(180_000).
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 90_000 });
+    await loadingOverlay.waitFor({ state: 'hidden', timeout: 150_000 }).catch(() => {});
+    // Once overlay is gone, section title should appear immediately.
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 30_000 });
   }
 
   async filterByStatus(status: 'Pendiente' | 'Parcial' | 'Pagado' | 'Todos') {
