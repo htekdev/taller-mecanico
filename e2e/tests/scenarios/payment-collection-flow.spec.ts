@@ -26,7 +26,9 @@ test.describe('Payment Collection Flow', () => {
   test('partial and full payment lifecycle with balance verification', async ({
     page, dashboardPage, trabajosPage, cuentasCobrarPage, sidebar
   }) => {
-    // ─── Phase 1: Create trabajo with known amounts ─────────────────────────
+    // This test creates a trabajo, finalizes it, and verifies CxC — multiple DB
+    // round-trips on a Vercel preview can push total time beyond 90s.
+    test.setTimeout(180_000);
     await showPhaseLabel(page, '🔧 Phase 1: Create Trabajo');
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
