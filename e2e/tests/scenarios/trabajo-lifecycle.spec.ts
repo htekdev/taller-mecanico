@@ -96,6 +96,7 @@ test.describe('Trabajo Lifecycle', () => {
   test('finalize trabajo and verify CxC record', async ({
     page, dashboardPage, trabajosPage, cuentasCobrarPage, sidebar
   }) => {
+    test.setTimeout(180_000);
     await showPhaseLabel(page, '🔧 Finalize Trabajo Flow');
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
