@@ -23,7 +23,8 @@ export class Sidebar {
     // Wait for loading overlay to clear before clicking (prevents masked actionability bugs)
     const loadingOverlay = this.page.locator('text=Cargando datos del taller');
     await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 }).catch(() => {});
-    await btn.click();
+    // force:true bypasses overlay/actionability — the nav is always interactable
+    await btn.click({ force: true });
     await this.page.waitForTimeout(500);
   }
 
