@@ -123,6 +123,16 @@ test.describe('Trabajo Lifecycle', () => {
         }
         await page.waitForTimeout(2000); // wait for Supabase UPDATE to complete
 
+        // Dismiss the Nota/Factura modal if it appeared.
+        // The modal MUST be dismissed before navigating to CxC — otherwise the
+        // sidebar click goes through (force:true) but the modal state prevents
+        // the CxC section from rendering, causing a 45s waitForPageLoad timeout.
+        const notaBtn = page.getByRole('button', { name: /^nota$/i });
+        if (await notaBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+          await notaBtn.click();
+          await page.waitForTimeout(2000); // wait for Supabase UPDATE
+        }
+
         // Check result
         const error = await trabajosPage.getFinalizarError();
         if (!error) {

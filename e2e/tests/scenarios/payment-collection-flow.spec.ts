@@ -66,7 +66,17 @@ test.describe('Payment Collection Flow', () => {
     const finBtn = page.getByRole('button', { name: /finalizar/i }).first();
     if (await finBtn.isVisible().catch(() => false)) {
       await finBtn.click();
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(2000);
+      // Dismiss the Nota/Factura modal if it appeared — pick Nota (sin IVA)
+      // Without dismissing, the modal blocks the next sidebar navigation.
+      const notaBtn = page.getByRole('button', { name: /^nota$/i });
+      if (await notaBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await notaBtn.click();
+        await page.waitForTimeout(2000); // wait for Supabase UPDATE
+      } else {
+        // Modal didn't appear (e.g. job had no labor) — just wait
+        await page.waitForTimeout(1000);
+      }
     }
 
     // ─── Phase 3: Check CxC ─────────────────────────────────────────────────
