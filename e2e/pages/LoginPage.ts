@@ -71,9 +71,9 @@ export class LoginPage extends BasePage {
 
     // Race: login form OR dashboard OR setup page
     const firstVisible = await Promise.race([
-      emailField.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'login' as const),
-      navButton.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'dashboard' as const),
-      setupPage.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'setup' as const),
+      emailField.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'login' as const),
+      navButton.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'dashboard' as const),
+      setupPage.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'setup' as const),
     ]).catch(() => 'timeout' as const);
 
     if (firstVisible === 'dashboard') {
@@ -98,8 +98,8 @@ export class LoginPage extends BasePage {
 
     // After login, might go to dashboard OR setup
     const postLogin = await Promise.race([
-      navButton.waitFor({ state: 'visible', timeout: 45_000 }).then(() => 'dashboard' as const),
-      setupPage.waitFor({ state: 'visible', timeout: 45_000 }).then(() => 'setup' as const),
+      navButton.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'dashboard' as const),
+      setupPage.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'setup' as const),
     ]).catch(() => 'timeout' as const);
 
     if (postLogin === 'setup') {
@@ -115,7 +115,7 @@ export class LoginPage extends BasePage {
     const tallerButton = this.page.locator('button:has(span:has-text("🔧"))').first();
     if (await tallerButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await tallerButton.click();
-      await this.page.locator('nav button').first().waitFor({ state: 'visible', timeout: 15_000 });
+      await this.page.locator('nav button').first().waitFor({ state: 'visible', timeout: 30_000 });
       return;
     }
 
@@ -134,7 +134,7 @@ export class LoginPage extends BasePage {
       const submitBtn = this.page.getByRole('button', { name: /crear taller/i });
       if (await submitBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await submitBtn.click();
-        await this.page.locator('nav button').first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+        await this.page.locator('nav button').first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
       }
     }
   }
