@@ -55,17 +55,12 @@ export class DashboardPage extends BasePage {
       await this.page.waitForLoadState('domcontentloaded');
       await this.nav.waitFor({ state: 'visible', timeout: 45_000 }).catch(() => {});
     });
-<<<<<<< HEAD
-    // Wait for data to finish loading
-    await this.loadingIndicator.waitFor({ state: 'hidden', timeout: 30_000 }).catch(() => {});
-=======
     // Wait for cargarDatos() to complete — app-content-loaded only renders when cargando=false.
     // This is a POSITIVE signal (element must appear), avoiding the race condition where
     // waitFor({ state: 'hidden' }) resolves instantly if the overlay hasn't mounted yet.
     // On Vercel preview with 8 parallel Supabase queries this can take 2+ minutes.
     await this.page.locator('[data-testid="app-content-loaded"]')
       .waitFor({ state: 'visible', timeout: 150_000 }).catch(() => {});
->>>>>>> 7c2faa4 (fix(e2e): reliable app-ready signal via data-testid — replace fragile overlay text wait)
   }
 
   /** Navigate to the dashboard directly (assumes logged in). */
