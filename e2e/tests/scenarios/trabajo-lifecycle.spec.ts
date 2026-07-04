@@ -99,6 +99,7 @@ test.describe('Trabajo Lifecycle', () => {
     // This test finalizes a trabajo (DB write + re-fetch) then navigates to CxC
     // (another DB fetch). Two cold Vercel preview round-trips can exceed 90s.
     test.setTimeout(180_000);
+    await showPhaseLabel(page, '🔧 Finalize Trabajo Flow');
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
 

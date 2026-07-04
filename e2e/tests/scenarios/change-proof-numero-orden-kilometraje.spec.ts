@@ -22,8 +22,7 @@ test('change-proof-numero-orden-kilometraje', async ({ page, loginPage, dashboar
   // The db.ts 42703 fallback saves the job successfully but the column must be present
   // for the value to persist across page reloads (lines 86-88 check after reload).
   // Unblock by running: supabase db push --linked (applies 20260706120000_add_kilometraje_to_trabajos.sql)
-  test.fixme(true, 'Requires supabase db push --linked to add kilometraje column to production DB');
-  test.slow();
+  test.fixme(true, 'Requires supabase db push --linked to add kilometraje column to production DB');  test.slow();
   const descriptionText = 'Trabajo de prueba numero_orden + kilometraje';
   const numeroOrdenValue = 'OT-PR105-TEST';
   const kilometrajeValue = '55000';
