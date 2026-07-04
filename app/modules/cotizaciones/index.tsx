@@ -28,7 +28,7 @@ function loadDepartamentos(): string[] {
     const raw = localStorage.getItem(DEPTOS_KEY);
     if (!raw) return [...DEFAULT_DEPTOS];
     const parsed = JSON.parse(raw) as string[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [...DEFAULT_DEPTOS];
+    return Array.isArray(parsed) ? parsed : [...DEFAULT_DEPTOS];
   } catch (e) {
     console.error('[Cotizaciones] Error leyendo departamentos de localStorage:', e);
     return [...DEFAULT_DEPTOS];
