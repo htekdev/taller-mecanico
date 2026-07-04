@@ -7,7 +7,7 @@ concurrency:
   # Group by deployment SHA so multiple events for the same commit deduplicate,
   # but different commits (from separate pushes) never cancel each other's E2E runs.
   group: e2e-${{ github.event.deployment.sha }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   e2e:
