@@ -34,10 +34,14 @@ export class CuentasCobrarPage extends BasePage {
   }
 
   async waitForPageLoad() {
-    // Wait for cargando overlay to disappear first (can take up to 90s on cold Vercel preview)
+    // Wait for cargando overlay to disappear first. Use a shorter timeout here
+    // because the overlay check is best-effort — if it times out we proceed
+    // and rely on the section title wait below.
     const loadingOverlay = this.page.locator('text=Cargando datos del taller');
-    await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 }).catch(() => {});
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 });
+    await loadingOverlay.waitFor({ state: 'hidden', timeout: 30_000 }).catch(() => {});
+    // Wait up to 90s for the CxC heading. Tests that navigate here after heavy
+    // DB operations (finalizar trabajo → CxC) use test.setTimeout(180_000).
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 90_000 });
   }
 
   async filterByStatus(status: 'Pendiente' | 'Parcial' | 'Pagado' | 'Todos') {
