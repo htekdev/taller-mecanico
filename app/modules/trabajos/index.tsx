@@ -5,15 +5,9 @@ import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, Tr
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt, getMontoPagado } from '@/app/lib/utils';
 import { getPricingIntel } from '@/app/lib/pricing';
+import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
 
 // ─── Departamentos localStorage ───────────────────────────────────────────────
-
-const DEPTOS_KEY = 'taller_departamentos_ayuntamiento';
-const DEFAULT_DEPTOS: string[] = [
-  'Obras públicas mantenimiento vial',
-  'Servicios públicos aseo urbano poniente',
-  'Servicios públicos aseo urbano oriente',
-];
 
 function loadDepartamentos(): string[] {
   try {
