@@ -167,7 +167,11 @@ export class TrabajosPage extends BasePage {
   }
 
   async getFinalizarError(): Promise<string | null> {
-    const error = this.page.locator('.bg-rose-50, .text-red-600, .border-rose-200').first();
+    // Target the save-error div specifically (bg-red-50 text-red-700).
+    // The previous broad '.bg-rose-50, .text-red-600, .border-rose-200' selector
+    // matched danger buttons and profit-indicator badges which use the same rose
+    // classes legitimately. Use compound selector to match only the actual error div.
+    const error = this.page.locator('div.bg-red-50').filter({ hasText: /no se pudo|error/i }).first();
     if (await error.isVisible().catch(() => false)) {
       return this.getText(error);
     }
