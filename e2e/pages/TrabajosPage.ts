@@ -38,7 +38,9 @@ export class TrabajosPage extends BasePage {
 
     this.clientSelect = page.locator('select').first();
     this.vehicleSelect = page.locator('select').nth(1);
-    this.descripcionInput = page.locator('textarea[placeholder*="descripción" i], input[placeholder*="descripción" i]').first();
+    // Actual placeholder in app: "Ej. Servicio completo frenos y aceite..."
+    // Note: DO NOT use "Ej." alone — numeroOrden also starts with "Ej." and appears first in DOM.
+    this.descripcionInput = page.locator('input[placeholder*="Servicio completo" i], input[placeholder*="frenos y aceite" i]').first();
     this.fechaInput = page.locator('input[type="date"]').first();
     this.manoDeObraConceptoInput = page.locator('input[placeholder*="concepto" i], input[placeholder*="mano de obra" i]').first();
     this.manoDeObraPrecioInput = page.locator('input[type="number"]').first();
@@ -97,13 +99,24 @@ export class TrabajosPage extends BasePage {
   }
 
   async fillDescription(text: string) {
-    if (await this.descripcionInput.isVisible().catch(() => false)) {
+    // Use a precise locator — placeholder is "Ej. Servicio completo frenos y aceite..."
+    // Cannot use "Ej." alone — numeroOrden field also starts with "Ej." and is first in DOM.
+    const precise = this.page.locator('input[placeholder*="Servicio completo" i], input[placeholder*="frenos y aceite" i]').first();
+    if (await precise.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await this.fillInput(precise, text);
+      await this.page.waitForTimeout(300);
+      return;
+    }
+    // Fallback to the locator defined in constructor
+    if (await this.descripcionInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await this.fillInput(this.descripcionInput, text);
     }
   }
 
   async addLaborItem(concepto: string, precio: number) {
-    const conceptoInput = this.page.locator('input[placeholder*="Arreglo de frenos" i], input[placeholder*="Ej." i]').first();
+    // Mano de obra concepto: placeholder="Ej. Arreglo de frenos, engrase de pernos..."
+    // Use a specific selector that won't accidentally match the main description field.
+    const conceptoInput = this.page.locator('input[placeholder*="Arreglo de frenos" i], input[placeholder*="engrase" i]').first();
     if (await conceptoInput.isVisible().catch(() => false)) {
       await conceptoInput.fill(concepto);
     }
