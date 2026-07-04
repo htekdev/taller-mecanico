@@ -1830,7 +1830,7 @@ export function VistaTrabajo({
                   </tr>
                 );
               })}
-              {trabajosFiltrados.length === 0 && <EmptyRow cols={esAyuntamientoTab ? 14 : 11} message={filtroClienteId || filtroVehiculoId || filtroEstado !== 'todos' || filtroFacturacion !== 'todos' || (esAyuntamientoTab && filtroTft !== 'todos') ? 'No se encontraron resultados.' : 'Sin trabajos registrados. Agrega el primero arriba.'} />}
+              {trabajosFiltrados.length === 0 && <EmptyRow cols={esAyuntamientoTab ? 15 : 12} message={filtroClienteId || filtroVehiculoId || filtroEstado !== 'todos' || filtroFacturacion !== 'todos' || (esAyuntamientoTab && filtroTft !== 'todos') ? 'No se encontraron resultados.' : 'Sin trabajos registrados. Agrega el primero arriba.'} />}
             </tbody>
           </table>
         </div>

@@ -17,7 +17,7 @@ import { showPhaseLabel } from '../visual-assert';
 const UNIQUE_DESC = `PRUEBA-VIDEO-${Date.now()}`;
 
 test('change-proof-historial-numero-orden', async ({ page, loginPage }) => {
-  test.fixme(true, 'Requires supabase db push --linked to add numero_orden + kilometraje columns to production DB. Run: supabase db push --linked from the repo root.');
+  // DB migrations 20260702 + 20260706 are now deployed — numero_orden + kilometraje columns exist.
   test.slow();
 
   // ── 1. Login ──────────────────────────────────────────────────────────────
@@ -62,9 +62,8 @@ test('change-proof-historial-numero-orden', async ({ page, loginPage }) => {
     }
   }
 
-  // NOTE: Número de Orden is intentionally NOT filled here.
-  // Filling it would include 'numero_orden' in the INSERT payload → 42703 error in production
-  // DB (migration pending). The historial column header exists in the UI regardless of DB state.
+  // Número de Orden is optional — leaving it empty is valid.
+  // Migrations 20260702 + 20260706 have been deployed; numero_orden/kilometraje columns exist.
 
   // ── 3c. Descripción (required) ────────────────────────────────────────────
   const descInput = page.locator('input[placeholder*="descripci" i], input[placeholder*="Ej. Servicio" i]').first();
