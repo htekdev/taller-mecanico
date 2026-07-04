@@ -116,16 +116,23 @@ test.describe('Trabajo Lifecycle', () => {
 
         // Dismiss the Nota/Factura modal if it appeared.
         // Modal MUST be fully closed before navigating to CxC.
-        // sidebar.clickTab() waits for overlay but not for modal -- if modal is open,
-        // the button click will time out (30s default Playwright timeout).
-        const notaBtn = page.getByRole("button", { name: /^nota$/i });
-        if (await notaBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-          await notaBtn.click();
+        // NOTE: button accessible text is full content, match via filter({ hasText: 'Sin IVA' })
+        const notaBtn = page.locator('button').filter({ hasText: 'Sin IVA' });
+        if (await notaBtn.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
+          await notaBtn.first().click();
           // Wait for modal to fully close -- not just 2s
-          await page.locator("[role=\"dialog\"]").waitFor({ state: "hidden", timeout: 30_000 }).catch(async () => {
-            // Fallback: wait for nota button to disappear
-            await notaBtn.waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => {});
-          });
+          // The modal uses CSS class .fixed.inset-0.z-50 (not role=dialog).
+          // Wait for it to be removed from DOM after clicking Nota.
+          const modalOverlay = page.locator(".fixed.inset-0.z-50");
+          const modalStillOpen = await modalOverlay.isVisible({ timeout: 1_000 }).catch(() => false);
+          if (modalStillOpen) {
+            await modalOverlay.waitFor({ state: "hidden", timeout: 30_000 }).catch(async () => {
+              await notaBtn.waitFor({ state: "hidden", timeout: 10_000 }).catch(() => {});
+            });
+          } else {
+            // Fast React re-render already closed modal
+            await notaBtn.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
+          }
           await page.waitForTimeout(500); // Brief settle after modal close
         }        }
 
@@ -209,8 +216,8 @@ test.describe('Trabajo Lifecycle', () => {
                        visibleText.toLowerCase().includes('error');
       const hasSuccess = visibleText.toLowerCase().includes('terminado') ||
                         visibleText.toLowerCase().includes('finalizado');
-      const hasModal = await page.getByRole('button', { name: /^nota$/i }).isVisible().catch(() => false) ||
-                       await page.getByRole('button', { name: /^factura$/i }).isVisible().catch(() => false);
+      const hasModal = await page.locator('button').filter({ hasText: 'Sin IVA' }).first().isVisible().catch(() => false) ||
+                       await page.locator('button').filter({ hasText: 'IVA 16' }).first().isVisible().catch(() => false);
 
       // One of these must be true — no silent failure
       expect(hasError || hasSuccess || hasModal).toBe(true);
