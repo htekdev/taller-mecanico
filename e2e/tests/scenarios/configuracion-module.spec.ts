@@ -6,7 +6,7 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
  *
  * Verifies:
  * 1. Module navigates and loads without crashing
- * 2. Settings heading visible in Spanish
+ * 2. Settings heading visible in Spanish (scoped to main content — not nav tab)
  * 3. Members or invite sections are rendered
  * 4. Module is reachable from other tabs
  */
@@ -21,7 +21,7 @@ test.describe('Configuración', () => {
   }) => {
     await showPhaseLabel(page, '⚙️ Phase 1: Navigate to Configuración');
     await dashboardPage.navigateToModule('configuracion');
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
     // No fatal crash state
     const errorText = page.getByText(/error al cargar|algo salió mal|fatal error/i);
@@ -39,11 +39,17 @@ test.describe('Configuración', () => {
   }) => {
     await showPhaseLabel(page, '🔍 Phase 1: Check Spanish Heading');
     await dashboardPage.navigateToModule('configuracion');
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
-    // Accept any of the expected Spanish headings for this module
+    // Accept any expected Spanish heading in the main content area.
+    // Scope to 'main' to avoid false-positive match on the "Configuración" nav tab label.
+    const mainContent = page.locator('main');
     const possibleHeadings = [
-      page.getByText(/Configuración|Miembros|Equipo|Taller|Ajustes/i).first(),
+      mainContent.getByText(/Miembros/i).first(),
+      mainContent.getByText(/Equipo/i).first(),
+      mainContent.getByText(/Taller/i).first(),
+      mainContent.getByText(/Ajustes/i).first(),
+      mainContent.getByText(/Configuración del Taller|Configuración General/i).first(),
     ];
 
     let foundAny = false;
@@ -52,7 +58,7 @@ test.describe('Configuración', () => {
       if (visible) { foundAny = true; break; }
     }
 
-    expect(foundAny).toBe(true);
+    expect(foundAny, 'At least one settings heading must be visible in main content').toBe(true);
     await showPhaseLabel(page, '✅ Spanish Heading Visible');
   });
 
@@ -61,7 +67,7 @@ test.describe('Configuración', () => {
   }) => {
     await showPhaseLabel(page, '👥 Phase 1: Check Members/Invite Section');
     await dashboardPage.navigateToModule('configuracion');
-    await page.waitForTimeout(2000);
+    await dashboardPage.waitForPageLoad();
 
     // Should render some form of team/member UI
     const memberKeywords = [
@@ -84,7 +90,7 @@ test.describe('Configuración', () => {
   }) => {
     await showPhaseLabel(page, '🔒 Phase 1: No Debug Artifacts');
     await dashboardPage.navigateToModule('configuracion');
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
     const unhandledError = page.getByText(/unhandled|uncaught|undefined is not|cannot read property/i);
     const hasRawError = await unhandledError.isVisible().catch(() => false);
@@ -102,7 +108,7 @@ test.describe('Configuración', () => {
     await page.waitForTimeout(500);
 
     await dashboardPage.navigateToModule('configuracion');
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
     const tab = dashboardPage.getTabLocator('configuracion');
     await expectVisible(tab, 'Configuración tab in nav');
