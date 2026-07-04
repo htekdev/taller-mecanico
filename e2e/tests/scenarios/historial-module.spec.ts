@@ -7,7 +7,7 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
  * Verifies:
  * 1. Module navigates and loads without crashing
  * 2. Client list or "Historial por Unidad" heading visible
- * 3. Search input is visible and functional
+ * 3. Search input is visible and functional (hard requirement — no conditional guard)
  * 4. Module is reachable from other tabs
  */
 
@@ -21,7 +21,7 @@ test.describe('Historial por Unidad', () => {
   }) => {
     await showPhaseLabel(page, '📋 Phase 1: Navigate to Historial');
     await dashboardPage.navigateToModule('historial');
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
     // No fatal crash
     const errorText = page.getByText(/error al cargar|algo salió mal|fatal error/i);
@@ -39,7 +39,7 @@ test.describe('Historial por Unidad', () => {
   }) => {
     await showPhaseLabel(page, '🔍 Phase 1: Check Heading');
     await dashboardPage.navigateToModule('historial');
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
     // The module renders a "Historial por Unidad" section title
     const heading = page.getByText(/Historial por Unidad|Historial/i).first();
@@ -54,7 +54,7 @@ test.describe('Historial por Unidad', () => {
   }) => {
     await showPhaseLabel(page, '🔍 Phase 1: Check Search Input');
     await dashboardPage.navigateToModule('historial');
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
     // Search input should be visible
     const searchInput = page.getByPlaceholder(/Buscar cliente/i);
@@ -69,24 +69,27 @@ test.describe('Historial por Unidad', () => {
   }) => {
     await showPhaseLabel(page, '⌨️ Phase 1: Type in Search');
     await dashboardPage.navigateToModule('historial');
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
     const searchInput = page.getByPlaceholder(/Buscar cliente/i);
-    const inputVisible = await searchInput.isVisible().catch(() => false);
 
-    if (inputVisible) {
-      await searchInput.fill('test');
-      await page.waitForTimeout(500);
+    // Hard requirement — search input must be visible (no conditional guard)
+    expect(
+      await searchInput.isVisible().catch(() => false),
+      'Search input must be visible after navigating to Historial'
+    ).toBe(true);
 
-      // App should not crash after typing
-      const errorText = page.getByText(/error al cargar|algo salió mal|fatal error/i);
-      const hasError = await errorText.isVisible().catch(() => false);
-      expect(hasError).toBe(false);
+    await searchInput.fill('test');
+    await page.waitForTimeout(500);
 
-      // Clear search
-      await searchInput.fill('');
-      await page.waitForTimeout(300);
-    }
+    // App should not crash after typing
+    const errorText = page.getByText(/error al cargar|algo salió mal|fatal error/i);
+    const hasError = await errorText.isVisible().catch(() => false);
+    expect(hasError).toBe(false);
+
+    // Clear search
+    await searchInput.fill('');
+    await page.waitForTimeout(300);
 
     await showPhaseLabel(page, '✅ Search Works Without Crash');
   });
@@ -100,7 +103,7 @@ test.describe('Historial por Unidad', () => {
     await page.waitForTimeout(500);
 
     await dashboardPage.navigateToModule('historial');
-    await page.waitForTimeout(1500);
+    await dashboardPage.waitForPageLoad();
 
     const tab = dashboardPage.getTabLocator('historial');
     await expectVisible(tab, 'Historial tab in nav');
