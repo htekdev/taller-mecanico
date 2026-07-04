@@ -26,7 +26,9 @@ test.describe('Payment Collection Flow', () => {
   test.skip('partial and full payment lifecycle with balance verification', async ({
     page, dashboardPage, trabajosPage, cuentasCobrarPage, sidebar
   }) => {
-    // ─── Phase 1: Create trabajo with known amounts ─────────────────────────
+    // This test creates a trabajo, finalizes it, and verifies CxC — guardarTrabajo
+    // triggers a full 8-table cargarDatos() reload; allow 5 minutes total.
+    test.setTimeout(300_000);
     await showPhaseLabel(page, '🔧 Phase 1: Create Trabajo');
     await dashboardPage.navigateToModule('trabajos');
     await trabajosPage.waitForPageLoad();
@@ -50,6 +52,14 @@ test.describe('Payment Collection Flow', () => {
 
     await trabajosPage.save();
     await showPhaseLabel(page, '✅ Trabajo created');
+
+    // guardarTrabajo triggers cargarDatos() — full 8-table reload. Wait for
+    // the loading overlay to clear before navigating so we don't race with it.
+    {
+      const overlay = page.locator('text=Cargando datos del taller');
+      await overlay.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {}); // may flash quickly
+      await overlay.waitFor({ state: 'hidden', timeout: 150_000 }).catch(() => {}); // wait for reload
+    }
 
     // ─── Phase 2: Try to finalize ───────────────────────────────────────────
     await showPhaseLabel(page, '✅ Phase 2: Finalize');

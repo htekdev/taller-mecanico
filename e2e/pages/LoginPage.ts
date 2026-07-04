@@ -75,6 +75,9 @@ export class LoginPage extends BasePage {
     ]).catch(() => 'timeout' as const);
 
     if (firstVisible === 'dashboard') {
+      // Nav is visible but data may still be loading — wait for positive app-ready signal
+      await this.page.locator('[data-testid="app-content-loaded"]')
+        .waitFor({ state: 'visible', timeout: 150_000 }).catch(() => {});
       return; // Already logged in with taller
     }
 
@@ -102,6 +105,10 @@ export class LoginPage extends BasePage {
 
     if (postLogin === 'setup') {
       await this.handleSetupPage();
+    } else {
+      // On dashboard — wait for positive app-ready signal (avoids overlay race condition)
+      await this.page.locator('[data-testid="app-content-loaded"]')
+        .waitFor({ state: 'visible', timeout: 150_000 }).catch(() => {});
     }
   }
 

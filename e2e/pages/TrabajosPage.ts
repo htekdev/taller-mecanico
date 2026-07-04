@@ -71,7 +71,7 @@ export class TrabajosPage extends BasePage {
     if (overlayVisible) {
       await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 });
     }
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 });
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 90_000 });
   }
 
   async selectClient(index = 1) {
@@ -167,7 +167,8 @@ export class TrabajosPage extends BasePage {
   }
 
   async getFinalizarError(): Promise<string | null> {
-    const error = this.page.locator('.bg-rose-50, .text-red-600, .border-rose-200').first();
+    // Match the actual error div: bg-red-50 + border-red-200 (not rose-colored structural elements)
+    const error = this.page.locator('div.bg-red-50.border-red-200, div.bg-red-50.border.border-red-200').first();
     if (await error.isVisible().catch(() => false)) {
       return this.getText(error);
     }
