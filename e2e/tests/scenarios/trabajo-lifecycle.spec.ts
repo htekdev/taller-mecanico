@@ -118,8 +118,7 @@ test.describe('Trabajo Lifecycle', () => {
         // which uniquely targets the Nota button in the ¿Cómo se va a cobrar? modal.
         const notaBtn = page.locator('button').filter({ hasText: 'Sin IVA' });
         if (await notaBtn.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
-          await notaBtn.first().click();
-        }
+          await notaBtn.first().click();        }
         await page.waitForTimeout(2000); // wait for Supabase UPDATE to complete
 
         // Dismiss the Nota/Factura modal if it appeared.
