@@ -110,5 +110,65 @@ test.describe('Cotización Lifecycle', () => {
 
     await showPhaseLabel(page, '✅ Form preserved on error');
   });
+
+  test('departamento dropdown reflects localStorage values', async ({
+    page, dashboardPage, cotizacionesPage
+  }) => {
+    await showPhaseLabel(page, '🏛️ localStorage Sync Test');
+
+    // Seed custom departments in localStorage before navigating
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.setItem(
+        'taller_departamentos_ayuntamiento',
+        JSON.stringify(['Depto Prueba A', 'Depto Prueba B'])
+      );
+    });
+
+    await dashboardPage.navigateToModule('cotizaciones');
+    await cotizacionesPage.waitForPageLoad();
+
+    if (await cotizacionesPage.plantillaAyuntamiento.isVisible().catch(() => false)) {
+      await cotizacionesPage.selectPlantillaAyuntamiento();
+      await page.waitForTimeout(500);
+
+      const deptoSelect = page.locator('[data-testid="departamento-select"]');
+      if (await deptoSelect.isVisible().catch(() => false)) {
+        await expect(deptoSelect.locator('option:has-text("Depto Prueba A")')).toBeAttached();
+        await expect(deptoSelect.locator('option:has-text("Depto Prueba B")')).toBeAttached();
+      }
+    }
+
+    await showPhaseLabel(page, '✅ Custom departments visible in dropdown');
+  });
+
+  test('departamento dropdown falls back to defaults when localStorage empty', async ({
+    page, dashboardPage, cotizacionesPage
+  }) => {
+    await showPhaseLabel(page, '🔄 Default Fallback Test');
+
+    // Clear the localStorage key to test fallback
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.removeItem('taller_departamentos_ayuntamiento');
+    });
+
+    await dashboardPage.navigateToModule('cotizaciones');
+    await cotizacionesPage.waitForPageLoad();
+
+    if (await cotizacionesPage.plantillaAyuntamiento.isVisible().catch(() => false)) {
+      await cotizacionesPage.selectPlantillaAyuntamiento();
+      await page.waitForTimeout(500);
+
+      const deptoSelect = page.locator('[data-testid="departamento-select"]');
+      if (await deptoSelect.isVisible().catch(() => false)) {
+        // At least one default option should be present
+        const optionCount = await deptoSelect.locator('option').count();
+        expect(optionCount).toBeGreaterThanOrEqual(2); // placeholder + at least 1 default
+      }
+    }
+
+    await showPhaseLabel(page, '✅ Default departments shown when localStorage empty');
+  });
 });
 

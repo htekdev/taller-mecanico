@@ -17,10 +17,6 @@ const LS_MIGRATED_KEY    = (tallerId: string) => `taller_cotizaciones_migrated_$
 
 const NUM_PROVEEDOR_RED = 'P004093';
 
-// ─── Departamentos localStorage — same key as Trabajos module ─────────────────
-// Departments are managed dynamically from the Trabajos/Ayuntamiento tab.
-// Cotizaciones reads from the SAME localStorage key so they stay in sync.
-
 function loadDepartamentos(): string[] {
   if (typeof window === 'undefined') return [...DEFAULT_DEPTOS];
   try {
@@ -1494,8 +1490,7 @@ export function VistaCotizaciones({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
             <div>
               <Label>Departamento <span className="text-rose-500">*</span></Label>
-              <select value={form.departamento} onChange={e => set('departamento', e.target.value)}
-                data-testid="departamento-select"
+              <select data-testid="departamento-select" value={form.departamento} onChange={e => set('departamento', e.target.value)}
                 className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
                 <option value="" disabled>— Seleccionar departamento —</option>
                 {departamentos.map(d => (
