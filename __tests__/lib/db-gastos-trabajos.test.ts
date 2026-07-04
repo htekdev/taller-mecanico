@@ -101,6 +101,7 @@ function makeTrabajo(overrides: Partial<Trabajo> = {}): Trabajo {
 }
 
 beforeEach(() => {
+  mockFrom.mockReset();
   vi.clearAllMocks();
 });
 
@@ -120,13 +121,13 @@ describe('updateTrabajo', () => {
     expect(eq).toHaveBeenCalledWith('id', 'trabajo-xyz');
   });
 
-  it('always includes kilometraje: null when field is undefined', async () => {
+  it('omits kilometraje when field is undefined', async () => {
     const { update } = mockUpdateChain();
     const data = makeTrabajo(); // no kilometraje
     expect(data.kilometraje).toBeUndefined();
     await updateTrabajo('t1', data);
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ kilometraje: null })
+    expect(update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kilometraje: expect.anything() })
     );
   });
 
@@ -229,66 +230,82 @@ describe('updateTrabajo', () => {
 // ── updateTrabajoFinalizar ──────────────────────────────────────────────────
 
 describe('updateTrabajoFinalizar', () => {
+  function mockTwoPhaseUpdate() {
+    const eq1 = vi.fn().mockResolvedValue({ error: null });
+    const update1 = vi.fn().mockReturnValue({ eq: eq1 });
+    const eq2 = vi.fn().mockResolvedValue({ error: null });
+    const update2 = vi.fn().mockReturnValue({ eq: eq2 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockFrom.mockReturnValueOnce({ update: update1 } as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .mockReturnValueOnce({ update: update2 } as any);
+    return { update1, eq1, update2, eq2 };
+  }
+
   it('calls trabajos table', async () => {
-    mockUpdateChain();
+    mockTwoPhaseUpdate();
     await updateTrabajoFinalizar('t1', 'nota', 0, 350);
     expect(mockFrom).toHaveBeenCalledWith('trabajos');
   });
 
   it('calls .eq with the trabajo id', async () => {
-    const { eq } = mockUpdateChain();
+    const { eq1 } = mockTwoPhaseUpdate();
     await updateTrabajoFinalizar('trabajo-abc', 'nota', 0, 500);
-    expect(eq).toHaveBeenCalledWith('id', 'trabajo-abc');
+    expect(eq1).toHaveBeenCalledWith('id', 'trabajo-abc');
   });
 
   it('sets estado: completado', async () => {
-    const { update } = mockUpdateChain();
+    const { update1 } = mockTwoPhaseUpdate();
     await updateTrabajoFinalizar('t1', 'factura', 160, 1160);
-    expect(update).toHaveBeenCalledWith(
+    expect(update1).toHaveBeenCalledWith(
       expect.objectContaining({ estado: 'completado' })
     );
   });
 
   it('for tipo=factura: sets tipo_documento=factura and requiere_factura=true', async () => {
-    const { update } = mockUpdateChain();
+    const { update1, update2 } = mockTwoPhaseUpdate();
     await updateTrabajoFinalizar('t1', 'factura', 160, 1160);
-    expect(update).toHaveBeenCalledWith(
+    expect(update1).toHaveBeenCalledWith(
       expect.objectContaining({
-        tipo_documento: 'factura',
         requiere_factura: true,
       })
+    );
+    expect(update2).toHaveBeenCalledWith(
+      expect.objectContaining({ tipo_documento: 'factura' })
     );
   });
 
   it('for tipo=nota: sets tipo_documento=nota and requiere_factura=false', async () => {
-    const { update } = mockUpdateChain();
+    const { update1, update2 } = mockTwoPhaseUpdate();
     await updateTrabajoFinalizar('t1', 'nota', 0, 350);
-    expect(update).toHaveBeenCalledWith(
+    expect(update1).toHaveBeenCalledWith(
       expect.objectContaining({
-        tipo_documento: 'nota',
         requiere_factura: false,
       })
+    );
+    expect(update2).toHaveBeenCalledWith(
+      expect.objectContaining({ tipo_documento: 'nota' })
     );
   });
 
   it('sends iva and total values', async () => {
-    const { update } = mockUpdateChain();
+    const { update1 } = mockTwoPhaseUpdate();
     await updateTrabajoFinalizar('t1', 'factura', 160, 1160);
-    expect(update).toHaveBeenCalledWith(
+    expect(update1).toHaveBeenCalledWith(
       expect.objectContaining({ iva: 160, total: 1160 })
     );
   });
 
   it('sets fecha_finalizacion to an ISO date string', async () => {
-    const { update } = mockUpdateChain();
+    const { update2 } = mockTwoPhaseUpdate();
     await updateTrabajoFinalizar('t1', 'nota', 0, 350);
-    const payload = update.mock.calls[0][0];
+    const payload = update2.mock.calls[0][0];
     expect(typeof payload.fecha_finalizacion).toBe('string');
     expect(payload.fecha_finalizacion).toMatch(/^\d{4}-\d{2}-\d{2}T/); // ISO format
   });
 
   it('resolves without error', async () => {
-    mockUpdateChain();
+    mockTwoPhaseUpdate();
     await expect(updateTrabajoFinalizar('t1', 'nota', 0, 350)).resolves.toBeUndefined();
   });
 });
