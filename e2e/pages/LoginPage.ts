@@ -62,46 +62,40 @@ export class LoginPage extends BasePage {
     await this.page.goto('/login');
     await this.page.waitForLoadState('domcontentloaded');
 
-    // Check if we're already logged in (redirected to dashboard or setup)
     const navButton = this.page.locator('nav button').first();
-    const emailField = this.emailInput;
     const setupPage = this.page.locator('text=/Crear.*Taller|Crear nuevo taller|Setup/i').first();
 
-    // Race: login form OR dashboard OR setup page
-    const firstVisible = await Promise.race([
-      emailField.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'login' as const),
-      navButton.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'dashboard' as const),
-      setupPage.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'setup' as const),
-    ]).catch(() => 'timeout' as const);
+    // Use sequential isVisible checks to avoid orphaned waitFor operations.
+    // Concurrent Promise.race(waitFor) calls leave background Playwright polling
+    // running after the race resolves — these orphaned operations can fail when the
+    // page later navigates to a state with multiple matching elements (strict mode).
+    const isDashboard = await navButton.isVisible({ timeout: 3_000 }).catch(() => false);
+    if (isDashboard) return; // Already logged in with taller
 
-    if (firstVisible === 'dashboard') {
-      return; // Already logged in with taller
-    }
-
-    if (firstVisible === 'setup') {
-      // User logged in but no taller — create one
+    const isSetup = await setupPage.isVisible({ timeout: 2_000 }).catch(() => false);
+    if (isSetup) {
       await this.handleSetupPage();
       return;
     }
 
-    if (firstVisible === 'timeout') {
-      await this.page.goto('/');
-      await this.page.waitForLoadState('domcontentloaded');
-      await navButton.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
-      return;
-    }
+    // Expect login form — wait for it
+    await this.emailInput.waitFor({ state: 'visible', timeout: 30_000 });
 
-    // On login page — fill and submit
+    // Fill and submit
     await this.login(email, password);
 
-    // After login, might go to dashboard OR setup
-    const postLogin = await Promise.race([
-      navButton.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'dashboard' as const),
-      setupPage.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'setup' as const),
-    ]).catch(() => 'timeout' as const);
-
-    if (postLogin === 'setup') {
-      await this.handleSetupPage();
+    // After login: poll sequentially for dashboard or setup (no concurrent waitFor)
+    let attempts = 0;
+    while (attempts < 40) {
+      const onDashboard = await navButton.isVisible({ timeout: 500 }).catch(() => false);
+      if (onDashboard) return;
+      const onSetup = await setupPage.isVisible({ timeout: 500 }).catch(() => false);
+      if (onSetup) {
+        await this.handleSetupPage();
+        return;
+      }
+      attempts++;
+      await this.page.waitForTimeout(500);
     }
   }
 
