@@ -19,6 +19,9 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
 
 test('change-proof-numero-orden-kilometraje', async ({ page, loginPage, dashboardPage, trabajosPage }) => {
   test.slow();
+  const descriptionText = 'Trabajo de prueba numero_orden + kilometraje';
+  const numeroOrdenValue = 'OT-PR105-TEST';
+  const kilometrajeValue = '55000';
 
   await showPhaseLabel(page, '🔐 Login');
   await loginPage.loginAsTestUser();
@@ -40,41 +43,35 @@ test('change-proof-numero-orden-kilometraje', async ({ page, loginPage, dashboar
     'textarea[placeholder*="descripci" i]',
   ].join(', ')).first();
 
-  if (await descInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await descInput.fill('Prueba PR #105 — con numero_orden y kilometraje');
-    await page.waitForTimeout(400);
-  }
+  await expect(descInput).toBeVisible({ timeout: 10_000 });
+  await descInput.fill(descriptionText);
 
   await showPhaseLabel(page, '🔢 Llenando número de orden');
-  const numeroOrdenInput = page.locator([
-    'input[placeholder*="número de orden" i]',
-    'input[placeholder*="orden" i]',
-    'input[name*="numeroOrden" i]',
-    'input[name*="numero_orden" i]',
-  ].join(', ')).first();
-
-  if (await numeroOrdenInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await numeroOrdenInput.fill('OT-PR105-TEST');
-    await page.waitForTimeout(300);
-  }
+  const numeroOrdenInput = page
+    .getByLabel(/Número de Orden/i)
+    .or(page.getByPlaceholder(/Orden/i))
+    .first();
+  await expect(numeroOrdenInput).toBeVisible({ timeout: 10_000 });
+  await numeroOrdenInput.fill(numeroOrdenValue);
 
   await showPhaseLabel(page, '🛣️ Llenando kilometraje');
   const kilometrajeInput = page.locator([
     'input[placeholder*="kilom" i]',
     'input[name*="kilometraje" i]',
   ].join(', ')).first();
-
-  if (await kilometrajeInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await kilometrajeInput.fill('55000');
-    await page.waitForTimeout(300);
-  }
+  await expect(kilometrajeInput).toBeVisible({ timeout: 10_000 });
+  await kilometrajeInput.fill(kilometrajeValue);
 
   await showPhaseLabel(page, '💾 Guardando trabajo con numero_orden + kilometraje');
+  const errorBanner = page.locator('text=/No se pudo guardar el trabajo/i');
+  const savedRow = page.locator('tr', { hasText: descriptionText }).first();
   await trabajosPage.save();
-  await page.waitForTimeout(3000);
+  await Promise.race([
+    savedRow.waitFor({ state: 'visible', timeout: 15_000 }),
+    errorBanner.waitFor({ state: 'visible', timeout: 15_000 }),
+  ]);
 
   await showPhaseLabel(page, '✅ Verificando: sin error de guardado');
-  const errorBanner = page.locator('text=/No se pudo guardar el trabajo/i');
   const errorVisible = await errorBanner.isVisible({ timeout: 2_000 }).catch(() => false);
 
   expect(
@@ -82,14 +79,31 @@ test('change-proof-numero-orden-kilometraje', async ({ page, loginPage, dashboar
     '❌ Error "No se pudo guardar el trabajo" debe estar AUSENTE — la corrección 42703 debe funcionar'
   ).toBe(false);
 
-  await page.mouse.wheel(0, 500);
-  await page.waitForTimeout(800);
+  await expect(savedRow).toBeVisible({ timeout: 10_000 });
+  await expect(savedRow.getByText(/55,?000 km/i)).toBeVisible({ timeout: 10_000 });
 
   const historial = page.locator('text=/Historial de Trabajos/i');
-  if (await historial.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await expectVisible(historial, '✅ Historial de Trabajos visible — save completado sin crash');
-  }
+  await expectVisible(historial, '✅ Historial de Trabajos visible — save completado sin crash');
+
+  await showPhaseLabel(page, '🔄 Verificando persistencia tras recarga');
+  await page.reload();
+  await trabajosPage.waitForPageLoad();
+
+  const persistedRow = page.locator('tr', { hasText: descriptionText }).first();
+  await expect(persistedRow).toBeVisible({ timeout: 10_000 });
+  await expect(persistedRow.getByText(/55,?000 km/i)).toBeVisible({ timeout: 10_000 });
+  await persistedRow.getByRole('button', { name: /editar/i }).click();
+
+  const persistedNumeroOrdenInput = page
+    .getByLabel(/Número de Orden/i)
+    .or(page.getByPlaceholder(/Orden/i))
+    .first();
+  const persistedKilometrajeInput = page.locator([
+    'input[placeholder*="kilom" i]',
+    'input[name*="kilometraje" i]',
+  ].join(', ')).first();
+  await expect(persistedNumeroOrdenInput).toHaveValue(numeroOrdenValue);
+  await expect(persistedKilometrajeInput).toHaveValue(kilometrajeValue);
 
   await showPhaseLabel(page, '🎉 PR #105 verificado — numero_orden + kilometraje se guardan sin error 42703');
-  await page.waitForTimeout(1500);
 });

@@ -1,4 +1,4 @@
-import type { Page, Locator } from '@playwright/test';
+import { expect, type Page, type Locator } from '@playwright/test';
 import { BasePage } from './BasePage';
 
 /**
@@ -121,13 +121,9 @@ export class TrabajosPage extends BasePage {
   }
 
   async save() {
-    if (await this.saveButton.isVisible().catch(() => false)) {
-      const isDisabled = await this.saveButton.isDisabled().catch(() => false);
-      if (!isDisabled) {
-        await this.saveButton.click();
-        await this.page.waitForTimeout(2000);
-      }
-    }
+    await this.saveButton.waitFor({ state: 'visible', timeout: 10_000 });
+    await expect(this.saveButton).toBeEnabled();
+    await this.saveButton.click();
   }
 
   async finalizar() {
