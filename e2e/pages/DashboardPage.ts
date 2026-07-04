@@ -102,8 +102,9 @@ export class DashboardPage extends BasePage {
   /** Logout the current user. */
   async logout() {
     await this.logoutButton.click();
-    // Wait for redirect to login page
-    await this.page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 20_000 });
+    // Wait for redirect to login page — use .first() to handle pages that may
+    // have multiple email inputs (e.g. PR #110 feedback form adds a second one)
+    await this.page.locator('input[type="email"]').first().waitFor({ state: 'visible', timeout: 20_000 });
   }
 
   /** Get the currently displayed user email. */
