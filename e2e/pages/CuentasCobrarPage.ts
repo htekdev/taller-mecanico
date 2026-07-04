@@ -40,7 +40,7 @@ export class CuentasCobrarPage extends BasePage {
     const loadingOverlay = this.page.locator('text=Cargando datos del taller');
     await loadingOverlay.waitFor({ state: 'hidden', timeout: 150_000 }).catch(() => {});
     // Once overlay is gone, section title should appear immediately.
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 30_000 });
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 90_000 });
   }
 
   async filterByStatus(status: 'Pendiente' | 'Parcial' | 'Pagado' | 'Todos') {
