@@ -34,8 +34,10 @@ export default defineConfig({
   /* Single worker in CI to avoid resource contention with shared DB */
   workers: process.env.CI ? 1 : 2,
 
-  /* Global test timeout — 60s for Vercel preview cold-start tolerance */
-  timeout: 60_000,
+  /* Global test timeout — 90s for Vercel preview cold-start tolerance.
+     Some operations (sidebar.clickTab, selectOption) use explicit 60s action timeouts;
+     the 90s global budget gives them room without the overall test timing out. */
+  timeout: 90_000,
 
   /* Expect timeout */
   expect: { timeout: 10_000 },

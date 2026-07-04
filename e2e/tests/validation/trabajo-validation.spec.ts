@@ -1,5 +1,6 @@
 import { test, expect } from '../../fixtures';
 import { expectVisible, showPhaseLabel } from '../visual-assert';
+import { TestData } from '../../utils/test-data';
 
 /**
  * Trabajo Validation — Form validation and error handling.
@@ -29,8 +30,9 @@ test.describe('Trabajo Validation', () => {
       await precioInput.fill('500');
     }
 
-    // Try to save
-    await trabajosPage.save();
+    // Verify the save button is DISABLED — client, vehicle, and description are all required.
+    // The button disabled condition: guardandoForm || !clienteId || !vehiculoId || !descripcion
+    await expect(trabajosPage.saveButton).toBeDisabled();
 
     // Should still be on the form (not saved without client)
     await expectVisible(trabajosPage.sectionTitle, 'Still on form');
@@ -49,15 +51,12 @@ test.describe('Trabajo Validation', () => {
     await trabajosPage.selectClient(1);
     await trabajosPage.selectVehicle(1);
 
+    // Fill description (required field) — placeholder: "Ej. Servicio completo frenos y aceite..."
+    await trabajosPage.fillDescription('Solo mano de obra E2E — sin refacciones');
+
     // Add only labor — no parts
-    const conceptoInput = page.locator('input[placeholder*="concepto" i], input[placeholder*="descripción" i]').first();
-    if (await conceptoInput.isVisible().catch(() => false)) {
-      await conceptoInput.fill('Solo mano de obra E2E');
-    }
-    const precioInput = page.locator('input[type="number"]').first();
-    if (await precioInput.isVisible().catch(() => false)) {
-      await precioInput.fill('1500');
-    }
+    const labor = TestData.laborItem();
+    await trabajosPage.addLaborItem(labor.concepto, labor.precio);
 
     // Save should work
     await trabajosPage.save();

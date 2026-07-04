@@ -1,4 +1,4 @@
-import type { Page, Locator } from '@playwright/test';
+import { expect, type Page, type Locator } from '@playwright/test';
 import { BasePage } from './BasePage';
 
 /**
@@ -8,11 +8,8 @@ import { BasePage } from './BasePage';
  * search, PDF generation, payment recording.
  */
 export class TrabajosPage extends BasePage {
-  // ─── Section locators ──────────────────────────────────────────────────────
   readonly sectionTitle: Locator;
   readonly nuevoTrabajoButton: Locator;
-
-  // ─── Form locators ─────────────────────────────────────────────────────────
   readonly clientSelect: Locator;
   readonly vehicleSelect: Locator;
   readonly descripcionInput: Locator;
@@ -22,19 +19,13 @@ export class TrabajosPage extends BasePage {
   readonly addManoDeObraButton: Locator;
   readonly saveButton: Locator;
   readonly finalizarButton: Locator;
-
-  // ─── Parts section ─────────────────────────────────────────────────────────
   readonly addPartButton: Locator;
   readonly partSelect: Locator;
   readonly partQuantityInput: Locator;
   readonly partPriceInput: Locator;
-
-  // ─── List / table ──────────────────────────────────────────────────────────
   readonly trabajosList: Locator;
   readonly searchInput: Locator;
   readonly filterSelect: Locator;
-
-  // ─── Detail view ───────────────────────────────────────────────────────────
   readonly editButton: Locator;
   readonly deleteButton: Locator;
   readonly pdfButton: Locator;
@@ -47,7 +38,9 @@ export class TrabajosPage extends BasePage {
 
     this.clientSelect = page.locator('select').first();
     this.vehicleSelect = page.locator('select').nth(1);
-    this.descripcionInput = page.locator('textarea[placeholder*="descripción" i], input[placeholder*="descripción" i]').first();
+    // Actual placeholder in app: "Ej. Servicio completo frenos y aceite..."
+    // Note: DO NOT use "Ej." alone — numeroOrden also starts with "Ej." and appears first in DOM.
+    this.descripcionInput = page.locator('input[placeholder*="Servicio completo" i], input[placeholder*="frenos y aceite" i]').first();
     this.fechaInput = page.locator('input[type="date"]').first();
     this.manoDeObraConceptoInput = page.locator('input[placeholder*="concepto" i], input[placeholder*="mano de obra" i]').first();
     this.manoDeObraPrecioInput = page.locator('input[type="number"]').first();
@@ -71,17 +64,23 @@ export class TrabajosPage extends BasePage {
   }
 
   async waitForPageLoad() {
-    await this.sectionTitle.waitFor({ state: 'visible', timeout: 15_000 });
+    // Wait for cargando overlay to disappear, but only if it actually appears.
+    // Using isVisible check first so a permanently stuck overlay fails the test instead of being swallowed.
+    const loadingOverlay = this.page.locator('text=Cargando datos del taller');
+    const overlayVisible = await loadingOverlay.isVisible({ timeout: 2_000 }).catch(() => false);
+    if (overlayVisible) {
+      await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 });
+    }
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 45_000 });
   }
 
-  /** Select a client for the new trabajo. */
   async selectClient(index = 1) {
     await this.page.waitForFunction(
       () => {
         const sel = document.querySelector('select');
         return sel && sel.options.length > 1;
       },
-      { timeout: 15_000 }
+      { timeout: 45_000 }
     ).catch(() => {});
     const count = await this.getOptionCount(this.clientSelect);
     if (count > 1) {
@@ -90,7 +89,6 @@ export class TrabajosPage extends BasePage {
     }
   }
 
-  /** Select a vehicle. */
   async selectVehicle(index = 1) {
     if (await this.vehicleSelect.isVisible().catch(() => false)) {
       const count = await this.getOptionCount(this.vehicleSelect);
@@ -100,26 +98,32 @@ export class TrabajosPage extends BasePage {
     }
   }
 
-  /** Fill description field. */
   async fillDescription(text: string) {
-    if (await this.descripcionInput.isVisible().catch(() => false)) {
+    // Use a precise locator — placeholder is "Ej. Servicio completo frenos y aceite..."
+    // Cannot use "Ej." alone — numeroOrden field also starts with "Ej." and is first in DOM.
+    const precise = this.page.locator('input[placeholder*="Servicio completo" i], input[placeholder*="frenos y aceite" i]').first();
+    if (await precise.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await this.fillInput(precise, text);
+      await this.page.waitForTimeout(300);
+      return;
+    }
+    // Fallback to the locator defined in constructor
+    if (await this.descripcionInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await this.fillInput(this.descripcionInput, text);
     }
   }
 
-  /** Add a mano de obra (labor) line. */
   async addLaborItem(concepto: string, precio: number) {
-    // Fill concepto — placeholder: "Ej. Arreglo de frenos, engrase de pernos..."
-    const conceptoInput = this.page.locator('input[placeholder*="Arreglo de frenos" i], input[placeholder*="Ej." i]').first();
+    // Mano de obra concepto: placeholder="Ej. Arreglo de frenos, engrase de pernos..."
+    // Use a specific selector that won't accidentally match the main description field.
+    const conceptoInput = this.page.locator('input[placeholder*="Arreglo de frenos" i], input[placeholder*="engrase" i]').first();
     if (await conceptoInput.isVisible().catch(() => false)) {
       await conceptoInput.fill(concepto);
     }
-    // Fill precio — the number input for price in the labor row
     const precioInput = this.page.locator('input[type="number"][placeholder="0.00"]').first();
     if (await precioInput.isVisible().catch(() => false)) {
       await precioInput.fill(String(precio));
     }
-    // Click "+ Agregar" to add the labor item
     if (await this.addManoDeObraButton.isVisible().catch(() => false)) {
       const isDisabled = await this.addManoDeObraButton.isDisabled().catch(() => false);
       if (!isDisabled) {
@@ -129,52 +133,48 @@ export class TrabajosPage extends BasePage {
     }
   }
 
-  /** Save the trabajo. */
   async save() {
-    // Wait for button to be actionable (might be disabled until form valid)
-    if (await this.saveButton.isVisible().catch(() => false)) {
-      const isDisabled = await this.saveButton.isDisabled().catch(() => false);
-      if (!isDisabled) {
-        await this.saveButton.click();
-        await this.page.waitForTimeout(2000);
-      }
+    // Soft save — waits for button to appear but does not hard-assert enabled state.
+    // Tests that verify save success check the error banner absence and saved row presence.
+    // Hard assertion (toBeEnabled) requires all test data (client+vehicle+description) to
+    // be fully set up — track separately from this hotfix PR.
+    await this.saveButton.waitFor({ state: 'visible', timeout: 10_000 });
+    const isDisabled = await this.saveButton.isDisabled().catch(() => true);
+    if (!isDisabled) {
+      await this.saveButton.click();
+      await this.page.waitForTimeout(500);
     }
   }
 
-  /** Finalize a trabajo. */
   async finalizar() {
     await this.finalizarButton.click();
     await this.page.waitForTimeout(2000);
   }
 
-  /** Get the count of trabajos in the list. */
   async getTrabajoCount(): Promise<number> {
     const items = this.page.locator('.border.rounded-xl:has(button:has-text("Editar")), [data-testid="trabajo-item"]');
     return items.count();
   }
 
-  /** Get total displayed for a trabajo. */
   async getDisplayedTotal(): Promise<string> {
     const total = this.page.locator('text=/Total:.*\\$[\\d,.]+/').first();
     return this.getText(total);
   }
 
-  /** Check if finalize was successful (estado changes to 'terminado'). */
   async wasFinalizarSuccessful(): Promise<boolean> {
     const badge = this.page.locator('text=/terminado|finalizado/i').first();
     return badge.isVisible().catch(() => false);
   }
 
-  /** Check for error message after finalizar attempt. */
   async getFinalizarError(): Promise<string | null> {
-    const error = this.page.locator('.bg-rose-50, .text-red-600, .border-rose-200').first();
+    // Match the actual error div: bg-red-50 + border-red-200 (not rose-colored structural elements)
+    const error = this.page.locator('div.bg-red-50.border-red-200, div.bg-red-50.border.border-red-200').first();
     if (await error.isVisible().catch(() => false)) {
       return this.getText(error);
     }
     return null;
   }
 
-  /** Search trabajos by query. */
   async search(query: string) {
     if (await this.searchInput.isVisible().catch(() => false)) {
       await this.fillInput(this.searchInput, query);
@@ -182,7 +182,6 @@ export class TrabajosPage extends BasePage {
     }
   }
 
-  /** Filter trabajos by status. */
   async filterByStatus(status: string) {
     if (await this.filterSelect.isVisible().catch(() => false)) {
       await this.filterSelect.selectOption({ label: status });
@@ -190,7 +189,6 @@ export class TrabajosPage extends BasePage {
     }
   }
 
-  /** Click edit on a specific trabajo (by index in list). */
   async clickEditOnTrabajo(index = 0) {
     const editButtons = this.page.getByRole('button', { name: /editar/i });
     const all = await editButtons.all();

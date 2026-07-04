@@ -64,6 +64,9 @@ test.describe('Sofia Regression Tests', () => {
     await trabajosPage.selectClient(1);
     await trabajosPage.selectVehicle(1);
 
+    // Fill description (required field: "Ej. Servicio completo frenos y aceite...")
+    await trabajosPage.fillDescription(TestData.trabajoDescription());
+
     // Add ONLY labor — no parts
     const labor = TestData.laborItem();
     await trabajosPage.addLaborItem(labor.concepto, labor.precio);

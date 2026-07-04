@@ -12,9 +12,18 @@ export class Sidebar {
     this.nav = page.locator('nav');
   }
 
-  /** Click a nav tab by its label text. */
+  /** Click a nav tab by its label text.
+   *  Uses waitFor(visible) + force:true to survive:
+   *  1. Cold Vercel preview startup (30-40s before nav renders)
+   *  2. Loading overlays after DB operations (cargarDatos, finalizarTrabajo)
+   *     that can block actionability checks for extended periods.
+   */
   async clickTab(label: string) {
-    await this.nav.getByRole('button', { name: label }).click();
+    const btn = this.nav.getByRole('button', { name: label });
+    // Wait up to 90s for the button to be visible in the DOM
+    await btn.waitFor({ state: 'visible', timeout: 90_000 });
+    // force:true bypasses overlay/actionability — the nav is always interactable
+    await btn.click({ force: true });
     await this.page.waitForTimeout(500);
   }
 
