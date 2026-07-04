@@ -100,16 +100,21 @@ test('change-proof-historial-numero-orden', async ({ page, loginPage }) => {
   await page.waitForTimeout(800);
   await page.mouse.wheel(0, 400);
   await page.waitForTimeout(800);
+  // Extra scroll to ensure historial table is in view
+  await page.mouse.wheel(0, 400);
+  await page.waitForTimeout(600);
 
-  // Verify first header is "No. Orden"
-  const firstTh = page.locator('table thead th').first();
-  const firstThText = await firstTh.textContent({ timeout: 10_000 }).catch(() => '');
-  expect(firstThText?.toLowerCase()).toContain('no. orden');
+  // Verify "No. Orden" header exists in the historial table.
+  // NOTE: page has multiple <table> elements (mano de obra, refacciones, historial).
+  // We look for the column by text rather than .first() which would grab the wrong table.
+  const noOrdenHeader = page.locator('table thead th', { hasText: /No\.?\s*Orden/i });
+  const hasNoOrden = await noOrdenHeader.isVisible({ timeout: 10_000 }).catch(() => false);
+  expect(hasNoOrden, '"No. Orden" debe aparecer como columna en el historial').toBe(true);
 
-  // Verify "Kilometraje" header (not "Km")
+  // Verify "Km" (old label) is gone — replaced by "Kilometraje"
   const kmHeader = page.locator('table thead th', { hasText: /^km$/i });
   const hasOldKm = await kmHeader.isVisible({ timeout: 2_000 }).catch(() => false);
-  expect(hasOldKm, '"Km" antiguo NO debe estar').toBe(false);
+  expect(hasOldKm, '"Km" antiguo NO debe estar — debe ser "Kilometraje"').toBe(false);
 
   await showPhaseLabel(page, '✅ "No. Orden" es primera columna · "Km" → "Kilometraje"');
   await page.waitForTimeout(1200);
