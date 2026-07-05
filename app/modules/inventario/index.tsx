@@ -13,6 +13,8 @@ export function VistaInventario({
   onGuardarRefaccion,
   onRecibirStock,
   onActualizarCompatibilidad,
+  onEliminarRefaccion,
+  onGuardarProveedor,
 }: {
   inventario: Refaccion[];
   clientes: Cliente[];
@@ -21,6 +23,8 @@ export function VistaInventario({
   onGuardarRefaccion: (r: Omit<Refaccion, 'id'>) => Promise<void>;
   onRecibirStock: (id: string, cantidad: number) => void;
   onActualizarCompatibilidad: (id: string, compatibilidad: CompatibilidadVehiculo[]) => void;
+  onEliminarRefaccion: (id: string) => Promise<void>;
+  onGuardarProveedor: (data: Omit<Proveedor, 'id'>) => Promise<void>;
 }) {
   const [form, setForm] = useState({
     nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza',
@@ -35,6 +39,18 @@ export function VistaInventario({
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [guardandoForm, setGuardandoForm] = useState(false);
   const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
+
+  // ── Estado para eliminar pieza ──
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState<string | null>(null);
+  const [eliminandoPieza, setEliminandoPieza]         = useState<string | null>(null);
+  const [errorEliminar, setErrorEliminar]             = useState<string | null>(null);
+
+  // ── Estado para agregar proveedor inline ──
+  const [mostrarFormProveedor, setMostrarFormProveedor] = useState(false);
+  const [nuevoProveedorNombre, setNuevoProveedorNombre] = useState('');
+  const [nuevoProveedorTel, setNuevoProveedorTel]       = useState('');
+  const [guardandoProveedor, setGuardandoProveedor]     = useState(false);
+  const [errorProveedor, setErrorProveedor]             = useState<string | null>(null);
 
   // ── Estado para edición de compatibilidad de piezas existentes ──
   // Modelo plano: cada entrada es un par (marca, modelo)
@@ -145,6 +161,36 @@ export function VistaInventario({
       onRecibirStock(id, cant);
       setRecibirCantidad(prev => ({ ...prev, [id]: 0 }));
       setExpandido(null);
+    }
+  };
+
+  const handleEliminar = async (id: string) => {
+    setEliminandoPieza(id);
+    setErrorEliminar(null);
+    try {
+      await onEliminarRefaccion(id);
+      setConfirmandoEliminar(null);
+    } catch (err) {
+      setErrorEliminar(err instanceof Error ? err.message : 'No se pudo eliminar la pieza');
+    } finally {
+      setEliminandoPieza(null);
+    }
+  };
+
+  const handleGuardarProveedor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nuevoProveedorNombre.trim()) return;
+    setGuardandoProveedor(true);
+    setErrorProveedor(null);
+    try {
+      await onGuardarProveedor({ nombre: nuevoProveedorNombre.trim(), telefono: nuevoProveedorTel.trim() });
+      setNuevoProveedorNombre('');
+      setNuevoProveedorTel('');
+      setMostrarFormProveedor(false);
+    } catch (err) {
+      setErrorProveedor(err instanceof Error ? err.message : 'No se pudo guardar el proveedor');
+    } finally {
+      setGuardandoProveedor(false);
     }
   };
 
@@ -269,15 +315,51 @@ export function VistaInventario({
           </div>
 
           {/* ── Proveedor (opcional) ── */}
-          {proveedores.length > 0 && (
-            <div>
-              <Label>🏪 Proveedor habitual <span className="font-normal text-slate-400">(opcional)</span></Label>
+          <div className="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">🏪 Proveedor habitual <span className="font-normal normal-case text-slate-400">(opcional)</span></p>
+              </div>
+              <Btn size="sm" variant="ghost" type="button" onClick={() => setMostrarFormProveedor(v => !v)}
+                className="whitespace-nowrap">
+                {mostrarFormProveedor ? '✕ Cancelar' : '+ Nuevo proveedor'}
+              </Btn>
+            </div>
+
+            {mostrarFormProveedor && (
+              <form onSubmit={handleGuardarProveedor} className="bg-slate-50 rounded-lg p-3 space-y-2">
+                <p className="text-xs font-semibold text-slate-600">Agregar nuevo proveedor:</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input type="text" placeholder="Nombre del proveedor *"
+                    aria-label="Nombre del proveedor"
+                    value={nuevoProveedorNombre}
+                    onChange={e => setNuevoProveedorNombre(e.target.value)}
+                    className="w-full sm:flex-1" required />
+                  <Input type="tel" inputMode="tel" placeholder="Teléfono"
+                    aria-label="Teléfono del proveedor"
+                    value={nuevoProveedorTel}
+                    onChange={e => setNuevoProveedorTel(e.target.value)}
+                    className="w-full sm:flex-1" />
+                  <Btn type="submit" size="sm" variant="primary" disabled={guardandoProveedor || !nuevoProveedorNombre.trim()}
+                    className="whitespace-nowrap">
+                    {guardandoProveedor ? '⏳' : '✓ Guardar'}
+                  </Btn>
+                </div>
+                {errorProveedor && (
+                  <p className="text-xs text-rose-600 mt-1">⚠️ {errorProveedor}</p>
+                )}
+              </form>
+            )}
+
+            {proveedores.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No hay proveedores registrados. Usa &quot;+ Nuevo proveedor&quot; para agregar uno.</p>
+            ) : (
               <Select value={form.proveedorId} onChange={e => setForm(f => ({ ...f, proveedorId: e.target.value }))}>
                 <option value="">Sin proveedor asignado</option>
                 {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
               </Select>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* ── Compatibilidad de vehículos ── */}
           <div className="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
@@ -453,6 +535,28 @@ export function VistaInventario({
                                 onClick={() => isEditCompat ? setEditandoCompat(null) : abrirEditCompat(r)}>
                                 {isEditCompat ? '✕ Cerrar' : '🚗 Compatibilidad'}
                               </Btn>
+                              {confirmandoEliminar === r.id ? (
+                                <div className="flex flex-col gap-1 mt-0.5 items-center">
+                                  <div className="flex gap-1">
+                                    <Btn size="sm" variant="danger"
+                                      disabled={eliminandoPieza === r.id}
+                                      onClick={() => handleEliminar(r.id)}>
+                                      {eliminandoPieza === r.id ? '⏳' : '✓ Confirmar'}
+                                    </Btn>
+                                    <Btn size="sm" variant="ghost" onClick={() => { setConfirmandoEliminar(null); setErrorEliminar(null); }}>
+                                     Cancelar
+                                    </Btn>
+                                  </div>
+                                  {errorEliminar && (
+                                    <p className="text-xs text-rose-600 max-w-[120px] text-center">⚠️ {errorEliminar}</p>
+                                  )}
+                                </div>
+                              ) : (
+                                <Btn size="sm" variant="danger"
+                                  onClick={() => { setConfirmandoEliminar(r.id); setErrorEliminar(null); }}>
+                                  🗑 Eliminar
+                                </Btn>
+                              )}
                             </div>
                           </td>
                         </tr>
