@@ -182,7 +182,7 @@ export async function updateRefacciones(items: Refaccion[]): Promise<void> {
 
 export async function deleteRefaccion(tallerId: string, id: string): Promise<void> {
   const { error } = await supabase.from('refacciones').delete().eq('id', id).eq('taller_id', tallerId);
-  if (error) throw new Error(deleteRefaccion: ${error.message});
+  if (error) throw new Error(`deleteRefaccion: ${error.message}`);
 }
 
 // ── Proveedores ───────────────────────────────────────────────
