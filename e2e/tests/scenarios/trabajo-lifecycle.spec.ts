@@ -113,21 +113,20 @@ test.describe('Trabajo Lifecycle', () => {
         await finalizarBtns.first().click();
 
         // Dismiss the Nota/Factura modal if it appeared.
-        // The button's accessible text is full content — match via filter({ hasText: 'Sin IVA' })
-        // which uniquely targets the Nota button in the ¿Cómo se va a cobrar? modal.
+        // The modal MUST be dismissed before navigating to CxC — otherwise the
+        // sidebar click may go through but the modal state prevents CxC from rendering.
+        //
+        // Approach 1: button with 'Sin IVA' text (¿Cómo se va a cobrar? modal)
         const notaBtn = page.locator('button').filter({ hasText: 'Sin IVA' });
         if (await notaBtn.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
           await notaBtn.first().click();
         }
         await page.waitForTimeout(2000); // wait for Supabase UPDATE to complete
 
-        // Dismiss the Nota/Factura modal if it appeared.
-        // The modal MUST be dismissed before navigating to CxC — otherwise the
-        // sidebar click may go through but the modal state prevents the CxC
-        // section from rendering, causing a waitForPageLoad timeout.
-        const notaBtn = page.getByRole('button', { name: /^nota$/i });
-        if (await notaBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-          await notaBtn.click();
+        // Approach 2: fallback for Nota modal using accessible name
+        const notaBtnFallback = page.getByRole('button', { name: /^nota$/i });
+        if (await notaBtnFallback.isVisible({ timeout: 3_000 }).catch(() => false)) {
+          await notaBtnFallback.click();
           await page.waitForTimeout(2000); // wait for Supabase UPDATE
         }
 
