@@ -117,6 +117,7 @@ test.describe('Trabajo Lifecycle', () => {
         // Dismiss the Nota/Factura modal if it appeared.
         // Modal MUST be fully closed before navigating to CxC.
         // NOTE: button accessible text is full content, match via filter({ hasText: 'Sin IVA' })
+
         const notaBtn = page.locator('button').filter({ hasText: 'Sin IVA' });
         if (await notaBtn.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
           await notaBtn.first().click();
@@ -135,6 +136,14 @@ test.describe('Trabajo Lifecycle', () => {
           }
           await page.waitForTimeout(500); // Brief settle after modal close
         }
+
+        // Approach 2: fallback for Nota modal using accessible name
+        const notaBtnFallback = page.getByRole('button', { name: /^nota$/i });
+        if (await notaBtnFallback.isVisible({ timeout: 3_000 }).catch(() => false)) {
+          await notaBtnFallback.click();
+          await page.waitForTimeout(2000); // wait for Supabase UPDATE
+        }
+
 
         // Check result
         const error = await trabajosPage.getFinalizarError();
