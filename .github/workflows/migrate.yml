@@ -36,12 +36,19 @@ jobs:
       - name: Install Supabase CLI
         run: npm install -g supabase@latest
 
+      - name: Link Supabase project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          echo "Linking to Supabase project fzondawpxhkojszrwgck..."
+          supabase link --project-ref fzondawpxhkojszrwgck
+
       - name: Apply pending migrations
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          echo "Applying migrations to project fzondawpxhkojszrwgck..."
-          supabase db push --project-ref fzondawpxhkojszrwgck
+          echo "Applying migrations to linked project..."
+          supabase db push --linked
           echo "✅ Migrations applied successfully"
 
       - name: Verify critical columns exist
@@ -49,7 +56,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           echo "Verifying critical columns..."
-          supabase db execute --project-ref fzondawpxhkojszrwgck --sql \
+          supabase db execute --linked --sql \
             "SELECT column_name FROM information_schema.columns WHERE table_name = 'trabajos' AND column_name IN ('numero_orden', 'kilometraje') ORDER BY column_name" \
             2>&1 | tee /tmp/verify.txt
           if grep -q "numero_orden" /tmp/verify.txt && grep -q "kilometraje" /tmp/verify.txt; then
