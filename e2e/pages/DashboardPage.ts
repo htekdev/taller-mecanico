@@ -73,7 +73,7 @@ export class DashboardPage extends BasePage {
   async navigateToModule(module: ModuleKey) {
     // Wait for app to finish initial load before navigating (cold Vercel preview tolerance)
     await this.page.locator('[data-testid="app-content-loaded"]')
-      .waitFor({ state: 'visible', timeout: 150_000 }).catch(() => {});
+      .waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
     const label = MODULE_LABELS[module];
     const tab = this.nav.getByRole('button', { name: label });
     await tab.click();
