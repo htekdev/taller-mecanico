@@ -45,5 +45,6 @@ full-log.txt
 
 # E2E artifacts
 e2e/results/
+playwright-report/
 playwright-report/data/
 test-results/

@@ -167,8 +167,11 @@ export class TrabajosPage extends BasePage {
   }
 
   async getFinalizarError(): Promise<string | null> {
-    // Match the actual error div: bg-red-50 + border-red-200 (not rose-colored structural elements)
-    const error = this.page.locator('div.bg-red-50.border-red-200, div.bg-red-50.border.border-red-200').first();
+    // Match the actual error banner: page.tsx uses bg-rose-50 border-rose-200 (rose scale, not red).
+    // Also check bg-red-50 as a fallback for older patterns.
+    const error = this.page.locator(
+      'div.bg-rose-50, div[role="alert"].bg-rose-50, div.bg-red-50.border-red-200, div.bg-red-50.border.border-red-200'
+    ).first();
     if (await error.isVisible().catch(() => false)) {
       return this.getText(error);
     }

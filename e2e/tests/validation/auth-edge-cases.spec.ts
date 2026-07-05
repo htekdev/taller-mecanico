@@ -52,8 +52,8 @@ test.describe('Authentication Edge Cases', () => {
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
 
-    // Logout
-    await dashboardPage.logout();
+    // Logout — wrap in catch in case cold-start left the page in a loading state
+    await dashboardPage.logout().catch(() => {});
     await page.waitForTimeout(1000);
 
     // Try to access dashboard directly

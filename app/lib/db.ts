@@ -267,7 +267,7 @@ function buildInsertTrabajoPayload(tallerId: string, data: Omit<Trabajo, 'id'>) 
     // New optional columns — only include when the user actually supplied a non-empty value
     // so the INSERT never fails with "column not found" on an older DB schema.
     // NOTE: emptyForm uses '' (empty string) for unset fields — handleSubmit converts to undefined,
-    // but the falsy check here adds an extra safety layer.
+    // but the extra guard here adds a safety layer.
     ...(data.kilometraje !== undefined && data.kilometraje !== null ? { kilometraje: data.kilometraje } : {}),
     ...(data.numeroOrden ? { numero_orden: data.numeroOrden } : {}),
     // Migration 005 columns — only include when explicitly set (not empty string defaults)
