@@ -1,4 +1,5 @@
 name: Apply Database Migrations
+# Updated: 2026-07-05 — use supabase link + --linked flag instead of --project-ref
 
 on:
   # Manual trigger — run after merging to main to apply pending migrations
