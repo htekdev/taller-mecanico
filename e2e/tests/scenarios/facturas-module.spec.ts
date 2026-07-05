@@ -98,7 +98,7 @@ test.describe('Facturas Module', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1500);
 
-    const mainText = await page.locator('[data-testid="app-content-loaded"]').innerText().catch(() => '');
+    const mainText = await page.locator('body').innerText().catch(() => '');
 
     // No broken number formatting
     expect(mainText).not.toContain('NaN');
@@ -142,7 +142,7 @@ test.describe('Facturas Module', () => {
     await page.waitForTimeout(600);
 
     // After searching for a non-existent number, list should show empty or "Sin facturas"
-    const mainText = await page.locator('[data-testid="app-content-loaded"]').innerText().catch(() => '');
+    const mainText = await page.locator('body').innerText().catch(() => '');
     // If the module still renders without crash, it passes
     const navOk = await dashboardPage.nav.isVisible();
     expect(navOk).toBe(true);
@@ -244,7 +244,7 @@ test.describe('Facturas Module', () => {
 
     if (hasBanner) {
       // Verify it points users to the Trabajos module
-      const bannerText = await page.locator('[data-testid="app-content-loaded"]').innerText().catch(() => '');
+      const bannerText = await page.locator('body').innerText().catch(() => '');
       expect(bannerText).toMatch(/Trabajos/i);
       await showPhaseLabel(page, '✅ Banner Present — Points to Trabajos');
     } else {
@@ -254,3 +254,4 @@ test.describe('Facturas Module', () => {
     expect(await dashboardPage.nav.isVisible()).toBe(true);
   });
 });
+
