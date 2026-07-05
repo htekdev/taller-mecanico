@@ -14,7 +14,9 @@ jobs:
     # Only run when Vercel deploys successfully
     if: github.event.deployment_status.state == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Suite has grown to 55+ tests (~49s avg each). 90min covers up to ~110 tests.
+    # TODO: implement Playwright sharding (--shard=X/N) once suite exceeds ~80 tests.
+    timeout-minutes: 90
 
     # Required for posting PR comments
     permissions:

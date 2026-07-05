@@ -18,8 +18,17 @@ CREATE TABLE IF NOT EXISTS cotizaciones (
   created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_cotizaciones_taller_id
-  ON cotizaciones (taller_id, created_at DESC);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes WHERE indexname = 'idx_cotizaciones_taller_id'
+  ) THEN
+    CREATE INDEX idx_cotizaciones_taller_id
+      ON cotizaciones (taller_id, created_at DESC);
+  END IF;
+EXCEPTION WHEN insufficient_privilege THEN
+  NULL; -- Index may already exist; owner check not required when index exists
+END $$;
 
 CREATE TABLE IF NOT EXISTS cotizacion_counter (
   taller_id   UUID REFERENCES talleres(id) ON DELETE CASCADE PRIMARY KEY,

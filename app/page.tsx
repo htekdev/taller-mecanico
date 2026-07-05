@@ -812,7 +812,7 @@ export default function TallerMecanico() {
             <div className="text-slate-400 text-sm">Cargando datos del taller...</div>
           </div>
         ) : (
-        <Card className="p-6 sm:p-8">
+        <Card className="p-6 sm:p-8" data-testid="app-content-loaded">
           {vista === 'clientes' && (
             <VistaClientes clientes={clientes} vehiculos={vehiculos}
               onGuardarCliente={guardarCliente} onGuardarVehiculo={guardarVehiculo}
