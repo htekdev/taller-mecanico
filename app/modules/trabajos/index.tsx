@@ -8,12 +8,7 @@ import { getPricingIntel } from '@/app/lib/pricing';
 
 // ─── Departamentos localStorage ───────────────────────────────────────────────
 
-const DEPTOS_KEY = 'taller_departamentos_ayuntamiento';
-const DEFAULT_DEPTOS: string[] = [
-  'Obras públicas mantenimiento vial',
-  'Servicios públicos aseo urbano poniente',
-  'Servicios públicos aseo urbano oriente',
-];
+import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
 
 function loadDepartamentos(): string[] {
   try {

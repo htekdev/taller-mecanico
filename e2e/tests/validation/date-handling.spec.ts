@@ -21,6 +21,10 @@ test.describe('Date Handling', () => {
     page, dashboardPage, sidebar
   }) => {
     test.slow(); // Multi-module navigation needs extra time
+
+    // Ensure app is fully loaded before starting sidebar navigation
+    await dashboardPage.waitForPageLoad();
+
     const modules = ['Trabajos', 'Órdenes de Compra', 'Gastos', 'Por Cobrar'] as const;
 
     for (const mod of modules) {
@@ -28,7 +32,7 @@ test.describe('Date Handling', () => {
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(1500).catch(() => {});
 
-      const bodyText = await page.locator('main').innerText().catch(() => '');
+      const bodyText = await page.locator('body').innerText().catch(() => '');
       expect(bodyText).not.toContain('Invalid Date');
       expect(bodyText).not.toContain('NaN');
     }
@@ -72,7 +76,7 @@ test.describe('Date Handling', () => {
     await page.waitForTimeout(1500);
 
     // If there are trabajos with dates, the year should be visible
-    const bodyText = await page.locator('main').innerText().catch(() => '');
+    const bodyText = await page.locator('body').innerText().catch(() => '');
     // This is a soft check — if there's data, dates should include current year
     if (bodyText.includes('/') || bodyText.includes('-')) {
       // Has date-like content — verify no garbage years
