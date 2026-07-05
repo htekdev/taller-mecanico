@@ -94,6 +94,11 @@ export default function TallerMecanico() {
     const nuevo = await db.insertRefaccion(taller.id, data); // throws on error
     setInventario(prev => [...prev, nuevo]);
   };
+  const eliminarRefaccion = async (id: string) => {
+    if (!taller) return;
+    await db.deleteRefaccion(taller.id, id);
+    setInventario(prev => prev.filter(r => r.id !== id));
+  };
   const recibirStock = async (refaccionId: string, cantidad: number) => {
     const ref = inventario.find(r => r.id === refaccionId);
     if (!ref) return;
@@ -337,7 +342,8 @@ export default function TallerMecanico() {
   const guardarProveedor = async (data: Omit<Proveedor, 'id'>) => {
     if (!taller) return;
     const nuevo = await db.insertProveedor(taller.id, data);
-    if (nuevo) setProveedores(prev => [...prev, nuevo]);
+    if (!nuevo) throw new Error('No se pudo guardar el proveedor');
+    setProveedores(prev => [...prev, nuevo]);
   };
 
   // ── Purchase Order handlers ──
@@ -822,7 +828,9 @@ export default function TallerMecanico() {
             <VistaInventario inventario={inventario} clientes={clientes} vehiculos={vehiculos}
               proveedores={proveedores}
               onGuardarRefaccion={guardarRefaccion} onRecibirStock={recibirStock}
-              onActualizarCompatibilidad={actualizarCompatibilidad} />
+              onActualizarCompatibilidad={actualizarCompatibilidad}
+              onEliminarRefaccion={eliminarRefaccion}
+              onGuardarProveedor={guardarProveedor} />
           )}
           {vista === 'trabajos' && (
             <VistaTrabajo clientes={clientes} vehiculos={vehiculos} inventario={inventario}
