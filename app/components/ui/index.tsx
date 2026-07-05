@@ -78,7 +78,7 @@ export function Btn({
 
 export function Card({ children, className = '', ...props }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-slate-200 ${className}` {...props}>
+    <div className={`bg-white rounded-2xl shadow-sm border border-slate-200 ${className}`} {...props}>
       {children}
     </div>
   );
