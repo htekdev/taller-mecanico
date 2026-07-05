@@ -76,7 +76,7 @@ export class DashboardPage extends BasePage {
       .waitFor({ state: 'visible', timeout: 150_000 }).catch(() => {});
     const label = MODULE_LABELS[module];
     const tab = this.nav.getByRole('button', { name: label });
-    await tab.click();
+    await tab.click({ timeout: 60_000 });
     // Wait for the tab to become active
     await tab.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
     // Small delay for module content to render
