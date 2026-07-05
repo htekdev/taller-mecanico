@@ -1,4 +1,3 @@
-EAD
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -710,8 +709,8 @@ export default function TallerMecanico() {
     { key: 'gastos',        icon: '💸', label: 'Gastos',            count: gastos.filter(g => g.fecha.startsWith(mesActual)).length > 0 ? gastos.filter(g => g.fecha.startsWith(mesActual)).length : null },
     { key: 'historial',     icon: '📋', label: 'Historial',          count: null },
     { key: 'cotizaciones',  icon: '📄', label: 'Cotizaciones',       count: null },
-    { key: 'reportes',      icon: '📣', label: 'Reportes',           count: null },
     { key: 'configuracion', icon: '⚙️', label: 'Configuración',     count: null },
+    { key: 'reportes',      icon: '📣', label: 'Reportes',           count: null },
   ] as const;
 
   return (
@@ -987,3 +986,4 @@ export default function TallerMecanico() {
       )}
     </div>
   );
+}
