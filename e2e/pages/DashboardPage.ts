@@ -60,7 +60,7 @@ export class DashboardPage extends BasePage {
     // waitFor({ state: 'hidden' }) resolves instantly if the overlay hasn't mounted yet.
     // On Vercel preview with 8 parallel Supabase queries this can take 2+ minutes.
     await this.page.locator('[data-testid="app-content-loaded"]')
-      .waitFor({ state: 'visible', timeout: 150_000 }).catch(() => {});
+      .waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
   }
 
   /** Navigate to the dashboard directly (assumes logged in). */
