@@ -42,3 +42,8 @@ next-env.d.ts
 ci-report/
 ci-log.txt
 full-log.txt
+
+# E2E artifacts
+e2e/results/
+playwright-report/data/
+test-results/
