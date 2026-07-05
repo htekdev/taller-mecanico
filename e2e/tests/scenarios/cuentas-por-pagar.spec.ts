@@ -76,7 +76,7 @@ test.describe('Cuentas por Pagar (Por Pagar)', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1500);
 
-    const mainText = await page.locator('[data-testid="app-content-loaded"]').innerText().catch(() => '');
+    const mainText = await page.locator('body').innerText().catch(() => '');
 
     // No broken number formatting
     expect(mainText).not.toContain('NaN');
@@ -104,7 +104,7 @@ test.describe('Cuentas por Pagar (Por Pagar)', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1000);
 
-    const mainText = await page.locator('[data-testid="app-content-loaded"]').innerText().catch(() => '');
+    const mainText = await page.locator('body').innerText().catch(() => '');
 
     // If no payables exist, the empty state message should be Spanish
     const hasEmptyState =
@@ -133,7 +133,7 @@ test.describe('Cuentas por Pagar (Por Pagar)', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1500);
 
-    const mainText = await page.locator('[data-testid="app-content-loaded"]').innerText().catch(() => '');
+    const mainText = await page.locator('body').innerText().catch(() => '');
 
     // "Total por Pagar" heading appears in either the services or refacciones summary
     const hasTotalLabel =
@@ -230,7 +230,7 @@ test.describe('Cuentas por Pagar (Por Pagar)', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1500);
 
-    const mainText = await page.locator('[data-testid="app-content-loaded"]').innerText().catch(() => '');
+    const mainText = await page.locator('body').innerText().catch(() => '');
 
     // If payables exist, they should be categorized correctly
     // The module tracks both "servicios externos" payables and "ordenes de compra" payables
@@ -253,3 +253,4 @@ test.describe('Cuentas por Pagar (Por Pagar)', () => {
     await showPhaseLabel(page, '✅ Category Sections Present');
   });
 });
+
