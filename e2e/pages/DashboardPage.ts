@@ -71,9 +71,14 @@ export class DashboardPage extends BasePage {
 
   /** Navigate to a specific module tab. */
   async navigateToModule(module: ModuleKey) {
-    // Wait for app to finish initial load before navigating (cold Vercel preview tolerance)
-    await this.page.locator('[data-testid="app-content-loaded"]')
-      .waitFor({ state: 'visible', timeout: 150_000 }).catch(() => {});
+    // Only wait for cold-start if app hasn't loaded yet — avoids exceeding 90s test budget
+    // on subsequent navigations within the same test (isVisible check is instant)
+    const alreadyLoaded = await this.page.locator('[data-testid="app-content-loaded"]')
+      .isVisible().catch(() => false);
+    if (!alreadyLoaded) {
+      await this.page.locator('[data-testid="app-content-loaded"]')
+        .waitFor({ state: 'visible', timeout: 45_000 }).catch(() => {});
+    }
     const label = MODULE_LABELS[module];
     const tab = this.nav.getByRole('button', { name: label });
     await tab.click();
