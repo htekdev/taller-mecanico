@@ -34,11 +34,12 @@ export class CuentasCobrarPage extends BasePage {
   }
 
   async waitForPageLoad() {
-    // guardarTrabajo triggers a full 8-table cargarDatos() reload which can take
-    // 2+ minutes on a cold Vercel preview — wait long enough for it to complete.
-    const loadingOverlay = this.page.locator('text=Cargando datos del taller');
-    await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 }).catch(() => {});
-    // Once overlay is gone, section title should appear immediately.
+    // Wait for app content to be loaded (positive signal — only renders when cargando=false).
+    // This avoids the overlay race condition where waitFor('hidden') resolves immediately
+    // if the overlay hasn't mounted yet. The data-testid Card only appears after cargarDatos().
+    await this.page.locator('[data-testid="app-content-loaded"]')
+      .waitFor({ state: 'visible', timeout: 150_000 }).catch(() => {});
+    // Once app content is loaded, section title should appear immediately.
     await this.sectionTitle.waitFor({ state: 'visible', timeout: 30_000 });
   }
 
