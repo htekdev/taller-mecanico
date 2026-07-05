@@ -25,10 +25,11 @@ import { VistaConfiguracion } from '@/app/modules/configuracion';
 import { VistaCotizaciones } from '@/app/modules/cotizaciones';
 import type { ConversionTrabajo } from '@/app/modules/cotizaciones';
 import { VistaGastos } from '@/app/modules/gastos';
+import { VistaReportes } from '@/app/modules/reportes';
 import { useAuth }      from '@/app/context/auth';
 import * as db          from '@/app/lib/db';
 
-type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones'|'gastos';
+type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones'|'gastos'|'reportes';
 
 export default function TallerMecanico() {
   const { taller, talleres, selectTaller, user, signOut } = useAuth();
@@ -706,6 +707,7 @@ export default function TallerMecanico() {
     { key: 'pagos',       icon: '🔴', label: 'Por Pagar',         count: ordenesPendientesPago > 0 ? ordenesPendientesPago : null },
     { key: 'resumen',       icon: '📊', label: 'Resumen',           count: null },
     { key: 'gastos',        icon: '💸', label: 'Gastos',            count: gastos.filter(g => g.fecha.startsWith(mesActual)).length > 0 ? gastos.filter(g => g.fecha.startsWith(mesActual)).length : null },
+    { key: 'reportes',      icon: '📣', label: 'Reportes',           count: null },
     { key: 'historial',     icon: '📋', label: 'Historial',          count: null },
     { key: 'cotizaciones',  icon: '📄', label: 'Cotizaciones',       count: null },
     { key: 'configuracion', icon: '⚙️', label: 'Configuración',     count: null },
@@ -886,6 +888,9 @@ export default function TallerMecanico() {
               onEditar={editarGasto}
               onEliminar={eliminarGasto}
             />
+          )}
+          {vista === 'reportes' && (
+            <VistaReportes />
           )}
           {vista === 'historial' && (
             <VistaHistorial clientes={clientes} vehiculos={vehiculos} trabajos={trabajos} />
