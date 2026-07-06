@@ -45,9 +45,9 @@ export class InventarioPage extends BasePage {
     super(page);
     this.sectionTitle = page.locator('h2:has-text("Inventario")');
 
-    // Form inputs — use placeholder text matching
+    // Form inputs
     this.nombreInput = page.locator('input[placeholder*="Filtro de aceite" i], input[placeholder*="nombre" i]').first();
-    this.codigoInput = page.locator('input[placeholder*="código" i], input[placeholder*="COD" i]').first();
+    this.codigoInput = page.locator('input[placeholder*="codigo" i], input[placeholder*="COD" i]').first();
     this.categoriaSelect = page.locator('select:has(option:has-text("Filtros"))').first();
     this.unidadSelect = page.locator('select:has(option:has-text("pza"))').first();
     this.precioCompraInput = page.locator('input[type="number"]').first();
@@ -55,12 +55,12 @@ export class InventarioPage extends BasePage {
     this.stockMinimoInput = page.locator('input[type="number"]').nth(2);
     this.proveedorSelect = page.locator('select:has(option:has-text("Proveedor"))').first();
     this.clienteSelect = page.locator('select:has(option:has-text("Cliente"))').first();
-    this.vehiculoSelect = page.locator('select:has(option:has-text("Vehículo"))').first();
+    this.vehiculoSelect = page.locator('select:has(option:has-text("Vehiculo"))').first();
     this.agregarButton = page.getByRole('button', { name: /agregar al inventario/i });
 
     // Filters
     this.filtroProveedorSelect = page.locator('select:has(option:has-text("Todos los proveedores"))').first();
-    this.filtroCategoriaSelect = page.locator('select:has(option:has-text("Todas las categorías"))').first();
+    this.filtroCategoriaSelect = page.locator('select:has(option:has-text("Todas las categorias"))').first();
 
     // List
     this.inventarioList = page.locator('.space-y-2, .divide-y').first();
@@ -80,7 +80,6 @@ export class InventarioPage extends BasePage {
     await this.sectionTitle.waitFor({ state: 'visible', timeout: 90_000 });
   }
 
-  /** Add a new part to inventory. */
   async addPart(data: {
     nombre: string;
     codigo?: string;
@@ -115,7 +114,6 @@ export class InventarioPage extends BasePage {
     await this.page.waitForTimeout(2000);
   }
 
-  /** Select a proveedor for the part being added. */
   async selectProveedor(index = 1) {
     if (await this.proveedorSelect.isVisible().catch(() => false)) {
       const count = await this.getOptionCount(this.proveedorSelect);
@@ -125,7 +123,6 @@ export class InventarioPage extends BasePage {
     }
   }
 
-  /** Filter inventory by proveedor. */
   async filterByProveedor(proveedorName: string) {
     if (await this.filtroProveedorSelect.isVisible().catch(() => false)) {
       await this.filtroProveedorSelect.selectOption({ label: proveedorName });
@@ -133,7 +130,6 @@ export class InventarioPage extends BasePage {
     }
   }
 
-  /** Filter inventory by category. */
   async filterByCategoria(categoria: string) {
     if (await this.filtroCategoriaSelect.isVisible().catch(() => false)) {
       await this.filtroCategoriaSelect.selectOption({ label: categoria });
@@ -141,27 +137,22 @@ export class InventarioPage extends BasePage {
     }
   }
 
-  /** Get the count of visible parts in the list. */
   async getPartCount(): Promise<number> {
     return this.partRows.count();
   }
 
-  /** Check if a specific part name is visible in the list. */
   async isPartVisible(name: string): Promise<boolean> {
     return this.page.locator(`text=${name}`).first().isVisible().catch(() => false);
   }
 
-  /** Expand a part row to see details. */
   async expandPart(name: string) {
     const row = this.page.locator(`text=${name}`).first();
     await row.click();
     await this.page.waitForTimeout(500);
   }
 
-  /** Receive stock for a part (by its visible name). */
   async receiveStock(partName: string, quantity: number) {
     await this.expandPart(partName);
-    // Find the receive input near this part
     const container = this.page.locator(`.border:has(text="${partName}")`).first();
     const input = container.locator('input[type="number"]').last();
     if (await input.isVisible().catch(() => false)) {
@@ -172,16 +163,63 @@ export class InventarioPage extends BasePage {
     }
   }
 
-  /** Check if the "Agregar" was successful (part appears in list). */
   async wasAddSuccessful(partName: string): Promise<boolean> {
     await this.page.waitForTimeout(1000);
     return this.isPartVisible(partName);
   }
 
-  /** Get the stock count displayed for a specific part. */
   async getStockCount(partName: string): Promise<string> {
     const row = this.page.locator(`:has-text("${partName}")`).first();
     const stock = row.locator('text=/\\d+ (pza|lt|kg|m)/').first();
     return this.getText(stock);
+  }
+
+  /**
+   * 2-step delete: click "Eliminar" on the row for `name`,
+   * then either confirm or cancel.
+   */
+  async eliminarPieza(name: string, confirm: boolean) {
+    const row = this.page.locator(`tr:has-text("${name}")`).first();
+    const eliminarBtn = row.getByRole('button', { name: /Eliminar/i });
+    await eliminarBtn.waitFor({ state: 'visible', timeout: 15_000 });
+    await eliminarBtn.click();
+    await this.page.waitForTimeout(400);
+
+    if (confirm) {
+      const confirmarBtn = row.getByRole('button', { name: /Confirmar/i });
+      await confirmarBtn.waitFor({ state: 'visible', timeout: 10_000 });
+      await confirmarBtn.click();
+      await this.page.waitForTimeout(2000);
+    } else {
+      const cancelarBtn = row.getByRole('button', { name: /Cancelar/i });
+      await cancelarBtn.waitFor({ state: 'visible', timeout: 10_000 });
+      await cancelarBtn.click();
+      await this.page.waitForTimeout(400);
+    }
+  }
+
+  /**
+   * Add a new proveedor via the inline form in the Inventario add-part panel.
+   */
+  async agregarProveedorInline(nombre: string, telefono: string) {
+    const toggleBtn = this.page.getByRole('button', { name: /\+ Nuevo proveedor/i });
+    await toggleBtn.waitFor({ state: 'visible', timeout: 15_000 });
+    await toggleBtn.click();
+    await this.page.waitForTimeout(500);
+
+    const nombreInput = this.page.getByLabel('Nombre del proveedor');
+    await nombreInput.waitFor({ state: 'visible', timeout: 10_000 });
+    await nombreInput.fill(nombre);
+
+    const telInput = this.page.getByLabel('Telefono del proveedor');
+    if (await telInput.isVisible().catch(() => false)) {
+      await telInput.fill(telefono);
+    }
+
+    // "Guardar" button inside the proveedor form
+    const guardarBtn = this.page.locator('form').filter({ hasText: 'Agregar nuevo proveedor' }).getByRole('button', { name: /Guardar/i });
+    await guardarBtn.waitFor({ state: 'visible', timeout: 10_000 });
+    await guardarBtn.click();
+    await this.page.waitForTimeout(2000);
   }
 }
