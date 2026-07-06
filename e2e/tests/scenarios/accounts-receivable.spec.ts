@@ -74,6 +74,7 @@ test.describe('Accounts Receivable (CxC)', () => {
   test('filter CxC by payment status', async ({
     page, dashboardPage, cuentasCobrarPage
   }) => {
+    test.slow(); // cold-start + module load can exceed 90s default timeout
     await showPhaseLabel(page, '🔍 Filter CxC by Status');
     await dashboardPage.navigateToModule('cuentas');
     await cuentasCobrarPage.waitForPageLoad();

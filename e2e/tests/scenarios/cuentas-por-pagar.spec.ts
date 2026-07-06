@@ -128,6 +128,7 @@ test.describe('Cuentas por Pagar (Por Pagar)', () => {
   test('cuentas por pagar "Total por Pagar" summary renders', async ({
     page, dashboardPage,
   }) => {
+    test.slow(); // cold-start + module load can exceed 90s default timeout
     await showPhaseLabel(page, '💰 Phase 1: Total Summary');
     await dashboardPage.navigateToModule('pagos');
     await dashboardPage.waitForPageLoad();

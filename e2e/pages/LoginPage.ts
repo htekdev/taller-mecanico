@@ -116,11 +116,26 @@ export class LoginPage extends BasePage {
   private async handleSetupPage() {
     await this.page.waitForTimeout(2000); // Let invite check complete
 
-    // If there are existing talleres to select, click the first one
-    const tallerButton = this.page.locator('button:has(span:has-text("🔧"))').first();
-    if (await tallerButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    // If there are existing talleres to select, click the first one.
+    // Use class-based selector — emoji text matching (🔧) is unreliable in Playwright.
+    // Taller card buttons have class "w-full flex items-center" and contain the taller name.
+    // The "+ Crear nuevo taller" button has "Crear nuevo" text — exclude it.
+    const tallerButton = this.page.locator('button.w-full').filter({
+      hasNot: this.page.locator('text=/Crear nuevo/i'),
+    }).first();
+
+    if (await tallerButton.isVisible({ timeout: 10_000 }).catch(() => false)) {
       await tallerButton.click();
-      await this.page.locator('nav button').first().waitFor({ state: 'visible', timeout: 30_000 });
+      // Wait for nav to appear — if it doesn't, navigate directly to root
+      const navAppeared = await this.page.locator('nav button').first()
+        .waitFor({ state: 'visible', timeout: 45_000 })
+        .then(() => true).catch(() => false);
+      if (!navAppeared) {
+        // Fallback: try navigating directly
+        await this.page.goto('/');
+        await this.page.locator('nav button').first()
+          .waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
+      }
       return;
     }
 

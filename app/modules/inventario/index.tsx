@@ -177,8 +177,8 @@ export function VistaInventario({
     }
   };
 
-  const handleGuardarProveedor = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // doGuardarProveedor — core save logic, callable from button click OR form submit (Enter)
+  const doGuardarProveedor = async () => {
     if (!nuevoProveedorNombre.trim()) return;
     setGuardandoProveedor(true);
     setErrorProveedor(null);
@@ -193,6 +193,13 @@ export function VistaInventario({
       setGuardandoProveedor(false);
     }
   };
+
+  // handleGuardarProveedor — form onSubmit (Enter key in input)
+  const handleGuardarProveedor = (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    doGuardarProveedor();
+  }
 
   const stockStatus = (r: Refaccion) => {
     if (r.stock <= 0)             return { label: 'Sin stock',           cls: 'bg-rose-100 text-rose-700' };
@@ -340,8 +347,8 @@ export function VistaInventario({
                     value={nuevoProveedorTel}
                     onChange={e => setNuevoProveedorTel(e.target.value)}
                     className="w-full sm:flex-1" />
-                  <Btn type="submit" size="sm" variant="primary" disabled={guardandoProveedor || !nuevoProveedorNombre.trim()}
-                    className="whitespace-nowrap">
+                  <Btn type="button" size="sm" variant="primary" disabled={guardandoProveedor || !nuevoProveedorNombre.trim()}
+                    onClick={doGuardarProveedor} className="whitespace-nowrap">
                     {guardandoProveedor ? '⏳' : '✓ Guardar'}
                   </Btn>
                 </div>
