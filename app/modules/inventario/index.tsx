@@ -177,9 +177,8 @@ export function VistaInventario({
     }
   };
 
-  const handleGuardarProveedor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation(); // prevent nested form submit from bubbling to outer add-part form
+  // doGuardarProveedor — core save logic, callable from button click OR form submit (Enter)
+  const doGuardarProveedor = async () => {
     if (!nuevoProveedorNombre.trim()) return;
     setGuardandoProveedor(true);
     setErrorProveedor(null);
@@ -194,6 +193,13 @@ export function VistaInventario({
       setGuardandoProveedor(false);
     }
   };
+
+  // handleGuardarProveedor — form onSubmit (Enter key in input)
+  const handleGuardarProveedor = (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    doGuardarProveedor();
+  }
 
   const stockStatus = (r: Refaccion) => {
     if (r.stock <= 0)             return { label: 'Sin stock',           cls: 'bg-rose-100 text-rose-700' };
