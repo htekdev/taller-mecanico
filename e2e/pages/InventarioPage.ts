@@ -217,34 +217,37 @@ export class InventarioPage extends BasePage {
    * Add a new proveedor via the inline form in the Inventario add-part panel.
    *
    * Clicks "+ Nuevo proveedor" to expand the form, fills in nombre and telefono,
-   * then clicks "✓ Guardar" to save.
+   * then presses Enter to submit (avoids outer-form ambiguity from locator('form') approach).
+   * The app-level handleGuardarProveedor has e.stopPropagation() to prevent outer form bubbling.
    */
   async agregarProveedorInline(nombre: string, telefono: string) {
     // Click the toggle button to reveal the inline proveedor form
-    const toggleBtn = this.page.getByRole('button', { name: /\+ Nuevo proveedor/i });
+    const toggleBtn = this.page.getByRole('button', { name: /nuevo proveedor/i });
     await toggleBtn.waitFor({ state: 'visible', timeout: 15_000 });
     await toggleBtn.click();
-    await this.page.waitForTimeout(500);
+    await this.page.waitForTimeout(600);
 
-    // Fill in the proveedor name (aria-label="Nombre del proveedor")
+    // Fill in the proveedor name
     const nombreInput = this.page.locator('[aria-label="Nombre del proveedor"]');
     await nombreInput.waitFor({ state: 'visible', timeout: 10_000 });
     await nombreInput.fill(nombre);
+    await this.page.waitForTimeout(300);
 
-    // Fill in the phone number (aria-label="Teléfono del proveedor" — note accent)
-    const telInput = this.page.locator('[aria-label*="Tel" i]').filter({ hasText: '' }).nth(0)
-      .or(this.page.locator('[aria-label="Tel\u00e9fono del proveedor"]'));
+    // Fill in the phone number
+    const telInput = this.page.locator('[aria-label="Teléfono del proveedor"]');
     if (await telInput.isVisible().catch(() => false)) {
       await telInput.fill(telefono);
+      await this.page.waitForTimeout(200);
     }
 
-    // Click "✓ Guardar" inside the proveedor form (not the main inventory form)
-    const guardarBtn = this.page
-      .locator('form')
-      .filter({ hasText: 'Agregar nuevo proveedor' })
-      .getByRole('button', { name: /Guardar/i });
-    await guardarBtn.waitFor({ state: 'visible', timeout: 10_000 });
-    await guardarBtn.click();
-    await this.page.waitForTimeout(2000);
+    // Submit via keyboard Enter — more reliable than button click for nested form patterns.
+    // Enter triggers implicit form submission on the nearest ancestor <form>, which is the
+    // inner proveedor form (handleGuardarProveedor). The e.stopPropagation() in that handler
+    // prevents the submit event from reaching the outer add-part form.
+    await nombreInput.press('Enter');
+
+    // Wait for the form to close (nombre input disappears = proveedor saved successfully)
+    await nombreInput.waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => {});
+    await this.page.waitForTimeout(1000);
   }
 }
