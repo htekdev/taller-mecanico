@@ -1,5 +1,5 @@
-import { test, expect } from '../fixtures/app-fixtures';
-import { showPhaseLabel } from '../helpers/visual-helpers';
+import { test, expect } from '../../fixtures';
+import { showPhaseLabel } from '../visual-assert';
 
 /**
  * Change-proof spec: gastos module error handling
@@ -10,10 +10,14 @@ import { showPhaseLabel } from '../helpers/visual-helpers';
  */
 test.describe('change-proof-gastos-error-handling', () => {
   test('gastos form shows correct save state and dismiss on cancel', async ({
-    page, dashboardPage, sidebar
+    page, loginPage, dashboardPage
   }) => {
-    await showPhaseLabel(page, '🔧 Gastos Error Handling');
+    await showPhaseLabel(page, '🔐 Login al Taller Mecánico');
+    await loginPage.loginAsTestUser();
+    await page.locator('nav').waitFor({ state: 'visible', timeout: 45_000 });
+    await page.waitForTimeout(1000);
 
+    await showPhaseLabel(page, '🔧 Gastos Error Handling');
     await dashboardPage.navigateToModule('gastos');
     await page.waitForTimeout(1500);
 
@@ -40,8 +44,13 @@ test.describe('change-proof-gastos-error-handling', () => {
   });
 
   test('gastos module loads without NaN or broken values', async ({
-    page, dashboardPage
+    page, loginPage, dashboardPage
   }) => {
+    await showPhaseLabel(page, '🔐 Login al Taller Mecánico');
+    await loginPage.loginAsTestUser();
+    await page.locator('nav').waitFor({ state: 'visible', timeout: 45_000 });
+    await page.waitForTimeout(1000);
+
     await dashboardPage.navigateToModule('gastos');
     await page.waitForTimeout(2000);
 
