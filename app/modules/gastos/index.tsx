@@ -49,6 +49,7 @@ function GastoForm({
 }) {
   const [form, setForm] = useState<GastoFormData>(initial);
   const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // Track whether "Otros" is selected so we can show a free-text input
   const [otroSubcat, setOtroSubcat] = useState(() => {
     const predefined = GASTO_SUBCATEGORIAS[initial.categoria];
@@ -96,12 +97,15 @@ function GastoForm({
   const handleSubmit = async () => {
     if (!valid) return;
     setSaving(true);
+    setErrorMsg(null);
     try {
       await onGuardar(form);
       // Persist new custom subcategory for 'personal' category for future use
       if (form.categoria === 'personal' && otroSubcat && otroSubcatTexto.trim()) {
         onNuevaPersonalSub?.(otroSubcatTexto.trim());
       }
+    } catch {
+      setErrorMsg('No se pudo guardar el gasto. Verifica tu conexión e intenta de nuevo.');
     } finally { setSaving(false); }
   };
 
@@ -187,6 +191,9 @@ function GastoForm({
       </div>
 
       {/* Actions */}
+      {errorMsg && (
+        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{errorMsg}</p>
+      )}
       <div className="flex gap-3 pt-1">
         <Btn variant="primary" disabled={!valid || saving} onClick={handleSubmit}>
           {saving ? '⏳ Guardando...' : '✓ Guardar'}
@@ -260,6 +267,7 @@ export function VistaGastos({
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
   // Custom subcategories for 'personal' category, persisted in localStorage
   const PERSONAL_SUBS_KEY = 'taller_personal_subcats';
@@ -324,8 +332,13 @@ export function VistaGastos({
   };
 
   const handleDelete = async (id: string) => {
-    await onEliminar(id);
-    setConfirmDelete(null);
+    try {
+      await onEliminar(id);
+      setConfirmDelete(null);
+    } catch {
+      setErrorEliminar('No se pudo eliminar el gasto. Verifica tu conexión e intenta de nuevo.');
+      setConfirmDelete(null);
+    }
   };
 
   const editingGasto = editingId ? gastos.find(g => g.id === editingId) : null;
@@ -347,6 +360,9 @@ export function VistaGastos({
       </div>
 
       {/* ── Add form ── */}
+      {errorEliminar && (
+        <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">{errorEliminar}</div>
+      )}
       {showForm && (
         <div className="mb-6">
           <GastoForm
