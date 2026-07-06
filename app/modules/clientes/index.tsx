@@ -21,19 +21,26 @@ function ModalEditarCliente({
     email2: cliente.email2 ?? '',
   });
   const [guardando, setGuardando] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nombre.trim()) return;
     setGuardando(true);
-    await onGuardar(cliente.id, {
-      nombre: form.nombre.trim(),
-      telefono: form.telefono.trim() || undefined,
-      email: form.email.trim() || undefined,
-      email2: form.email2.trim() || undefined,
-    });
-    setGuardando(false);
-    onCerrar();
+    setErrorMsg(null);
+    try {
+      await onGuardar(cliente.id, {
+        nombre: form.nombre.trim(),
+        telefono: form.telefono.trim() || undefined,
+        email: form.email.trim() || undefined,
+        email2: form.email2.trim() || undefined,
+      });
+      onCerrar();
+    } catch {
+      setErrorMsg('No se pudo guardar. Verifica tu conexión e intenta de nuevo.');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -63,6 +70,9 @@ function ModalEditarCliente({
             <Label>Correo 2 <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
             <Input type="email" placeholder="correo2@ejemplo.com" value={form.email2} onChange={e => setForm({ ...form, email2: e.target.value })} />
           </div>
+          {errorMsg && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorMsg}</p>
+          )}
           <div className="flex gap-3 pt-1">
             <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>Cancelar</Btn>
             <Btn type="submit" variant="primary" fullWidth disabled={guardando}>{guardando ? 'Guardando...' : '✓ Guardar cambios'}</Btn>
@@ -90,19 +100,26 @@ function ModalEditarVehiculo({
     placa: vehiculo.placa ?? '',
   });
   const [guardando, setGuardando] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.marca.trim() || !form.modelo.trim()) return;
     setGuardando(true);
-    await onGuardar(vehiculo.id, {
-      marca: form.marca.trim(),
-      modelo: form.modelo.trim(),
-      anio: form.anio.trim(),
-      placa: form.placa.trim().toUpperCase(),
-    });
-    setGuardando(false);
-    onCerrar();
+    setErrorMsg(null);
+    try {
+      await onGuardar(vehiculo.id, {
+        marca: form.marca.trim(),
+        modelo: form.modelo.trim(),
+        anio: form.anio.trim(),
+        placa: form.placa.trim().toUpperCase(),
+      });
+      onCerrar();
+    } catch {
+      setErrorMsg('No se pudo guardar. Verifica tu conexión e intenta de nuevo.');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -163,6 +180,9 @@ function ModalEditarVehiculo({
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
             ⚠️ El nombre completo de la unidad se verá como: <strong>{[form.anio, form.marca, form.modelo].filter(Boolean).join(' ') || '(vacío)'}</strong>
           </div>
+          {errorMsg && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorMsg}</p>
+          )}
           <div className="flex gap-3 pt-1">
             <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>Cancelar</Btn>
             <Btn type="submit" variant="primary" fullWidth disabled={guardando || !form.marca.trim() || !form.modelo.trim()}>
