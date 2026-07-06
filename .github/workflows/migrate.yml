@@ -61,9 +61,9 @@ jobs:
             "SELECT column_name FROM information_schema.columns WHERE table_name = 'trabajos' AND column_name IN ('numero_orden', 'kilometraje') ORDER BY column_name" \
             2>&1 | tee /tmp/verify.txt
           if grep -q "numero_orden" /tmp/verify.txt && grep -q "kilometraje" /tmp/verify.txt; then
-            echo "✅ All critical columns verified"
+            echo "⊕ All critical columns verified"
           else
             echo "❌ Missing columns — check migration output"
             exit 1
           fi
-# ci-retrigger: 2026-07-05T06:03:28Z
+# ci-retrigger: 2026-07-06T14:32:00Z
