@@ -1145,6 +1145,7 @@ export function VistaCotizaciones({
   // Conversion modal: tracks which cotización is being reconciled
   const [reconciliandoId, setReconciliandoId] = useState<string | null>(null);
   const [guardando, setGuardando]       = useState(false);
+  const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
 
   // ── Departamentos — loaded from localStorage (shared with Trabajos module) ──
   // Start with SSR-safe static defaults so server and client render the same
@@ -1261,6 +1262,7 @@ export function VistaCotizaciones({
   const handleGuardar = async () => {
     if (!tallerId || guardando) return;
     setGuardando(true);
+    setErrorGuardar(null);
     try {
     const { total } = calcTotales(form);
     const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de Mérida'
@@ -1309,6 +1311,8 @@ export function VistaCotizaciones({
     }
 
     setPantalla('preview');
+    } catch {
+      setErrorGuardar('No se pudo guardar la cotización. Verifica tu conexión e intenta de nuevo.');
     } finally {
       setGuardando(false);
     }
@@ -1592,6 +1596,9 @@ export function VistaCotizaciones({
                 : plantilla === 'ayuntamiento' && form.inventario.trim() === '' ? '* No. Inventario es obligatorio'
                 : '* Selecciona un departamento válido'}
             </span>
+          )}
+          {errorGuardar && (
+            <span className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded px-2 py-1 w-full">❌ {errorGuardar}</span>
           )}
         </div>
       </div>
