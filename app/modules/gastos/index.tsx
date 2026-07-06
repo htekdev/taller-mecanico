@@ -102,7 +102,10 @@ function GastoForm({
       if (form.categoria === 'personal' && otroSubcat && otroSubcatTexto.trim()) {
         onNuevaPersonalSub?.(otroSubcatTexto.trim());
       }
-    } finally { setSaving(false); }
+    } catch (err) {
+    console.error('[GastoForm] Error al guardar gasto:', err);
+    alert('Error al guardar. Intenta de nuevo.');
+  } finally { setSaving(false); }
   };
 
   const catInfo = GASTO_CATEGORIAS.find(c => c.key === form.categoria)!;
@@ -324,8 +327,14 @@ export function VistaGastos({
   };
 
   const handleDelete = async (id: string) => {
-    await onEliminar(id);
-    setConfirmDelete(null);
+    try {
+      await onEliminar(id);
+      setConfirmDelete(null);
+    } catch (err) {
+      console.error('[GastoPage] Error al eliminar gasto:', err);
+      alert('Error al eliminar el gasto. Intenta de nuevo.');
+      setConfirmDelete(null);
+    }
   };
 
   const editingGasto = editingId ? gastos.find(g => g.id === editingId) : null;
