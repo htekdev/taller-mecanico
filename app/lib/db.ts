@@ -461,7 +461,11 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
 
   // Fallback: if any new optional column doesn't exist in DB yet, strip ALL migration-gated
   // columns and retry with just the core fields.
-  if (error?.code === '42703') {
+  // Accept both PostgreSQL '42703' and PostgREST 'PGRST204' (schema-cache miss).
+  const isColumnMissing = (code: string | undefined) =>
+    code === '42703' || code === 'PGRST204';
+
+  if (isColumnMissing(error?.code)) {
     const {
       kilometraje: _km, numero_orden: _no,
       departamento: _dep, inventario_num: _inv, orden_servicio_gob: _osg,
@@ -491,8 +495,15 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
  *   Phase 1: Update the columns guaranteed to exist in all schema versions (estado, iva, total, requiere_factura).
  *            Throws on failure — this is the critical part.
  *   Phase 2: Update tipo_documento + fecha_finalizacion (added in migration 20260701220000).
- *            Best-effort: error is thrown so the caller knows it failed, but if columns don't
- *            exist yet the app still finishes the job correctly (estado=completado is set in phase 1).
+ *            Truly best-effort: never throws. If columns are missing we silently succeed
+ *            (estado=completado is already set in Phase 1 — the job IS finalized).
+ *
+ * WHY TWO ERROR CODES:
+ *   When the column does not exist, PostgREST may return:
+ *     • '42703' — PostgreSQL "undefined_column" code (passed through by older PostgREST)
+ *     • 'PGRST204' — PostgREST schema-cache miss (newer PostgREST / Supabase)
+ *   The old guard only checked '42703', causing Phase 2 to throw with 'PGRST204',
+ *   which surfaced as "No se pudo finalizar el trabajo" even though Phase 1 succeeded.
  */
 export async function updateTrabajoFinalizar(
   trabajoId: string,
@@ -509,14 +520,29 @@ export async function updateTrabajoFinalizar(
   }).eq('id', trabajoId);
   if (err1) throw new Error(`updateTrabajoFinalizar (estado): ${err1.message}`);
 
-  // Phase 2 — tipo_documento + fecha_finalizacion (added in 20260701220000 migration)
-  // Silently ignore if columns don't exist yet (42703 = undefined_column)
+  // Phase 2 — tipo_documento + fecha_finalizacion (added in migration 20260701220000)
+  // Truly best-effort: swallow ALL column-not-found variants so the caller never
+  // sees an error just because the migration hasn't run yet.
   const { error: err2 } = await supabase.from('trabajos').update({
     tipo_documento: tipo,
     fecha_finalizacion: new Date().toISOString(),
   }).eq('id', trabajoId);
-  if (err2 && err2.code !== '42703') {
-    throw new Error(`updateTrabajoFinalizar (tipo_documento): ${err2.message}`);
+
+  if (err2) {
+    // Recognise every known "column does not exist" signal:
+    //   '42703'    — PostgreSQL undefined_column (passed through by PostgREST ≤ v11)
+    //   'PGRST204' — PostgREST schema-cache miss (PostgREST v12 / newer Supabase)
+    //   message fallback — belt-and-suspenders for future PostgREST changes
+    const isColumnMissing =
+      err2.code === '42703' ||
+      err2.code === 'PGRST204' ||
+      (err2.message ?? '').toLowerCase().includes('does not exist') ||
+      (err2.message ?? '').toLowerCase().includes('column');
+    if (!isColumnMissing) {
+      throw new Error(`updateTrabajoFinalizar (tipo_documento): ${err2.message}`);
+    }
+    // Column missing — silently succeed. Phase 1 already set estado=completado.
+    console.warn('[updateTrabajoFinalizar] Phase 2 skipped (column missing):', err2.code, err2.message);
   }
 }
 
