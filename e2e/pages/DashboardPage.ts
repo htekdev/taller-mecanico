@@ -11,14 +11,15 @@ import { BasePage } from './BasePage';
 export type ModuleKey =
   | 'clientes' | 'inventario' | 'trabajos' | 'proveedores'
   | 'ordenes' | 'facturas' | 'cuentas' | 'pagos'
-  | 'resumen' | 'gastos' | 'historial' | 'cotizaciones' | 'configuracion';
+  | 'resumen' | 'gastos' | 'historial' | 'cotizaciones' | 'configuracion'
+  | 'reportes';
 
 export const MODULE_LABELS: Record<ModuleKey, string> = {
   clientes: 'Clientes',
   inventario: 'Inventario',
   trabajos: 'Trabajos',
   proveedores: 'Proveedores',
-  ordenes: 'Órdenes de Compra',
+  ordenes: 'Ordenes de Compra',
   facturas: 'Facturas',
   cuentas: 'Por Cobrar',
   pagos: 'Por Pagar',
@@ -26,7 +27,8 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   gastos: 'Gastos',
   historial: 'Historial',
   cotizaciones: 'Cotizaciones',
-  configuracion: 'Configuración',
+  configuracion: 'Configuracion',
+  reportes: 'Reportes',
 };
 
 export class DashboardPage extends BasePage {
@@ -42,7 +44,7 @@ export class DashboardPage extends BasePage {
     this.nav = page.locator('nav');
     this.logoutButton = page.getByRole('button', { name: /salir/i });
     this.userEmail = page.locator('.text-slate-500.text-xs');
-    this.headerTitle = page.locator('h1:has-text("Taller Mecánico")');
+    this.headerTitle = page.locator('h1:has-text("Taller Mecanico")');
     this.loadingIndicator = page.getByText('Cargando datos...');
   }
 
