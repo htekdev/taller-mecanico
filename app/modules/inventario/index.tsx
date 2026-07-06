@@ -179,6 +179,7 @@ export function VistaInventario({
 
   const handleGuardarProveedor = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // prevent nested form submit from bubbling to outer add-part form
     if (!nuevoProveedorNombre.trim()) return;
     setGuardandoProveedor(true);
     setErrorProveedor(null);
