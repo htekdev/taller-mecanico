@@ -341,8 +341,8 @@ export function VistaInventario({
                     value={nuevoProveedorTel}
                     onChange={e => setNuevoProveedorTel(e.target.value)}
                     className="w-full sm:flex-1" />
-                  <Btn type="submit" size="sm" variant="primary" disabled={guardandoProveedor || !nuevoProveedorNombre.trim()}
-                    className="whitespace-nowrap">
+                  <Btn type="button" size="sm" variant="primary" disabled={guardandoProveedor || !nuevoProveedorNombre.trim()}
+                    onClick={doGuardarProveedor} className="whitespace-nowrap">
                     {guardandoProveedor ? '⏳' : '✓ Guardar'}
                   </Btn>
                 </div>
