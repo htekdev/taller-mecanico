@@ -23,7 +23,8 @@ test('change-proof-supabase-ci-migrate-workflow', async ({
   const historialError = page.getByText(/error al cargar|column.*not exist/i);
   const hasHistorialError = await historialError.isVisible({ timeout: 3_000 }).catch(() => false);
   expect(hasHistorialError, 'Historial sin error de columna').toBe(false);
-  const historialContent = page.locator('[data-testid="historial-module"], text=/Historial|Sin trabajos/i').first();
+  // Use text-based selector — data-testid may not be present in all code versions
+  const historialContent = page.getByText(/Historial|Sin trabajos|Sin registros/i).first();
   const historialVisible = await historialContent.isVisible({ timeout: 10_000 }).catch(() => false);
   expect(historialVisible, 'Historial cargado correctamente').toBe(true);
 
@@ -33,7 +34,8 @@ test('change-proof-supabase-ci-migrate-workflow', async ({
   const trabajosError = page.getByText(/error al cargar|column.*not exist/i);
   const hasTrabajosError = await trabajosError.isVisible({ timeout: 3_000 }).catch(() => false);
   expect(hasTrabajosError, 'Trabajos sin error de esquema').toBe(false);
-  const trabajosContent = page.locator('[data-testid="trabajos-module"], text=/Trabajo|Sin trabajos|Agregar/i').first();
+  // Use text-based selector — data-testid may not be present in all code versions
+  const trabajosContent = page.getByText(/Trabajo|Sin trabajos|Agregar trabajo/i).first();
   const trabajosVisible = await trabajosContent.isVisible({ timeout: 10_000 }).catch(() => false);
   expect(trabajosVisible, 'Trabajos cargado correctamente').toBe(true);
 

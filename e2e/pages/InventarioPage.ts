@@ -250,3 +250,4 @@ export class InventarioPage extends BasePage {
     await this.page.waitForTimeout(2000); // allow Supabase save to complete
   }
 }
+
