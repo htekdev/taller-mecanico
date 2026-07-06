@@ -45,7 +45,7 @@ export class InventarioPage extends BasePage {
     super(page);
     this.sectionTitle = page.locator('h2:has-text("Inventario")');
 
-    // Form inputs
+    // Form inputs — use placeholder text matching
     this.nombreInput = page.locator('input[placeholder*="Filtro de aceite" i], input[placeholder*="nombre" i]').first();
     this.codigoInput = page.locator('input[placeholder*="codigo" i], input[placeholder*="COD" i]').first();
     this.categoriaSelect = page.locator('select:has(option:has-text("Filtros"))').first();
@@ -175,23 +175,31 @@ export class InventarioPage extends BasePage {
   }
 
   /**
-   * 2-step delete: click "Eliminar" on the row for `name`,
-   * then either confirm or cancel.
+   * 2-step delete: click the "🗑 Eliminar" button in the row for `name`,
+   * then either confirm (true) or cancel (false) the deletion.
+   *
+   * The inventory table renders one row per part. After clicking "Eliminar",
+   * the same row shows "✓ Confirmar" and "Cancelar" buttons.
    */
   async eliminarPieza(name: string, confirm: boolean) {
+    // Find the table row that contains this part's name
     const row = this.page.locator(`tr:has-text("${name}")`).first();
+
+    // Click the initial "🗑 Eliminar" button
     const eliminarBtn = row.getByRole('button', { name: /Eliminar/i });
     await eliminarBtn.waitFor({ state: 'visible', timeout: 15_000 });
     await eliminarBtn.click();
     await this.page.waitForTimeout(400);
 
     if (confirm) {
+      // Click "✓ Confirmar" to complete the deletion
       const confirmarBtn = row.getByRole('button', { name: /Confirmar/i });
       await confirmarBtn.waitFor({ state: 'visible', timeout: 10_000 });
       await confirmarBtn.click();
       await this.page.waitForTimeout(2000);
     } else {
-      const cancelarBtn = row.getByRole('button', { name: /Cancelar/i });
+      // Click "Cancelar" to abort (part remains in list)
+      const cancelarBtn = row.getByRole('button', { name: /^Cancelar$/i });
       await cancelarBtn.waitFor({ state: 'visible', timeout: 10_000 });
       await cancelarBtn.click();
       await this.page.waitForTimeout(400);
@@ -200,24 +208,34 @@ export class InventarioPage extends BasePage {
 
   /**
    * Add a new proveedor via the inline form in the Inventario add-part panel.
+   *
+   * Clicks "+ Nuevo proveedor" to expand the form, fills in nombre and telefono,
+   * then clicks "✓ Guardar" to save.
    */
   async agregarProveedorInline(nombre: string, telefono: string) {
+    // Click the toggle button to reveal the inline proveedor form
     const toggleBtn = this.page.getByRole('button', { name: /\+ Nuevo proveedor/i });
     await toggleBtn.waitFor({ state: 'visible', timeout: 15_000 });
     await toggleBtn.click();
     await this.page.waitForTimeout(500);
 
-    const nombreInput = this.page.getByLabel('Nombre del proveedor');
+    // Fill in the proveedor name (aria-label="Nombre del proveedor")
+    const nombreInput = this.page.locator('[aria-label="Nombre del proveedor"]');
     await nombreInput.waitFor({ state: 'visible', timeout: 10_000 });
     await nombreInput.fill(nombre);
 
-    const telInput = this.page.getByLabel('Telefono del proveedor');
+    // Fill in the phone number (aria-label="Teléfono del proveedor" — note accent)
+    const telInput = this.page.locator('[aria-label*="Tel" i]').filter({ hasText: '' }).nth(0)
+      .or(this.page.locator('[aria-label="Tel\u00e9fono del proveedor"]'));
     if (await telInput.isVisible().catch(() => false)) {
       await telInput.fill(telefono);
     }
 
-    // "Guardar" button inside the proveedor form
-    const guardarBtn = this.page.locator('form').filter({ hasText: 'Agregar nuevo proveedor' }).getByRole('button', { name: /Guardar/i });
+    // Click "✓ Guardar" inside the proveedor form (not the main inventory form)
+    const guardarBtn = this.page
+      .locator('form')
+      .filter({ hasText: 'Agregar nuevo proveedor' })
+      .getByRole('button', { name: /Guardar/i });
     await guardarBtn.waitFor({ state: 'visible', timeout: 10_000 });
     await guardarBtn.click();
     await this.page.waitForTimeout(2000);
