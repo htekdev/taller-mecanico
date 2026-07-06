@@ -77,11 +77,14 @@ export class DashboardPage extends BasePage {
       .isVisible().catch(() => false);
     if (!alreadyLoaded) {
       await this.page.locator('[data-testid="app-content-loaded"]')
-        .waitFor({ state: 'visible', timeout: 45_000 }).catch(() => {});
+        .waitFor({ state: 'visible', timeout: 45_000 }).catch(async () => {
+          // Sentinel timed out — wait for nav to be visible as a fallback
+          await this.nav.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
+        });
     }
     const label = MODULE_LABELS[module];
     const tab = this.nav.getByRole('button', { name: label });
-    await tab.click();
+    await tab.click({ timeout: 60_000 });
     // Wait for the tab to become active
     await tab.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
     // Small delay for module content to render
