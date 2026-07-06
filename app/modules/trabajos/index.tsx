@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel, Proveedor } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
-import { labelVehiculo, fmt, getMontoPagado } from '@/app/lib/utils';
+import { labelVehiculo, fmt, getMontoPagado, formatearFecha, getHoy } from '@/app/lib/utils';
 import { getPricingIntel } from '@/app/lib/pricing';
 
 // ─── Departamentos localStorage ───────────────────────────────────────────────
@@ -63,7 +63,7 @@ async function generarPDFAyuntamiento(
   const WHITE  = [255,255,255]  as [number, number, number];
 
   const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
-  const fechaSlug = new Date().toISOString().split('T')[0];
+  const fechaSlug = getHoy();
 
   const filtroNombres: Record<FiltroAyuntamiento, string> = {
     sin_tft:          'Sin TFT',
@@ -362,7 +362,7 @@ export function VistaTrabajo({
 }) {
   const emptyForm = {
     clienteId: '', vehiculoId: '',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: getHoy(),
     numeroOrden: '',
     descripcion: '',
     kilometraje: '' as string | number,
@@ -1316,7 +1316,7 @@ export function VistaTrabajo({
                               }
                             </span>
                             <span className="text-slate-400 ml-1">
-                              — {new Date(intel.clientLastSale!.fecha).toLocaleDateString('es-MX')}
+                              — {formatearFecha(intel.clientLastSale!.fecha)}
                               {intel.clientAllSales.length > 1 && ` · ${intel.clientAllSales.length} veces vendida`}
                             </span>
                           </div>
@@ -1666,7 +1666,7 @@ export function VistaTrabajo({
                         : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-700 font-medium">
-                      {new Date(trabajo.fecha).toLocaleDateString('es-MX')}
+                      {formatearFecha(trabajo.fecha)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">{badgeEstado}</td>
                     <td className="px-4 py-3 text-slate-800 font-medium">{cliente?.nombre ?? '—'}</td>
@@ -1847,7 +1847,7 @@ export function VistaTrabajo({
                       <div className="flex items-center gap-2 flex-wrap text-sm">
                         <span className="text-slate-500 line-through">{cl?.nombre ?? '—'}</span>
                         {vh && <span className="text-xs text-slate-400">{[vh.anio, vh.marca, vh.modelo].filter(Boolean).join(' ')}</span>}
-                        <span className="text-xs text-slate-400">{new Date(t.fecha).toLocaleDateString('es-MX')}</span>
+                        <span className="text-xs text-slate-400">{formatearFecha(t.fecha)}</span>
                         <span className="text-xs bg-rose-100 text-rose-600 font-semibold px-2 py-0.5 rounded-full">Cancelado</span>
                       </div>
                       <button type="button" onClick={() => onReactivarTrabajo(t.id)}

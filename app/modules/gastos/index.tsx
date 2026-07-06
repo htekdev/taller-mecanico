@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { Gasto, GastoCategoria } from '@/app/types';
 import { GASTO_CATEGORIAS, GASTO_SUBCATEGORIAS } from '@/app/types';
 import { Btn, Input, Label, Select, SectionTitle } from '@/app/components/ui';
-import { fmt } from '@/app/lib/utils';
+import { fmt, formatearFecha, getHoy } from '@/app/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -200,7 +200,7 @@ function GastoRow({
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-800 truncate">{gasto.concepto}</div>
           <div className="text-xs text-slate-400 mt-0.5">
-            {gasto.subcategoria} · {new Date(gasto.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
+            {gasto.subcategoria} · {formatearFecha(gasto.fecha)}
             {gasto.notas && <> · <span className="italic">{gasto.notas}</span></>}
           </div>
         </div>
@@ -239,7 +239,7 @@ export function VistaGastos({
   onEditar: (id: string, data: Partial<Omit<Gasto, 'id' | 'tallerId'>>) => Promise<void>;
   onEliminar: (id: string) => Promise<void>;
 }) {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = getHoy();
   const [filtro, setFiltro] = useState<FiltroCat>('todos');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
