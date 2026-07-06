@@ -350,10 +350,13 @@ export async function insertTrabajo(tallerId: string, data: Omit<Trabajo, 'id'>)
     .select()
     .single();
 
-  // Fallback: if any new optional column doesn't exist in DB yet (42703 = undefined_column),
-  // strip ALL migration-gated columns and retry with just the core fields.
-  // This handles the window between deploying the code and running supabase db push.
-  if (error?.code === '42703') {
+  // Fallback: if any new optional column doesn't exist in DB yet, strip ALL migration-gated
+  // columns and retry with just the core fields.
+  // Accept both PostgreSQL '42703' and PostgREST 'PGRST204' (schema-cache miss, v12+).
+  const isColumnMissingInsert = (code: string | undefined) =>
+    code === '42703' || code === 'PGRST204';
+
+  if (isColumnMissingInsert(error?.code)) {
     const {
       kilometraje: _km, numero_orden: _no,
       departamento: _dep, inventario_num: _inv, orden_servicio_gob: _osg,
@@ -610,7 +613,8 @@ export async function insertOrden(tallerId: string, data: Omit<OrdenCompra, 'id'
   if (error) {
     const isColumnMissing = error.message?.includes('subtotal_sin_iva') ||
       error.message?.includes('iva_amount') || error.message?.includes('con_iva') ||
-      error.code === '42703'; // PostgreSQL: undefined_column
+      error.code === '42703' || // PostgreSQL: undefined_column
+      error.code === 'PGRST204'; // PostgREST v12: schema-cache miss
     if (isColumnMissing) {
       const { data: fallbackRow, error: fallbackError } = await supabase
         .from('ordenes_compra')
