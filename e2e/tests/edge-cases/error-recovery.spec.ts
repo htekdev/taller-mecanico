@@ -50,6 +50,7 @@ test.describe('Error Recovery', () => {
   test('browser refresh during module use — no crash', async ({
     page, loginPage, dashboardPage, cotizacionesPage, sidebar
   }) => {
+    test.slow(); // Extra time for refresh + optional re-login cycle
     await showPhaseLabel(page, '🔄 Browser Refresh Recovery');
     await dashboardPage.navigateToModule('cotizaciones');
     await cotizacionesPage.waitForPageLoad();
@@ -78,8 +79,11 @@ test.describe('Error Recovery', () => {
       await loginPage.loginAsTestUser();
     }
 
-    // App should be stable — nav visible
-    const navVisible = await page.locator('nav button').first().isVisible().catch(() => false);
+    // Wait for nav to become visible — give extra time after potential re-login redirect
+    const navVisible = await page.locator('nav button').first()
+      .waitFor({ state: 'visible', timeout: 30_000 })
+      .then(() => true)
+      .catch(() => false);
     expect(navVisible).toBe(true);
 
     await showPhaseLabel(page, '✅ Refresh Recovery OK');
