@@ -70,13 +70,13 @@ function ModalEditarCliente({
             <Label>Correo 2 <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
             <Input type="email" placeholder="correo2@ejemplo.com" value={form.email2} onChange={e => setForm({ ...form, email2: e.target.value })} />
           </div>
-          {errorMsg && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorMsg}</p>
-          )}
           <div className="flex gap-3 pt-1">
             <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>Cancelar</Btn>
             <Btn type="submit" variant="primary" fullWidth disabled={guardando}>{guardando ? 'Guardando...' : '✓ Guardar cambios'}</Btn>
           </div>
+          {errorMsg && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorMsg}</p>
+          )}
         </form>
       </div>
     </div>
@@ -180,15 +180,15 @@ function ModalEditarVehiculo({
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
             ⚠️ El nombre completo de la unidad se verá como: <strong>{[form.anio, form.marca, form.modelo].filter(Boolean).join(' ') || '(vacío)'}</strong>
           </div>
-          {errorMsg && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorMsg}</p>
-          )}
           <div className="flex gap-3 pt-1">
             <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>Cancelar</Btn>
             <Btn type="submit" variant="primary" fullWidth disabled={guardando || !form.marca.trim() || !form.modelo.trim()}>
               {guardando ? 'Guardando...' : '✓ Guardar cambios'}
             </Btn>
           </div>
+          {errorMsg && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorMsg}</p>
+          )}
         </form>
       </div>
     </div>
@@ -447,3 +447,4 @@ export function VistaClientes({
     </div>
   );
 }
+
