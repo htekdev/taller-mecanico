@@ -36,3 +36,5 @@ Desplegado en Vercel. Los datos se guardan localmente en cada navegador.
 ---
 
 Creado para demostrar las capacidades de desarrollo rápido con GitHub Copilot.
+
+<!-- ci-retrigger: 2026-07-06T15:24:00Z -->
