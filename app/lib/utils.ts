@@ -66,6 +66,43 @@ export function fmt(n: number): string {
   return safe.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// ─── Date Utilities ───────────────────────────────────────────────────────────
+// IMPORTANT: Never use `new Date("YYYY-MM-DD").toLocaleDateString()` — JavaScript
+// parses bare date strings as UTC midnight, which shifts the date back 1 day for
+// users in UTC-5 (Mexico CDT). Always use these helpers instead.
+
+/**
+ * Formats a YYYY-MM-DD date string for display without UTC shift.
+ * Parses the date as local time (year, month, day) to avoid the UTC midnight bug.
+ */
+export function formatearFecha(fechaStr: string | undefined | null): string {
+  if (!fechaStr) return '';
+  const parts = fechaStr.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return fechaStr;
+  const [year, month, day] = parts;
+  return new Date(year, month - 1, day).toLocaleDateString('es-MX');
+}
+
+/**
+ * Returns today's date as a YYYY-MM-DD string in the user's LOCAL timezone.
+ * Use instead of `new Date().toISOString().split('T')[0]` which returns UTC date.
+ */
+export function getHoy(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Returns the current month as a YYYY-MM string in the user's LOCAL timezone.
+ * Use instead of `new Date().toISOString().slice(0, 7)` which returns UTC month.
+ */
+export function getMesActual(): string {
+  return getHoy().slice(0, 7);
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const CATEGORIAS = ['Filtros', 'Aceites', 'Frenos', 'Motor', 'Eléctrico', 'Transmisión', 'Suspensión', 'Otros'];

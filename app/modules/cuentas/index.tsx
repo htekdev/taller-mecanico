@@ -10,6 +10,7 @@ import {
   getEstadoPagoOrden, getMontoPagadoOrden, getSaldoOrden,
   getMontoPagadoServicio, getSaldoServicio, getEstadoServicio,
   BADGE_ESTADO,
+  formatearFecha, getHoy,
   type FiltroCuenta,
 } from '@/app/lib/utils';
 
@@ -163,7 +164,7 @@ async function generarPDFReporte(
       const estLabel = estado === 'pagado' ? 'Pagado' : estado === 'parcial' ? 'Parcial' : 'Pendiente';
       trow([
         { text: f.numeroFactura,                                     w: wFolio  },
-        { text: new Date(f.fecha).toLocaleDateString('es-MX'),       w: wFecha  },
+        { text: formatearFecha(f.fecha),                               w: wFecha  },
         { text: '$' + fmtPeso(f.total),                              w: wTotal,  align: 'right' },
         { text: '$' + fmtPeso(pagado),                               w: wPagado, align: 'right' },
         { text: '$' + fmtPeso(saldo),                                w: wSaldo,  align: 'right', bold: saldo > 0 },
@@ -194,7 +195,7 @@ async function generarPDFReporte(
       trow([
         { text: t.descripcion,                                       w: wDesc  },
         { text: vLabel,                                              w: wVeh   },
-        { text: new Date(t.fecha).toLocaleDateString('es-MX'),       w: wFecha },
+        { text: formatearFecha(t.fecha),                               w: wFecha },
         { text: '$' + fmtPeso(t.total),                              w: wTotal, align: 'right' },
         { text: '$' + fmtPeso(getMontoPagado(t)),                    w: wPag,   align: 'right' },
         { text: '$' + fmtPeso(getSaldo(t)),                          w: wSal,   align: 'right', bold: true },
@@ -243,7 +244,7 @@ async function generarPDFReporte(
   doc.text(`Documento generado el ${fechaHoy}  ·  Este documento no tiene validez fiscal.`, ml, y);
   doc.text('MICRO DIESEL DE MÉRIDA', ml + cw, y, { align: 'right' });
 
-  const filename = `EstadoCuenta_${cliente.nombre.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}`;
+  const filename = `EstadoCuenta_${cliente.nombre.replace(/[^a-zA-Z0-9]/g, '_')}_${getHoy()}`;
   doc.save(`${filename}.pdf`);
 }
 
@@ -367,7 +368,7 @@ function ReporteCliente({
                     return (
                       <tr key={f.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="py-2 px-3 font-mono text-xs text-slate-600">{f.numeroFactura}</td>
-                        <td className="py-2 px-3 text-slate-600">{new Date(f.fecha).toLocaleDateString('es-MX')}</td>
+                        <td className="py-2 px-3 text-slate-600">{formatearFecha(f.fecha)}</td>
                         <td className="py-2 px-3 text-right text-slate-800 font-medium">${fmt(f.total)}</td>
                         <td className="py-2 px-3 text-right text-emerald-600 font-medium">${fmt(getMontoPagadoFactura(f))}</td>
                         <td className="py-2 px-3 text-right text-rose-600 font-bold">${fmt(getSaldoFactura(f))}</td>
@@ -404,7 +405,7 @@ function ReporteCliente({
                     return (
                       <tr key={t.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="py-2 px-3 text-slate-700 max-w-[180px] truncate">{t.descripcion}</td>
-                        <td className="py-2 px-3 text-slate-600">{new Date(t.fecha).toLocaleDateString('es-MX')}</td>
+                        <td className="py-2 px-3 text-slate-600">{formatearFecha(t.fecha)}</td>
                         <td className="py-2 px-3 text-slate-500 text-xs">{veh ? `${veh.anio} ${veh.marca} ${veh.modelo}`.trim() : '—'}</td>
                         <td className="py-2 px-3 text-right text-slate-800 font-medium">${fmt(t.total)}</td>
                         <td className="py-2 px-3 text-right text-emerald-600 font-medium">${fmt(getMontoPagado(t))}</td>
@@ -470,7 +471,7 @@ export function VistaCuentas({
   onCancelarNota: (trabajoId: string) => void;
   onReactivarNota: (trabajoId: string) => void;
 }) {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = getHoy();
   const [filtro, setFiltro] = useState<FiltroCuenta>('todos');
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'notas' | 'facturas'>('todos');
   const [clienteFiltroId, setClienteFiltroId] = useState<string>('');
@@ -719,7 +720,7 @@ export function VistaCuentas({
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
                       </div>
                       <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
-                        <span>{new Date(trabajo.fecha).toLocaleDateString('es-MX')}</span>
+                        <span>{formatearFecha(trabajo.fecha)}</span>
                         {vehiculo && <span>· {[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>}
                         <span>· {trabajo.descripcion}</span>
                       </div>
@@ -743,7 +744,7 @@ export function VistaCuentas({
                               <div key={p.id}>
                                 <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
                                   <div className="flex gap-3">
-                                    <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
+                                    <span className="text-slate-500">{formatearFecha(p.fecha)}</span>
                                     {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -821,7 +822,7 @@ export function VistaCuentas({
                         <span className="font-semibold text-slate-800 text-sm">{cliente?.nombre ?? '—'}</span>
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
                       </div>
-                      <div className="text-xs text-slate-500 mt-0.5">{new Date(factura.fecha).toLocaleDateString('es-MX')}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">{formatearFecha(factura.fecha)}</div>
                     </div>
                     <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Total</div><div className="font-semibold text-slate-800">${fmt(factura.total)}</div></div>
                     <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
@@ -843,7 +844,7 @@ export function VistaCuentas({
                               <div key={p.id}>
                                 <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
                                   <div className="flex gap-3">
-                                    <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
+                                    <span className="text-slate-500">{formatearFecha(p.fecha)}</span>
                                     <span className="text-slate-500">{p.metodoPago}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -920,7 +921,7 @@ export function VistaCuentas({
                   <div key={t.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 opacity-60">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm text-slate-500 line-through">{cl?.nombre ?? '—'}</span>
-                      <span className="text-xs text-slate-400">{new Date(t.fecha).toLocaleDateString('es-MX')} · {t.descripcion}</span>
+                      <span className="text-xs text-slate-400">{formatearFecha(t.fecha)} · {t.descripcion}</span>
                       <span className="text-xs bg-rose-100 text-rose-600 font-semibold px-2 py-0.5 rounded-full">Cancelada</span>
                     </div>
                     <button type="button" onClick={() => onReactivarNota(t.id)} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-4 flex-shrink-0">↩ Reactivar</button>
@@ -969,7 +970,7 @@ export function VistaCuentasPorPagar({
   onIrAOrdenes: () => void;
   onPagarServicioExterno: (trabajoId: string, itemId: string, pago: Omit<PagoServicioExterno, 'id'>) => void;
 }) {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = getHoy();
   const [tabPago, setTabPago] = useState<'refacciones' | 'servicios'>('refacciones');
   const [expandido, setExpandido] = useState<string | null>(null);
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo', nota: '' });
@@ -1408,7 +1409,7 @@ export function VistaCuentasPorPagar({
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
                         </div>
                         <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
-                          <span>{orden.fechaRecibida ? `Recibida: ${new Date(orden.fechaRecibida).toLocaleDateString('es-MX')}` : new Date(orden.fecha).toLocaleDateString('es-MX')}</span>
+                          <span>{orden.fechaRecibida ? `Recibida: ${formatearFecha(orden.fechaRecibida)}` : formatearFecha(orden.fecha)}</span>
                           {orden.descripcion && <span>· {orden.descripcion}</span>}
                           <span>· {orden.partes.length} pieza{orden.partes.length !== 1 ? 's' : ''}</span>
                         </div>
@@ -1468,7 +1469,7 @@ export function VistaCuentasPorPagar({
                               {orden.pagos.map(p => (
                                 <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
                                   <div className="flex gap-3">
-                                    <span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span>
+                                    <span className="text-slate-500">{formatearFecha(p.fecha)}</span>
                                     {p.metodoPago && <span className="text-slate-500 font-medium">{p.metodoPago}</span>}
                                     {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
                                   </div>
