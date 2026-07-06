@@ -50,7 +50,7 @@ export class InventarioPage extends BasePage {
     this.codigoInput = page.locator('input[placeholder*="codigo" i], input[placeholder*="COD" i]').first();
     this.categoriaSelect = page.locator('select:has(option:has-text("Filtros"))').first();
     this.unidadSelect = page.locator('select:has(option:has-text("pza"))').first();
-    this.precioCompraInput = page.locator('input[type="number"]').first();
+    this.precioCompraInput = page.locator('input[placeholder="0.00"]').first();
     this.stockInput = page.locator('input[type="number"]').nth(1);
     this.stockMinimoInput = page.locator('input[type="number"]').nth(2);
     this.proveedorSelect = page.locator('select:has(option:has-text("Proveedor"))').first();
@@ -99,9 +99,14 @@ export class InventarioPage extends BasePage {
     }
 
     // precioCompra must be > 0 or the submit button stays disabled — default $100
+    // Use click+keyboard instead of fill() — React controlled number inputs don't
+    // reliably pick up Playwright's fill() synthetic events on all versions.
     const precio = data.precioCompra ?? 100;
     if (await this.precioCompraInput.isVisible().catch(() => false)) {
-      await this.fillInput(this.precioCompraInput, String(precio));
+      await this.precioCompraInput.click();
+      await this.precioCompraInput.press('Control+A');
+      await this.page.keyboard.type(String(precio));
+      await this.page.waitForTimeout(300); // let React process the state update
     }
 
     if (data.stock !== undefined && await this.stockInput.isVisible().catch(() => false)) {
