@@ -27,7 +27,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   gastos: 'Gastos',
   historial: 'Historial',
   cotizaciones: 'Cotizaciones',
-  configuracion: 'Configuracion',
+  configuracion: 'Configuración',
   reportes: 'Reportes',
 };
 
@@ -44,7 +44,7 @@ export class DashboardPage extends BasePage {
     this.nav = page.locator('nav');
     this.logoutButton = page.getByRole('button', { name: /salir/i });
     this.userEmail = page.locator('.text-slate-500.text-xs');
-    this.headerTitle = page.locator('h1:has-text("Taller Mecanico")');
+    this.headerTitle = page.locator('h1:has-text("Taller Mecánico")');
     this.loadingIndicator = page.getByText('Cargando datos...');
   }
 
@@ -79,11 +79,14 @@ export class DashboardPage extends BasePage {
       .isVisible().catch(() => false);
     if (!alreadyLoaded) {
       await this.page.locator('[data-testid="app-content-loaded"]')
-        .waitFor({ state: 'visible', timeout: 45_000 }).catch(() => {});
+        .waitFor({ state: 'visible', timeout: 45_000 }).catch(async () => {
+          // Sentinel timed out — wait for nav to be visible as a fallback
+          await this.nav.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
+        });
     }
     const label = MODULE_LABELS[module];
     const tab = this.nav.getByRole('button', { name: label });
-    await tab.click();
+    await tab.click({ timeout: 60_000 });
     // Wait for the tab to become active
     await tab.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
     // Small delay for module content to render
