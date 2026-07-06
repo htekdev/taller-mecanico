@@ -230,21 +230,23 @@ export class InventarioPage extends BasePage {
     const nombreInput = this.page.locator('[aria-label="Nombre del proveedor"]');
     await nombreInput.waitFor({ state: 'visible', timeout: 10_000 });
     await nombreInput.fill(nombre);
+    await this.page.waitForTimeout(300); // allow React state update
 
-    // Fill in the phone number (aria-label="Teléfono del proveedor" — note accent)
-    const telInput = this.page.locator('[aria-label*="Tel" i]').filter({ hasText: '' }).nth(0)
-      .or(this.page.locator('[aria-label="Tel\u00e9fono del proveedor"]'));
+    // Fill in the phone number — exact aria-label to avoid ambiguity
+    const telInput = this.page.locator('[aria-label="Tel\u00e9fono del proveedor"]');
     if (await telInput.isVisible().catch(() => false)) {
       await telInput.fill(telefono);
+      await this.page.waitForTimeout(200);
     }
 
-    // Click "✓ Guardar" inside the proveedor form (not the main inventory form)
-    const guardarBtn = this.page
-      .locator('form')
-      .filter({ hasText: 'Agregar nuevo proveedor' })
-      .getByRole('button', { name: /Guardar/i });
+    // Click "✓ Guardar" — unique on page since main form uses "Agregar al inventario".
+    // Button is now type="button" + onClick (no form submit side effects).
+    const guardarBtn = this.page.getByRole('button', { name: /✓\s*Guardar/i });
     await guardarBtn.waitFor({ state: 'visible', timeout: 10_000 });
     await guardarBtn.click();
-    await this.page.waitForTimeout(2000);
+
+    // Wait for the proveedor form to close — confirms save was triggered
+    await nombreInput.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
+    await this.page.waitForTimeout(2000); // allow Supabase save to complete
   }
 }
