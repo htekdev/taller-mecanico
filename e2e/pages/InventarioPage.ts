@@ -98,8 +98,10 @@ export class InventarioPage extends BasePage {
       await this.categoriaSelect.selectOption({ label: data.categoria });
     }
 
-    if (data.precioCompra !== undefined) {
-      await this.fillInput(this.precioCompraInput, String(data.precioCompra));
+    // precioCompra must be > 0 or the submit button stays disabled — default $100
+    const precio = data.precioCompra ?? 100;
+    if (await this.precioCompraInput.isVisible().catch(() => false)) {
+      await this.fillInput(this.precioCompraInput, String(precio));
     }
 
     if (data.stock !== undefined && await this.stockInput.isVisible().catch(() => false)) {
