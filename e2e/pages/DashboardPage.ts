@@ -19,7 +19,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   inventario: 'Inventario',
   trabajos: 'Trabajos',
   proveedores: 'Proveedores',
-  ordenes: 'Ordenes de Compra',
+  ordenes: 'Órdenes de Compra',
   facturas: 'Facturas',
   cuentas: 'Por Cobrar',
   pagos: 'Por Pagar',
