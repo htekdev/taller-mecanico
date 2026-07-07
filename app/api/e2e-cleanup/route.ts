@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * POST /api/e2e-cleanup — Deletes accumulated test data before each CI run.
- *
+ * POST /api/e2e-cleanup -- Deletes accumulated test data before each CI run.
  * The shared Supabase test DB accumulates data across many CI runs, causing
  * cargarDatos() to slow down significantly. This endpoint cleans up data older
- * than 30 minutes so concurrent CI runs don't interfere with each other.
- *
+ * than 30 minutes so concurrent CI runs do not interfere with each other.
  * Called by e2e/global-setup.ts before each test suite run.
  */
 export async function POST(request: NextRequest) {
@@ -26,7 +24,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { email } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({}));
+  const email = body.email;
   if (!email) {
     return NextResponse.json({ error: 'email required' }, { status: 400 });
   }
@@ -55,20 +54,20 @@ export async function POST(request: NextRequest) {
 
   const tallerId = members[0].taller_id;
 
-  // Only delete data older than 30 minutes — avoids wiping data from concurrent CI runs
+  // Only delete data older than 30 minutes -- avoids wiping data from concurrent CI runs
   const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
-  // Deletion order respects FK constraints (SET NULL allows any order, but explicit is safer)
+  // Deletion order respects FK constraints
   const tables = [
-    'facturas',        // refs trabajos/clientes/vehiculos (SET NULL)
-    'trabajos',        // refs clientes/vehiculos (SET NULL)
-    'cotizaciones',    // refs taller (CASCADE)
-    'ordenes_compra',  // refs proveedores (SET NULL)
-    'gastos',          // refs taller (CASCADE)
-    'vehiculos',       // refs clientes (CASCADE) — deleted before clientes
-    'refacciones',     // refs taller (CASCADE)
-    'proveedores',     // refs taller (CASCADE)
-    'clientes',        // refs taller (CASCADE) — cascades vehiculos
+    'facturas',
+    'trabajos',
+    'cotizaciones',
+    'ordenes_compra',
+    'gastos',
+    'vehiculos',
+    'refacciones',
+    'proveedores',
+    'clientes',
   ];
 
   const results: Record<string, number> = {};
@@ -80,15 +79,15 @@ export async function POST(request: NextRequest) {
         .eq('taller_id', tallerId)
         .lt('created_at', cutoff);
       results[table] = count ?? 0;
-      if (error) console.warn(`[E2E Cleanup] ${table} error:`, error.message);
+      if (error) console.warn('[E2E Cleanup]', table, 'error:', error.message);
     } catch (err) {
       results[table] = -1;
-      console.warn(`[E2E Cleanup] ${table} threw:`, String(err));
+      console.warn('[E2E Cleanup]', table, 'threw:', String(err));
     }
   }
 
-  const totalDeleted = Object.values(results).filter(n => n > 0).reduce((a, b) => a + b, 0);
-  console.log(`[E2E Cleanup] Deleted ${totalDeleted} records for taller ${tallerId} (cutoff: ${cutoff})`);
+  const totalDeleted = Object.values(results).filter((n) => n > 0).reduce((a, b) => a + b, 0);
+  console.log('[E2E Cleanup] Deleted', totalDeleted, 'records for taller', tallerId);
 
   return NextResponse.json({
     status: 'cleaned',
