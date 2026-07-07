@@ -71,6 +71,10 @@ test('change-proof-inventario-eliminar-proveedor', async ({ page, loginPage, das
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(500);
 
+  // ── 6b. Add a filler part so inventory is non-empty (filtroProveedorSelect only renders when inventario.length > 0) ──
+  await inventarioPage.addPart({ nombre: UNIQUE_PART + '-B', stock: 1 });
+  await page.waitForTimeout(1500);
+
   // ── 7. Add a new proveedor inline ────────────────────────────────────────────
   await showPhaseLabel(page, '🏪 Agregando proveedor inline: ' + UNIQUE_PROV);
   await inventarioPage.agregarProveedorInline(UNIQUE_PROV, '555-1234');
