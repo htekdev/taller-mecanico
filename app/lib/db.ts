@@ -155,11 +155,13 @@ export async function insertRefaccion(tallerId: string, data: Omit<Refaccion, 'i
 }
 
 export async function updateRefaccionStock(id: string, nuevoStock: number): Promise<void> {
-  await supabase.from('refacciones').update({ stock: nuevoStock }).eq('id', id);
+  const { error } = await supabase.from('refacciones').update({ stock: nuevoStock }).eq('id', id);
+  if (error) throw new Error('updateRefaccionStock: ' + error.message);
 }
 
 export async function updateRefaccionCompatibilidad(id: string, compatibilidad: Refaccion['compatibilidad'] | null): Promise<void> {
-  await supabase.from('refacciones').update({ compatibilidad: compatibilidad ?? null }).eq('id', id);
+  const { error } = await supabase.from('refacciones').update({ compatibilidad: compatibilidad ?? null }).eq('id', id);
+  if (error) throw new Error('updateRefaccionCompatibilidad: ' + error.message);
 }
 
 /** Update nombre and/or precioCompra on an inventory record — used when correcting a received purchase order. */
@@ -171,14 +173,16 @@ export async function updateRefaccionDetalles(
   if (data.nombre !== undefined) patch.nombre = data.nombre;
   if (data.precioCompra !== undefined) patch.precio_compra = data.precioCompra;
   if (Object.keys(patch).length > 0) {
-    await supabase.from('refacciones').update(patch).eq('id', id);
+    const { error } = await supabase.from('refacciones').update(patch).eq('id', id);
+    if (error) throw new Error('updateRefaccionDetalles: ' + error.message);
   }
 }
 
 export async function updateRefacciones(items: Refaccion[]): Promise<void> {
   // Batch update stocks after a work order
   for (const r of items) {
-    await supabase.from('refacciones').update({ stock: r.stock }).eq('id', r.id);
+    const { error } = await supabase.from('refacciones').update({ stock: r.stock }).eq('id', r.id);
+    if (error) throw new Error('updateRefacciones (id=' + r.id + '): ' + error.message);
   }
 }
 
@@ -835,11 +839,13 @@ export async function reactivarNota(trabajoId: string): Promise<void> {
 
 // cancelarTrabajo / reactivarTrabajo — same convention, applies to ALL job types (not just notas)
 export async function cancelarTrabajo(trabajoId: string): Promise<void> {
-  await supabase.from('trabajos').update({ folio_fiscal: '__CANCELADA__' }).eq('id', trabajoId);
+  const { error } = await supabase.from('trabajos').update({ folio_fiscal: '__CANCELADA__' }).eq('id', trabajoId);
+  if (error) throw new Error('cancelarTrabajo: ' + error.message);
 }
 
 export async function reactivarTrabajo(trabajoId: string): Promise<void> {
-  await supabase.from('trabajos').update({ folio_fiscal: null }).eq('id', trabajoId);
+  const { error } = await supabase.from('trabajos').update({ folio_fiscal: null }).eq('id', trabajoId);
+  if (error) throw new Error('reactivarTrabajo: ' + error.message);
 }
 
 // ── Taller Members ────────────────────────────────────────────
