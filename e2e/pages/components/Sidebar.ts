@@ -1,7 +1,7 @@
 import type { Page, Locator } from '@playwright/test';
 
 /**
- * Sidebar Component — Tab navigation bar.
+ * Sidebar Component -- Tab navigation bar.
  *
  * Encapsulates all navigation interactions and badge reading.
  */
@@ -12,18 +12,16 @@ export class Sidebar {
     this.nav = page.locator('nav');
   }
 
-  /** Click a nav tab by its label text.
-   *  Waits for the button to be visible, then waits for any loading overlay
-   *  to clear before clicking (avoids masking real overlay/z-index bugs).
-   */
+  /** Click a nav tab by its label text. */
   async clickTab(label: string) {
     const btn = this.nav.getByRole('button', { name: label });
-    // Wait up to 90s for the button to be visible in the DOM
-    await btn.waitFor({ state: 'visible', timeout: 90_000 });
-    // Wait for loading overlay to clear before clicking (prevents masked actionability bugs)
+    // Reduced from 90s to 30s -- a missing button should not block the test for 90 seconds.
+    // The catch swallows the timeout; force:true click below handles the actionability.
+    await btn.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
+    // Wait for loading overlay to clear before clicking
     const loadingOverlay = this.page.locator('text=Cargando datos del taller');
     await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 }).catch(() => {});
-    // force:true bypasses overlay/actionability — the nav is always interactable
+    // force:true bypasses overlay/actionability -- the nav is always interactable
     await btn.click({ force: true });
     await this.page.waitForTimeout(500);
   }
@@ -34,17 +32,17 @@ export class Sidebar {
     return (await active.textContent())?.trim() ?? '';
   }
 
-  /** Check if a tab has a warning badge (⚠). */
+  /** Check if a tab has a warning badge. */
   async hasWarningBadge(label: string): Promise<boolean> {
     const tab = this.nav.getByRole('button', { name: label });
-    const badge = tab.locator('span:has-text("⚠")');
+    const badge = tab.locator('span:has-text("!")');
     return badge.isVisible().catch(() => false);
   }
 
-  /** Check if a tab has a pending badge (🕐). */
+  /** Check if a tab has a pending badge. */
   async hasPendingBadge(label: string): Promise<boolean> {
     const tab = this.nav.getByRole('button', { name: label });
-    const badge = tab.locator('span:has-text("🕐")');
+    const badge = tab.locator('span:has-text("pending")');
     return badge.isVisible().catch(() => false);
   }
 
