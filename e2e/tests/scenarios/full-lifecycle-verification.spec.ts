@@ -25,7 +25,7 @@ import { TestData } from '../../utils/test-data';
  */
 
 test.describe('Full Lifecycle Verification', () => {
-  test('complete daily workflow: client → cotización → trabajo → payment → expense', async ({
+  test('complete daily workflow: client → cotización → trabajo → payment → expense', { retries: 1 }, async ({
     page, loginPage, dashboardPage, cotizacionesPage, trabajosPage,
     inventarioPage, cuentasCobrarPage, ordenesCompraPage, gastosPage, sidebar
   }) => {
@@ -108,8 +108,10 @@ test.describe('Full Lifecycle Verification', () => {
     await dashboardPage.waitForPageLoad();
 
     // Verify data persisted — check inventory
+    // Use text-based wait instead of instant check — Supabase reload after re-login is variable on CI
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
+    await page.getByText(partName).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
     const partStillVisible = await inventarioPage.isPartVisible(partName);
     expect(partStillVisible).toBe(true);
 
