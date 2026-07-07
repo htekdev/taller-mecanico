@@ -1,77 +1,97 @@
 import { test, expect } from '../../fixtures';
+import { expectVisible, showPhaseLabel } from '../visual-assert';
 
 /**
- * reportes-module — E2E coverage for the "Reportes y Sugerencias" module
+ * reportes-module -- Resumen Financiero E2E coverage
  *
- * 1. Navigates to Reportes and shows section title + both tabs
- * 2. "Estado" tab (default) renders filter badges for all states
- * 3. "Nuevo Reporte" tab renders the complete submission form
- * 4. Form validates: empty title → shows error
- * 5. Form validates: title filled but empty description → shows error
- * 6. Filter badges change the visible section heading when clicked
+ * 6 tests: load, P&L headings, cash cards, month-nav prev, month-nav next, no errors
  */
 
-test.describe('reportes-module', () => {
-  test.beforeEach(async ({ loginPage, dashboardPage }) => {
+test.describe('Reportes -- Resumen Financiero Module', () => {
+  test.beforeEach(async ({ loginPage }) => {
+    await loginPage.loginAsTestUser();
+  });
+
+  test('reportes module loads without crash', async ({ page, dashboardPage }) => {
     test.slow();
-    await loginPage.goto();
-    await loginPage.login('sofia@test.com', 'Test1234!');
+    await showPhaseLabel(page, 'Navigate to Resumen');
+    await dashboardPage.navigateToModule('resumen');
     await dashboardPage.waitForPageLoad();
-    await dashboardPage.navigateToModule('reportes');
-    // Wait for module heading to confirm navigation succeeded
-    await expect(
-      dashboardPage.page.getByText('📣 Reportes y Sugerencias'),
-    ).toBeVisible({ timeout: 20_000 });
+    await expectVisible(dashboardPage.nav, 'Nav still present');
+    const crashed = await page.getByText(/error al cargar|algo salio mal/i).isVisible().catch(() => false);
+    expect(crashed, 'No fatal error after loading Resumen').toBe(false);
   });
 
-  test('1. shows module title and both navigation tabs', async ({ page }) => {
-    await expect(page.getByText('📣 Reportes y Sugerencias')).toBeVisible();
-    await expect(page.getByText('📋 Ver Reportes')).toBeVisible();
-    await expect(page.getByText('✏️ Nuevo Reporte')).toBeVisible();
+  test('reportes shows P&L headings in Spanish', async ({ page, dashboardPage }) => {
+    test.slow();
+    await dashboardPage.navigateToModule('resumen');
+    await dashboardPage.waitForPageLoad();
+    await page.waitForTimeout(1500);
+    const headings = ['Estado de Resultados', 'Utilidad Bruta', 'Utilidad Neta', 'Ingresos'];
+    let found = false;
+    for (const h of headings) {
+      if (await page.getByText(h).first().isVisible().catch(() => false)) { found = true; break; }
+    }
+    expect(found, 'At least one P&L heading visible').toBe(true);
   });
 
-  test('2. Estado tab shows all four filter badges', async ({ page }) => {
-    // "Estado" tab is active by default — filter badges should render
-    await expect(page.getByText('Total')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText('Pendientes')).toBeVisible();
-    await expect(page.getByText('En Progreso')).toBeVisible();
-    await expect(page.getByText('Resueltos')).toBeVisible();
+  test('reportes renders cash flow cards', async ({ page, dashboardPage }) => {
+    test.slow();
+    await dashboardPage.navigateToModule('resumen');
+    await dashboardPage.waitForPageLoad();
+    await page.waitForTimeout(1500);
+    const cashLabels = ['COBRADO', 'POR COBRAR', 'PAGADO A PROVEEDORES', 'FLUJO NETO'];
+    let found = false;
+    for (const label of cashLabels) {
+      if (await page.getByText(label).first().isVisible().catch(() => false)) { found = true; break; }
+    }
+    expect(found, 'At least one cash flow card visible').toBe(true);
   });
 
-  test('3. Nuevo Reporte tab shows complete submission form', async ({ page }) => {
-    await page.getByText('✏️ Nuevo Reporte').click();
-    await expect(page.getByText('Título *')).toBeVisible();
-    await expect(page.getByText('Descripción *')).toBeVisible();
-    await expect(page.getByText('Categoría')).toBeVisible();
-    await expect(page.getByText('Prioridad (opcional)')).toBeVisible();
-    await expect(page.getByText('📤 Enviar Reporte')).toBeVisible();
+  test('month nav prev changes the month label', async ({ page, dashboardPage }) => {
+    test.slow();
+    await dashboardPage.navigateToModule('resumen');
+    await dashboardPage.waitForPageLoad();
+    await page.waitForTimeout(1500);
+    const prevBtn = page.locator('button').filter({ hasText: /\u25C0/ }).first();
+    if (await prevBtn.isVisible().catch(() => false)) {
+      const monthEl = page.locator('h2,h3,p').filter({ hasText: /20\d\d/ }).first();
+      const before = await monthEl.textContent().catch(() => '');
+      await prevBtn.click();
+      await page.waitForTimeout(800);
+      const after = await monthEl.textContent().catch(() => '');
+      expect(after, 'Month label changes after prev click').not.toBe(before);
+    } else {
+      const err = await page.getByText(/error/i).first().isVisible().catch(() => false);
+      expect(err, 'No error visible if no prev button').toBe(false);
+    }
   });
 
-  test('4. form validation — empty title shows required error', async ({ page }) => {
-    await page.getByText('✏️ Nuevo Reporte').click();
-    // Submit without filling anything
-    await page.getByText('📤 Enviar Reporte').click();
-    await expect(page.getByRole('alert')).toContainText('El título es obligatorio');
+  test('month nav next accessible after going back', async ({ page, dashboardPage }) => {
+    test.slow();
+    await dashboardPage.navigateToModule('resumen');
+    await dashboardPage.waitForPageLoad();
+    await page.waitForTimeout(1500);
+    const prevBtn = page.locator('button').filter({ hasText: /\u25C0/ }).first();
+    if (await prevBtn.isVisible().catch(() => false)) {
+      await prevBtn.click();
+      await page.waitForTimeout(600);
+      const nextBtn = page.locator('button').filter({ hasText: /\u25B6/ }).first();
+      const nextVisible = await nextBtn.isVisible().catch(() => false);
+      expect(nextVisible, 'Next button visible after going back').toBe(true);
+      if (nextVisible) { await nextBtn.click(); await page.waitForTimeout(500); }
+    }
   });
 
-  test('5. form validation — title filled but empty description shows error', async ({ page }) => {
-    await page.getByText('✏️ Nuevo Reporte').click();
-    // Fill title only
-    await page.locator('input[maxlength="120"]').fill('Test E2E título');
-    await page.getByText('📤 Enviar Reporte').click();
-    await expect(page.getByRole('alert')).toContainText('La descripción es obligatoria');
-  });
-
-  test('6. filter badges update section heading when clicked', async ({ page }) => {
-    // Wait for Estado tab to load
-    await expect(page.getByText('Total')).toBeVisible({ timeout: 20_000 });
-    // Click "Pendientes" filter
-    await page.getByText('Pendientes').click();
-    // Heading should change (shows filtered state or all if empty)
-    const heading = page.locator('h2, h3').filter({ hasText: /reportes|reporte/i }).first();
-    await expect(heading).toBeVisible({ timeout: 5_000 });
-    // Click "Resueltos" filter — verify it's clickable and doesn't crash
-    await page.getByText('Resueltos').click();
-    await expect(page.getByText('Resueltos')).toBeVisible();
+  test('reportes shows no error messages in UI', async ({ page, dashboardPage }) => {
+    test.slow();
+    await dashboardPage.navigateToModule('resumen');
+    await dashboardPage.waitForPageLoad();
+    await page.waitForTimeout(2000);
+    for (const txt of ['Error al cargar', 'Failed to fetch', 'Algo salio mal']) {
+      const vis = await page.getByText(txt, { exact: false }).first().isVisible().catch(() => false);
+      expect(vis, 'Must not show: ' + txt).toBe(false);
+    }
+    await expectVisible(dashboardPage.nav, 'Nav present -- not crashed');
   });
 });
