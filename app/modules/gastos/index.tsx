@@ -263,6 +263,7 @@ export function VistaGastos({
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Custom subcategories for 'personal' category, persisted in localStorage
   const PERSONAL_SUBS_KEY = 'taller_personal_subcats';
@@ -327,6 +328,8 @@ export function VistaGastos({
   };
 
   const handleDelete = async (id: string) => {
+    if (isDeleting) return;
+    setIsDeleting(true);
     try {
       await onEliminar(id);
       setConfirmDelete(null);
@@ -334,6 +337,8 @@ export function VistaGastos({
       console.error('[GastoPage] Error al eliminar gasto:', err);
       alert('Error al eliminar el gasto. Intenta de nuevo.');
       setConfirmDelete(null);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
