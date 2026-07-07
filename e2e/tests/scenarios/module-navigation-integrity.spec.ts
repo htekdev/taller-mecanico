@@ -118,6 +118,8 @@ test.describe('Module Navigation Integrity', () => {
   test('module switching preserves no stale data', async ({
     page, dashboardPage, sidebar
   }) => {
+    // Ensure app is fully loaded before switching -- cargarDatos() must complete first
+    await dashboardPage.waitForPageLoad();
     // Rapidly switch modules and verify each renders without crash
     const moduleOrder = [
       'Inventario', 'Trabajos', 'Cotizaciones',
