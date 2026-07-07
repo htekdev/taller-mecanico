@@ -44,8 +44,7 @@ test.describe('Cuentas por Pagar (Por Pagar)', () => {
     await showPhaseLabel(page, '✅ Por Pagar Loaded');
   });
 
-  // test.fixme: Known CI flakiness - timing/env issue. See #138.
-  test.fixme('cuentas por pagar shows Spanish section title', async ({
+  test('cuentas por pagar shows Spanish section title', async ({
     page, dashboardPage,
   }) => {
     await showPhaseLabel(page, '🏷️ Phase 1: Spanish Labels');

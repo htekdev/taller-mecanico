@@ -11,7 +11,7 @@ function ModalEditarCliente({
   onCerrar,
 }: {
   cliente: Cliente;
-  onGuardar: (id: string, datos: Omit<Cliente, 'id'>) => void;
+  onGuardar: (id: string, datos: Omit<Cliente, 'id'>) => Promise<void>;
   onCerrar: () => void;
 }) {
   const [form, setForm] = useState({
@@ -21,19 +21,26 @@ function ModalEditarCliente({
     email2: cliente.email2 ?? '',
   });
   const [guardando, setGuardando] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nombre.trim()) return;
     setGuardando(true);
-    await onGuardar(cliente.id, {
-      nombre: form.nombre.trim(),
-      telefono: form.telefono.trim() || undefined,
-      email: form.email.trim() || undefined,
-      email2: form.email2.trim() || undefined,
-    });
-    setGuardando(false);
-    onCerrar();
+    setErrorMsg(null);
+    try {
+      await onGuardar(cliente.id, {
+        nombre: form.nombre.trim(),
+        telefono: form.telefono.trim() || undefined,
+        email: form.email.trim() || undefined,
+        email2: form.email2.trim() || undefined,
+      });
+      onCerrar();
+    } catch {
+      setErrorMsg('No se pudo guardar. Verifica tu conexión e intenta de nuevo.');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -67,6 +74,9 @@ function ModalEditarCliente({
             <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>Cancelar</Btn>
             <Btn type="submit" variant="primary" fullWidth disabled={guardando}>{guardando ? 'Guardando...' : '✓ Guardar cambios'}</Btn>
           </div>
+          {errorMsg && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorMsg}</p>
+          )}
         </form>
       </div>
     </div>
@@ -80,7 +90,7 @@ function ModalEditarVehiculo({
   onCerrar,
 }: {
   vehiculo: Vehiculo;
-  onGuardar: (id: string, datos: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => void;
+  onGuardar: (id: string, datos: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => Promise<void>;
   onCerrar: () => void;
 }) {
   const [form, setForm] = useState({
@@ -90,19 +100,26 @@ function ModalEditarVehiculo({
     placa: vehiculo.placa ?? '',
   });
   const [guardando, setGuardando] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.marca.trim() || !form.modelo.trim()) return;
     setGuardando(true);
-    await onGuardar(vehiculo.id, {
-      marca: form.marca.trim(),
-      modelo: form.modelo.trim(),
-      anio: form.anio.trim(),
-      placa: form.placa.trim().toUpperCase(),
-    });
-    setGuardando(false);
-    onCerrar();
+    setErrorMsg(null);
+    try {
+      await onGuardar(vehiculo.id, {
+        marca: form.marca.trim(),
+        modelo: form.modelo.trim(),
+        anio: form.anio.trim(),
+        placa: form.placa.trim().toUpperCase(),
+      });
+      onCerrar();
+    } catch {
+      setErrorMsg('No se pudo guardar. Verifica tu conexión e intenta de nuevo.');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -169,6 +186,9 @@ function ModalEditarVehiculo({
               {guardando ? 'Guardando...' : '✓ Guardar cambios'}
             </Btn>
           </div>
+          {errorMsg && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorMsg}</p>
+          )}
         </form>
       </div>
     </div>
@@ -186,10 +206,10 @@ export function VistaClientes({
 }: {
   clientes: Cliente[];
   vehiculos: Vehiculo[];
-  onGuardarCliente: (c: Omit<Cliente, 'id'>) => void;
-  onGuardarVehiculo: (v: Omit<Vehiculo, 'id'>) => void;
-  onActualizarCliente: (id: string, datos: Omit<Cliente, 'id'>) => void;
-  onActualizarVehiculo: (id: string, datos: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => void;
+  onGuardarCliente: (c: Omit<Cliente, 'id'>) => Promise<void>;
+  onGuardarVehiculo: (v: Omit<Vehiculo, 'id'>) => Promise<void>;
+  onActualizarCliente: (id: string, datos: Omit<Cliente, 'id'>) => Promise<void>;
+  onActualizarVehiculo: (id: string, datos: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => Promise<void>;
 }) {
   const [formCliente, setFormCliente] = useState({ nombre: '', telefono: '', email: '', email2: '' });
   const [clienteExpandido, setClienteExpandido] = useState<string | null>(null);
@@ -427,3 +447,4 @@ export function VistaClientes({
     </div>
   );
 }
+

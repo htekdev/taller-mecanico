@@ -104,21 +104,23 @@ export async function insertVehiculo(tallerId: string, data: Omit<Vehiculo, 'id'
 }
 
 export async function updateVehiculo(vehiculoId: string, data: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('vehiculos')
     .update({ marca: data.marca, modelo: data.modelo, anio: data.anio, placa: data.placa })
     .eq('id', vehiculoId);
+  if (error) throw new Error(error.message);
 }
 
 // ── Refacciones ───────────────────────────────────────────────
 
 export async function getRefacciones(tallerId: string): Promise<Refaccion[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('refacciones')
     .select('*')
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
+  if (error) console.error('[getRefacciones] Supabase error:', error.message, error.code);
   return (data ?? []).map(r => ({
     id: r.id, nombre: r.nombre, codigo: r.codigo, categoria: r.categoria,
     unidad: r.unidad, precioCompra: r.precio_compra,
