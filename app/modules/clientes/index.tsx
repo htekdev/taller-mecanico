@@ -1,5 +1,4 @@
-
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import type { Cliente, Vehiculo } from '@/app/types';
@@ -52,34 +51,28 @@ function ModalEditarCliente({
             <h2 className="text-base font-bold text-slate-800">Editar Cliente</h2>
             <p className="text-xs text-slate-500 mt-0.5">Actualiza los datos de contacto.</p>
           </div>
-          <button type="button" onClick={onCerrar} className="text-slate-400 hover:text-slate-600 text-xl 
-leading-none" aria-label="Cerrar">×</button>
+          <button type="button" onClick={onCerrar} className="text-slate-400 hover:text-slate-600 text-xl leading-none" aria-label="Cerrar">×</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label>Nombre *</Label>
-            <Input type="text" placeholder="Nombre completo" value={form.nombre} onChange={e => setForm({ ...form, 
-nombre: e.target.value })} required />
+            <Input type="text" placeholder="Nombre completo" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} required />
           </div>
           <div>
             <Label>Teléfono <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
-            <Input type="tel" placeholder="Ej. 555-123-4567" value={form.telefono} onChange={e => setForm({ ...form, 
-telefono: e.target.value })} />
+            <Input type="tel" placeholder="Ej. 555-123-4567" value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} />
           </div>
           <div>
             <Label>Correo 1 <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
-            <Input type="email" placeholder="correo@ejemplo.com" value={form.email} onChange={e => setForm({ ...form, 
-email: e.target.value })} />
+            <Input type="email" placeholder="correo@ejemplo.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
           </div>
           <div>
             <Label>Correo 2 <span className="text-slate-400 font-normal text-xs">(opcional)</span></Label>
-            <Input type="email" placeholder="correo2@ejemplo.com" value={form.email2} onChange={e => setForm({ 
-...form, email2: e.target.value })} />
+            <Input type="email" placeholder="correo2@ejemplo.com" value={form.email2} onChange={e => setForm({ ...form, email2: e.target.value })} />
           </div>
           <div className="flex gap-3 pt-1">
             <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>Cancelar</Btn>
-            <Btn type="submit" variant="primary" fullWidth disabled={guardando}>{guardando ? 'Guardando...' : '✓ 
-Guardar cambios'}</Btn>
+            <Btn type="submit" variant="primary" fullWidth disabled={guardando}>{guardando ? 'Guardando...' : '✓ Guardar cambios'}</Btn>
           </div>
           {errorMsg && (
             <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errorMsg}</p>
@@ -139,8 +132,7 @@ function ModalEditarVehiculo({
               Los cambios se reflejan en todos los trabajos, facturas, historial y reportes relacionados.
             </p>
           </div>
-          <button type="button" onClick={onCerrar} className="text-slate-400 hover:text-slate-600 text-xl 
-leading-none" aria-label="Cerrar">×</button>
+          <button type="button" onClick={onCerrar} className="text-slate-400 hover:text-slate-600 text-xl leading-none" aria-label="Cerrar">×</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -186,13 +178,11 @@ leading-none" aria-label="Cerrar">×</button>
             </div>
           </div>
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-            ⚠️ El nombre completo de la unidad se verá como: <strong>{[form.anio, form.marca, 
-form.modelo].filter(Boolean).join(' ') || '(vacío)'}</strong>
+            ⚠️ El nombre completo de la unidad se verá como: <strong>{[form.anio, form.marca, form.modelo].filter(Boolean).join(' ') || '(vacío)'}</strong>
           </div>
           <div className="flex gap-3 pt-1">
             <Btn type="button" variant="ghost" fullWidth onClick={onCerrar}>Cancelar</Btn>
-            <Btn type="submit" variant="primary" fullWidth disabled={guardando || !form.marca.trim() || 
-!form.modelo.trim()}>
+            <Btn type="submit" variant="primary" fullWidth disabled={guardando || !form.marca.trim() || !form.modelo.trim()}>
               {guardando ? 'Guardando...' : '✓ Guardar cambios'}
             </Btn>
           </div>
@@ -230,7 +220,6 @@ export function VistaClientes({
   const [savingCliente, setSavingCliente] = useState(false);
   const [saveClienteError, setSaveClienteError] = useState<string | null>(null);
   const [savingVehiculo, setSavingVehiculo] = useState<string | null>(null);
-  const [saveVehiculoError, setSaveVehiculoError] = useState<string | null>(null);
 
   const handleSubmitCliente = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,12 +245,12 @@ export function VistaClientes({
     e.preventDefault();
     if (!formVehiculo.marca || !formVehiculo.modelo) return;
     setSavingVehiculo(clienteId);
-    setSaveVehiculoError(null);
+    setSaveClienteError(null);
     try {
       await onGuardarVehiculo({ ...formVehiculo, clienteId });
       setFormVehiculo({ marca: '', modelo: '', anio: '', placa: '' });
     } catch {
-      setSaveVehiculoError('No se pudo guardar la unidad. Verifica tu conexión e intenta de nuevo.');
+      setSaveClienteError('No se pudo guardar la unidad. Verifica tu conexión e intenta de nuevo.');
     } finally {
       setSavingVehiculo(null);
     }
@@ -321,12 +310,12 @@ export function VistaClientes({
             <Input type="email" placeholder="correo2@ejemplo.com" value={formCliente.email2}
               onChange={e => setFormCliente({ ...formCliente, email2: e.target.value })} />
           </div>
-          <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-3 justify-end">
+          <div className="sm:col-span-2 lg:col-span-4 flex flex-col items-end gap-1">
             <Btn type="submit" variant="primary" disabled={savingCliente}>
               {savingCliente ? '⏳ Guardando...' : '+ Agregar Cliente'}
             </Btn>
+            {saveClienteError && <p className="text-rose-600 text-xs text-right">{saveClienteError}</p>}
           </div>
-          {saveClienteError && <p className="text-rose-600 text-xs sm:col-span-2 lg:col-span-4">{saveClienteError}</p>}
         </form>
       </div>
 
@@ -379,8 +368,7 @@ export function VistaClientes({
                   {/* Clickable area (expand units) */}
                   <button type="button" onClick={() => toggleCliente(cliente.id)}
                     className="flex-1 flex items-center gap-3 px-5 py-4 text-left min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center 
-justify-center font-bold text-sm flex-shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
                       {cliente.nombre.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
@@ -389,15 +377,13 @@ justify-center font-bold text-sm flex-shrink-0">
                         {cliente.telefono && <span>📞 {cliente.telefono}</span>}
                         {cliente.email && <span>✉️ {cliente.email}</span>}
                         {cliente.email2 && <span>✉️ {cliente.email2}</span>}
-                        {!cliente.telefono && !cliente.email && <span className="text-slate-400">Sin contacto 
-registrado</span>}
+                        {!cliente.telefono && !cliente.email && <span className="text-slate-400">Sin contacto registrado</span>}
                       </div>
                     </div>
                     <span className={`ml-2 text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${
                       unidades.length > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'
                     }`}>
-                      {unidades.length > 0 ? `${unidades.length} unidad${unidades.length !== 1 ? 'es' : ''}` : '⚠ Sin 
-unidades'}
+                      {unidades.length > 0 ? `${unidades.length} unidad${unidades.length !== 1 ? 'es' : ''}` : '⚠ Sin unidades'}
                     </span>
                   </button>
 
@@ -406,8 +392,7 @@ unidades'}
                     <button
                       type="button"
                       onClick={e => { e.stopPropagation(); setClienteEditando(cliente); }}
-                      className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-3 
-py-1.5 rounded-lg transition-colors border border-indigo-200 hover:border-indigo-300"
+                      className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors border border-indigo-200 hover:border-indigo-300"
                     >
                       ✏️ Editar
                     </button>
@@ -421,12 +406,10 @@ py-1.5 rounded-lg transition-colors border border-indigo-200 hover:border-indigo
                   <div className="px-5 pb-5 pt-4 bg-slate-50 border-t border-slate-200">
                     {unidades.length > 0 && (
                       <div className="mb-5">
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Unidades 
-registradas</p>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Unidades registradas</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                           {unidades.map(v => (
-                            <div key={v.id} className="flex items-center gap-3 bg-white border border-slate-200 
-rounded-lg px-4 py-3 shadow-sm">
+                            <div key={v.id} className="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 shadow-sm">
                               <span className="text-2xl flex-shrink-0">🚗</span>
                               <div className="min-w-0 flex-1">
                                 <div className="font-semibold text-slate-800 text-sm truncate">
@@ -441,9 +424,7 @@ rounded-lg px-4 py-3 shadow-sm">
                               <button
                                 type="button"
                                 onClick={e => { e.stopPropagation(); setVehiculoEditando(v); }}
-                                className="text-xs font-medium text-indigo-600 hover:text-indigo-800 
-hover:bg-indigo-50 px-2 py-1 rounded-lg transition-colors border border-indigo-200 hover:border-indigo-300 
-flex-shrink-0"
+                                className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2 py-1 rounded-lg transition-colors border border-indigo-200 hover:border-indigo-300 flex-shrink-0"
                                 title="Editar unidad"
                               >
                                 ✏️
@@ -453,8 +434,7 @@ flex-shrink-0"
                         </div>
                       </div>
                     )}
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Registrar nueva 
-unidad</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Registrar nueva unidad</p>
                     <form onSubmit={e => handleSubmitVehiculo(e, cliente.id)}
                       className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                       <div><Label>Marca *</Label>
@@ -462,12 +442,10 @@ unidad</p>
                           onChange={e => setFormVehiculo({ ...formVehiculo, marca: e.target.value })} required /></div>
                       <div><Label>Modelo *</Label>
                         <Input type="text" placeholder="Ej. F-150" value={formVehiculo.modelo}
-                          onChange={e => setFormVehiculo({ ...formVehiculo, modelo: e.target.value })} required 
-/></div>
+                          onChange={e => setFormVehiculo({ ...formVehiculo, modelo: e.target.value })} required /></div>
                       <div><Label>Año</Label>
                         <Input type="text" placeholder="Ej. 2020" value={formVehiculo.anio}
-                          onChange={e => setFormVehiculo({ ...formVehiculo, anio: e.target.value })} maxLength={4} 
-/></div>
+                          onChange={e => setFormVehiculo({ ...formVehiculo, anio: e.target.value })} maxLength={4} /></div>
                       <div><Label>Placa</Label>
                         <Input type="text" placeholder="Ej. ABC-123" value={formVehiculo.placa}
                           onChange={e => setFormVehiculo({ ...formVehiculo, placa: e.target.value.toUpperCase() })}
@@ -491,6 +469,4 @@ unidad</p>
     </div>
   );
 }
-
-
 
