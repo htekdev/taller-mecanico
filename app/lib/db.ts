@@ -1053,7 +1053,7 @@ export async function getGastos(tallerId: string): Promise<Gasto[]> {
 export async function insertGasto(
   tallerId: string,
   data: Omit<Gasto, 'id' | 'tallerId'>,
-): Promise<Gasto | null> {
+): Promise<Gasto> {
   const { data: row, error } = await supabase
     .from('gastos')
     .insert({
@@ -1067,7 +1067,7 @@ export async function insertGasto(
     })
     .select()
     .single();
-  if (error || !row) { console.error('insertGasto', error); return null; }
+  if (error || !row) throw new Error(`insertGasto: ${error?.message ?? 'no row returned'}`);
   return rowToGasto(row);
 }
 
@@ -1082,11 +1082,13 @@ export async function updateGasto(
   if (data.monto        !== undefined) patch.monto        = data.monto;
   if (data.fecha        !== undefined) patch.fecha        = data.fecha;
   if (data.notas        !== undefined) patch.notas        = data.notas ?? null;
-  await supabase.from('gastos').update(patch).eq('id', gastoId);
+  const { error } = await supabase.from('gastos').update(patch).eq('id', gastoId);
+  if (error) throw new Error(`updateGasto: ${error.message}`);
 }
 
 export async function deleteGasto(gastoId: string): Promise<void> {
-  await supabase.from('gastos').delete().eq('id', gastoId);
+  const { error } = await supabase.from('gastos').delete().eq('id', gastoId);
+  if (error) throw new Error(`deleteGasto: ${error.message}`);
 }
 
 // ── Cotizaciones ──────────────────────────────────────────────
