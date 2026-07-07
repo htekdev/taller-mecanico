@@ -82,6 +82,10 @@ test.describe('Data Persistence', () => {
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
 
+    // Settle auth -- navigate to clientes first so Supabase auth is set before inventario query
+    await dashboardPage.navigateToModule('clientes');
+    await page.waitForTimeout(1200);
+
     // Check part still exists — wait for Supabase data to reload after re-login (CI can be slow)
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
