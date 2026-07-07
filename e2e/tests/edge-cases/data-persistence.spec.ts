@@ -73,7 +73,8 @@ test.describe('Data Persistence', () => {
     // Check part still exists — wait for Supabase data to reload after re-login (CI can be slow)
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    await page.waitForTimeout(2000);
+    // Poll for the specific part — Vercel preview cold starts can take >2s
+    await page.getByText(partName).first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
 
     const exists2 = await inventarioPage.isPartVisible(partName);
     expect(exists2).toBe(true);
