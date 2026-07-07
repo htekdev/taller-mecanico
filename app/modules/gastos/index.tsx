@@ -96,6 +96,7 @@ function GastoForm({
 
   const handleSubmit = async () => {
     if (!valid) return;
+    setSaveError(null); // clear previous error before new attempt
     setSaving(true);
     try {
       await onGuardar(form);
