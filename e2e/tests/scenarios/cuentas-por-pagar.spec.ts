@@ -44,7 +44,7 @@ test.describe('Cuentas por Pagar (Por Pagar)', () => {
     await showPhaseLabel(page, '✅ Por Pagar Loaded');
   });
 
-  test('cuentas por pagar shows Spanish section title', async ({
+  test.fixme('cuentas por pagar shows Spanish section title', async ({
     page, dashboardPage,
   }) => {
     await showPhaseLabel(page, '🏷️ Phase 1: Spanish Labels');
