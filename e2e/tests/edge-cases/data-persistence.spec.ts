@@ -73,9 +73,7 @@ test.describe('Data Persistence', () => {
     // Check part still exists — wait for Supabase data to reload after re-login (CI can be slow)
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    // Component renders header before fetching data — wait for the HTTP fetch to complete
-    await page.waitForLoadState('networkidle');
-    await page.getByText(partName).waitFor({ state: 'visible', timeout: 30_000 });
+    await page.waitForTimeout(2000);
 
     const exists2 = await inventarioPage.isPartVisible(partName);
     expect(exists2).toBe(true);
