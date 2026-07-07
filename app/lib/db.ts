@@ -104,10 +104,11 @@ export async function insertVehiculo(tallerId: string, data: Omit<Vehiculo, 'id'
 }
 
 export async function updateVehiculo(vehiculoId: string, data: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('vehiculos')
     .update({ marca: data.marca, modelo: data.modelo, anio: data.anio, placa: data.placa })
     .eq('id', vehiculoId);
+  if (error) throw new Error(error.message);
 }
 
 // ── Refacciones ───────────────────────────────────────────────
