@@ -110,7 +110,8 @@ export default function TallerMecanico() {
     try {
       await db.updateRefaccionStock(refaccionId, nuevoStock);
       setInventario(prev => prev.map(r => r.id === refaccionId ? { ...r, stock: nuevoStock } : r));
-    } catch {
+    } catch (err) {
+      console.error('[recibirStock] FAILED:', err);
       setErrorBanner('No se pudo actualizar el stock. Verifica tu conexion e intenta de nuevo.');
     }
   };
@@ -199,7 +200,11 @@ export default function TallerMecanico() {
         const usada = data.partes.find(p => p.refaccionId === r.id);
         return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
       });
-      await db.updateRefacciones(updatedInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
+      try {
+        await db.updateRefacciones(updatedInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
+      } catch (err) {
+        console.error('[convertirCotizacionATrabajo] stock update failed (best-effort, non-fatal):', err);
+      }
       setInventario(updatedInv);
     }
 
@@ -212,7 +217,8 @@ export default function TallerMecanico() {
     try {
       await db.updateRefaccionCompatibilidad(refaccionId, compat ?? null);
       setInventario(prev => prev.map(r => r.id === refaccionId ? { ...r, compatibilidad: compat } : r));
-    } catch {
+    } catch (err) {
+      console.error('[actualizarCompatibilidad] FAILED:', err);
       setErrorBanner('No se pudo guardar la compatibilidad. Verifica tu conexion e intenta de nuevo.');
     }
   };
@@ -232,7 +238,11 @@ export default function TallerMecanico() {
         const usada = data.partes.find(p => p.refaccionId === r.id);
         return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
       });
-      await db.updateRefacciones(nuevoInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
+      try {
+        await db.updateRefacciones(nuevoInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
+      } catch (err) {
+        console.error('[guardarTrabajo] stock update failed (best-effort, non-fatal):', err);
+      }
       setInventario(nuevoInv);
     }
   };
@@ -546,7 +556,8 @@ export default function TallerMecanico() {
       setTrabajos(prev => prev.map(t =>
         t.id === trabajoId ? { ...t, folioFiscal: '__CANCELADA__' } : t,
       ));
-    } catch {
+    } catch (err) {
+      console.error('[cancelarTrabajo] FAILED:', err);
       setErrorBanner('No se pudo cancelar el trabajo. Verifica tu conexion e intenta de nuevo.');
     }
   };
@@ -557,7 +568,8 @@ export default function TallerMecanico() {
       setTrabajos(prev => prev.map(t =>
         t.id === trabajoId ? { ...t, folioFiscal: undefined } : t,
       ));
-    } catch {
+    } catch (err) {
+      console.error('[reactivarTrabajo] FAILED:', err);
       setErrorBanner('No se pudo reactivar el trabajo. Verifica tu conexion e intenta de nuevo.');
     }
   };
