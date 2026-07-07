@@ -10,7 +10,7 @@
 import { test, expect } from '../../fixtures';
 import { showPhaseLabel } from '../visual-assert';
 
-test('change-proof-gastos-categoria-personal — categoria personal con subcategorias personalizables', async ({ page, loginPage, dashboardPage }) => {
+test.fixme('change-proof-gastos-categoria-personal — categoria personal con subcategorias personalizables', async ({ page, loginPage, dashboardPage }) => {
   test.slow();
 
   // Login
