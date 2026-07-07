@@ -53,7 +53,7 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1000);
 
-    const mainText = await page.locator('main').innerText().catch(() => '');
+    const mainText = await page.locator('main, [data-testid="app-content-loaded"]').first().innerText().catch(() => '');
 
     // Module should contain Spanish-language content (not a blank or error-only page)
     expect(mainText.length).toBeGreaterThan(10);
@@ -78,7 +78,7 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(2000);
 
-    const mainText = await page.locator('main').innerText().catch(() => '');
+    const mainText = await page.locator('main, [data-testid="app-content-loaded"]').first().innerText().catch(() => '');
     expect(mainText).not.toContain('NaN');
     expect(mainText).not.toContain('undefined');
     expect(mainText).not.toContain('Infinity');
@@ -115,7 +115,7 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(2000);
 
-    const mainText = await page.locator('main').innerText().catch(() => '');
+    const mainText = await page.locator('main, [data-testid="app-content-loaded"]').first().innerText().catch(() => '');
     expect(mainText).not.toContain('NaN');
     expect(mainText).not.toContain('undefined');
     expect(mainText).not.toContain('Infinity');
@@ -131,7 +131,7 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1500);
 
-    const mainText = await page.locator('main').innerText().catch(() => '');
+    const mainText = await page.locator('main, [data-testid="app-content-loaded"]').first().innerText().catch(() => '');
 
     // Filter tabs: Todos / Pendiente / Parcial / Pagado — at least one should be present
     const hasSpanishFilterTerms =
