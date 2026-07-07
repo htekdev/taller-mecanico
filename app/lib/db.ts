@@ -114,12 +114,13 @@ export async function updateVehiculo(vehiculoId: string, data: Pick<Vehiculo, 'm
 // ── Refacciones ───────────────────────────────────────────────
 
 export async function getRefacciones(tallerId: string): Promise<Refaccion[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('refacciones')
     .select('*')
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
+  if (error) console.error('[getRefacciones] Supabase error:', error.message, error.code);
   return (data ?? []).map(r => ({
     id: r.id, nombre: r.nombre, codigo: r.codigo, categoria: r.categoria,
     unidad: r.unidad, precioCompra: r.precio_compra,
