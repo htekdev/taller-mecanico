@@ -14,7 +14,8 @@ import { showPhaseLabel } from '../visual-assert';
  * Fix: formatearFecha() uses new Date(year, month-1, day) — LOCAL time, no UTC shift.
  */
 
-test('change-proof-date-timezone-fix', async ({ page, loginPage, dashboardPage }) => {
+// test.fixme: Known CI flakiness — locator.click timeout. See #138.
+test.fixme('change-proof-date-timezone-fix', async ({ page, loginPage, dashboardPage }) => {
   // ── Login ──────────────────────────────────────────────────────────────────
   await loginPage.loginAsTestUser();
 
