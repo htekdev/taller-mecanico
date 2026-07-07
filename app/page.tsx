@@ -107,8 +107,12 @@ export default function TallerMecanico() {
     const ref = inventario.find(r => r.id === refaccionId);
     if (!ref) return;
     const nuevoStock = ref.stock + cantidad;
-    await db.updateRefaccionStock(refaccionId, nuevoStock);
-    setInventario(prev => prev.map(r => r.id === refaccionId ? { ...r, stock: nuevoStock } : r));
+    try {
+      await db.updateRefaccionStock(refaccionId, nuevoStock);
+      setInventario(prev => prev.map(r => r.id === refaccionId ? { ...r, stock: nuevoStock } : r));
+    } catch {
+      setErrorBanner('No se pudo actualizar el stock. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   /** Creates a new refaccion from within a PO form — used by VistaOrdenesCompra */
   const crearRefaccionDesdeOrden = async (data: Omit<Refaccion, 'id'>): Promise<Refaccion | null> => {
@@ -205,8 +209,12 @@ export default function TallerMecanico() {
   };
   const actualizarCompatibilidad = async (refaccionId: string, compatibilidad: CompatibilidadVehiculo[]) => {
     const compat = compatibilidad.length > 0 ? compatibilidad : undefined;
-    await db.updateRefaccionCompatibilidad(refaccionId, compat ?? null);
-    setInventario(prev => prev.map(r => r.id === refaccionId ? { ...r, compatibilidad: compat } : r));
+    try {
+      await db.updateRefaccionCompatibilidad(refaccionId, compat ?? null);
+      setInventario(prev => prev.map(r => r.id === refaccionId ? { ...r, compatibilidad: compat } : r));
+    } catch {
+      setErrorBanner('No se pudo guardar la compatibilidad. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   const guardarTrabajo = async (data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => {
     if (!taller) return;
@@ -533,17 +541,25 @@ export default function TallerMecanico() {
   };
 
   const cancelarTrabajo = async (trabajoId: string) => {
-    await db.cancelarTrabajo(trabajoId);
-    setTrabajos(prev => prev.map(t =>
-      t.id === trabajoId ? { ...t, folioFiscal: '__CANCELADA__' } : t,
-    ));
+    try {
+      await db.cancelarTrabajo(trabajoId);
+      setTrabajos(prev => prev.map(t =>
+        t.id === trabajoId ? { ...t, folioFiscal: '__CANCELADA__' } : t,
+      ));
+    } catch {
+      setErrorBanner('No se pudo cancelar el trabajo. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const reactivarTrabajo = async (trabajoId: string) => {
-    await db.reactivarTrabajo(trabajoId);
-    setTrabajos(prev => prev.map(t =>
-      t.id === trabajoId ? { ...t, folioFiscal: undefined } : t,
-    ));
+    try {
+      await db.reactivarTrabajo(trabajoId);
+      setTrabajos(prev => prev.map(t =>
+        t.id === trabajoId ? { ...t, folioFiscal: undefined } : t,
+      ));
+    } catch {
+      setErrorBanner('No se pudo reactivar el trabajo. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const confirmarFactura = async () => {
