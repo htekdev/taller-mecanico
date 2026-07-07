@@ -248,5 +248,19 @@ export class InventarioPage extends BasePage {
     // Wait for the proveedor form to close — confirms save was triggered
     await nombreInput.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
     await this.page.waitForTimeout(2000); // allow Supabase save to complete
+
+    // Poll until the new proveedor appears in the select — confirms React re-render complete
+    await this.page.waitForFunction(
+      (nombre: string) => {
+        const selects = Array.from(document.querySelectorAll('select'));
+        return selects.some(sel =>
+          Array.from(sel.options).some(opt => opt.text.includes(nombre))
+        );
+      },
+      nombre,
+      { timeout: 15_000 }
+    ).catch(() => {
+      // If not found after 15s, continue — test assertion will catch it
+    });
   }
 }
