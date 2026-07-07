@@ -78,7 +78,8 @@ export default function TallerMecanico() {
   };
   const actualizarCliente = async (id: string, data: Omit<Cliente, 'id'>) => {
     const actualizado = await db.updateCliente(id, data);
-    if (actualizado) setClientes(prev => prev.map(c => c.id === id ? actualizado : c));
+    if (!actualizado) throw new Error('No se pudo actualizar el cliente');
+    setClientes(prev => prev.map(c => c.id === id ? actualizado : c));
   };
   const guardarVehiculo = async (data: Omit<Vehiculo, 'id'>) => {
     if (!taller) return;

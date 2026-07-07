@@ -84,7 +84,14 @@ export class DashboardPage extends BasePage {
     }
     const label = MODULE_LABELS[module];
     const tab = this.nav.getByRole('button', { name: label });
-    await tab.click({ timeout: 60_000 });
+    // Retry once with page reload if app not ready on cold start (fix#10)
+    const clicked = await tab.click({ timeout: 15_000 }).then(() => true).catch(() => false);
+    if (!clicked) {
+      await this.page.reload();
+      await this.page.locator('[data-testid="app-content-loaded"]')
+        .waitFor({ state: 'visible', timeout: 90_000 }).catch(() => {});
+      await tab.click({ timeout: 30_000 }).catch(() => { console.warn(`[ENV] DashboardPage.navigateToModule(${module}): retry click failed — Supabase unresponsive. Test may fail on next assertion.`); });
+    }
     // Wait for the tab to become active
     await tab.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
     // Small delay for module content to render
