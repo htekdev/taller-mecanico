@@ -118,19 +118,10 @@ test.describe('Full Lifecycle Verification', () => {
     // Verify data persisted — check inventory
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    // Cold-start retry (FIXME #137): getRefacciones() silently returns [] on cold start.
-    // Two-step: quick isVisible check → retry reload if empty → final soft warn.
-    const partFoundFirst = await page.getByText(partName).isVisible().catch(() => false);
-    if (!partFoundFirst) {
-      await page.reload();
-      await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 90_000 });
-      await dashboardPage.navigateToModule('inventario');
-      await inventarioPage.waitForPageLoad();
-    }
-    const partStillVisible = await page.getByText(partName).isVisible().catch(() => false);
-    if (!partStillVisible) {
-      console.warn('[FIXME #137] Phase 8: Part not visible after double-reload — fix needed in getRefacciones()+cargarDatos(). Issue #137.');
-    }
+    // Use expect() with retry — replaces silent .catch(() => {}) that masked failures
+    await expect(page.getByText(partName)).toBeVisible({ timeout: 45_000 });
+    const partStillVisible = await inventarioPage.isPartVisible(partName);
+    expect(partStillVisible).toBe(true);
 
     // ═══ Phase 9: Module Stability Sweep ═════════════════════════════════════
     await showPhaseLabel(page, '🧪 Phase 9: Stability Sweep');
