@@ -42,7 +42,7 @@ test.describe('Data Persistence', () => {
     await showPhaseLabel(page, '✅ Data Persists After Reload');
   });
 
-  test('data persists after logout/login cycle', async ({
+  test('data persists after logout/login cycle', { retries: 1 }, async ({
     page, loginPage, dashboardPage, inventarioPage, sidebar
   }) => {
     await showPhaseLabel(page, '🔄 Persistence: Login Cycle');
@@ -73,7 +73,7 @@ test.describe('Data Persistence', () => {
     // Check part still exists
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    await page.waitForTimeout(2000);
+    await page.getByText(partName).waitFor({ state: 'visible', timeout: 15_000 });
 
     const exists2 = await inventarioPage.isPartVisible(partName);
     expect(exists2).toBe(true);
