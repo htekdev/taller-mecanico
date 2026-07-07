@@ -16,7 +16,6 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
  */
 
 test.describe('Accounts Receivable (CxC)', () => {
-  test.describe.configure({ retries: 1 }); // flaky: CxC filter click can timeout on CI cold-start
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.loginAsTestUser();
   });

@@ -11,8 +11,7 @@ import { BasePage } from './BasePage';
 export type ModuleKey =
   | 'clientes' | 'inventario' | 'trabajos' | 'proveedores'
   | 'ordenes' | 'facturas' | 'cuentas' | 'pagos'
-  | 'resumen' | 'gastos' | 'historial' | 'cotizaciones' | 'configuracion'
-  | 'reportes';
+  | 'resumen' | 'gastos' | 'historial' | 'cotizaciones' | 'configuracion';
 
 export const MODULE_LABELS: Record<ModuleKey, string> = {
   clientes: 'Clientes',
@@ -28,7 +27,6 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   historial: 'Historial',
   cotizaciones: 'Cotizaciones',
   configuracion: 'Configuración',
-  reportes: 'Reportes',
 };
 
 export class DashboardPage extends BasePage {
@@ -86,14 +84,7 @@ export class DashboardPage extends BasePage {
     }
     const label = MODULE_LABELS[module];
     const tab = this.nav.getByRole('button', { name: label });
-    // Retry once with page reload if app not ready on cold start (fix#10)
-    const clicked = await tab.click({ timeout: 15_000 }).then(() => true).catch(() => false);
-    if (!clicked) {
-      await this.page.reload();
-      await this.page.locator('[data-testid="app-content-loaded"]')
-        .waitFor({ state: 'visible', timeout: 90_000 }).catch(() => {});
-      await tab.click({ timeout: 30_000 });
-    }
+    await tab.click({ timeout: 60_000 });
     // Wait for the tab to become active
     await tab.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
     // Small delay for module content to render
