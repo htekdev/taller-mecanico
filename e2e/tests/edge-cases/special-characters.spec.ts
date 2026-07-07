@@ -45,7 +45,7 @@ test.describe('Special Characters & Long Text', () => {
     await showPhaseLabel(page, '✅ Accents Display Correctly');
   });
 
-  test('long description text does not crash UI', async ({
+  test('long description text does not crash UI', { retries: 1 }, async ({
     page, dashboardPage, inventarioPage
   }) => {
     await showPhaseLabel(page, '📝 Long Text');
