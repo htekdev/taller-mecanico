@@ -111,7 +111,8 @@ test.describe('Full Lifecycle Verification', () => {
     // Use text-based wait instead of instant check — Supabase reload after re-login is variable on CI
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    await page.waitForTimeout(2000);
+    // Poll for the specific part — Vercel preview cold starts can take >2s
+    await page.getByText(partName).first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
     const partStillVisible = await inventarioPage.isPartVisible(partName);
     expect(partStillVisible).toBe(true);
 
