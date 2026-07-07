@@ -670,14 +670,16 @@ export async function insertOrden(tallerId: string, data: Omit<OrdenCompra, 'id'
 }
 
 export async function updateOrdenEstado(ordenId: string, estado: 'recibida' | 'cancelada', fechaRecibida?: string): Promise<void> {
-  await supabase.from('ordenes_compra').update({
+  const { error } = await supabase.from('ordenes_compra').update({
     estado,
     ...(fechaRecibida ? { fecha_recibida: fechaRecibida } : {}),
   }).eq('id', ordenId);
+  if (error) throw new Error(`updateOrdenEstado: ${error.message}`);
 }
 
 export async function updateOrdenPagos(ordenId: string, pagos: PagoCompra[]): Promise<void> {
-  await supabase.from('ordenes_compra').update({ pagos }).eq('id', ordenId);
+  const { error } = await supabase.from('ordenes_compra').update({ pagos }).eq('id', ordenId);
+  if (error) throw new Error(`updateOrdenPagos: ${error.message}`);
 }
 
 /** Edit a pending purchase order — updates items, description, and totals.
@@ -686,7 +688,7 @@ export async function updateOrden(
   ordenId: string,
   data: Pick<OrdenCompra, 'descripcion' | 'numeroOrden' | 'partes' | 'subtotalSinIVA' | 'ivaAmount' | 'total' | 'conIVA'>,
 ): Promise<void> {
-  await supabase.from('ordenes_compra').update({
+  const { error } = await supabase.from('ordenes_compra').update({
     descripcion: data.descripcion,
     numero_orden: data.numeroOrden ?? null,
     partes: data.partes,
@@ -695,6 +697,7 @@ export async function updateOrden(
     total: data.total,
     con_iva: data.conIVA,
   }).eq('id', ordenId);
+  if (error) throw new Error(`updateOrden: ${error.message}`);
 }
 
 // ── Facturas ──────────────────────────────────────────────────
@@ -756,27 +759,31 @@ export async function insertFactura(tallerId: string, data: Omit<Factura, 'id'>)
 }
 
 export async function updateFacturaPagos(facturaId: string, pagos: PagoFactura[]): Promise<void> {
-  await supabase.from('facturas').update({ pagos }).eq('id', facturaId);
+  const { error } = await supabase.from('facturas').update({ pagos }).eq('id', facturaId);
+  if (error) throw new Error(`updateFacturaPagos: ${error.message}`);
 }
 
 export async function updateFacturaFecha(facturaId: string, fecha: string): Promise<void> {
-  await supabase.from('facturas').update({ fecha }).eq('id', facturaId);
+  const { error } = await supabase.from('facturas').update({ fecha }).eq('id', facturaId);
+  if (error) throw new Error(`updateFacturaFecha: ${error.message}`);
 }
 
 export async function updateFacturaNumero(facturaId: string, numeroFactura: string): Promise<void> {
-  await supabase.from('facturas').update({ numero_factura: numeroFactura }).eq('id', facturaId);
+  const { error } = await supabase.from('facturas').update({ numero_factura: numeroFactura }).eq('id', facturaId);
+  if (error) throw new Error(`updateFacturaNumero: ${error.message}`);
 }
 
 export async function updateFacturaConceptos(
   facturaId: string,
   data: { conceptos: FacturaConcepto[]; subtotal: number; iva: number | undefined; total: number },
 ): Promise<void> {
-  await supabase.from('facturas').update({
+  const { error } = await supabase.from('facturas').update({
     conceptos: data.conceptos,
     subtotal: data.subtotal,
     iva: data.iva ?? null,
     total: data.total,
   }).eq('id', facturaId);
+  if (error) throw new Error(`updateFacturaConceptos: ${error.message}`);
 }
 
 /** Manual adjustment of factura totals + invoice number — used when Sofia corrects migrated data */
@@ -784,12 +791,13 @@ export async function updateFacturaTotales(
   facturaId: string,
   data: { subtotal: number; iva: number | undefined; total: number; numeroFactura: string },
 ): Promise<void> {
-  await supabase.from('facturas').update({
+  const { error } = await supabase.from('facturas').update({
     subtotal: data.subtotal,
     iva: data.iva ?? null,
     total: data.total,
     numero_factura: data.numeroFactura,
   }).eq('id', facturaId);
+  if (error) throw new Error(`updateFacturaTotales: ${error.message}`);
 }
 
 /** Update only iva + total on a trabajo — used to sync back when factura totals are manually adjusted */
@@ -797,7 +805,8 @@ export async function updateTrabajoTotales(
   trabajoId: string,
   data: { iva: number; total: number },
 ): Promise<void> {
-  await supabase.from('trabajos').update({ iva: data.iva, total: data.total }).eq('id', trabajoId);
+  const { error } = await supabase.from('trabajos').update({ iva: data.iva, total: data.total }).eq('id', trabajoId);
+  if (error) throw new Error(`updateTrabajoTotales: ${error.message}`);
 }
 
 // Cancellation conventions (no DB schema changes required):
@@ -805,19 +814,23 @@ export async function updateTrabajoTotales(
 // - Notas/trabajos sin factura: use folio_fiscal='__CANCELADA__' (column already exists in trabajos table).
 // Both can be restored at any time via the reactivar* functions.
 export async function cancelarFactura(facturaId: string): Promise<void> {
-  await supabase.from('facturas').update({ notas: 'CANCELADA' }).eq('id', facturaId);
+  const { error } = await supabase.from('facturas').update({ notas: 'CANCELADA' }).eq('id', facturaId);
+  if (error) throw new Error(`cancelarFactura: ${error.message}`);
 }
 
 export async function reactivarFactura(facturaId: string): Promise<void> {
-  await supabase.from('facturas').update({ notas: null }).eq('id', facturaId);
+  const { error } = await supabase.from('facturas').update({ notas: null }).eq('id', facturaId);
+  if (error) throw new Error(`reactivarFactura: ${error.message}`);
 }
 
 export async function cancelarNota(trabajoId: string): Promise<void> {
-  await supabase.from('trabajos').update({ folio_fiscal: '__CANCELADA__' }).eq('id', trabajoId);
+  const { error } = await supabase.from('trabajos').update({ folio_fiscal: '__CANCELADA__' }).eq('id', trabajoId);
+  if (error) throw new Error(`cancelarNota: ${error.message}`);
 }
 
 export async function reactivarNota(trabajoId: string): Promise<void> {
-  await supabase.from('trabajos').update({ folio_fiscal: null }).eq('id', trabajoId);
+  const { error } = await supabase.from('trabajos').update({ folio_fiscal: null }).eq('id', trabajoId);
+  if (error) throw new Error(`reactivarNota: ${error.message}`);
 }
 
 // cancelarTrabajo / reactivarTrabajo — same convention, applies to ALL job types (not just notas)
