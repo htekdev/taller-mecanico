@@ -49,6 +49,7 @@ function GastoForm({
 }) {
   const [form, setForm] = useState<GastoFormData>(initial);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   // Track whether "Otros" is selected so we can show a free-text input
   const [otroSubcat, setOtroSubcat] = useState(() => {
     const predefined = GASTO_SUBCATEGORIAS[initial.categoria];
@@ -104,7 +105,7 @@ function GastoForm({
       }
     } catch (err) {
     console.error('[GastoForm] Error al guardar gasto:', err);
-    alert('Error al guardar. Intenta de nuevo.');
+    setSaveError('Error al guardar. Intenta de nuevo.');
   } finally { setSaving(false); }
   };
 
@@ -189,6 +190,7 @@ function GastoForm({
         />
       </div>
 
+      {saveError && <p className="text-red-600 text-sm mt-1 bg-red-50 rounded p-2">{saveError}</p>}
       {/* Actions */}
       <div className="flex gap-3 pt-1">
         <Btn variant="primary" disabled={!valid || saving} onClick={handleSubmit}>
@@ -264,6 +266,7 @@ export function VistaGastos({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Custom subcategories for 'personal' category, persisted in localStorage
   const PERSONAL_SUBS_KEY = 'taller_personal_subcats';
@@ -335,7 +338,7 @@ export function VistaGastos({
       setConfirmDelete(null);
     } catch (err) {
       console.error('[GastoPage] Error al eliminar gasto:', err);
-      alert('Error al eliminar el gasto. Intenta de nuevo.');
+      setDeleteError('Error al eliminar el gasto. Intenta de nuevo.');
       setConfirmDelete(null);
     } finally {
       setIsDeleting(false);
