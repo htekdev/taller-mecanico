@@ -25,8 +25,7 @@ import { TestData } from '../../utils/test-data';
  */
 
 test.describe('Full Lifecycle Verification', () => {
-  // test.fixme: Known CI flakiness - Supabase cold-start after re-login. 8 fix attempts failed. See #138.
-  test.fixme('complete daily workflow: client → cotización → trabajo → payment → expense', { retries: 1 }, async ({
+  test('complete daily workflow: client → cotización → trabajo → payment → expense', { retries: 1 }, async ({
     page, loginPage, dashboardPage, cotizacionesPage, trabajosPage,
     inventarioPage, cuentasCobrarPage, ordenesCompraPage, gastosPage, sidebar
   }) => {
@@ -120,13 +119,9 @@ test.describe('Full Lifecycle Verification', () => {
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
     // Use expect() with retry — replaces silent .catch(() => {}) that masked failures
-    await page.getByText(partName).first().waitFor({ state: 'visible', timeout: 45_000 }).catch(() => {}); // FIXME #137: soft failure
+    await expect(page.getByText(partName)).toBeVisible({ timeout: 45_000 });
     const partStillVisible = await inventarioPage.isPartVisible(partName);
-    // FIXME #137: Hard assertion is flaky on Vercel preview cold starts.
-    // Softened to warn-only — keeps phases 1-7 and 9-14 running. Fix tracked in issue #137.
-    if (!partStillVisible) {
-      console.warn('[FIXME #137] Phase 8: Part not visible after re-login — Supabase fetch incomplete on cold start');
-    }
+    expect(partStillVisible).toBe(true);
 
     // ═══ Phase 9: Module Stability Sweep ═════════════════════════════════════
     await showPhaseLabel(page, '🧪 Phase 9: Stability Sweep');
