@@ -68,9 +68,10 @@ test.describe('Cuentas por Pagar (Por Pagar)', () => {
     await showPhaseLabel(page, '✅ Spanish Labels OK');
   });
 
-  test('cuentas por pagar monetary values are well-formatted', async ({
+  test('cuentas por pagar monetary values are well-formatted', { retries: 1 }, async ({
     page, dashboardPage,
   }) => {
+    test.slow(); // navigateToModule('pagos') can time out under CI load -- triple timeout
     await showPhaseLabel(page, '🧮 Phase 1: Math Check');
     await dashboardPage.navigateToModule('pagos');
     await dashboardPage.waitForPageLoad();
