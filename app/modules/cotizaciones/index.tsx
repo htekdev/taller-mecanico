@@ -1303,9 +1303,8 @@ export function VistaCotizaciones({
         form:             savedForm as unknown as Record<string, unknown>,
       });
       await recargarHistory();
-      const entry: CotizacionGuardada = row
-        ? rowToEntry(row)
-        : { id: '', numeroCotizacion: numero, plantilla, cliente: clienteNombre, fecha: form.fecha, total, savedAt: new Date().toISOString(), form: savedForm };
+      if (!row) throw new Error('No se pudo guardar la cotización');
+      const entry: CotizacionGuardada = rowToEntry(row);
       setForm(savedForm);
       setViewEntry(entry);
     }
