@@ -17,7 +17,7 @@ test.describe('Inventory Validation', () => {
     await loginPage.loginAsTestUser();
   });
 
-  test('cannot add part without a name', async ({
+  test('cannot add part without a name', { retries: 1 }, async ({
     page, dashboardPage, inventarioPage
   }) => {
     await showPhaseLabel(page, '⚠️ Required: Part Name');

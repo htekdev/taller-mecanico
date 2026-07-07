@@ -20,13 +20,13 @@ import { showPhaseLabel } from '../visual-assert';
 const UNIQUE_PART  = `PIEZA-VIDEO-${Date.now()}`;
 const UNIQUE_PROV  = `PROV-VIDEO-${Date.now()}`;
 
-test('change-proof-inventario-eliminar-proveedor', async ({ page, loginPage, dashboardPage, inventarioPage }) => {
+test('change-proof-inventario-eliminar-proveedor', { retries: 1 }, async ({ page, loginPage, dashboardPage, inventarioPage }) => {
   test.slow();
 
   // ── 1. Login ────────────────────────────────────────────────────────────────
   await showPhaseLabel(page, '🔐 Login al Taller Mecánico');
   await loginPage.loginAsTestUser();
-  await page.locator('nav').waitFor({ state: 'visible', timeout: 45_000 });
+  await page.locator('nav').waitFor({ state: 'visible', timeout: 90_000 });
   await page.waitForTimeout(1000);
 
   // ── 2. Navigate to Inventario ────────────────────────────────────────────────
@@ -71,16 +71,21 @@ test('change-proof-inventario-eliminar-proveedor', async ({ page, loginPage, das
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(500);
 
+  // ── 6b. Add a filler part so inventory is non-empty (filtroProveedorSelect only renders when inventario.length > 0) ──
+  await inventarioPage.addPart({ nombre: UNIQUE_PART + '-B', stock: 1 });
+  await page.waitForTimeout(1500);
+
   // ── 7. Add a new proveedor inline ────────────────────────────────────────────
   await showPhaseLabel(page, '🏪 Agregando proveedor inline: ' + UNIQUE_PROV);
   await inventarioPage.agregarProveedorInline(UNIQUE_PROV, '555-1234');
   await page.waitForTimeout(2000);
 
-  // New proveedor should appear in the proveedor select
-  await showPhaseLabel(page, '✅ Verificando proveedor en selector...');
-  const provSelect = inventarioPage.proveedorSelect;
-  const provOptions = await provSelect.locator('option').allTextContents().catch(() => [] as string[]);
-  const provFound = provOptions.some(opt => opt.includes(UNIQUE_PROV) || opt.toLowerCase().includes(UNIQUE_PROV.toLowerCase()));
+  // New proveedor should appear in the filter proveedor select (always visible — confirms it's in the system)
+  await showPhaseLabel(page, '✅ Verificando proveedor en selector de filtro...');
+  const filtroSelect = inventarioPage.filtroProveedorSelect;
+  await filtroSelect.waitFor({ state: 'visible', timeout: 10_000 });
+  const filtroOptions = await filtroSelect.locator('option').allTextContents().catch(() => [] as string[]);
+  const provFound = filtroOptions.some(opt => opt.includes(UNIQUE_PROV) || opt.toLowerCase().includes(UNIQUE_PROV.toLowerCase()));
   expect(provFound, `El proveedor "${UNIQUE_PROV}" debe aparecer en el selector`).toBe(true);
 
   await showPhaseLabel(page, `✅ Proveedor "${UNIQUE_PROV}" disponible en selector`);

@@ -25,7 +25,7 @@ import { TestData } from '../../utils/test-data';
  */
 
 test.describe('Full Lifecycle Verification', () => {
-  test('complete daily workflow: client → cotización → trabajo → payment → expense', async ({
+  test('complete daily workflow: client → cotización → trabajo → payment → expense', { retries: 1 }, async ({
     page, loginPage, dashboardPage, cotizacionesPage, trabajosPage,
     inventarioPage, cuentasCobrarPage, ordenesCompraPage, gastosPage, sidebar
   }) => {
@@ -51,6 +51,8 @@ test.describe('Full Lifecycle Verification', () => {
       stock: 10,
       stockMinimo: 2,
     });
+    // Wait for Supabase INSERT to complete — UI is optimistic, DB commit may lag in CI
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
 
     // Verify part was added
     const partVisible = await inventarioPage.isPartVisible(partName);
@@ -107,9 +109,17 @@ test.describe('Full Lifecycle Verification', () => {
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
 
+    // Reload to force fresh cargarDatos() after re-login.
+    // Root cause: getRefacciones() silently returns [] on Supabase cold-start errors.
+    // page.reload() retries with warm auth token — consistent DB fetch.
+    await page.reload();
+    await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 60_000 });
+
     // Verify data persisted — check inventory
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
+    // Use expect() with retry — replaces silent .catch(() => {}) that masked failures
+    await expect(page.getByText(partName)).toBeVisible({ timeout: 45_000 });
     const partStillVisible = await inventarioPage.isPartVisible(partName);
     expect(partStillVisible).toBe(true);
 
