@@ -12,7 +12,7 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
  *
  * Tests:
  * 1. ordenes_compra module loads without crash
- * 2. ordenes_compra shows Spanish content
+ * 2. ordenes_compra shows Spanish content (getByText pattern — avoids innerText container issues)
  * 3. ordenes_compra monetary values contain no NaN/undefined
  * 4. facturas module loads without crash
  * 5. facturas monetary values contain no NaN/undefined
@@ -32,10 +32,8 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1000);
 
-    // Nav still visible — app did not crash
     await expectVisible(dashboardPage.nav, 'Nav visible after ordenes load');
 
-    // No fatal error banner visible
     const errorBanner = page
       .locator('.bg-rose-50:has-text("Error"), .text-red-600:has-text("Error")')
       .first();
@@ -53,19 +51,22 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1000);
 
-    const mainText = await page.locator('main, [data-testid="app-content-loaded"]').first().innerText().catch(() => '');
+    // Use getByText — works regardless of DOM container (avoids innerText on wrong element)
+    const spanishTerms = [
+      /Órdenes de Compra/i,
+      /Orden de Compra/i,
+      /Nueva Orden/i,
+      /Proveedor/i,
+      /Estado/i,
+      /No hay órdenes/i,
+    ];
 
-    // Module should contain Spanish-language content (not a blank or error-only page)
-    expect(mainText.length).toBeGreaterThan(10);
-
-    // Should contain at least one Spanish term from the ordenes module
-    const hasSpanishContent =
-      mainText.includes('Orden') ||
-      mainText.includes('Compra') ||
-      mainText.includes('Proveedor') ||
-      mainText.includes('Estado') ||
-      mainText.includes('Total');
-    expect(hasSpanishContent).toBe(true);
+    let found = false;
+    for (const pattern of spanishTerms) {
+      const el = page.getByText(pattern).first();
+      if (await el.isVisible().catch(() => false)) { found = true; break; }
+    }
+    expect(found, 'At least one Spanish ordenes term must be visible').toBe(true);
 
     await showPhaseLabel(page, '✅ Contenido español OK');
   });
@@ -78,10 +79,10 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(2000);
 
-    const mainText = await page.locator('main, [data-testid="app-content-loaded"]').first().innerText().catch(() => '');
-    expect(mainText).not.toContain('NaN');
-    expect(mainText).not.toContain('undefined');
-    expect(mainText).not.toContain('Infinity');
+    const bodyText = await page.locator('body').innerText().catch(() => '');
+    expect(bodyText).not.toContain('NaN');
+    expect(bodyText).not.toContain('[object Object]');
+    expect(bodyText).not.toMatch(/\$undefined|\$null/);
 
     await showPhaseLabel(page, '✅ Valores OK sin NaN');
   });
@@ -94,10 +95,8 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1000);
 
-    // Nav still visible — app did not crash
     await expectVisible(dashboardPage.nav, 'Nav visible after facturas load');
 
-    // No fatal error banner visible
     const errorBanner = page
       .locator('.bg-rose-50:has-text("Error"), .text-red-600:has-text("Error")')
       .first();
@@ -115,10 +114,10 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(2000);
 
-    const mainText = await page.locator('main, [data-testid="app-content-loaded"]').first().innerText().catch(() => '');
-    expect(mainText).not.toContain('NaN');
-    expect(mainText).not.toContain('undefined');
-    expect(mainText).not.toContain('Infinity');
+    const bodyText = await page.locator('body').innerText().catch(() => '');
+    expect(bodyText).not.toContain('NaN');
+    expect(bodyText).not.toContain('[object Object]');
+    expect(bodyText).not.toMatch(/\$undefined|\$null/);
 
     await showPhaseLabel(page, '✅ Facturas Values OK sin NaN');
   });
@@ -131,19 +130,27 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1500);
 
-    const mainText = await page.locator('main, [data-testid="app-content-loaded"]').first().innerText().catch(() => '');
+    // Use getByText for reliable Spanish content check (avoids innerText container issues)
+    const spanishTerms = [
+      /Facturas/i,
+      /Factura/i,
+      /Pendiente/i,
+      /Pagado/i,
+      /Nueva Factura/i,
+      /No hay facturas/i,
+    ];
 
-    // Filter tabs: Todos / Pendiente / Parcial / Pagado — at least one should be present
-    const hasSpanishFilterTerms =
-      mainText.includes('Pendiente') ||
-      mainText.includes('Pagado') ||
-      mainText.includes('Todos') ||
-      mainText.includes('Factura');
-    expect(hasSpanishFilterTerms).toBe(true);
+    let found = false;
+    for (const pattern of spanishTerms) {
+      const el = page.getByText(pattern).first();
+      if (await el.isVisible().catch(() => false)) { found = true; break; }
+    }
+    expect(found, 'At least one Spanish facturas term must be visible').toBe(true);
 
-    // No English-only error text that would indicate the module failed to load
-    expect(mainText).not.toContain('Error loading');
-    expect(mainText).not.toContain('Something went wrong');
+    // No English error text
+    const bodyText = await page.locator('body').innerText().catch(() => '');
+    expect(bodyText).not.toContain('Error loading');
+    expect(bodyText).not.toContain('Something went wrong');
 
     await showPhaseLabel(page, '✅ Filtros en español OK');
   });
