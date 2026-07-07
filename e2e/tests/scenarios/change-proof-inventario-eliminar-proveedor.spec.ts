@@ -82,7 +82,7 @@ test('change-proof-inventario-eliminar-proveedor', async ({ page, loginPage, das
   await filtroSelect.waitFor({ state: 'visible', timeout: 10_000 });
   const filtroOptions = await filtroSelect.locator('option').allTextContents().catch(() => [] as string[]);
   const provFound = filtroOptions.some(opt => opt.includes(UNIQUE_PROV) || opt.toLowerCase().includes(UNIQUE_PROV.toLowerCase()));
-  expect(provFound, El proveedor "" debe aparecer en el selector).toBe(true);
+  expect(provFound, `El proveedor "${UNIQUE_PROV}" debe aparecer en el selector`).toBe(true);
 
   await showPhaseLabel(page, `✅ Proveedor "${UNIQUE_PROV}" disponible en selector`);
   await page.waitForTimeout(800);
