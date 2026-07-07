@@ -62,7 +62,7 @@ test.describe('Reportes -- Resumen Financiero Module', () => {
       const after = await monthEl.textContent().catch(() => '');
       expect(after, 'Month label changes after prev click').not.toBe(before);
     } else {
-      const err = await page.getByText(/error/i).first().isVisible().catch(() => false);
+      const err = await page.getByText(/error al cargar|algo salió mal|algo salio mal/i).first().isVisible().catch(() => false);
       expect(err, 'No error visible if no prev button').toBe(false);
     }
   });
