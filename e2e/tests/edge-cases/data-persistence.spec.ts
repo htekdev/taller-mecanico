@@ -61,7 +61,14 @@ test.describe('Data Persistence', () => {
     // Wait for Supabase INSERT to complete — UI is optimistic, DB commit may lag in CI
     await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
 
-    // Verify it exists
+    // Navigate away and back to force a real Supabase re-fetch — verifies INSERT committed
+    await dashboardPage.navigateToModule('clientes');
+    await page.waitForTimeout(800);
+    await dashboardPage.navigateToModule('inventario');
+    await inventarioPage.waitForPageLoad();
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+
+    // Verify it exists (from real DB fetch, not optimistic UI)
     const exists1 = await inventarioPage.isPartVisible(partName);
     expect(exists1).toBe(true);
 
