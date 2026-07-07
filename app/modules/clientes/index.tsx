@@ -11,7 +11,7 @@ function ModalEditarCliente({
   onCerrar,
 }: {
   cliente: Cliente;
-  onGuardar: (id: string, datos: Omit<Cliente, 'id'>) => void;
+  onGuardar: (id: string, datos: Omit<Cliente, 'id'>) => Promise<void>;
   onCerrar: () => void;
 }) {
   const [form, setForm] = useState({
@@ -90,7 +90,7 @@ function ModalEditarVehiculo({
   onCerrar,
 }: {
   vehiculo: Vehiculo;
-  onGuardar: (id: string, datos: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => void;
+  onGuardar: (id: string, datos: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => Promise<void>;
   onCerrar: () => void;
 }) {
   const [form, setForm] = useState({
@@ -206,10 +206,10 @@ export function VistaClientes({
 }: {
   clientes: Cliente[];
   vehiculos: Vehiculo[];
-  onGuardarCliente: (c: Omit<Cliente, 'id'>) => void;
-  onGuardarVehiculo: (v: Omit<Vehiculo, 'id'>) => void;
-  onActualizarCliente: (id: string, datos: Omit<Cliente, 'id'>) => void;
-  onActualizarVehiculo: (id: string, datos: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => void;
+  onGuardarCliente: (c: Omit<Cliente, 'id'>) => Promise<void>;
+  onGuardarVehiculo: (v: Omit<Vehiculo, 'id'>) => Promise<void>;
+  onActualizarCliente: (id: string, datos: Omit<Cliente, 'id'>) => Promise<void>;
+  onActualizarVehiculo: (id: string, datos: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => Promise<void>;
 }) {
   const [formCliente, setFormCliente] = useState({ nombre: '', telefono: '', email: '', email2: '' });
   const [clienteExpandido, setClienteExpandido] = useState<string | null>(null);
