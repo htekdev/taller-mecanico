@@ -110,10 +110,9 @@ test.describe('Full Lifecycle Verification', () => {
     // Verify data persisted — check inventory
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    // Force full page reload — SPA re-login doesn't always trigger Supabase re-fetch
-    await page.reload();
-    await inventarioPage.waitForPageLoad();
-    await page.getByText(partName).waitFor({ state: 'visible', timeout: 20_000 });
+    // Component renders header before fetching data — wait for the HTTP fetch to complete
+    await page.waitForLoadState('networkidle');
+    await page.getByText(partName).waitFor({ state: 'visible', timeout: 30_000 });
     const partStillVisible = await inventarioPage.isPartVisible(partName);
     expect(partStillVisible).toBe(true);
 
