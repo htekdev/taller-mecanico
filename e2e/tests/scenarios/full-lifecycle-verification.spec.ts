@@ -51,6 +51,8 @@ test.describe('Full Lifecycle Verification', () => {
       stock: 10,
       stockMinimo: 2,
     });
+    // Wait for Supabase INSERT to complete — UI is optimistic, DB commit may lag in CI
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
 
     // Verify part was added
     const partVisible = await inventarioPage.isPartVisible(partName);
@@ -110,6 +112,8 @@ test.describe('Full Lifecycle Verification', () => {
     // Verify data persisted — check inventory
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
+    // networkidle ensures Supabase fetch completes — h2 renders before data arrives
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
     // Poll for the specific part — Vercel preview cold starts can take >2s
     await page.getByText(partName).first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
     const partStillVisible = await inventarioPage.isPartVisible(partName);
