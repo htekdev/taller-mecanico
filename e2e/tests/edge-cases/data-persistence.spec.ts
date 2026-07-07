@@ -73,8 +73,10 @@ test.describe('Data Persistence', () => {
     // Check part still exists — wait for Supabase data to reload after re-login (CI can be slow)
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    // Use text-based wait instead of fixed 2s — Supabase reload is variable on CI
-    await page.getByText(partName).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+    // Force full page reload — SPA re-login doesn't always trigger Supabase re-fetch
+    await page.reload();
+    await inventarioPage.waitForPageLoad();
+    await page.getByText(partName).waitFor({ state: 'visible', timeout: 20_000 });
 
     const exists2 = await inventarioPage.isPartVisible(partName);
     expect(exists2).toBe(true);

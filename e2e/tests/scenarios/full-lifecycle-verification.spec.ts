@@ -111,7 +111,10 @@ test.describe('Full Lifecycle Verification', () => {
     // Use text-based wait instead of instant check — Supabase reload after re-login is variable on CI
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    await page.getByText(partName).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+    // Force full page reload — SPA re-login doesn't always trigger Supabase re-fetch
+    await page.reload();
+    await inventarioPage.waitForPageLoad();
+    await page.getByText(partName).waitFor({ state: 'visible', timeout: 20_000 });
     const partStillVisible = await inventarioPage.isPartVisible(partName);
     expect(partStillVisible).toBe(true);
 
