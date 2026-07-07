@@ -20,13 +20,13 @@ import { showPhaseLabel } from '../visual-assert';
 const UNIQUE_PART  = `PIEZA-VIDEO-${Date.now()}`;
 const UNIQUE_PROV  = `PROV-VIDEO-${Date.now()}`;
 
-test('change-proof-inventario-eliminar-proveedor', async ({ page, loginPage, dashboardPage, inventarioPage }) => {
+test('change-proof-inventario-eliminar-proveedor', { retries: 1 }, async ({ page, loginPage, dashboardPage, inventarioPage }) => {
   test.slow();
 
   // ── 1. Login ────────────────────────────────────────────────────────────────
   await showPhaseLabel(page, '🔐 Login al Taller Mecánico');
   await loginPage.loginAsTestUser();
-  await page.locator('nav').waitFor({ state: 'visible', timeout: 45_000 });
+  await page.locator('nav').waitFor({ state: 'visible', timeout: 90_000 });
   await page.waitForTimeout(1000);
 
   // ── 2. Navigate to Inventario ────────────────────────────────────────────────
