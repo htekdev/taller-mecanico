@@ -61,17 +61,16 @@ test.describe('Data Persistence', () => {
       precioCompra: 99,
       stock: 7,
     });
-    // Wait for Supabase INSERT to complete — UI is optimistic, DB commit may lag in CI
-    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
-
-    // Navigate away and back to force a real Supabase re-fetch — verifies INSERT committed
-    await dashboardPage.navigateToModule('clientes');
-    await page.waitForTimeout(800);
+    // page.reload() forces a new app mount + cargarDatos() — the ONLY way to confirm
+    // INSERT committed to Supabase. navigate-away-back uses cached React state and does NOT
+    // trigger a new DB fetch (cargarDatos runs once on mount, not on tab switch).
+    await page.reload();
+    await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 60_000 });
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
 
-    // Verify it exists (from real DB fetch, not optimistic UI)
+    // Verify INSERT committed to DB (not just optimistic React state)
+    await expect(page.getByText(partName)).toBeVisible({ timeout: 30_000 });
     const exists1 = await inventarioPage.isPartVisible(partName);
     expect(exists1).toBe(true);
 
@@ -81,19 +80,20 @@ test.describe('Data Persistence', () => {
     // Login again
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
+    // Reload after re-login to force a fresh cargarDatos() with warm auth token.
+    // Root cause of fix#1-#8 failures: getRefacciones() silently returns [] on
+    // Supabase cold-start/transient errors (drops { error } from destructuring).
+    // cargarDatos() then sets inventario=[] without throwing. page.reload() retries
+    // cargarDatos() when the auth token is fully warm — consistent DB fetch.
+    await page.reload();
+    await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 60_000 });
 
-    // Settle auth -- navigate to clientes first so Supabase auth is set before inventario query
-    await dashboardPage.navigateToModule('clientes');
-    await page.waitForTimeout(1200);
-
-    // Check part still exists — wait for Supabase data to reload after re-login (CI can be slow)
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    // networkidle ensures Supabase fetch completes — h2 renders before data arrives
-    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
-    // Poll for the specific part — Vercel preview cold starts can take >2s
-    await page.getByText(partName).first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
 
+    // Use expect() with built-in retry — replaces silent .catch(() => {}) pattern
+    // that masked timeout failures as assertion failures.
+    await expect(page.getByText(partName)).toBeVisible({ timeout: 45_000 });
     const exists2 = await inventarioPage.isPartVisible(partName);
     expect(exists2).toBe(true);
 
