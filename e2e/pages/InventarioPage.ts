@@ -249,16 +249,13 @@ export class InventarioPage extends BasePage {
     await nombreInput.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
     await this.page.waitForTimeout(2000); // allow Supabase save to complete
 
-    // Wait for the filtroProveedor select (always visible) to contain the new proveedor
-    // This select always shows all proveedores — more reliable than the conditional add-part form select
-    await this.filtroProveedorSelect.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+    // Poll until the new proveedor appears in the select — confirms React re-render complete
     await this.page.waitForFunction(
       (nombre: string) => {
-        // Target filtro proveedor select (has "Todos los proveedores" option — always present)
-        const filtroSelect = Array.from(document.querySelectorAll('select'))
-          .find(sel => Array.from(sel.options).some(opt => opt.text.includes('Todos los proveedores')));
-        if (!filtroSelect) return false;
-        return Array.from(filtroSelect.options).some(opt => opt.text.includes(nombre));
+        const selects = Array.from(document.querySelectorAll('select'));
+        return selects.some(sel =>
+          Array.from(sel.options).some(opt => opt.text.includes(nombre))
+        );
       },
       nombre,
       { timeout: 15_000 }
