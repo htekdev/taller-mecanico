@@ -1,266 +1,269 @@
-import type { Page, Locator } from '@playwrig ht/test';
-import { BasePage } from './BasePag e';
+import type { Page, Locator } from '@playwright/test';
+import { BasePage } from './BasePage';
 
 /**
- * InventarioPage — Manages the in ventory (parts) module.
+ * InventarioPage — Manages the inventory (parts) module.
  *
- * Covers: adding  parts, editing, receiving stock, filtering by 
- * category/proveedor, compatibility managem ent, search.
+ * Covers: adding parts, editing, receiving stock, filtering by
+ * category/proveedor, compatibility management, search.
  */
-export class InventarioPage  extends BasePage {
-  // ─── Section loc ators ───────────── ─────────────── ─────────────── ───────────
-  readonly  sectionTitle: Locator;
+export class InventarioPage extends BasePage {
+  // ─── Section locators ──────────────────────────────────────────────────────
+  readonly sectionTitle: Locator;
 
-  // ─── Add pa rt form ────────────� ��──────────────� ��──────────────� ��──────────────
-   readonly nombreInput: Locator;
-  readonly c odigoInput: Locator;
-  readonly categoriaSele ct: Locator;
-  readonly unidadSelect: Locator ;
+  // ─── Add part form ─────────────────────────────────────────────────────────
+  readonly nombreInput: Locator;
+  readonly codigoInput: Locator;
+  readonly categoriaSelect: Locator;
+  readonly unidadSelect: Locator;
   readonly precioCompraInput: Locator;
-  re adonly stockInput: Locator;
-  readonly stockM inimoInput: Locator;
-  readonly proveedorSele ct: Locator;
-  readonly clienteSelect: Locato r;
+  readonly stockInput: Locator;
+  readonly stockMinimoInput: Locator;
+  readonly proveedorSelect: Locator;
+  readonly clienteSelect: Locator;
   readonly vehiculoSelect: Locator;
-  read only agregarButton: Locator;
+  readonly agregarButton: Locator;
 
-  // ───  Filters ────────────� ��──────────────� ��──────────────� ��──────────────� ��─────
-  readonly filtroProveedorS elect: Locator;
-  readonly filtroCategoriaSel ect: Locator;
+  // ─── Filters ───────────────────────────────────────────────────────────────
+  readonly filtroProveedorSelect: Locator;
+  readonly filtroCategoriaSelect: Locator;
 
-  // ─── Inventory list  ─────────────── ─────────────── ─────────────── ───────────
-  readonly  inventarioList: Locator;
-  readonly partRows:  Locator;
+  // ─── Inventory list ────────────────────────────────────────────────────────
+  readonly inventarioList: Locator;
+  readonly partRows: Locator;
 
-  // ─── Compatibility ─� �──────────────� �──────────────� �──────────────� �──────────
-  readonly ad dCompatButton: Locator;
-  readonly compatMarc aInput: Locator;
-  readonly compatModeloInput : Locator;
+  // ─── Compatibility ─────────────────────────────────────────────────────────
+  readonly addCompatButton: Locator;
+  readonly compatMarcaInput: Locator;
+  readonly compatModeloInput: Locator;
 
-  // ─── Stock receive ─� ��──────────────� ��──────────────� ��──────────────� ��──────────
-  readonly r ecibirStockInput: Locator;
-  readonly recibir StockButton: Locator;
+  // ─── Stock receive ─────────────────────────────────────────────────────────
+  readonly recibirStockInput: Locator;
+  readonly recibirStockButton: Locator;
 
-  constructor(page: Pa ge) {
+  constructor(page: Page) {
     super(page);
-    this.sectionTitle  = page.locator('h2:has-text("Inventario")');
- 
-    // Form inputs — use placeholder text  matching
-    this.nombreInput = page.locator( 'input[placeholder*="Filtro de aceite" i], in put[placeholder*="nombre" i]').first();
-    t his.codigoInput = page.locator('input[placeho lder*="codigo" i], input[placeholder*="COD" i ]').first();
-    this.categoriaSelect = page. locator('select:has(option:has-text("Filtros" ))').first();
-    this.unidadSelect = page.lo cator('select:has(option:has-text("pza"))').f irst();
-    this.precioCompraInput = page.loc ator('input[placeholder="0.00"]').first();
-     this.stockInput = page.locator('input[type= "number"]').nth(1);
-    this.stockMinimoInput  = page.locator('input[type="number"]').nth(2 );
-    this.proveedorSelect = page.locator('s elect:has(option:has-text("Proveedor"))').fir st();
-    this.clienteSelect = page.locator(' select:has(option:has-text("Cliente"))').firs t();
-    this.vehiculoSelect = page.locator(' select:has(option:has-text("Vehiculo"))').fir st();
-    this.agregarButton = page.getByRole ('button', { name: /agregar al inventario/i } );
+    this.sectionTitle = page.locator('h2:has-text("Inventario")');
+
+    // Form inputs — use placeholder text matching
+    this.nombreInput = page.locator('input[placeholder*="Filtro de aceite" i], input[placeholder*="nombre" i]').first();
+    this.codigoInput = page.locator('input[placeholder*="codigo" i], input[placeholder*="COD" i]').first();
+    this.categoriaSelect = page.locator('select:has(option:has-text("Filtros"))').first();
+    this.unidadSelect = page.locator('select:has(option:has-text("pza"))').first();
+    this.precioCompraInput = page.locator('input[placeholder="0.00"]').first();
+    this.stockInput = page.locator('input[type="number"]').nth(1);
+    this.stockMinimoInput = page.locator('input[type="number"]').nth(2);
+    this.proveedorSelect = page.locator('select:has(option:has-text("Proveedor"))').first();
+    this.clienteSelect = page.locator('select:has(option:has-text("Cliente"))').first();
+    this.vehiculoSelect = page.locator('select:has(option:has-text("Vehiculo"))').first();
+    this.agregarButton = page.getByRole('button', { name: /agregar al inventario/i });
 
     // Filters
-    this.filtroProveedorSe lect = page.locator('select:has(option:has-te xt("Todos los proveedores"))').first();
-    t his.filtroCategoriaSelect = page.locator('sel ect:has(option:has-text("Todas las categorias "))').first();
+    this.filtroProveedorSelect = page.locator('select:has(option:has-text("Todos los proveedores"))').first();
+    this.filtroCategoriaSelect = page.locator('select:has(option:has-text("Todas las categorias"))').first();
 
     // List
-    this.inventar ioList = page.locator('.space-y-2, .divide-y' ).first();
-    this.partRows = page.locator(' .border.rounded-lg, .border.rounded-xl, [data -testid="part-row"]');
+    this.inventarioList = page.locator('.space-y-2, .divide-y').first();
+    this.partRows = page.locator('.border.rounded-lg, .border.rounded-xl, [data-testid="part-row"]');
 
     // Compatibility
-     this.addCompatButton = page.getByRole('bu tton', { name: /agregar marca|compatibilidad/ i }).first();
-    this.compatMarcaInput = pag e.locator('input[placeholder*="marca" i]').fi rst();
-    this.compatModeloInput = page.loca tor('input[placeholder*="modelo" i]').first() ;
+    this.addCompatButton = page.getByRole('button', { name: /agregar marca|compatibilidad/i }).first();
+    this.compatMarcaInput = page.locator('input[placeholder*="marca" i]').first();
+    this.compatModeloInput = page.locator('input[placeholder*="modelo" i]').first();
 
     // Stock receive
-    this.recibirStock Input = page.locator('input[type="number"][pl aceholder*="recibir" i], input[placeholder*=" cantidad" i]').first();
-    this.recibirStock Button = page.getByRole('button', { name: /re cibir|\\+/i }).first();
+    this.recibirStockInput = page.locator('input[type="number"][placeholder*="recibir" i], input[placeholder*="cantidad" i]').first();
+    this.recibirStockButton = page.getByRole('button', { name: /recibir|\\+/i }).first();
   }
 
-  async waitForP ageLoad() {
-    await this.sectionTitle.waitF or({ state: 'visible', timeout: 90_000 });
-   }
+  async waitForPageLoad() {
+    await this.sectionTitle.waitFor({ state: 'visible', timeout: 90_000 });
+  }
 
   async addPart(data: {
-    nombre: string ;
+    nombre: string;
     codigo?: string;
-    categoria?: string ;
+    categoria?: string;
     precioCompra?: number;
-    stock?: numb er;
+    stock?: number;
     stockMinimo?: number;
   }) {
-    awai t this.fillInput(this.nombreInput, data.nombr e);
+    await this.fillInput(this.nombreInput, data.nombre);
 
-    if (data.codigo && await this.codigo Input.isVisible().catch(() => false)) {
-       await this.fillInput(this.codigoInput, data. codigo);
+    if (data.codigo && await this.codigoInput.isVisible().catch(() => false)) {
+      await this.fillInput(this.codigoInput, data.codigo);
     }
 
-    if (data.categoria && awa it this.categoriaSelect.isVisible().catch(()  => false)) {
-      await this.categoriaSelect .selectOption({ label: data.categoria });
-     }
-
-    // precioCompra must be > 0 or the su bmit button stays disabled — default $100
-     // Use click+keyboard instead of fill() � � React controlled number inputs don't
-    //  reliably pick up Playwright's fill() synthet ic events on all versions.
-    const precio =  data.precioCompra ?? 100;
-    if (await this .precioCompraInput.isVisible().catch(() => fa lse)) {
-      await this.precioCompraInput.cl ick();
-      await this.precioCompraInput.pre ss('Control+A');
-      await this.page.keyboa rd.type(String(precio));
-      await this.pag e.waitForTimeout(300); // let React process t he state update
+    if (data.categoria && await this.categoriaSelect.isVisible().catch(() => false)) {
+      await this.categoriaSelect.selectOption({ label: data.categoria });
     }
 
-    if (data.stock !==  undefined && await this.stockInput.isVisible ().catch(() => false)) {
-      await this.fil lInput(this.stockInput, String(data.stock));
-     }
-
-    if (data.stockMinimo !== undefined  && await this.stockMinimoInput.isVisible().c atch(() => false)) {
-      await this.fillInp ut(this.stockMinimoInput, String(data.stockMi nimo));
+    // precioCompra must be > 0 or the submit button stays disabled — default $100
+    // Use click+keyboard instead of fill() — React controlled number inputs don't
+    // reliably pick up Playwright's fill() synthetic events on all versions.
+    const precio = data.precioCompra ?? 100;
+    if (await this.precioCompraInput.isVisible().catch(() => false)) {
+      await this.precioCompraInput.click();
+      await this.precioCompraInput.press('Control+A');
+      await this.page.keyboard.type(String(precio));
+      await this.page.waitForTimeout(300); // let React process the state update
     }
 
-    await this.agregarButton.c lick();
-    await this.page.waitForTimeout(20 00);
+    if (data.stock !== undefined && await this.stockInput.isVisible().catch(() => false)) {
+      await this.fillInput(this.stockInput, String(data.stock));
+    }
+
+    if (data.stockMinimo !== undefined && await this.stockMinimoInput.isVisible().catch(() => false)) {
+      await this.fillInput(this.stockMinimoInput, String(data.stockMinimo));
+    }
+
+    await this.agregarButton.click();
+    await this.page.waitForTimeout(2000);
   }
 
-  async selectProveedor(index = 1)  {
-    if (await this.proveedorSelect.isVisibl e().catch(() => false)) {
-      const count =  await this.getOptionCount(this.proveedorSele ct);
+  async selectProveedor(index = 1) {
+    if (await this.proveedorSelect.isVisible().catch(() => false)) {
+      const count = await this.getOptionCount(this.proveedorSelect);
       if (count > 1) {
-        await thi s.selectByIndex(this.proveedorSelect, Math.mi n(index, count - 1));
+        await this.selectByIndex(this.proveedorSelect, Math.min(index, count - 1));
       }
     }
   }
 
-  as ync filterByProveedor(proveedorName: string)  {
-    if (await this.filtroProveedorSelect.is Visible().catch(() => false)) {
-      await t his.filtroProveedorSelect.selectOption({ labe l: proveedorName });
-      await this.page.wa itForTimeout(500);
+  async filterByProveedor(proveedorName: string) {
+    if (await this.filtroProveedorSelect.isVisible().catch(() => false)) {
+      await this.filtroProveedorSelect.selectOption({ label: proveedorName });
+      await this.page.waitForTimeout(500);
     }
   }
 
-  async filterB yCategoria(categoria: string) {
-    if (await  this.filtroCategoriaSelect.isVisible().catch (() => false)) {
-      await this.filtroCateg oriaSelect.selectOption({ label: categoria }) ;
+  async filterByCategoria(categoria: string) {
+    if (await this.filtroCategoriaSelect.isVisible().catch(() => false)) {
+      await this.filtroCategoriaSelect.selectOption({ label: categoria });
       await this.page.waitForTimeout(500);
-     }
+    }
   }
 
-  async getPartCount(): Promise<nu mber> {
+  async getPartCount(): Promise<number> {
     return this.partRows.count();
-  } 
-
-  async isPartVisible(name: string): Promis e<boolean> {
-    return this.page.locator(`te xt=${name}`).first().isVisible().catch(() =>  false);
   }
 
-  async expandPart(name: string)  {
-    const row = this.page.locator(`text=${ name}`).first();
+  async isPartVisible(name: string): Promise<boolean> {
+    return this.page.locator(`text=${name}`).first().isVisible().catch(() => false);
+  }
+
+  async expandPart(name: string) {
+    const row = this.page.locator(`text=${name}`).first();
     await row.click();
-    a wait this.page.waitForTimeout(500);
+    await this.page.waitForTimeout(500);
   }
 
-  as ync receiveStock(partName: string, quantity:  number) {
-    await this.expandPart(partName) ;
-    const container = this.page.locator(`.b order:has(text="${partName}")`).first();
-     const input = container.locator('input[type=" number"]').last();
-    if (await input.isVisi ble().catch(() => false)) {
-      await input .fill(String(quantity));
-      const btn = co ntainer.getByRole('button', { name: /recibir| \\+/ }).first();
+  async receiveStock(partName: string, quantity: number) {
+    await this.expandPart(partName);
+    const container = this.page.locator(`.border:has(text="${partName}")`).first();
+    const input = container.locator('input[type="number"]').last();
+    if (await input.isVisible().catch(() => false)) {
+      await input.fill(String(quantity));
+      const btn = container.getByRole('button', { name: /recibir|\\+/ }).first();
       await btn.click();
-       await this.page.waitForTimeout(1000);
-     }
+      await this.page.waitForTimeout(1000);
+    }
   }
 
-  async wasAddSuccessful(partName: str ing): Promise<boolean> {
-    await this.page. waitForTimeout(1000);
-    return this.isPartV isible(partName);
+  async wasAddSuccessful(partName: string): Promise<boolean> {
+    await this.page.waitForTimeout(1000);
+    return this.isPartVisible(partName);
   }
 
-  async getStockCount( partName: string): Promise<string> {
-    cons t row = this.page.locator(`:has-text("${partN ame}")`).first();
-    const stock = row.locat or('text=/\\d+ (pza|lt|kg|m)/').first();
-     return this.getText(stock);
+  async getStockCount(partName: string): Promise<string> {
+    const row = this.page.locator(`:has-text("${partName}")`).first();
+    const stock = row.locator('text=/\\d+ (pza|lt|kg|m)/').first();
+    return this.getText(stock);
   }
 
   /**
-   * 2 -step delete: click the "🗑 Eliminar" butto n in the row for `name`,
-   * then either con firm (true) or cancel (false) the deletion.
-    *
-   * The inventory table renders one row  per part. After clicking "Eliminar",
-   * the  same row shows "✓ Confirmar" and "Cancelar " buttons.
+   * 2-step delete: click the "🗑 Eliminar" button in the row for `name`,
+   * then either confirm (true) or cancel (false) the deletion.
+   *
+   * The inventory table renders one row per part. After clicking "Eliminar",
+   * the same row shows "✓ Confirmar" and "Cancelar" buttons.
    */
-  async eliminarPieza(name:  string, confirm: boolean) {
-    // Find the t able row that contains this part's name
-    c onst row = this.page.locator(`tr:has-text("${ name}")`).first();
+  async eliminarPieza(name: string, confirm: boolean) {
+    // Find the table row that contains this part's name
+    const row = this.page.locator(`tr:has-text("${name}")`).first();
 
-    // Click the initial  "🗑 Eliminar" button
-    const eliminarBtn  = row.getByRole('button', { name: /Eliminar/i  });
-    await eliminarBtn.waitFor({ state: ' visible', timeout: 15_000 });
-    await elimi narBtn.click();
-    await this.page.waitForTi meout(400);
+    // Click the initial "🗑 Eliminar" button
+    const eliminarBtn = row.getByRole('button', { name: /Eliminar/i });
+    await eliminarBtn.waitFor({ state: 'visible', timeout: 15_000 });
+    await eliminarBtn.click();
+    await this.page.waitForTimeout(400);
 
     if (confirm) {
-      // Clic k "✓ Confirmar" to complete the deletion
-       const confirmarBtn = row.getByRole('butto n', { name: /Confirmar/i });
-      await conf irmarBtn.waitFor({ state: 'visible', timeout:  10_000 });
-      await confirmarBtn.click(); 
+      // Click "✓ Confirmar" to complete the deletion
+      const confirmarBtn = row.getByRole('button', { name: /Confirmar/i });
+      await confirmarBtn.waitFor({ state: 'visible', timeout: 10_000 });
+      await confirmarBtn.click();
       await this.page.waitForTimeout(2000);
-     } else {
-      // Click "Cancelar" to abo rt (part remains in list)
-      const cancela rBtn = row.getByRole('button', { name: /^Canc elar$/i });
-      await cancelarBtn.waitFor({  state: 'visible', timeout: 10_000 });
-       await cancelarBtn.click();
-      await this.p age.waitForTimeout(400);
+    } else {
+      // Click "Cancelar" to abort (part remains in list)
+      const cancelarBtn = row.getByRole('button', { name: /^Cancelar$/i });
+      await cancelarBtn.waitFor({ state: 'visible', timeout: 10_000 });
+      await cancelarBtn.click();
+      await this.page.waitForTimeout(400);
     }
   }
 
   /**
-    * Add a new proveedor via the inline form in  the Inventario add-part panel.
+   * Add a new proveedor via the inline form in the Inventario add-part panel.
    *
-   * Clic ks "+ Nuevo proveedor" to expand the form, fi lls in nombre and telefono,
-   * then clicks  "✓ Guardar" to save.
+   * Clicks "+ Nuevo proveedor" to expand the form, fills in nombre and telefono,
+   * then clicks "✓ Guardar" to save.
    */
-  async agregarP roveedorInline(nombre: string, telefono: stri ng) {
-    // Click the toggle button to revea l the inline proveedor form
-    const toggleB tn = this.page.getByRole('button', { name: /\ + Nuevo proveedor/i });
-    await toggleBtn.w aitFor({ state: 'visible', timeout: 15_000 }) ;
+  async agregarProveedorInline(nombre: string, telefono: string) {
+    // Click the toggle button to reveal the inline proveedor form
+    const toggleBtn = this.page.getByRole('button', { name: /\+ Nuevo proveedor/i });
+    await toggleBtn.waitFor({ state: 'visible', timeout: 15_000 });
     await toggleBtn.click();
-    await this .page.waitForTimeout(500);
+    await this.page.waitForTimeout(500);
 
-    // Fill in th e proveedor name (aria-label="Nombre del prov eedor")
-    const nombreInput = this.page.loc ator('[aria-label="Nombre del proveedor"]');
-     await nombreInput.waitFor({ state: 'visib le', timeout: 10_000 });
-    await nombreInpu t.fill(nombre);
-    await this.page.waitForTi meout(300); // allow React state update
+    // Fill in the proveedor name (aria-label="Nombre del proveedor")
+    const nombreInput = this.page.locator('[aria-label="Nombre del proveedor"]');
+    await nombreInput.waitFor({ state: 'visible', timeout: 10_000 });
+    await nombreInput.fill(nombre);
+    await this.page.waitForTimeout(300); // allow React state update
 
-     // Fill in the phone number — exact aria-la bel to avoid ambiguity
-    const telInput = t his.page.locator('[aria-label="Tel\u00e9fono  del proveedor"]');
-    if (await telInput.isV isible().catch(() => false)) {
-      await te lInput.fill(telefono);
-      await this.page. waitForTimeout(200);
+    // Fill in the phone number — exact aria-label to avoid ambiguity
+    const telInput = this.page.locator('[aria-label="Tel\u00e9fono del proveedor"]');
+    if (await telInput.isVisible().catch(() => false)) {
+      await telInput.fill(telefono);
+      await this.page.waitForTimeout(200);
     }
 
-    // Click "✓  Guardar" — unique on page since main form  uses "Agregar al inventario".
-    // Button i s now type="button" + onClick (no form submit  side effects).
-    const guardarBtn = this.p age.getByRole('button', { name: /✓\s*Guarda r/i });
-    await guardarBtn.waitFor({ state:  'visible', timeout: 10_000 });
-    await gua rdarBtn.click();
+    // Click "✓ Guardar" — unique on page since main form uses "Agregar al inventario".
+    // Button is now type="button" + onClick (no form submit side effects).
+    const guardarBtn = this.page.getByRole('button', { name: /✓\s*Guardar/i });
+    await guardarBtn.waitFor({ state: 'visible', timeout: 10_000 });
+    await guardarBtn.click();
 
-    // Wait for the proveed or form to close — confirms save was trigge red
-    await nombreInput.waitFor({ state: 'h idden', timeout: 10_000 }).catch(() => {});
-     await this.page.waitForTimeout(2000); // a llow Supabase save to complete
+    // Wait for the proveedor form to close — confirms save was triggered
+    await nombreInput.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
+    await this.page.waitForTimeout(2000); // allow Supabase save to complete
 
-    // Poll u ntil the new proveedor appears in the select  — confirms React re-render complete
-    awa it this.page.waitForFunction(
-      (nombre:  string) => {
-        const selects = Array.fr om(document.querySelectorAll('select'));
-         return selects.some(sel =>
-          Arra y.from(sel.options).some(opt => opt.text.incl udes(nombre))
-        );
+    // Wait for the filtroProveedor select (always visible) to contain the new proveedor
+    // This select always shows all proveedores — more reliable than the conditional add-part form select
+    await this.filtroProveedorSelect.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+    await this.page.waitForFunction(
+      (nombre: string) => {
+        // Target filtro proveedor select (has "Todos los proveedores" option — always present)
+        const filtroSelect = Array.from(document.querySelectorAll('select'))
+          .find(sel => Array.from(sel.options).some(opt => opt.text.includes('Todos los proveedores')));
+        if (!filtroSelect) return false;
+        return Array.from(filtroSelect.options).some(opt => opt.text.includes(nombre));
       },
-      nombr e,
+      nombre,
       { timeout: 15_000 }
-    ).catch(() = > {
-      // If not found after 15s, continue  — test assertion will catch it
+    ).catch(() => {
+      // If not found after 15s, continue — test assertion will catch it
     });
-  } 
-} 
+  }
+}
