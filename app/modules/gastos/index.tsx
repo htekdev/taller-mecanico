@@ -339,7 +339,6 @@ export function VistaGastos({
     } catch (err) {
       console.error('[GastoPage] Error al eliminar gasto:', err);
       setDeleteError('Error al eliminar el gasto. Intenta de nuevo.');
-      setConfirmDelete(null);
     } finally {
       setIsDeleting(false);
     }
@@ -467,7 +466,8 @@ export function VistaGastos({
                   if (confirmDelete === g.id) {
                     return (
                       <div key={g.id} className="flex items-center justify-between py-3 px-2 bg-rose-50 rounded-lg my-1">
-                        <span className="text-sm text-rose-700 font-medium">¿Eliminar &quot;{g.concepto}&quot;?</span>
+                        <div><span className="text-sm text-rose-700 font-medium">¿Eliminar &quot;{g.concepto}&quot;?</span>
+                        {deleteError && <p className="text-xs text-rose-600 mt-0.5">{deleteError}</p>}</div>
                         <div className="flex gap-2">
                           <Btn size="sm" variant="danger" onClick={() => handleDelete(g.id)}>Sí, eliminar</Btn>
                           <Btn size="sm" variant="ghost" onClick={() => setConfirmDelete(null)}>Cancelar</Btn>
@@ -480,7 +480,7 @@ export function VistaGastos({
                       key={g.id}
                       gasto={g}
                       onEditar={g => setEditingId(g.id)}
-                      onEliminar={id => setConfirmDelete(id)}
+                      onEliminar={id => { setDeleteError(null); setConfirmDelete(id); }}
                     />
                   );
                 })}
