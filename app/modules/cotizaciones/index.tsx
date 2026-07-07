@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Cliente, Vehiculo, Refaccion, Proveedor, TrabajoRefaccion, ManoDeObraItem } from '@/app/types';
 import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
-import { CATEGORIAS, UNIDADES } from '@/app/lib/utils';
+import { CATEGORIAS, UNIDADES, getHoy } from '@/app/lib/utils';
 import * as db from '@/app/lib/db';
 import type { CotizacionRow } from '@/app/lib/db';
 import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
@@ -168,7 +168,7 @@ function calcTotales(form: FormCotizacion) {
   return { subtotalRef, subtotalMO, subtotal, iva, total };
 }
 
-const hoy = () => new Date().toISOString().split('T')[0];
+const hoy = () => getHoy();
 
 // ─── PDF Generator ────────────────────────────────────────────────────────────
 

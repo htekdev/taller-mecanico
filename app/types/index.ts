@@ -207,13 +207,14 @@ export interface PricingIntel {
 
 // ─── Gastos (Operating Expenses) ─────────────────────────────────────────────
 
-export type GastoCategoria = 'operativo' | 'administrativo' | 'impuesto' | 'nomina';
+export type GastoCategoria = 'operativo' | 'administrativo' | 'impuesto' | 'nomina' | 'personal';
 
 export const GASTO_CATEGORIAS: { key: GastoCategoria; label: string; emoji: string }[] = [
   { key: 'operativo',      label: 'Operativos',       emoji: '🏠' },
   { key: 'administrativo', label: 'Administrativos',   emoji: '🌐' },
   { key: 'impuesto',       label: 'Impuestos',         emoji: '🧾' },
   { key: 'nomina',         label: 'Nómina',            emoji: '👷' },
+  { key: 'personal',       label: 'Personal',          emoji: '👤' },
 ];
 
 export const GASTO_SUBCATEGORIAS: Record<GastoCategoria, string[]> = {
@@ -221,6 +222,7 @@ export const GASTO_SUBCATEGORIAS: Record<GastoCategoria, string[]> = {
   administrativo: ['Papelería', 'Software', 'Teléfono', 'Contabilidad', 'Otro'],
   impuesto:       ['ISR', 'IVA por pagar', 'Tenencias', 'IMSS', 'Otro'],
   nomina:         ['Salario', 'Aguinaldo', 'Vacaciones', 'Bonos', 'Otro'],
+  personal:       ['Alimentación', 'Transporte', 'Salud', 'Educación', 'Entretenimiento'],
 };
 
 export interface Gasto {

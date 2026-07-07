@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { Gasto, GastoCategoria } from '@/app/types';
 import { GASTO_CATEGORIAS, GASTO_SUBCATEGORIAS } from '@/app/types';
 import { Btn, Input, Label, Select, SectionTitle } from '@/app/components/ui';
-import { fmt } from '@/app/lib/utils';
+import { fmt, formatearFecha, getHoy } from '@/app/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,10 +38,14 @@ function GastoForm({
   initial,
   onGuardar,
   onCancelar,
+  customPersonalSubs = [],
+  onNuevaPersonalSub,
 }: {
   initial: GastoFormData;
   onGuardar: (data: GastoFormData) => Promise<void>;
   onCancelar: () => void;
+  customPersonalSubs?: string[];
+  onNuevaPersonalSub?: (sub: string) => void;
 }) {
   const [form, setForm] = useState<GastoFormData>(initial);
   const [saving, setSaving] = useState(false);
@@ -92,8 +96,13 @@ function GastoForm({
   const handleSubmit = async () => {
     if (!valid) return;
     setSaving(true);
-    try { await onGuardar(form); }
-    finally { setSaving(false); }
+    try {
+      await onGuardar(form);
+      // Persist new custom subcategory for 'personal' category for future use
+      if (form.categoria === 'personal' && otroSubcat && otroSubcatTexto.trim()) {
+        onNuevaPersonalSub?.(otroSubcatTexto.trim());
+      }
+    } finally { setSaving(false); }
   };
 
   const catInfo = GASTO_CATEGORIAS.find(c => c.key === form.categoria)!;
@@ -119,7 +128,14 @@ function GastoForm({
             {GASTO_SUBCATEGORIAS[form.categoria].map(s => (
               <option key={s} value={s}>{s}</option>
             ))}
-            <option value="__otros__">✏️ Otros (escribir...)</option>
+            {form.categoria === 'personal' && customPersonalSubs
+              .filter(s => !GASTO_SUBCATEGORIAS['personal'].includes(s))
+              .map(s => (
+                <option key={s} value={s}>[+] {s}</option>
+              ))}
+            <option value="__otros__">
+              {form.categoria === 'personal' ? '✏️ Escribir nueva subcategoria...' : '✏️ Otros (escribir...)'}
+            </option>
           </Select>
           {otroSubcat && (
             <Input
@@ -200,7 +216,7 @@ function GastoRow({
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-800 truncate">{gasto.concepto}</div>
           <div className="text-xs text-slate-400 mt-0.5">
-            {gasto.subcategoria} · {new Date(gasto.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
+            {gasto.subcategoria} · {formatearFecha(gasto.fecha)}
             {gasto.notas && <> · <span className="italic">{gasto.notas}</span></>}
           </div>
         </div>
@@ -239,11 +255,28 @@ export function VistaGastos({
   onEditar: (id: string, data: Partial<Omit<Gasto, 'id' | 'tallerId'>>) => Promise<void>;
   onEliminar: (id: string) => Promise<void>;
 }) {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = getHoy();
   const [filtro, setFiltro] = useState<FiltroCat>('todos');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // Custom subcategories for 'personal' category, persisted in localStorage
+  const PERSONAL_SUBS_KEY = 'taller_personal_subcats';
+  const [customPersonalSubs, setCustomPersonalSubs] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try { return JSON.parse(localStorage.getItem(PERSONAL_SUBS_KEY) ?? '[]') as string[]; }
+    catch { return []; }
+  });
+
+  const handleNuevaPersonalSub = (sub: string) => {
+    setCustomPersonalSubs(prev => {
+      if (prev.includes(sub)) return prev;
+      const next = [...prev, sub];
+      localStorage.setItem(PERSONAL_SUBS_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
 
   // Filter to current month
   const gastosMes = gastos.filter(g => g.fecha.startsWith(mesActual));
@@ -320,6 +353,8 @@ export function VistaGastos({
             initial={emptyForm(hoy)}
             onGuardar={handleGuardar}
             onCancelar={() => setShowForm(false)}
+            customPersonalSubs={customPersonalSubs}
+            onNuevaPersonalSub={handleNuevaPersonalSub}
           />
         </div>
       )}
@@ -406,6 +441,8 @@ export function VistaGastos({
                           }}
                           onGuardar={handleUpdate}
                           onCancelar={() => setEditingId(null)}
+                          customPersonalSubs={customPersonalSubs}
+                          onNuevaPersonalSub={handleNuevaPersonalSub}
                         />
                       </div>
                     );

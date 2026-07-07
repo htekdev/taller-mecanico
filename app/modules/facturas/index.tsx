@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { Factura, Cliente, Vehiculo, Trabajo, PagoFactura } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
-import { fmt, getEstadoPagoFactura, getMontoPagadoFactura, getSaldoFactura, BADGE_ESTADO } from '@/app/lib/utils';
+import { fmt, getEstadoPagoFactura, getMontoPagadoFactura, getSaldoFactura, BADGE_ESTADO, formatearFecha, getHoy } from '@/app/lib/utils';
 
 export function VistaFacturas({
   facturas,
@@ -28,7 +28,7 @@ export function VistaFacturas({
   onCancelarFactura: (facturaId: string) => void;
   onReactivarFactura: (facturaId: string) => void;
 }) {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = getHoy();
   const [expandido, setExpandido] = useState<string | null>(null);
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
@@ -159,7 +159,7 @@ export function VistaFacturas({
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
                     </div>
                     <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
-                      <span>{new Date(factura.fecha).toLocaleDateString('es-MX')}</span>
+                      <span>{formatearFecha(factura.fecha)}</span>
                       {vehiculo && <span>· {[vehiculo.anio, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ')}</span>}
                       {vehiculo?.placa && <span className="font-mono bg-slate-100 px-1 rounded">{vehiculo.placa}</span>}
                       {(() => {
@@ -435,7 +435,7 @@ export function VistaFacturas({
                         <div className="space-y-1">
                           {factura.pagos.map(p => (
                             <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                              <div className="flex gap-3"><span className="text-slate-500">{new Date(p.fecha).toLocaleDateString('es-MX')}</span><span className="text-slate-500">{p.metodoPago}</span></div>
+                              <div className="flex gap-3"><span className="text-slate-500">{formatearFecha(p.fecha)}</span><span className="text-slate-500">{p.metodoPago}</span></div>
                               <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
                             </div>
                           ))}

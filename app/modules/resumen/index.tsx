@@ -2,7 +2,7 @@
 
 import type { Trabajo, Cliente, Vehiculo } from '@/app/types';
 import { SectionTitle, EmptyRow } from '@/app/components/ui';
-import { fmt } from '@/app/lib/utils';
+import { fmt, formatearFecha } from '@/app/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -311,7 +311,7 @@ export function VistaResumen({
                 const iva       = trabajo.iva ?? 0;
                 return (
                   <tr key={trabajo.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-600 text-xs">{new Date(trabajo.fecha).toLocaleDateString('es-MX')}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-slate-600 text-xs">{formatearFecha(trabajo.fecha)}</td>
                     <td className="px-4 py-3 text-slate-800 font-medium text-sm">{cliente?.nombre ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-600 text-sm">
                       <span className="line-clamp-1">{trabajo.descripcion}</span>
