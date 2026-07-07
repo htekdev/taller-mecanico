@@ -58,6 +58,8 @@ test.describe('Data Persistence', () => {
       precioCompra: 99,
       stock: 7,
     });
+    // Wait for Supabase INSERT to complete — UI is optimistic, DB commit may lag in CI
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
 
     // Verify it exists
     const exists1 = await inventarioPage.isPartVisible(partName);
@@ -73,6 +75,8 @@ test.describe('Data Persistence', () => {
     // Check part still exists — wait for Supabase data to reload after re-login (CI can be slow)
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
+    // networkidle ensures Supabase fetch completes — h2 renders before data arrives
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
     // Poll for the specific part — Vercel preview cold starts can take >2s
     await page.getByText(partName).first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
 
