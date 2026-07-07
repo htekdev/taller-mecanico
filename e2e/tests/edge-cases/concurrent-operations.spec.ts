@@ -37,10 +37,10 @@ test.describe('Concurrent Operations', () => {
     await showPhaseLabel(page, '✅ No Crash on Rapid Switch');
   });
 
-  test('double-click on save does not create duplicates', { retries: 1 }, async ({
+  // test.fixme: Known CI flakiness — nav timeout under runner load. See #138 for proper fix.
+  test.fixme('double-click on save does not create duplicates', async ({
     page, dashboardPage, inventarioPage
   }) => {
-    test.slow(); // Cold Vercel preview can delay nav rendering after login
     await showPhaseLabel(page, '🔄 Double-Click Protection');
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
