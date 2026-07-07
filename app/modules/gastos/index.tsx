@@ -49,6 +49,7 @@ function GastoForm({
 }) {
   const [form, setForm] = useState<GastoFormData>(initial);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   // Track whether "Otros" is selected so we can show a free-text input
   const [otroSubcat, setOtroSubcat] = useState(() => {
     const predefined = GASTO_SUBCATEGORIAS[initial.categoria];
@@ -95,6 +96,7 @@ function GastoForm({
 
   const handleSubmit = async () => {
     if (!valid) return;
+    setSaveError(null); // clear previous error before new attempt
     setSaving(true);
     try {
       await onGuardar(form);
@@ -102,7 +104,10 @@ function GastoForm({
       if (form.categoria === 'personal' && otroSubcat && otroSubcatTexto.trim()) {
         onNuevaPersonalSub?.(otroSubcatTexto.trim());
       }
-    } finally { setSaving(false); }
+    } catch (err) {
+    console.error('[GastoForm] Error al guardar gasto:', err);
+    setSaveError('Error al guardar. Intenta de nuevo.');
+  } finally { setSaving(false); }
   };
 
   const catInfo = GASTO_CATEGORIAS.find(c => c.key === form.categoria)!;
@@ -186,6 +191,7 @@ function GastoForm({
         />
       </div>
 
+      {saveError && <p className="text-red-600 text-sm mt-1 bg-red-50 rounded p-2">{saveError}</p>}
       {/* Actions */}
       <div className="flex gap-3 pt-1">
         <Btn variant="primary" disabled={!valid || saving} onClick={handleSubmit}>
@@ -260,6 +266,8 @@ export function VistaGastos({
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Custom subcategories for 'personal' category, persisted in localStorage
   const PERSONAL_SUBS_KEY = 'taller_personal_subcats';
@@ -324,8 +332,17 @@ export function VistaGastos({
   };
 
   const handleDelete = async (id: string) => {
-    await onEliminar(id);
-    setConfirmDelete(null);
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await onEliminar(id);
+      setConfirmDelete(null);
+    } catch (err) {
+      console.error('[GastoPage] Error al eliminar gasto:', err);
+      setDeleteError('Error al eliminar el gasto. Intenta de nuevo.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const editingGasto = editingId ? gastos.find(g => g.id === editingId) : null;
@@ -450,7 +467,8 @@ export function VistaGastos({
                   if (confirmDelete === g.id) {
                     return (
                       <div key={g.id} className="flex items-center justify-between py-3 px-2 bg-rose-50 rounded-lg my-1">
-                        <span className="text-sm text-rose-700 font-medium">¿Eliminar &quot;{g.concepto}&quot;?</span>
+                        <div><span className="text-sm text-rose-700 font-medium">¿Eliminar &quot;{g.concepto}&quot;?</span>
+                        {deleteError && <p className="text-xs text-rose-600 mt-0.5">{deleteError}</p>}</div>
                         <div className="flex gap-2">
                           <Btn size="sm" variant="danger" onClick={() => handleDelete(g.id)}>Sí, eliminar</Btn>
                           <Btn size="sm" variant="ghost" onClick={() => setConfirmDelete(null)}>Cancelar</Btn>
@@ -463,7 +481,7 @@ export function VistaGastos({
                       key={g.id}
                       gasto={g}
                       onEditar={g => setEditingId(g.id)}
-                      onEliminar={id => setConfirmDelete(id)}
+                      onEliminar={id => { setDeleteError(null); setConfirmDelete(id); }}
                     />
                   );
                 })}
