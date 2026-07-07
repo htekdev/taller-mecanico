@@ -360,42 +360,52 @@ export default function TallerMecanico() {
     if (!orden || orden.estado !== 'pendiente') return;
     const hoy = getHoy();
 
-    // Materialise any libre- parts that may have been added via the edit modal
-    let partesFinal = [...orden.partes];
-    const librePartes = partesFinal.filter(p => p.refaccionId.startsWith('libre-'));
-    if (librePartes.length > 0) {
-      const nuevasRefs: Refaccion[] = [];
-      for (const part of librePartes) {
-        const nueva = await db.insertRefaccion(taller.id, {
-          nombre: part.nombre, codigo: '', categoria: '', unidad: 'pza',
-          precioCompra: part.precioCompra, stock: 0, stockMinimo: 1,
-        });
-        if (nueva) {
-          partesFinal = partesFinal.map(p => p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p);
-          nuevasRefs.push(nueva);
+    try {
+      // Materialise any libre- parts that may have been added via the edit modal
+      let partesFinal = [...orden.partes];
+      const librePartes = partesFinal.filter(p => p.refaccionId.startsWith('libre-'));
+      if (librePartes.length > 0) {
+        const nuevasRefs: Refaccion[] = [];
+        for (const part of librePartes) {
+          const nueva = await db.insertRefaccion(taller.id, {
+            nombre: part.nombre, codigo: '', categoria: '', unidad: 'pza',
+            precioCompra: part.precioCompra, stock: 0, stockMinimo: 1,
+          });
+          if (nueva) {
+            partesFinal = partesFinal.map(p => p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p);
+            nuevasRefs.push(nueva);
+          }
         }
+        if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
+        // Persist real IDs in the order before marking received
+        const subtotal = partesFinal.reduce((s, p) => s + p.subtotal, 0);
+        await db.updateOrden(ordenId, { ...orden, partes: partesFinal, subtotalSinIVA: subtotal, ivaAmount: orden.ivaAmount, total: orden.total, conIVA: orden.conIVA });
+        setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, partes: partesFinal } : o));
       }
-      if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
-      // Persist real IDs in the order before marking received
-      const subtotal = partesFinal.reduce((s, p) => s + p.subtotal, 0);
-      await db.updateOrden(ordenId, { ...orden, partes: partesFinal, subtotalSinIVA: subtotal, ivaAmount: orden.ivaAmount, total: orden.total, conIVA: orden.conIVA });
-      setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, partes: partesFinal } : o));
-    }
 
-    await db.updateOrdenEstado(ordenId, 'recibida', hoy);
-    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'recibida' as const, fechaRecibida: hoy } : o));
-    if (partesFinal.length > 0) {
-      const nuevoInv = inventario.map(r => {
-        const item = partesFinal.find(p => p.refaccionId === r.id);
-        return item ? { ...r, stock: r.stock + item.cantidad } : r;
-      });
-      await db.updateRefacciones(nuevoInv.filter(r => partesFinal.some(p => p.refaccionId === r.id)));
-      setInventario(nuevoInv);
+      await db.updateOrdenEstado(ordenId, 'recibida', hoy);
+      setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'recibida' as const, fechaRecibida: hoy } : o));
+      if (partesFinal.length > 0) {
+        const nuevoInv = inventario.map(r => {
+          const item = partesFinal.find(p => p.refaccionId === r.id);
+          return item ? { ...r, stock: r.stock + item.cantidad } : r;
+        });
+        await db.updateRefacciones(nuevoInv.filter(r => partesFinal.some(p => p.refaccionId === r.id)));
+        setInventario(nuevoInv);
+      }
+    } catch (err) {
+      console.error('[recibirOrden] FAILED:', err);
+      setErrorBanner('No se pudo recibir la orden. Verifica tu conexion e intenta de nuevo.');
     }
   };
   const cancelarOrden = async (ordenId: string) => {
-    await db.updateOrdenEstado(ordenId, 'cancelada');
-    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'cancelada' as const } : o));
+    try {
+      await db.updateOrdenEstado(ordenId, 'cancelada');
+      setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'cancelada' as const } : o));
+    } catch (err) {
+      console.error('[cancelarOrden] FAILED:', err);
+      setErrorBanner('No se pudo cancelar la orden. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const editarOrden = async (
@@ -435,8 +445,14 @@ export default function TallerMecanico() {
     }
 
     const dataFinal = { ...data, partes: partesFinal };
-    await db.updateOrden(ordenId, dataFinal);
-    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, ...dataFinal } : o));
+    try {
+      await db.updateOrden(ordenId, dataFinal);
+      setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, ...dataFinal } : o));
+    } catch (err) {
+      console.error('[editarOrden] FAILED:', err);
+      setErrorBanner('No se pudo guardar los cambios. Verifica tu conexion e intenta de nuevo.');
+      return;
+    }
 
     // ── Sync nombre/precioCompra back to inventory for received orders ─────────
     if (orden?.estado === 'recibida') {
@@ -464,8 +480,13 @@ export default function TallerMecanico() {
     if (!ordenActual) return;
     const nuevoPago: PagoCompra = { ...pago, id: Date.now().toString() };
     const nuevos = [...(ordenActual.pagos ?? []), nuevoPago];
-    await db.updateOrdenPagos(ordenId, nuevos);
-    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, pagos: nuevos } : o));
+    try {
+      await db.updateOrdenPagos(ordenId, nuevos);
+      setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, pagos: nuevos } : o));
+    } catch (err) {
+      console.error('[registrarPagoOrden] FAILED:', err);
+      setErrorBanner('No se pudo registrar el pago. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   // ── Invoice (Factura) handlers ──
@@ -534,26 +555,46 @@ export default function TallerMecanico() {
     if (!facturaActual) return;
     const nuevoPago: PagoFactura = { ...pago, id: Date.now().toString() };
     const nuevos = [...(facturaActual.pagos ?? []), nuevoPago];
-    await db.updateFacturaPagos(facturaId, nuevos);
-    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, pagos: nuevos } : f));
+    try {
+      await db.updateFacturaPagos(facturaId, nuevos);
+      setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, pagos: nuevos } : f));
+    } catch (err) {
+      console.error('[registrarPagoFactura] FAILED:', err);
+      setErrorBanner('No se pudo registrar el pago. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const eliminarPagoFactura = async (facturaId: string, pagoId: string) => {
     const facturaActual = facturas.find(f => f.id === facturaId);
     if (!facturaActual) return;
     const nuevos = (facturaActual.pagos ?? []).filter(p => p.id !== pagoId);
-    await db.updateFacturaPagos(facturaId, nuevos);
-    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, pagos: nuevos } : f));
+    try {
+      await db.updateFacturaPagos(facturaId, nuevos);
+      setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, pagos: nuevos } : f));
+    } catch (err) {
+      console.error('[eliminarPagoFactura] FAILED:', err);
+      setErrorBanner('No se pudo eliminar el pago. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const editarFechaFactura = async (facturaId: string, fecha: string) => {
-    await db.updateFacturaFecha(facturaId, fecha);
-    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, fecha } : f));
+    try {
+      await db.updateFacturaFecha(facturaId, fecha);
+      setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, fecha } : f));
+    } catch (err) {
+      console.error('[editarFechaFactura] FAILED:', err);
+      setErrorBanner('No se pudo actualizar la fecha. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const editarNumeroFactura = async (facturaId: string, numeroFactura: string) => {
-    await db.updateFacturaNumero(facturaId, numeroFactura);
-    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, numeroFactura } : f));
+    try {
+      await db.updateFacturaNumero(facturaId, numeroFactura);
+      setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, numeroFactura } : f));
+    } catch (err) {
+      console.error('[editarNumeroFactura] FAILED:', err);
+      setErrorBanner('No se pudo actualizar el numero de factura. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const editarSubtotalFactura = async (
@@ -564,34 +605,59 @@ export default function TallerMecanico() {
   ) => {
     const iva = incluirIva ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
     const total = subtotal + iva;
-    await db.updateFacturaTotales(facturaId, { subtotal, iva: iva > 0 ? iva : undefined, total, numeroFactura: nuevoNumero });
-    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, subtotal, iva: iva > 0 ? iva : undefined, total, numeroFactura: nuevoNumero } : f));
-    // Sync back to the linked trabajo
-    const factura = facturas.find(f => f.id === facturaId);
-    if (factura?.trabajoId) {
-      await db.updateTrabajoTotales(factura.trabajoId, { iva, total });
-      setTrabajos(prev => prev.map(t => t.id === factura.trabajoId ? { ...t, iva, total } : t));
+    try {
+      await db.updateFacturaTotales(facturaId, { subtotal, iva: iva > 0 ? iva : undefined, total, numeroFactura: nuevoNumero });
+      setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, subtotal, iva: iva > 0 ? iva : undefined, total, numeroFactura: nuevoNumero } : f));
+      // Sync back to the linked trabajo
+      const factura = facturas.find(f => f.id === facturaId);
+      if (factura?.trabajoId) {
+        await db.updateTrabajoTotales(factura.trabajoId, { iva, total });
+        setTrabajos(prev => prev.map(t => t.id === factura.trabajoId ? { ...t, iva, total } : t));
+      }
+    } catch (err) {
+      console.error('[editarSubtotalFactura] FAILED:', err);
+      setErrorBanner('No se pudo actualizar los totales. Verifica tu conexion e intenta de nuevo.');
     }
   };
 
   const cancelarFactura = async (facturaId: string) => {
-    await db.cancelarFactura(facturaId);
-    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, notas: 'CANCELADA' } : f));
+    try {
+      await db.cancelarFactura(facturaId);
+      setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, notas: 'CANCELADA' } : f));
+    } catch (err) {
+      console.error('[cancelarFactura] FAILED:', err);
+      setErrorBanner('No se pudo cancelar la factura. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const reactivarFactura = async (facturaId: string) => {
-    await db.reactivarFactura(facturaId);
-    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, notas: undefined } : f));
+    try {
+      await db.reactivarFactura(facturaId);
+      setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, notas: undefined } : f));
+    } catch (err) {
+      console.error('[reactivarFactura] FAILED:', err);
+      setErrorBanner('No se pudo reactivar la factura. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const cancelarNota = async (trabajoId: string) => {
-    await db.cancelarNota(trabajoId);
-    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, folioFiscal: '__CANCELADA__' } : t));
+    try {
+      await db.cancelarNota(trabajoId);
+      setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, folioFiscal: '__CANCELADA__' } : t));
+    } catch (err) {
+      console.error('[cancelarNota] FAILED:', err);
+      setErrorBanner('No se pudo cancelar la nota. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const reactivarNota = async (trabajoId: string) => {
-    await db.reactivarNota(trabajoId);
-    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, folioFiscal: undefined } : t));
+    try {
+      await db.reactivarNota(trabajoId);
+      setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, folioFiscal: undefined } : t));
+    } catch (err) {
+      console.error('[reactivarNota] FAILED:', err);
+      setErrorBanner('No se pudo reactivar la nota. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   // ── Gastos handlers ──
