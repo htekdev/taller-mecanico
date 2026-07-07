@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { OrdenCompra, Proveedor, Refaccion, CompraItem, ItemCompatibilidad } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
-import { fmt, BADGE_ORDEN } from '@/app/lib/utils';
+import { fmt, BADGE_ORDEN, formatearFecha, getHoy } from '@/app/lib/utils';
 
 // ── Modal de edición de OC ────────────────────────────────────────────────────
 function ModalEditarOrden({
@@ -332,7 +332,7 @@ export function VistaOrdenesCompra({
   onIrAProveedores: () => void;
   onCrearRefaccionNueva: (data: Omit<Refaccion, 'id'>) => Promise<Refaccion | null>;
 }) {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = getHoy();
 
   // ── Form principal OC ─────────────────────────────────────────────────────────
   const [formProveedorId, setFormProveedorId] = useState('');
@@ -800,7 +800,7 @@ export function VistaOrdenesCompra({
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
                     </div>
                     <div className="text-xs text-slate-500 mt-1 flex gap-2 flex-wrap">
-                      <span>{new Date(orden.fecha).toLocaleDateString('es-MX')}</span>
+                      <span>{formatearFecha(orden.fecha)}</span>
                       {orden.descripcion && <span>· {orden.descripcion}</span>}
                       <span>· {orden.partes.length} pieza{orden.partes.length !== 1 ? 's' : ''}</span>
                       {orden.conIVA ? (
@@ -811,7 +811,7 @@ export function VistaOrdenesCompra({
                       {orden.conIVA && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">IVA incluido</span>}
                     </div>
                     {orden.estado === 'recibida' && orden.fechaRecibida && (
-                      <div className="text-xs text-emerald-600 mt-0.5">Recibida: {new Date(orden.fechaRecibida).toLocaleDateString('es-MX')}</div>
+                      <div className="text-xs text-emerald-600 mt-0.5">Recibida: {formatearFecha(orden.fechaRecibida)}</div>
                     )}
                   </div>
                   <div className="flex gap-2 flex-wrap">

@@ -9,7 +9,7 @@ import type {
 import {
   generarNumeroFactura, generarNumeroOrden,
   getEstadoPagoFactura, getSaldoFactura, getSaldo,
-  getEstadoPagoOrden,
+  getEstadoPagoOrden, getHoy, getMesActual,
 } from '@/app/lib/utils';
 import { Card } from '@/app/components/ui';
 import { VistaClientes } from '@/app/modules/clientes';
@@ -43,7 +43,7 @@ export default function TallerMecanico() {
   const [facturas,    setFacturas]    = useState<Factura[]>([]);
   const [gastos,      setGastos]      = useState<Gasto[]>([]);
   const [vista, setVista] = useState<Vista>('clientes');
-  const [mesActual, setMesActual] = useState(new Date().toISOString().slice(0, 7));
+  const [mesActual, setMesActual] = useState(getMesActual());
   const [cargando, setCargando] = useState(true);
   const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: boolean } | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
@@ -127,7 +127,7 @@ export default function TallerMecanico() {
     setInventario(prev => [...prev, nueva]);
     // Create a "received" purchase order if any PO data provided
     if (input.ordenCompra) {
-      const hoy = new Date().toISOString().split('T')[0];
+      const hoy = getHoy();
       const piezasSubtotal = nueva.precioCompra * input.ordenCompra.cantidad;
       const orden = await db.insertOrden(taller.id, {
         proveedorId:  input.ordenCompra.proveedorId || '',
@@ -357,7 +357,7 @@ export default function TallerMecanico() {
     if (!taller) return;
     const orden = ordenes.find(o => o.id === ordenId);
     if (!orden || orden.estado !== 'pendiente') return;
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = getHoy();
 
     // Materialise any libre- parts that may have been added via the edit modal
     let partesFinal = [...orden.partes];
@@ -494,7 +494,7 @@ export default function TallerMecanico() {
 
   const abrirModalFactura = (trabajoId: string) => {
     const sugerido = generarNumeroFactura(facturas);
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = getHoy();
     const trabajo = trabajos.find(t => t.id === trabajoId);
     // Default IVA checkbox: true if job was finalized as Factura or has requiereFactura=true (covers migrated data)
     const defaultIva = trabajo?.tipoDocumento === 'factura' || (trabajo?.tipoDocumento == null && trabajo?.requiereFactura === true);
