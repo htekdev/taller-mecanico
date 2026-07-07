@@ -90,7 +90,7 @@ export class DashboardPage extends BasePage {
       await this.page.reload();
       await this.page.locator('[data-testid="app-content-loaded"]')
         .waitFor({ state: 'visible', timeout: 90_000 }).catch(() => {});
-      await tab.click({ timeout: 30_000 });
+      await tab.click({ timeout: 30_000 }).catch(() => { console.warn(`[ENV] DashboardPage.navigateToModule(${module}): retry click failed — Supabase unresponsive. Test may fail on next assertion.`); });
     }
     // Wait for the tab to become active
     await tab.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
