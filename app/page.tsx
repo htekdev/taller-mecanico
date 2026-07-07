@@ -1,5 +1,4 @@
-
-> 'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import type {
@@ -30,8 +29,7 @@ import { VistaReportes } from '@/app/modules/reportes';
 import { useAuth }      from '@/app/context/auth';
 import * as db          from '@/app/lib/db';
 
-type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'histori
-al'|'configuracion'|'cotizaciones'|'gastos'|'reportes';
+type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones'|'gastos'|'reportes';
 
 export default function TallerMecanico() {
   const { taller, talleres, selectTaller, user, signOut } = useAuth();
@@ -47,8 +45,7 @@ export default function TallerMecanico() {
   const [vista, setVista] = useState<Vista>('clientes');
   const [mesActual, setMesActual] = useState(getMesActual());
   const [cargando, setCargando] = useState(true);
-  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: 
-boolean } | null>(null);
+  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: boolean } | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   // ── Cargar datos desde Supabase ──
@@ -92,8 +89,7 @@ boolean } | null>(null);
     setVehiculos(prev => [...prev, nuevo]);
   };
 
-  const actualizarVehiculo = async (vehiculoId: string, data: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) 
-=> {
+  const actualizarVehiculo = async (vehiculoId: string, data: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => {
     await db.updateVehiculo(vehiculoId, data);
     setVehiculos(prev => prev.map(v => v.id === vehiculoId ? { ...v, ...data } : v));
   };
@@ -127,8 +123,7 @@ boolean } | null>(null);
   };
 
   /** Adds a refaccion + optional PO from cotización reconciliation */
-  const agregarRefaccionDesdeCotizacion = async (input: import('@/app/modules/cotizaciones').AgregarRefaccionInput): 
-Promise<Refaccion | null> => {
+  const agregarRefaccionDesdeCotizacion = async (input: import('@/app/modules/cotizaciones').AgregarRefaccionInput): Promise<Refaccion | null> => {
     if (!taller) return null;
     const nueva = await db.insertRefaccion(taller.id, input.refaccion);
     if (!nueva) return null;
@@ -248,10 +243,8 @@ Promise<Refaccion | null> => {
     // If this job has a linked invoice, sync it with the updated costs
     if (existing.facturaId) {
       const conceptos: FacturaConcepto[] = [
-        ...data.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, 
-precioUnitario: m.precio, subtotal: m.precio })),
-        ...data.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, 
-precioUnitario: p.precioVenta, subtotal: p.subtotal })),
+        ...data.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
+        ...data.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
       ];
       const facturaSubtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
       const facturaIva = data.requiereFactura ? Math.round(facturaSubtotal * 0.16 * 100) / 100 : 0;
@@ -263,8 +256,7 @@ precioUnitario: p.precioVenta, subtotal: p.subtotal })),
         total: facturaTotal,
       });
       setFacturas(prev => prev.map(f => f.id === existing.facturaId
-        ? { ...f, conceptos, subtotal: facturaSubtotal, iva: facturaIva > 0 ? facturaIva : undefined, total: 
-facturaTotal }
+        ? { ...f, conceptos, subtotal: facturaSubtotal, iva: facturaIva > 0 ? facturaIva : undefined, total: facturaTotal }
         : f,
       ));
     }
@@ -330,8 +322,7 @@ facturaTotal }
       await db.updateTrabajoFinalizar(trabajoId, tipo, iva, total);
       // Optimistic update — correct state is confirmed by the successful DB write above
       setTrabajos(prev => prev.map(t => t.id === trabajoId
-        ? { ...t, estado: 'completado' as const, tipoDocumento: tipo, requiereFactura: tipo === 'factura', iva, total, 
-fechaFinalizacion: new Date().toISOString() }
+        ? { ...t, estado: 'completado' as const, tipoDocumento: tipo, requiereFactura: tipo === 'factura', iva, total, fechaFinalizacion: new Date().toISOString() }
         : t
       ));
     } catch (err) {
@@ -362,8 +353,7 @@ fechaFinalizacion: new Date().toISOString() }
   // ── Purchase Order handlers ──
   const crearOrden = async (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => {
     if (!taller) return;
-    const nueva = await db.insertOrden(taller.id, { ...data, numeroOrden: data.numeroOrden || 
-generarNumeroOrden(ordenes) });
+    const nueva = await db.insertOrden(taller.id, { ...data, numeroOrden: data.numeroOrden || generarNumeroOrden(ordenes) });
     if (nueva) setOrdenes(prev => [...prev, nueva]);
   };
   const recibirOrden = async (ordenId: string) => {
@@ -390,14 +380,12 @@ generarNumeroOrden(ordenes) });
       if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
       // Persist real IDs in the order before marking received
       const subtotal = partesFinal.reduce((s, p) => s + p.subtotal, 0);
-      await db.updateOrden(ordenId, { ...orden, partes: partesFinal, subtotalSinIVA: subtotal, ivaAmount: 
-orden.ivaAmount, total: orden.total, conIVA: orden.conIVA });
+      await db.updateOrden(ordenId, { ...orden, partes: partesFinal, subtotalSinIVA: subtotal, ivaAmount: orden.ivaAmount, total: orden.total, conIVA: orden.conIVA });
       setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, partes: partesFinal } : o));
     }
 
     await db.updateOrdenEstado(ordenId, 'recibida', hoy);
-    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'recibida' as const, fechaRecibida: hoy } : 
-o));
+    setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'recibida' as const, fechaRecibida: hoy } : o));
     if (partesFinal.length > 0) {
       const nuevoInv = inventario.map(r => {
         const item = partesFinal.find(p => p.refaccionId === r.id);
@@ -414,8 +402,7 @@ o));
 
   const editarOrden = async (
     ordenId: string,
-    data: Pick<OrdenCompra, 'descripcion' | 'numeroOrden' | 'partes' | 'subtotalSinIVA' | 'ivaAmount' | 'total' | 
-'conIVA'>,
+    data: Pick<OrdenCompra, 'descripcion' | 'numeroOrden' | 'partes' | 'subtotalSinIVA' | 'ivaAmount' | 'total' | 'conIVA'>,
   ) => {
     if (!taller) return;
     const orden = ordenes.find(o => o.id === ordenId);
@@ -484,16 +471,13 @@ o));
   };
 
   // ── Invoice (Factura) handlers ──
-  const generarFactura = async (trabajoId: string, numeroFactura: string, fechaFactura: string, incluirIva: boolean) 
-=> {
+  const generarFactura = async (trabajoId: string, numeroFactura: string, fechaFactura: string, incluirIva: boolean) => {
     if (!taller) return;
     const trabajo = trabajos.find(t => t.id === trabajoId);
     if (!trabajo || trabajo.facturaId) return;
     const conceptos: FacturaConcepto[] = [
-      ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, 
-precioUnitario: m.precio, subtotal: m.precio })),
-      ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, 
-precioUnitario: p.precioVenta, subtotal: p.subtotal })),
+      ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
+      ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
     ];
     const subtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
     // IVA is now explicit: controlled by the checkbox in the modal (incluirIva param).
@@ -508,8 +492,7 @@ precioUnitario: p.precioVenta, subtotal: p.subtotal })),
     if (!nuevaFactura) return;
     setFacturas(prev => [...prev, nuevaFactura]);
     await db.updateTrabajoFactura(trabajoId, nuevaFactura.id);
-    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 
-'facturado' as const } : t));
+    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 'facturado' as const } : t));
   };
 
   const abrirModalFactura = (trabajoId: string) => {
@@ -517,8 +500,7 @@ precioUnitario: p.precioVenta, subtotal: p.subtotal })),
     const hoy = getHoy();
     const trabajo = trabajos.find(t => t.id === trabajoId);
     // Default IVA checkbox: true if job was finalized as Factura or has requiereFactura=true (covers migrated data)
-    const defaultIva = trabajo?.tipoDocumento === 'factura' || (trabajo?.tipoDocumento == null && 
-trabajo?.requiereFactura === true);
+    const defaultIva = trabajo?.tipoDocumento === 'factura' || (trabajo?.tipoDocumento == null && trabajo?.requiereFactura === true);
     setPendingFactura({ trabajoId, numero: sugerido, fecha: hoy, incluirIva: defaultIva ?? false });
   };
 
@@ -545,8 +527,7 @@ trabajo?.requiereFactura === true);
 
   const confirmarFactura = async () => {
     if (!pendingFactura || !pendingFactura.numero.trim()) return;
-    await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, 
-pendingFactura.incluirIva);
+    await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
     setPendingFactura(null);
     setVista('facturas');
   };
@@ -585,10 +566,8 @@ pendingFactura.incluirIva);
   ) => {
     const iva = incluirIva ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
     const total = subtotal + iva;
-    await db.updateFacturaTotales(facturaId, { subtotal, iva: iva > 0 ? iva : undefined, total, numeroFactura: 
-nuevoNumero });
-    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, subtotal, iva: iva > 0 ? iva : undefined, total, 
-numeroFactura: nuevoNumero } : f));
+    await db.updateFacturaTotales(facturaId, { subtotal, iva: iva > 0 ? iva : undefined, total, numeroFactura: nuevoNumero });
+    setFacturas(prev => prev.map(f => f.id === facturaId ? { ...f, subtotal, iva: iva > 0 ? iva : undefined, total, numeroFactura: nuevoNumero } : f));
     // Sync back to the linked trabajo
     const factura = facturas.find(f => f.id === facturaId);
     if (factura?.trabajoId) {
@@ -663,8 +642,7 @@ numeroFactura: nuevoNumero } : f));
       ['operativo', 'administrativo', 'impuesto', 'nomina'] as const
     ).map(cat => ({
       categoria: cat,
-      label: cat === 'operativo' ? 'Operativos' : cat === 'administrativo' ? 'Administrativos' : cat === 'impuesto' ? 
-'Impuestos' : 'Nómina',
+      label: cat === 'operativo' ? 'Operativos' : cat === 'administrativo' ? 'Administrativos' : cat === 'impuesto' ? 'Impuestos' : 'Nómina',
       emoji: cat === 'operativo' ? '🏠' : cat === 'administrativo' ? '🌐' : cat === 'impuesto' ? '🧾' : '👷',
       total: gastosMes.filter(g => g.categoria === cat).reduce((s, g) => s + g.monto, 0),
     }));
@@ -684,18 +662,14 @@ numeroFactura: nuevoNumero } : f));
       return t?.fecha.startsWith(mesActual);
     }).reduce((s, f) => s + getSaldoFactura(f), 0);
     const pendientePorCobrar =
-      facturas.filter(f => { const t = trabajos.find(t => t.id === f.trabajoId); return 
-t?.fecha.startsWith(mesActual); })
+      facturas.filter(f => { const t = trabajos.find(t => t.id === f.trabajoId); return t?.fecha.startsWith(mesActual); })
         .reduce((s, f) => s + getSaldoFactura(f), 0)
       + trabajos.filter(t => t.fecha.startsWith(mesActual) && !t.facturaId).reduce((s, t) => s + getSaldo(t), 0);
     const ordenesMes    = ordenes.filter(o => o.fecha.startsWith(mesActual) && o.estado !== 'cancelada');
     const totalOrdenes  = ordenesMes.reduce((s, o) => s + o.total, 0);
-    const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos 
-?? []).reduce((s2, p) => s2 + p.monto, 0)), 0);
-    const pagadoAProveedoresMes = ordenesMes.reduce((s, o) => s + (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0), 
-0);
-    const porPagarTotal = ordenes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? 
-[]).reduce((s2, p) => s2 + p.monto, 0)), 0);
+    const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0);
+    const pagadoAProveedoresMes = ordenesMes.reduce((s, o) => s + (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0), 0);
+    const porPagarTotal = ordenes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0);
     const mesConIVA    = mes.filter(t => t.requiereFactura);
     const mesSinIVA    = mes.filter(t => !t.requiereFactura);
     const ingresoConIVA = mesConIVA.reduce((s, t) => s + t.total, 0);
@@ -726,32 +700,22 @@ t?.fecha.startsWith(mesActual); })
 
   const stockBajo              = inventario.filter(r => r.stock <= r.stockMinimo).length;
   const facturasPendientes     = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').length;
-  const ordenesPendientesPago  = ordenes.filter(o => o.estado === 'recibida' && getEstadoPagoOrden(o) !== 
-'pagado').length;
+  const ordenesPendientesPago  = ordenes.filter(o => o.estado === 'recibida' && getEstadoPagoOrden(o) !== 'pagado').length;
   const ordenesPendientesRecibir = ordenes.filter(o => o.estado === 'pendiente').length;
   const trabajosPendientesCt   = trabajos.filter(t => t.estado === 'pendiente').length;
-  const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 
-'facturado').length;
+  const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
 
   const tabs = [
     { key: 'clientes',    icon: '👥', label: 'Clientes',         count: clientes.length },
-    { key: 'inventario',  icon: '📦', label: 'Inventario',        count: stockBajo > 0 ? `⚠ ${stockBajo}` : 
-inventario.length > 0 ? inventario.length : null },
-    { key: 'trabajos',    icon: '🔧', label: 'Trabajos',          count: trabajosPendientesCt > 0 ? `🕐 
-${trabajosPendientesCt}` : trabajos.length > 0 ? trabajos.length : null },
-    { key: 'proveedores', icon: '🏪', label: 'Proveedores',       count: proveedores.length > 0 ? proveedores.length : 
-null },
-    { key: 'ordenes',     icon: '📋', label: 'Órdenes de Compra', count: ordenesPendientesRecibir > 0 ? 
-ordenesPendientesRecibir : ordenes.length > 0 ? ordenes.length : null },
-    { key: 'facturas',    icon: '🧾', label: 'Facturas',          count: facturas.length > 0 ? facturas.length : null 
-},
-    { key: 'cuentas',     icon: '💰', label: 'Por Cobrar',        count: facturasPendientes > 0 ? facturasPendientes : 
-null },
-    { key: 'pagos',       icon: '🔴', label: 'Por Pagar',         count: ordenesPendientesPago > 0 ? 
-ordenesPendientesPago : null },
+    { key: 'inventario',  icon: '📦', label: 'Inventario',        count: stockBajo > 0 ? `⚠ ${stockBajo}` : inventario.length > 0 ? inventario.length : null },
+    { key: 'trabajos',    icon: '🔧', label: 'Trabajos',          count: trabajosPendientesCt > 0 ? `🕐 ${trabajosPendientesCt}` : trabajos.length > 0 ? trabajos.length : null },
+    { key: 'proveedores', icon: '🏪', label: 'Proveedores',       count: proveedores.length > 0 ? proveedores.length : null },
+    { key: 'ordenes',     icon: '📋', label: 'Órdenes de Compra', count: ordenesPendientesRecibir > 0 ? ordenesPendientesRecibir : ordenes.length > 0 ? ordenes.length : null },
+    { key: 'facturas',    icon: '🧾', label: 'Facturas',          count: facturas.length > 0 ? facturas.length : null },
+    { key: 'cuentas',     icon: '💰', label: 'Por Cobrar',        count: facturasPendientes > 0 ? facturasPendientes : null },
+    { key: 'pagos',       icon: '🔴', label: 'Por Pagar',         count: ordenesPendientesPago > 0 ? ordenesPendientesPago : null },
     { key: 'resumen',       icon: '📊', label: 'Resumen',           count: null },
-    { key: 'gastos',        icon: '💸', label: 'Gastos',            count: gastos.filter(g => 
-g.fecha.startsWith(mesActual)).length > 0 ? gastos.filter(g => g.fecha.startsWith(mesActual)).length : null },
+    { key: 'gastos',        icon: '💸', label: 'Gastos',            count: gastos.filter(g => g.fecha.startsWith(mesActual)).length > 0 ? gastos.filter(g => g.fecha.startsWith(mesActual)).length : null },
     { key: 'reportes',      icon: '📣', label: 'Reportes',           count: null },
     { key: 'historial',     icon: '📋', label: 'Historial',          count: null },
     { key: 'cotizaciones',  icon: '📄', label: 'Cotizaciones',       count: null },
@@ -763,8 +727,7 @@ g.fecha.startsWith(mesActual)).length > 0 ? gastos.filter(g => g.fecha.startsWit
       {/* Error banner — replaces alert() for mobile-friendly error display */}
       {errorBanner && (
         <div role="alert" aria-live="assertive"
-          className="fixed bottom-4 left-4 right-4 z-50 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg 
-px-4 py-3 shadow-lg flex items-start gap-3">
+          className="fixed bottom-4 left-4 right-4 z-50 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg px-4 py-3 shadow-lg flex items-start gap-3">
           <span className="flex-1 text-sm font-medium">{errorBanner}</span>
           <button onClick={() => setErrorBanner(null)}
             className="text-rose-600 text-sm underline min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -773,8 +736,7 @@ px-4 py-3 shadow-lg flex items-start gap-3">
       )}
       <header className="bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center text-2xl shadow-inner 
-flex-shrink-0">🔧</div>
+          <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center text-2xl shadow-inner flex-shrink-0">🔧</div>
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold text-white tracking-tight">Taller Mecánico</h1>
 
@@ -783,8 +745,7 @@ flex-shrink-0">🔧</div>
               <div className="relative">
                 <button
                   onClick={() => setShowTallerMenu(v => !v)}
-                  className="flex items-center gap-1.5 text-slate-300 text-sm font-medium hover:text-white 
-transition-colors group"
+                  className="flex items-center gap-1.5 text-slate-300 text-sm font-medium hover:text-white transition-colors group"
                 >
                   <span className="truncate max-w-[160px]">{taller?.nombre ?? 'Seleccionar taller'}</span>
                   <span className="text-slate-500 group-hover:text-slate-300 text-xs">▼</span>
@@ -795,23 +756,19 @@ transition-colors group"
                     {/* Backdrop */}
                     <div className="fixed inset-0 z-10" onClick={() => setShowTallerMenu(false)} />
                     {/* Dropdown */}
-                    <div className="absolute left-0 top-full mt-2 z-20 bg-white rounded-xl shadow-xl border 
-border-slate-200 py-1.5 min-w-[220px]">
-                      <p className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Cambiar 
-taller</p>
+                    <div className="absolute left-0 top-full mt-2 z-20 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 min-w-[220px]">
+                      <p className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Cambiar taller</p>
                       {talleres.map(t => (
                         <button
                           key={t.id}
                           onClick={() => { selectTaller(t.id); setShowTallerMenu(false); }}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 
-transition-colors ${
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors ${
                             t.id === taller?.id ? 'bg-indigo-50' : ''
                           }`}
                         >
                           <span className="text-lg">🔧</span>
                           <div className="flex-1 min-w-0">
-                            <div className={`text-sm font-semibold truncate ${t.id === taller?.id ? 'text-indigo-700' 
-: 'text-slate-800'}`}>
+                            <div className={`text-sm font-semibold truncate ${t.id === taller?.id ? 'text-indigo-700' : 'text-slate-800'}`}>
                               {t.nombre}
                             </div>
                             <div className="text-xs text-slate-400">
@@ -832,8 +789,7 @@ transition-colors ${
           <div className="flex items-center gap-3 flex-shrink-0">
             <span className="text-slate-500 text-xs hidden sm:block truncate max-w-[8rem]">{user?.email}</span>
             <button onClick={signOut}
-              className="text-xs text-slate-400 hover:text-white border border-slate-600 hover:border-slate-400 px-3 
-py-1.5 rounded-lg transition-colors">
+              className="text-xs text-slate-400 hover:text-white border border-slate-600 hover:border-slate-400 px-3 py-1.5 rounded-lg transition-colors">
               Salir
             </button>
           </div>
@@ -844,10 +800,8 @@ py-1.5 rounded-lg transition-colors">
         <nav className="flex gap-1 mb-6 bg-white rounded-xl p-1.5 shadow-sm border border-slate-200 overflow-x-auto">
           {tabs.map(({ key, icon, label, count }) => (
             <button key={key} onClick={() => setVista(key)}
-              className={`relative flex items-center gap-2 px-3 py-2.5 rounded-lg font-semibold text-sm transition-all 
-duration-150 whitespace-nowrap ${
-                vista === key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 
-hover:bg-slate-100'
+              className={`relative flex items-center gap-2 px-3 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 whitespace-nowrap ${
+                vista === key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}>
               <span>{icon}</span>
               <span>{label}</span>
@@ -856,8 +810,7 @@ hover:bg-slate-100'
                   vista === key ? 'bg-indigo-400 text-white'
                     : (typeof count === 'string' && count.startsWith('⚠')) ? 'bg-rose-100 text-rose-600'
                     : (typeof count === 'string' && count.startsWith('🕐')) ? 'bg-amber-100 text-amber-700'
-                    : (key === 'cuentas' && facturasPendientes > 0) || (key === 'pagos' && ordenesPendientesPago > 0) 
-|| (key === 'ordenes' && ordenesPendientesRecibir > 0) ? 'bg-rose-100 text-rose-600'
+                    : (key === 'cuentas' && facturasPendientes > 0) || (key === 'pagos' && ordenesPendientesPago > 0) || (key === 'ordenes' && ordenesPendientesRecibir > 0) ? 'bg-rose-100 text-rose-600'
                     : 'bg-slate-200 text-slate-600'
                 }`}>{count}</span>
               )}
@@ -978,8 +931,7 @@ hover:bg-slate-100'
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
             <h2 className="text-lg font-bold text-slate-800 mb-1">🧾 Número de Factura</h2>
             <p className="text-sm text-slate-500 mb-4">
-              Escribe el número de factura que manejan en el taller. Puedes usar la sugerencia o escribir el tuyo 
-propio.
+              Escribe el número de factura que manejan en el taller. Puedes usar la sugerencia o escribir el tuyo propio.
             </p>
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
               Número de factura
@@ -997,15 +949,12 @@ propio.
                 else if (upperNum.startsWith('A')) incluirIva = true;
                 setPendingFactura(prev => prev ? { ...prev, numero: num, incluirIva } : null);
               }}
-              onKeyDown={e => { if (e.key === 'Enter') confirmarFactura(); if (e.key === 'Escape') 
-setPendingFactura(null); }}
+              onKeyDown={e => { if (e.key === 'Enter') confirmarFactura(); if (e.key === 'Escape') setPendingFactura(null); }}
               placeholder="A-001 = con IVA · SF-001 = sin IVA"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono text-slate-800 
-focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-1"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-1"
             />
             <p className="text-xs text-slate-400 mb-4">
-              💡 El IVA se ajusta automáticamente según el prefijo: <span className="font-mono font-semibold">A</span> 
-= con IVA · <span className="font-mono font-semibold">SF</span> = sin IVA
+              💡 El IVA se ajusta automáticamente según el prefijo: <span className="font-mono font-semibold">A</span> = con IVA · <span className="font-mono font-semibold">SF</span> = sin IVA
             </p>
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
               Fecha de factura
@@ -1014,11 +963,9 @@ focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb
               type="date"
               value={pendingFactura.fecha}
               onChange={e => setPendingFactura(prev => prev ? { ...prev, fecha: e.target.value } : null)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-800 
-focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
             />
-            <label className="flex items-center gap-3 cursor-pointer select-none mb-5 bg-slate-50 border 
-border-slate-200 rounded-lg px-4 py-3">
+            <label className="flex items-center gap-3 cursor-pointer select-none mb-5 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
               <input
                 type="checkbox"
                 checked={pendingFactura.incluirIva}
@@ -1028,23 +975,20 @@ border-slate-200 rounded-lg px-4 py-3">
               <div>
                 <span className="text-sm font-semibold text-slate-700">Incluir IVA (16%)</span>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {pendingFactura.incluirIva ? '✅ Se sumará 16% de IVA al total' : '⬜ Sin IVA — cobro informal o 
-cliente exento'}
+                  {pendingFactura.incluirIva ? '✅ Se sumará 16% de IVA al total' : '⬜ Sin IVA — cobro informal o cliente exento'}
                 </p>
               </div>
             </label>
             <div className="flex gap-3">
               <button
                 onClick={() => setPendingFactura(null)}
-                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold 
-hover:bg-slate-50 transition-colors">
+                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
                 Cancelar
               </button>
               <button
                 onClick={confirmarFactura}
                 disabled={!pendingFactura.numero.trim() || !pendingFactura.fecha}
-                className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold 
-hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 ✓ Crear Factura
               </button>
             </div>
@@ -1054,4 +998,3 @@ hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-c
     </div>
   );
 }
-
