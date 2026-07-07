@@ -495,22 +495,23 @@ describe('insertGasto', () => {
       categoria: 'nomina', subcategoria: 'Salario',
       concepto: 'Nómina quincena', monto: 4000, fecha: '2026-06-15', notas: 'Q2',
     });
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe('g2');
-    expect(result!.monto).toBe(4000);
-    expect(result!.notas).toBe('Q2');
+    expect(result.id).toBe('g2');
+    expect(result.monto).toBe(4000);
+    expect(result.notas).toBe('Q2');
   });
 
-  it('returns null when DB returns error', async () => {
+  it('throws when DB returns error', async () => {
     mockInsertChain(null, { message: 'insert failed' });
-    const result = await insertGasto('t1', { categoria: 'operativo', subcategoria: 'Otro', concepto: 'Gasto X', monto: 100, fecha: '2026-06-01' });
-    expect(result).toBeNull();
+    await expect(
+      insertGasto('t1', { categoria: 'operativo', subcategoria: 'Otro', concepto: 'Gasto X', monto: 100, fecha: '2026-06-01' })
+    ).rejects.toThrow('insert failed');
   });
 
-  it('returns null when row is null (no error)', async () => {
+  it('throws when row is null (no error)', async () => {
     mockInsertChain(null, null);
-    const result = await insertGasto('t1', { categoria: 'operativo', subcategoria: 'Otro', concepto: 'Gasto Y', monto: 200, fecha: '2026-06-01' });
-    expect(result).toBeNull();
+    await expect(
+      insertGasto('t1', { categoria: 'operativo', subcategoria: 'Otro', concepto: 'Gasto Y', monto: 200, fecha: '2026-06-01' })
+    ).rejects.toThrow();
   });
 
   it('sends notas: null when not provided', async () => {

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import type { Cliente, Vehiculo } from '@/app/types';
@@ -217,25 +217,42 @@ export function VistaClientes({
   const [busqueda, setBusqueda] = useState('');
   const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
   const [vehiculoEditando, setVehiculoEditando] = useState<Vehiculo | null>(null);
+  const [savingCliente, setSavingCliente] = useState(false);
+  const [saveClienteError, setSaveClienteError] = useState<string | null>(null);
+  const [savingVehiculo, setSavingVehiculo] = useState<string | null>(null);
 
-  const handleSubmitCliente = (e: React.FormEvent) => {
+  const handleSubmitCliente = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formCliente.nombre) {
-      onGuardarCliente({
+    if (!formCliente.nombre) return;
+    setSavingCliente(true);
+    setSaveClienteError(null);
+    try {
+      await onGuardarCliente({
         nombre: formCliente.nombre,
         telefono: formCliente.telefono || undefined,
         email: formCliente.email || undefined,
         email2: formCliente.email2 || undefined,
       });
       setFormCliente({ nombre: '', telefono: '', email: '', email2: '' });
+    } catch {
+      setSaveClienteError('No se pudo guardar el cliente. Verifica tu conexión e intenta de nuevo.');
+    } finally {
+      setSavingCliente(false);
     }
   };
 
-  const handleSubmitVehiculo = (e: React.FormEvent, clienteId: string) => {
+  const handleSubmitVehiculo = async (e: React.FormEvent, clienteId: string) => {
     e.preventDefault();
-    if (formVehiculo.marca && formVehiculo.modelo) {
-      onGuardarVehiculo({ ...formVehiculo, clienteId });
+    if (!formVehiculo.marca || !formVehiculo.modelo) return;
+    setSavingVehiculo(clienteId);
+    setSaveClienteError(null);
+    try {
+      await onGuardarVehiculo({ ...formVehiculo, clienteId });
       setFormVehiculo({ marca: '', modelo: '', anio: '', placa: '' });
+    } catch {
+      setSaveClienteError('No se pudo guardar la unidad. Verifica tu conexión e intenta de nuevo.');
+    } finally {
+      setSavingVehiculo(null);
     }
   };
 
@@ -293,8 +310,11 @@ export function VistaClientes({
             <Input type="email" placeholder="correo2@ejemplo.com" value={formCliente.email2}
               onChange={e => setFormCliente({ ...formCliente, email2: e.target.value })} />
           </div>
-          <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
-            <Btn type="submit" variant="primary">+ Agregar Cliente</Btn>
+          <div className="sm:col-span-2 lg:col-span-4 flex flex-col items-end gap-1">
+            <Btn type="submit" variant="primary" disabled={savingCliente}>
+              {savingCliente ? '⏳ Guardando...' : '+ Agregar Cliente'}
+            </Btn>
+            {saveClienteError && <p className="text-rose-600 text-xs text-right">{saveClienteError}</p>}
           </div>
         </form>
       </div>
@@ -431,7 +451,9 @@ export function VistaClientes({
                           onChange={e => setFormVehiculo({ ...formVehiculo, placa: e.target.value.toUpperCase() })}
                           className="font-mono" /></div>
                       <div className="col-span-2 sm:col-span-1 flex items-end">
-                        <Btn type="submit" variant="success" fullWidth>+ Agregar</Btn>
+                        <Btn type="submit" variant="success" fullWidth disabled={savingVehiculo === cliente.id}>
+                          {savingVehiculo === cliente.id ? '⏳...' : '+ Agregar'}
+                        </Btn>
                       </div>
                     </form>
                   </div>

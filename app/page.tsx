@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import type {
@@ -74,7 +74,8 @@ export default function TallerMecanico() {
   const guardarCliente = async (data: Omit<Cliente, 'id'>) => {
     if (!taller) return;
     const nuevo = await db.insertCliente(taller.id, data);
-    if (nuevo) setClientes(prev => [...prev, nuevo]);
+    if (!nuevo) throw new Error('No se pudo guardar el cliente');
+    setClientes(prev => [...prev, nuevo]);
   };
   const actualizarCliente = async (id: string, data: Omit<Cliente, 'id'>) => {
     const actualizado = await db.updateCliente(id, data);
@@ -84,7 +85,8 @@ export default function TallerMecanico() {
   const guardarVehiculo = async (data: Omit<Vehiculo, 'id'>) => {
     if (!taller) return;
     const nuevo = await db.insertVehiculo(taller.id, data);
-    if (nuevo) setVehiculos(prev => [...prev, nuevo]);
+    if (!nuevo) throw new Error('No se pudo guardar la unidad');
+    setVehiculos(prev => [...prev, nuevo]);
   };
 
   const actualizarVehiculo = async (vehiculoId: string, data: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => {
@@ -598,7 +600,7 @@ export default function TallerMecanico() {
   const crearGasto = async (data: Omit<Gasto, 'id' | 'tallerId'>) => {
     if (!taller) return;
     const nuevo = await db.insertGasto(taller.id, data);
-    if (nuevo) setGastos(prev => [nuevo, ...prev]);
+    setGastos(prev => [nuevo, ...prev]);
   };
   const editarGasto = async (id: string, data: Partial<Omit<Gasto, 'id' | 'tallerId'>>) => {
     await db.updateGasto(id, data);
