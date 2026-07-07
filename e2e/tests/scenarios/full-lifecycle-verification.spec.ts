@@ -109,13 +109,17 @@ test.describe('Full Lifecycle Verification', () => {
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
 
+    // Reload to force fresh cargarDatos() after re-login.
+    // Root cause: getRefacciones() silently returns [] on Supabase cold-start errors.
+    // page.reload() retries with warm auth token — consistent DB fetch.
+    await page.reload();
+    await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 60_000 });
+
     // Verify data persisted — check inventory
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    // networkidle ensures Supabase fetch completes — h2 renders before data arrives
-    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
-    // Poll for the specific part — Vercel preview cold starts can take >2s
-    await page.getByText(partName).first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
+    // Use expect() with retry — replaces silent .catch(() => {}) that masked failures
+    await expect(page.getByText(partName)).toBeVisible({ timeout: 45_000 });
     const partStillVisible = await inventarioPage.isPartVisible(partName);
     expect(partStillVisible).toBe(true);
 
