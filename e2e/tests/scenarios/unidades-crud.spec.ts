@@ -23,7 +23,7 @@ test.describe("Unidades CRUD", () => {
     test.slow();
     const runId = TestData.uniqueId();
     const clientName = `Cliente Unidades ${runId}`;
-    const placa = `PLK-${runId.slice(0, 3)}`;
+    const placa = `PLK-${runId.slice(0, 3).toUpperCase()}`;
 
     await showPhaseLabel(page, "Setup: Create test client");
     await dashboardPage.navigateToModule("clientes");
