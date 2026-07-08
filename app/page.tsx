@@ -439,15 +439,21 @@ export default function TallerMecanico() {
       const librePartes = partesFinal.filter(p => p.refaccionId.startsWith('libre-'));
       if (librePartes.length > 0) {
         const nuevasRefs: Refaccion[] = [];
-        for (const part of librePartes) {
-          const nueva = await db.insertRefaccion(taller.id, {
-            nombre: part.nombre, codigo: '', categoria: '', unidad: 'pza',
-            precioCompra: part.precioCompra, stock: 0, stockMinimo: 1,
-          });
-          if (nueva) {
-            partesFinal = partesFinal.map(p => p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p);
-            nuevasRefs.push(nueva);
+        try {
+          for (const part of librePartes) {
+            const nueva = await db.insertRefaccion(taller.id, {
+              nombre: part.nombre, codigo: '', categoria: '', unidad: 'pza',
+              precioCompra: part.precioCompra, stock: 0, stockMinimo: 1,
+            });
+            if (nueva) {
+              partesFinal = partesFinal.map(p => p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p);
+              nuevasRefs.push(nueva);
+            }
           }
+        } catch (err) {
+          console.error('[editarOrden] No se pudo crear refaccion libre:', err);
+          setErrorBanner('No se pudo registrar una pieza nueva. Verifica tu conexion e intenta de nuevo.');
+          return;
         }
         if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
         // Persist real IDs in the order before marking received
@@ -495,30 +501,24 @@ export default function TallerMecanico() {
     const librePartes = partesFinal.filter(p => p.refaccionId.startsWith('libre-'));
     if (librePartes.length > 0) {
       const nuevasRefs: Refaccion[] = [];
-      try {
-        for (const part of librePartes) {
-          // For received orders the goods are already in stock; pending orders start at 0
-          const stockInicial = orden?.estado === 'recibida' ? part.cantidad : 0;
-          const nueva = await db.insertRefaccion(taller.id, {
-            nombre: part.nombre,
-            codigo: '',
-            categoria: '',
-            unidad: 'pza',
-            precioCompra: part.precioCompra,
-            stock: stockInicial,
-            stockMinimo: 1,
-          });
-          if (nueva) {
-            partesFinal = partesFinal.map(p =>
-              p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p
-            );
-            nuevasRefs.push(nueva);
-          }
+      for (const part of librePartes) {
+        // For received orders the goods are already in stock; pending orders start at 0
+        const stockInicial = orden?.estado === 'recibida' ? part.cantidad : 0;
+        const nueva = await db.insertRefaccion(taller.id, {
+          nombre: part.nombre,
+          codigo: '',
+          categoria: '',
+          unidad: 'pza',
+          precioCompra: part.precioCompra,
+          stock: stockInicial,
+          stockMinimo: 1,
+        });
+        if (nueva) {
+          partesFinal = partesFinal.map(p =>
+            p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p
+          );
+          nuevasRefs.push(nueva);
         }
-      } catch (err) {
-        console.error('[editarOrden] No se pudo crear refaccion libre:', err);
-        setErrorBanner('No se pudo registrar una pieza nueva. Verifica tu conexion e intenta de nuevo.');
-        return;
       }
       if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
     }
@@ -1171,4 +1171,3 @@ export default function TallerMecanico() {
     </div>
   );
 }
-
