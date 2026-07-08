@@ -384,9 +384,14 @@ export default function TallerMecanico() {
   // ── Purchase Order handlers ──
   const crearOrden = async (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => {
     if (!taller) return;
-    const nueva = await db.insertOrden(taller.id, { ...data, numeroOrden: data.numeroOrden || generarNumeroOrden(ordenes) });
-    if (!nueva) throw new Error('No se pudo crear la orden de compra');
-    setOrdenes(prev => [...prev, nueva]);
+    try {
+      const nueva = await db.insertOrden(taller.id, { ...data, numeroOrden: data.numeroOrden || generarNumeroOrden(ordenes) });
+      if (!nueva) throw new Error('[crearOrden] insertOrden returned null');
+      setOrdenes(prev => [...prev, nueva]);
+    } catch (err) {
+      console.error('[crearOrden] FAILED:', err);
+      setErrorBanner('No se pudo crear la orden de compra. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   const recibirOrden = async (ordenId: string) => {
     if (!taller) return;
@@ -542,7 +547,7 @@ export default function TallerMecanico() {
       fecha: fechaFactura,
       conceptos, subtotal, iva: iva > 0 ? iva : undefined, total, pagos: [],
     });
-    if (!nuevaFactura) throw new Error('No se pudo crear la factura');
+    if (!nuevaFactura) throw new Error('[generarFactura] insertFactura returned null');
     setFacturas(prev => [...prev, nuevaFactura]);
     await db.updateTrabajoFactura(trabajoId, nuevaFactura.id);
     setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 'facturado' as const } : t));
@@ -590,9 +595,14 @@ export default function TallerMecanico() {
 
   const confirmarFactura = async () => {
     if (!pendingFactura || !pendingFactura.numero.trim()) return;
-    await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
-    setPendingFactura(null);
-    setVista('facturas');
+    try {
+      await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
+      setPendingFactura(null);
+      setVista('facturas');
+    } catch (err) {
+      console.error('[confirmarFactura] FAILED:', err);
+      setErrorBanner('No se pudo generar la factura. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   const registrarPagoFactura = async (facturaId: string, pago: Omit<PagoFactura, 'id'>) => {
     const facturaActual = facturas.find(f => f.id === facturaId);
