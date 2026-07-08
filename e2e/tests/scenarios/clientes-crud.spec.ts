@@ -180,6 +180,7 @@ test.describe('Clientes Full CRUD', () => {
   test('search for a client filters the list', async ({
     page, dashboardPage,
   }) => {
+    test.slow(); // Supabase cold-start can make navigation take 40-90s
     await showPhaseLabel(page, '🔍 Phase 1: Client Search');
     await dashboardPage.navigateToModule('clientes');
     await dashboardPage.waitForPageLoad();
@@ -256,3 +257,4 @@ test.describe('Clientes Full CRUD', () => {
     await showPhaseLabel(page, '✅ Navigation Resilience OK');
   });
 });
+
