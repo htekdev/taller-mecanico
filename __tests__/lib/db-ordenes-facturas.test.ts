@@ -1,5 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { supabase } from '@/app/lib/supabase';
+import type { CompraItem, FacturaConcepto } from '@/app/types';
 
 // Mock Supabase before importing db functions
 vi.mock('@/app/lib/supabase', () => ({
@@ -39,7 +40,7 @@ describe('updateOrden', () => {
   const sampleData = {
     descripcion: 'Filtros de aceite',
     numeroOrden: 'PO-007' as string | undefined,
-    partes: [] as import('@/app/types').CompraItem[],
+    partes: [] as CompraItem[],
     subtotalSinIVA: 500,
     ivaAmount: 80,
     total: 580,
@@ -74,6 +75,7 @@ describe('updateOrden', () => {
     expect(update).toHaveBeenCalledWith(expect.objectContaining({
       descripcion: 'Filtros de aceite',
       numero_orden: 'PO-007',
+      partes: [],
       subtotal_sin_iva: 500,
       iva_amount: 80,
       total: 580,
@@ -147,7 +149,7 @@ describe('updateFacturaNumero', () => {
 // ── updateFacturaConceptos ──────────────────────────────────────────────────
 
 describe('updateFacturaConceptos', () => {
-  const sampleConceptos: import('@/app/types').FacturaConcepto[] = [
+  const sampleConceptos: FacturaConcepto[] = [
     { tipo: 'mano_de_obra', descripcion: 'Cambio de aceite', cantidad: 1, precioUnitario: 300, subtotal: 300 },
   ];
 
