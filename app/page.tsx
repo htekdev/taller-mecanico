@@ -79,35 +79,65 @@ export default function TallerMecanico() {
 
   const guardarCliente = async (data: Omit<Cliente, 'id'>) => {
     if (!taller) return;
-    const nuevo = await db.insertCliente(taller.id, data);
-    if (!nuevo) throw new Error('No se pudo guardar el cliente');
-    setClientes(prev => [...prev, nuevo]);
+    try {
+      const nuevo = await db.insertCliente(taller.id, data);
+      if (!nuevo) throw new Error('No se pudo guardar el cliente');
+      setClientes(prev => [...prev, nuevo]);
+    } catch (err) {
+      console.error('[guardarCliente] FAILED:', err);
+      setErrorBanner('No se pudo guardar el cliente. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   const actualizarCliente = async (id: string, data: Omit<Cliente, 'id'>) => {
-    const actualizado = await db.updateCliente(id, data);
-    if (!actualizado) throw new Error('No se pudo actualizar el cliente');
-    setClientes(prev => prev.map(c => c.id === id ? actualizado : c));
+    try {
+      const actualizado = await db.updateCliente(id, data);
+      if (!actualizado) throw new Error('No se pudo actualizar el cliente');
+      setClientes(prev => prev.map(c => c.id === id ? actualizado : c));
+    } catch (err) {
+      console.error('[actualizarCliente] FAILED:', err);
+      setErrorBanner('No se pudo actualizar el cliente. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   const guardarVehiculo = async (data: Omit<Vehiculo, 'id'>) => {
     if (!taller) return;
-    const nuevo = await db.insertVehiculo(taller.id, data);
-    if (!nuevo) throw new Error('No se pudo guardar la unidad');
-    setVehiculos(prev => [...prev, nuevo]);
+    try {
+      const nuevo = await db.insertVehiculo(taller.id, data);
+      if (!nuevo) throw new Error('No se pudo guardar la unidad');
+      setVehiculos(prev => [...prev, nuevo]);
+    } catch (err) {
+      console.error('[guardarVehiculo] FAILED:', err);
+      setErrorBanner('No se pudo guardar la unidad. Verifica tu conexión e intenta de nuevo.');
+    }
   };
 
   const actualizarVehiculo = async (vehiculoId: string, data: Pick<Vehiculo, 'marca' | 'modelo' | 'anio' | 'placa'>) => {
-    await db.updateVehiculo(vehiculoId, data);
-    setVehiculos(prev => prev.map(v => v.id === vehiculoId ? { ...v, ...data } : v));
+    try {
+      await db.updateVehiculo(vehiculoId, data);
+      setVehiculos(prev => prev.map(v => v.id === vehiculoId ? { ...v, ...data } : v));
+    } catch (err) {
+      console.error('[actualizarVehiculo] FAILED:', err);
+      setErrorBanner('No se pudo actualizar la unidad. Verifica tu conexión e intenta de nuevo.');
+    }
   };
   const guardarRefaccion = async (data: Omit<Refaccion, 'id'>) => {
     if (!taller) return;
-    const nuevo = await db.insertRefaccion(taller.id, data); // throws on error
-    setInventario(prev => [...prev, nuevo]);
+    try {
+      const nuevo = await db.insertRefaccion(taller.id, data);
+      setInventario(prev => [...prev, nuevo]);
+    } catch (err) {
+      console.error('[guardarRefaccion] FAILED:', err);
+      setErrorBanner('No se pudo guardar la refacción. Verifica tu conexión e intenta de nuevo.');
+    }
   };
   const eliminarRefaccion = async (id: string) => {
     if (!taller) return;
-    await db.deleteRefaccion(taller.id, id);
-    setInventario(prev => prev.filter(r => r.id !== id));
+    try {
+      await db.deleteRefaccion(taller.id, id);
+      setInventario(prev => prev.filter(r => r.id !== id));
+    } catch (err) {
+      console.error('[eliminarRefaccion] FAILED:', err);
+      setErrorBanner('No se pudo eliminar la refacción. Verifica tu conexión e intenta de nuevo.');
+    }
   };
   const recibirStock = async (refaccionId: string, cantidad: number) => {
     const ref = inventario.find(r => r.id === refaccionId);
@@ -146,30 +176,35 @@ export default function TallerMecanico() {
     }
     if (!nueva) return null;
     setInventario(prev => [...prev, nueva!]);
-    // Create a "received" purchase order if any PO data provided
+    // Create a "received" purchase order if any PO data provided (best-effort — non-fatal)
     if (input.ordenCompra) {
-      const hoy = getHoy();
-      const piezasSubtotal = nueva.precioCompra * input.ordenCompra.cantidad;
-      const orden = await db.insertOrden(taller.id, {
-        proveedorId:  input.ordenCompra.proveedorId || '',
-        fecha:        hoy,
-        numeroOrden:  input.ordenCompra.numeroOrden,
-        descripcion:  input.ordenCompra.descripcion || `Alta desde cotización — ${input.refaccion.nombre}`,
-        partes: [{
-          refaccionId:  nueva.id,
-          nombre:       nueva.nombre,
-          cantidad:     input.ordenCompra.cantidad,
-          precioCompra: nueva.precioCompra,
-          subtotal:     piezasSubtotal,
-        }],
-        subtotalSinIVA: piezasSubtotal,
-        ivaAmount: 0,
-        total: piezasSubtotal,
-        conIVA: false,
-      });
-      if (orden) {
-        await db.updateOrdenEstado(orden.id, 'recibida', hoy);
-        setOrdenes(prev => [...prev, { ...orden, estado: 'recibida', fechaRecibida: hoy }]);
+      try {
+        const hoy = getHoy();
+        const piezasSubtotal = nueva.precioCompra * input.ordenCompra.cantidad;
+        const orden = await db.insertOrden(taller.id, {
+          proveedorId:  input.ordenCompra.proveedorId || '',
+          fecha:        hoy,
+          numeroOrden:  input.ordenCompra.numeroOrden,
+          descripcion:  input.ordenCompra.descripcion || `Alta desde cotización — ${input.refaccion.nombre}`,
+          partes: [{
+            refaccionId:  nueva.id,
+            nombre:       nueva.nombre,
+            cantidad:     input.ordenCompra.cantidad,
+            precioCompra: nueva.precioCompra,
+            subtotal:     piezasSubtotal,
+          }],
+          subtotalSinIVA: piezasSubtotal,
+          ivaAmount: 0,
+          total: piezasSubtotal,
+          conIVA: false,
+        });
+        if (orden) {
+          await db.updateOrdenEstado(orden.id, 'recibida', hoy);
+          setOrdenes(prev => [...prev, { ...orden, estado: 'recibida', fechaRecibida: hoy }]);
+        }
+      } catch (err) {
+        // Non-critical: refaccion was inserted successfully — PO creation is best-effort
+        console.error('[agregarRefaccionDesdeCotizacion] PO creation failed:', err);
       }
     }
     return nueva;
@@ -240,12 +275,16 @@ export default function TallerMecanico() {
     const subtotal = data.manoDeObra + data.refacciones;
     const iva      = data.requiereFactura ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
     const total    = subtotal + iva;
-    const nuevo = await db.insertTrabajo(taller.id, { ...data, iva, total, estadoFacturacion: 'sin_facturar' });
-    if (!nuevo) return;
-    // Merge client-side manoDeObraItems into the DB response to ensure tipo/costoTaller
-    // fields are always present — the Supabase JSONB round-trip preserves them but this
-    // guarantees the in-memory state matches exactly what was submitted by the form.
-    setTrabajos(prev => [...prev, { ...nuevo, manoDeObraItems: data.manoDeObraItems }]);
+    let nuevo: Trabajo | null = null;
+    try {
+      nuevo = await db.insertTrabajo(taller.id, { ...data, iva, total, estadoFacturacion: 'sin_facturar' });
+      if (!nuevo) { setErrorBanner('No se pudo guardar el trabajo. Verifica tu conexión e intenta de nuevo.'); return; }
+    } catch (err) {
+      console.error('[guardarTrabajo] insertTrabajo FAILED:', err);
+      setErrorBanner('No se pudo guardar el trabajo. Verifica tu conexión e intenta de nuevo.');
+      return;
+    }
+    setTrabajos(prev => [...prev, { ...nuevo!, manoDeObraItems: data.manoDeObraItems }]);
     if (data.partes.length > 0) {
       const nuevoInv = inventario.map(r => {
         const usada = data.partes.find(p => p.refaccionId === r.id);
@@ -376,9 +415,14 @@ export default function TallerMecanico() {
   };
   const guardarProveedor = async (data: Omit<Proveedor, 'id'>) => {
     if (!taller) return;
-    const nuevo = await db.insertProveedor(taller.id, data);
-    if (!nuevo) throw new Error('No se pudo guardar el proveedor');
-    setProveedores(prev => [...prev, nuevo]);
+    try {
+      const nuevo = await db.insertProveedor(taller.id, data);
+      if (!nuevo) throw new Error('No se pudo guardar el proveedor');
+      setProveedores(prev => [...prev, nuevo]);
+    } catch (err) {
+      console.error('[guardarProveedor] FAILED:', err);
+      setErrorBanner('No se pudo guardar el proveedor. Verifica tu conexión e intenta de nuevo.');
+    }
   };
 
   // ── Purchase Order handlers ──
@@ -558,10 +602,15 @@ export default function TallerMecanico() {
   };
 
   const refacturarTrabajo = async (trabajoId: string) => {
-    await db.resetFacturacionTrabajo(trabajoId);
-    setTrabajos(prev => prev.map(t =>
-      t.id === trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
-    ));
+    try {
+      await db.resetFacturacionTrabajo(trabajoId);
+      setTrabajos(prev => prev.map(t =>
+        t.id === trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
+      ));
+    } catch (err) {
+      console.error('[refacturarTrabajo] FAILED:', err);
+      setErrorBanner('No se pudo cancelar la facturación. Verifica tu conexión e intenta de nuevo.');
+    }
   };
 
   const cancelarTrabajo = async (trabajoId: string) => {
@@ -707,16 +756,31 @@ export default function TallerMecanico() {
   // ── Gastos handlers ──
   const crearGasto = async (data: Omit<Gasto, 'id' | 'tallerId'>) => {
     if (!taller) return;
-    const nuevo = await db.insertGasto(taller.id, data);
-    setGastos(prev => [nuevo, ...prev]);
+    try {
+      const nuevo = await db.insertGasto(taller.id, data);
+      setGastos(prev => [nuevo, ...prev]);
+    } catch (err) {
+      console.error('[crearGasto] FAILED:', err);
+      setErrorBanner('No se pudo registrar el gasto. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   const editarGasto = async (id: string, data: Partial<Omit<Gasto, 'id' | 'tallerId'>>) => {
-    await db.updateGasto(id, data);
-    setGastos(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
+    try {
+      await db.updateGasto(id, data);
+      setGastos(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
+    } catch (err) {
+      console.error('[editarGasto] FAILED:', err);
+      setErrorBanner('No se pudo actualizar el gasto. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   const eliminarGasto = async (id: string) => {
-    await db.deleteGasto(id);
-    setGastos(prev => prev.filter(g => g.id !== id));
+    try {
+      await db.deleteGasto(id);
+      setGastos(prev => prev.filter(g => g.id !== id));
+    } catch (err) {
+      console.error('[eliminarGasto] FAILED:', err);
+      setErrorBanner('No se pudo eliminar el gasto. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const calcularResumen = () => {
