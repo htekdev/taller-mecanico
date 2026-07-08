@@ -79,14 +79,24 @@ export default function TallerMecanico() {
 
   const guardarCliente = async (data: Omit<Cliente, 'id'>) => {
     if (!taller) return;
-    const nuevo = await db.insertCliente(taller.id, data);
-    if (!nuevo) throw new Error('No se pudo guardar el cliente');
-    setClientes(prev => [...prev, nuevo]);
+    try {
+      const nuevo = await db.insertCliente(taller.id, data);
+      if (!nuevo) throw new Error('No se pudo guardar el cliente');
+      setClientes(prev => [...prev, nuevo]);
+    } catch (err) {
+      console.error('[guardarCliente] FAILED:', err);
+      setErrorBanner('No se pudo guardar el cliente. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   const actualizarCliente = async (id: string, data: Omit<Cliente, 'id'>) => {
-    const actualizado = await db.updateCliente(id, data);
-    if (!actualizado) throw new Error('No se pudo actualizar el cliente');
-    setClientes(prev => prev.map(c => c.id === id ? actualizado : c));
+    try {
+      const actualizado = await db.updateCliente(id, data);
+      if (!actualizado) throw new Error('No se pudo actualizar el cliente');
+      setClientes(prev => prev.map(c => c.id === id ? actualizado : c));
+    } catch (err) {
+      console.error('[actualizarCliente] FAILED:', err);
+      setErrorBanner('No se pudo actualizar el cliente. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   const guardarVehiculo = async (data: Omit<Vehiculo, 'id'>) => {
     if (!taller) return;
@@ -707,16 +717,31 @@ export default function TallerMecanico() {
   // ── Gastos handlers ──
   const crearGasto = async (data: Omit<Gasto, 'id' | 'tallerId'>) => {
     if (!taller) return;
-    const nuevo = await db.insertGasto(taller.id, data);
-    setGastos(prev => [nuevo, ...prev]);
+    try {
+      const nuevo = await db.insertGasto(taller.id, data);
+      setGastos(prev => [nuevo, ...prev]);
+    } catch (err) {
+      console.error('[crearGasto] FAILED:', err);
+      setErrorBanner('No se pudo registrar el gasto. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   const editarGasto = async (id: string, data: Partial<Omit<Gasto, 'id' | 'tallerId'>>) => {
-    await db.updateGasto(id, data);
-    setGastos(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
+    try {
+      await db.updateGasto(id, data);
+      setGastos(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
+    } catch (err) {
+      console.error('[editarGasto] FAILED:', err);
+      setErrorBanner('No se pudo actualizar el gasto. Verifica tu conexion e intenta de nuevo.');
+    }
   };
   const eliminarGasto = async (id: string) => {
-    await db.deleteGasto(id);
-    setGastos(prev => prev.filter(g => g.id !== id));
+    try {
+      await db.deleteGasto(id);
+      setGastos(prev => prev.filter(g => g.id !== id));
+    } catch (err) {
+      console.error('[eliminarGasto] FAILED:', err);
+      setErrorBanner('No se pudo eliminar el gasto. Verifica tu conexion e intenta de nuevo.');
+    }
   };
 
   const calcularResumen = () => {
