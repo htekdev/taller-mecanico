@@ -602,15 +602,10 @@ export default function TallerMecanico() {
   };
 
   const refacturarTrabajo = async (trabajoId: string) => {
-    try {
-      await db.resetFacturacionTrabajo(trabajoId);
-      setTrabajos(prev => prev.map(t =>
-        t.id === trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
-      ));
-    } catch (err) {
-      console.error('[refacturarTrabajo] FAILED:', err);
-      setErrorBanner('No se pudo cancelar la facturación. Verifica tu conexión e intenta de nuevo.');
-    }
+    await db.resetFacturacionTrabajo(trabajoId);
+    setTrabajos(prev => prev.map(t =>
+      t.id === trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
+    ));
   };
 
   const cancelarTrabajo = async (trabajoId: string) => {
