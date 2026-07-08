@@ -456,24 +456,30 @@ export default function TallerMecanico() {
     const librePartes = partesFinal.filter(p => p.refaccionId.startsWith('libre-'));
     if (librePartes.length > 0) {
       const nuevasRefs: Refaccion[] = [];
-      for (const part of librePartes) {
-        // For received orders the goods are already in stock; pending orders start at 0
-        const stockInicial = orden?.estado === 'recibida' ? part.cantidad : 0;
-        const nueva = await db.insertRefaccion(taller.id, {
-          nombre: part.nombre,
-          codigo: '',
-          categoria: '',
-          unidad: 'pza',
-          precioCompra: part.precioCompra,
-          stock: stockInicial,
-          stockMinimo: 1,
-        });
-        if (nueva) {
-          partesFinal = partesFinal.map(p =>
-            p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p
-          );
-          nuevasRefs.push(nueva);
+      try {
+        for (const part of librePartes) {
+          // For received orders the goods are already in stock; pending orders start at 0
+          const stockInicial = orden?.estado === 'recibida' ? part.cantidad : 0;
+          const nueva = await db.insertRefaccion(taller.id, {
+            nombre: part.nombre,
+            codigo: '',
+            categoria: '',
+            unidad: 'pza',
+            precioCompra: part.precioCompra,
+            stock: stockInicial,
+            stockMinimo: 1,
+          });
+          if (nueva) {
+            partesFinal = partesFinal.map(p =>
+              p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p
+            );
+            nuevasRefs.push(nueva);
+          }
         }
+      } catch (err) {
+        console.error('[editarOrden] No se pudo crear refaccion libre:', err);
+        setErrorBanner('No se pudo registrar una pieza nueva. Verifica tu conexion e intenta de nuevo.');
+        return;
       }
       if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
     }
@@ -499,13 +505,18 @@ export default function TallerMecanico() {
         }
       }
       if (invUpdates.length > 0) {
-        await Promise.all(
-          invUpdates.map(u => db.updateRefaccionDetalles(u.id, { nombre: u.nombre, precioCompra: u.precioCompra }))
-        );
-        setInventario(prev => prev.map(r => {
-          const upd = invUpdates.find(u => u.id === r.id);
-          return upd ? { ...r, nombre: upd.nombre, precioCompra: upd.precioCompra } : r;
-        }));
+        try {
+          await Promise.all(
+            invUpdates.map(u => db.updateRefaccionDetalles(u.id, { nombre: u.nombre, precioCompra: u.precioCompra }))
+          );
+          setInventario(prev => prev.map(r => {
+            const upd = invUpdates.find(u => u.id === r.id);
+            return upd ? { ...r, nombre: upd.nombre, precioCompra: upd.precioCompra } : r;
+          }));
+        } catch (err) {
+          console.error('[editarOrden] No se pudo sincronizar inventario:', err);
+          // Non-critical: order saved, inventory names may be stale
+        }
       }
     }
   };
