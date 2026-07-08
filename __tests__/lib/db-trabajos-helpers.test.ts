@@ -30,8 +30,8 @@ beforeEach(() => { vi.clearAllMocks(); });
 
 describe('updateTrabajoPagos', () => {
   const samplePagos: Pago[] = [
-    { fecha: '2026-07-01', monto: 500, metodo: 'efectivo', notas: null },
-    { fecha: '2026-07-05', monto: 300, metodo: 'transferencia', notas: 'pendiente' },
+    { id: 'p1', fecha: '2026-07-01', monto: 500 },
+    { id: 'p2', fecha: '2026-07-05', monto: 300, nota: 'abono parcial' },
   ];
 
   it('resolves without throwing on success', async () => {
@@ -72,8 +72,8 @@ describe('updateTrabajoPagos', () => {
 
 describe('updateTrabajoManoDeObraItems', () => {
   const sampleItems: ManoDeObraItem[] = [
-    { descripcion: 'Cambio de aceite', precio: 200 },
-    { descripcion: 'Alineacion', precio: 350 },
+    { id: 'mdo-1', concepto: 'Cambio de aceite', precio: 200 },
+    { id: 'mdo-2', concepto: 'Alineacion', precio: 350 },
   ];
 
   it('resolves without throwing on success', async () => {
@@ -121,7 +121,7 @@ describe('updateTrabajoManoDeObraItems', () => {
 
   it('handles single item correctly', async () => {
     const { update } = mockUpdateEqChain(null);
-    const single: ManoDeObraItem[] = [{ descripcion: 'Diagnostico', precio: 150 }];
+    const single: ManoDeObraItem[] = [{ id: 'mdo-x', concepto: 'Diagnostico', precio: 150 }];
     await updateTrabajoManoDeObraItems('trabajo-1', single);
     const arg = update.mock.calls[0][0];
     expect(arg.mano_de_obra).toBe(150);
@@ -198,8 +198,7 @@ describe('resetFacturacionTrabajo', () => {
     expect(eq).toHaveBeenCalledWith('id', 'trabajo-reset');
   });
 
-  it('is the inverse of updateTrabajoFactura (restores pre-facturacion state)', async () => {
-    // Reset is always: factura_id = null, estado = sin_facturar — no matter what was set before
+  it('is the inverse of updateTrabajoFactura (always sets null + sin_facturar regardless of prior state)', async () => {
     const { update } = mockUpdateEqChain(null);
     await resetFacturacionTrabajo('any-trabajo');
     const arg = update.mock.calls[0][0];
@@ -211,10 +210,11 @@ describe('resetFacturacionTrabajo', () => {
 // updateVehiculo
 
 describe('updateVehiculo', () => {
+  // anio is a string in the Vehiculo type (e.g., "2020")
   const vehicleData = {
     marca: 'Toyota',
     modelo: 'Hilux',
-    anio: 2020,
+    anio: '2020',
     placa: 'ABC-123',
   };
 
@@ -240,7 +240,7 @@ describe('updateVehiculo', () => {
     expect(update).toHaveBeenCalledWith({
       marca: 'Toyota',
       modelo: 'Hilux',
-      anio: 2020,
+      anio: '2020',
       placa: 'ABC-123',
     });
   });
@@ -257,11 +257,9 @@ describe('updateVehiculo', () => {
     expect(eq).toHaveBeenCalledWith('id', 'vehiculo-diferente');
   });
 
-  it('handles numeric anio correctly (not a string)', async () => {
+  it('handles different vehicle makes without issue', async () => {
     const { update } = mockUpdateEqChain(null);
-    await updateVehiculo('vehiculo-1', { ...vehicleData, anio: 1998 });
-    const arg = update.mock.calls[0][0];
-    expect(typeof arg.anio).toBe('number');
-    expect(arg.anio).toBe(1998);
+    await updateVehiculo('vehiculo-1', { marca: 'Ford', modelo: 'F-150', anio: '2018', placa: 'XYZ-999' });
+    expect(update).toHaveBeenCalledWith({ marca: 'Ford', modelo: 'F-150', anio: '2018', placa: 'XYZ-999' });
   });
 });
