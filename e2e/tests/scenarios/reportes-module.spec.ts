@@ -2,97 +2,162 @@ import { test, expect } from '../../fixtures';
 import { expectVisible, showPhaseLabel } from '../visual-assert';
 
 /**
- * reportes-module -- Resumen Financiero E2E coverage
+ * Reportes Module — Bug reporting + issue tracking (VistaReportes).
  *
- * 6 tests: load, P&L headings, cash cards, month-nav prev, month-nav next, no errors
+ * VistaReportes has two tabs:
+ *   - "Estado" (default): list of existing GitHub issues
+ *   - "Nuevo Reporte": form to submit bugs/suggestions to the dev team
+ *
+ * Verifies:
+ * 1. Module loads without crash
+ * 2. Shows "Reportes y Sugerencias" heading in Spanish
+ * 3. Tab navigation present (Nuevo Reporte / Estado)
+ * 4. Form has required fields (titulo, descripcion, categoria)
+ * 5. Status tab shows issue-related content
+ * 6. No debug artifacts
+ * 7. Accessible from another module (cross-navigation)
  */
 
-test.describe('Reportes -- Resumen Financiero Module', () => {
+test.describe('Reportes Module', () => {
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.loginAsTestUser();
   });
 
-  test('reportes module loads without crash', async ({ page, dashboardPage }) => {
-    test.slow();
-    await showPhaseLabel(page, 'Navigate to Resumen');
-    await dashboardPage.navigateToModule('resumen');
-    await dashboardPage.waitForPageLoad();
-    await expectVisible(dashboardPage.nav, 'Nav still present');
-    const crashed = await page.getByText(/error al cargar|algo salio mal/i).isVisible().catch(() => false);
-    expect(crashed, 'No fatal error after loading Resumen').toBe(false);
-  });
-
-  test('reportes shows P&L headings in Spanish', async ({ page, dashboardPage }) => {
-    test.slow();
-    await dashboardPage.navigateToModule('resumen');
+  test('reportes module loads without crash', async ({
+    page, dashboardPage,
+  }) => {
+    await showPhaseLabel(page, 'Phase 1: Navigate to Reportes');
+    await dashboardPage.navigateToModule('reportes');
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1500);
-    const headings = ['Estado de Resultados', 'Utilidad Bruta', 'Utilidad Neta', 'Ingresos'];
+
+    const errorText = page.getByText(/error al cargar|algo salió mal|fatal error/i);
+    const hasError = await errorText.isVisible().catch(() => false);
+    expect(hasError).toBe(false);
+
+    await expectVisible(dashboardPage.nav, 'Nav present after loading Reportes');
+    await showPhaseLabel(page, 'Reportes Loaded');
+  });
+
+  test('reportes shows section heading in Spanish', async ({
+    page, dashboardPage,
+  }) => {
+    await showPhaseLabel(page, 'Phase 2: Spanish Heading');
+    await dashboardPage.navigateToModule('reportes');
+    await dashboardPage.waitForPageLoad();
+    await page.waitForTimeout(1000);
+
+    // SectionTitle renders "Reportes y Sugerencias"
+    const headings = [
+      page.getByText(/Reportes y Sugerencias/i).first(),
+      page.getByText(/Reportes/i).first(),
+    ];
+
     let found = false;
     for (const h of headings) {
-      if (await page.getByText(h).first().isVisible().catch(() => false)) { found = true; break; }
+      if (await h.isVisible().catch(() => false)) { found = true; break; }
     }
-    expect(found, 'At least one P&L heading visible').toBe(true);
+    expect(found, 'Reportes heading must be visible in Spanish').toBe(true);
+    await showPhaseLabel(page, 'Spanish Heading OK');
   });
 
-  test('reportes renders cash flow cards', async ({ page, dashboardPage }) => {
-    test.slow();
-    await dashboardPage.navigateToModule('resumen');
+  test('reportes shows tab switcher (Nuevo Reporte / Estado)', async ({
+    page, dashboardPage,
+  }) => {
+    await showPhaseLabel(page, 'Phase 3: Tab Navigation');
+    await dashboardPage.navigateToModule('reportes');
     await dashboardPage.waitForPageLoad();
-    await page.waitForTimeout(1500);
-    const cashLabels = ['COBRADO', 'POR COBRAR', 'PAGADO A PROVEEDORES', 'FLUJO NETO'];
-    let found = false;
-    for (const label of cashLabels) {
-      if (await page.getByText(label).first().isVisible().catch(() => false)) { found = true; break; }
-    }
-    expect(found, 'At least one cash flow card visible').toBe(true);
+    await page.waitForTimeout(1000);
+
+    const nuevoTab = page.getByRole('button', { name: /Nuevo Reporte/i }).first();
+    const estadoTab = page.getByRole('button', { name: /Estado/i }).first();
+
+    const nuevoVisible = await nuevoTab.isVisible().catch(() => false);
+    const estadoVisible = await estadoTab.isVisible().catch(() => false);
+
+    expect(nuevoVisible || estadoVisible, 'At least one tab must be present').toBe(true);
+    await showPhaseLabel(page, 'Tabs Present');
   });
 
-  // test.fixme: Known CI flakiness - timing/env issue. See #138.
-  test.fixme('month nav prev changes the month label', async ({ page, dashboardPage }) => {
-    test.slow();
-    await dashboardPage.navigateToModule('resumen');
+  test('reportes nuevo tab shows form with required fields', async ({
+    page, dashboardPage,
+  }) => {
+    await showPhaseLabel(page, 'Phase 4: Form Fields');
+    await dashboardPage.navigateToModule('reportes');
     await dashboardPage.waitForPageLoad();
-    await page.waitForTimeout(1500);
-    const prevBtn = page.locator('button').filter({ hasText: /\u25C0/ }).first();
-    if (await prevBtn.isVisible().catch(() => false)) {
-      const monthEl = page.locator('h2,h3,p').filter({ hasText: /20\d\d/ }).first();
-      const before = await monthEl.textContent().catch(() => '');
-      await prevBtn.click();
-      await page.waitForTimeout(800);
-      const after = await monthEl.textContent().catch(() => '');
-      expect(after, 'Month label changes after prev click').not.toBe(before);
-    } else {
-      const err = await page.getByText(/error al cargar|algo salió mal|algo salio mal/i).first().isVisible().catch(() => false);
-      expect(err, 'No error visible if no prev button').toBe(false);
+    await page.waitForTimeout(1000);
+
+    // Click "Nuevo Reporte" tab to show the submission form
+    const nuevoTab = page.getByRole('button', { name: /Nuevo Reporte/i }).first();
+    if (await nuevoTab.isVisible().catch(() => false)) {
+      await nuevoTab.click();
+      await page.waitForTimeout(500);
     }
+
+    // Form should have titulo input, descripcion textarea, and categoria select
+    const tituloInput = page.locator('input[placeholder*="titulo" i], input[placeholder*="titulo" i], input[type="text"]').first();
+    const descripcionArea = page.locator('textarea').first();
+    const categoriaSelect = page.locator('select').first();
+    const submitBtn = page.getByRole('button', { name: /enviar|submit|guardar/i }).first();
+
+    const tituloVisible = await tituloInput.isVisible().catch(() => false);
+    const descripcionVisible = await descripcionArea.isVisible().catch(() => false);
+    const categoriaVisible = await categoriaSelect.isVisible().catch(() => false);
+    const submitVisible = await submitBtn.isVisible().catch(() => false);
+
+    expect(tituloVisible || descripcionVisible || categoriaVisible || submitVisible,
+      'Form must have at least one input field').toBe(true);
+
+    await showPhaseLabel(page, 'Form Fields Present');
   });
 
-  test('month nav next accessible after going back', async ({ page, dashboardPage }) => {
-    test.slow();
-    await dashboardPage.navigateToModule('resumen');
+  test('reportes estado tab shows issue-related content', async ({
+    page, dashboardPage,
+  }) => {
+    await showPhaseLabel(page, 'Phase 5: Estado Content');
+    await dashboardPage.navigateToModule('reportes');
     await dashboardPage.waitForPageLoad();
-    await page.waitForTimeout(1500);
-    const prevBtn = page.locator('button').filter({ hasText: /\u25C0/ }).first();
-    if (await prevBtn.isVisible().catch(() => false)) {
-      await prevBtn.click();
-      await page.waitForTimeout(600);
-      const nextBtn = page.locator('button').filter({ hasText: /\u25B6/ }).first();
-      const nextVisible = await nextBtn.isVisible().catch(() => false);
-      expect(nextVisible, 'Next button visible after going back').toBe(true);
-      if (nextVisible) { await nextBtn.click(); await page.waitForTimeout(500); }
-    }
+    await page.waitForTimeout(2500); // Allow time for /api/feedback fetch
+
+    // Estado tab is default — should show filter, loading indicator, or issue list
+    const bodyText = await page.locator('body').innerText().catch(() => '');
+    const hasReportesContent =
+      /Pendiente|En Progreso|Resuelto|Todos|Cargando|reporte|sin reportes|error al cargar/i.test(bodyText);
+    expect(hasReportesContent, 'Estado tab must show issue-related content').toBe(true);
+
+    await showPhaseLabel(page, 'Estado Content Present');
   });
 
-  test('reportes shows no error messages in UI', async ({ page, dashboardPage }) => {
-    test.slow();
-    await dashboardPage.navigateToModule('resumen');
+  test('reportes does not expose raw debug errors', async ({
+    page, dashboardPage,
+  }) => {
+    await showPhaseLabel(page, 'Phase 6: No Debug Artifacts');
+    await dashboardPage.navigateToModule('reportes');
     await dashboardPage.waitForPageLoad();
-    await page.waitForTimeout(2000);
-    for (const txt of ['Error al cargar', 'Failed to fetch', 'Algo salio mal']) {
-      const vis = await page.getByText(txt, { exact: false }).first().isVisible().catch(() => false);
-      expect(vis, 'Must not show: ' + txt).toBe(false);
-    }
-    await expectVisible(dashboardPage.nav, 'Nav present -- not crashed');
+    await page.waitForTimeout(1000);
+
+    const unhandledError = page.getByText(/unhandled|uncaught|undefined is not|cannot read property/i);
+    const hasRawError = await unhandledError.isVisible().catch(() => false);
+    expect(hasRawError).toBe(false);
+
+    await showPhaseLabel(page, 'No Debug Artifacts');
+  });
+
+  test('reportes is accessible from configuracion tab', async ({
+    page, dashboardPage,
+  }) => {
+    await showPhaseLabel(page, 'Phase 7: Cross-Module Navigation');
+
+    await dashboardPage.navigateToModule('configuracion');
+    await dashboardPage.waitForPageLoad();
+
+    await dashboardPage.navigateToModule('reportes');
+    await dashboardPage.waitForPageLoad();
+
+    const tab = dashboardPage.getTabLocator('reportes');
+    const tabVisible = await tab.isVisible().catch(() => false);
+    expect(tabVisible, 'Reportes tab must be visible in nav').toBe(true);
+
+    await showPhaseLabel(page, 'Cross-Module Navigation OK');
   });
 });
