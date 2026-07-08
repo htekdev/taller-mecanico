@@ -41,7 +41,7 @@ test.describe('Date Handling', () => {
   test('date input accepts today and future dates', async ({
     page, dashboardPage, gastosPage
   }) => {
-    test.slow(); // navigateToModule('gastos') may hang on Supabase cold-start
+    test.slow(); // navigateToModule may hang on Supabase cold-start
     await showPhaseLabel(page, '📅 Date Input');
     await dashboardPage.navigateToModule('gastos');
     await gastosPage.waitForPageLoad();

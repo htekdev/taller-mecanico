@@ -44,6 +44,7 @@ test.describe('Facturas Module', () => {
   test('facturas shows Spanish section title', async ({
     page, dashboardPage,
   }) => {
+    test.slow(); // navigateToModule(facturas) can retry 3.5min on Supabase cold-start
     await showPhaseLabel(page, '🏷️ Phase 1: Check Spanish Labels');
     await dashboardPage.navigateToModule('facturas');
     await dashboardPage.waitForPageLoad();

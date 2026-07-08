@@ -84,6 +84,7 @@ test.describe('Sofia Regression Tests', () => {
   test('REGRESSION: supplier visible when adding parts', async ({
     page, dashboardPage, inventarioPage
   }) => {
+    test.slow(); // navigateToModule(inventario) can retry 3.5min on Supabase cold-start
     await showPhaseLabel(page, '🏪 REGRESSION: Supplier Visible');
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
@@ -205,7 +206,7 @@ test.describe('Sofia Regression Tests', () => {
   test('REGRESSION: conditional columns render correctly', async ({
     page, dashboardPage, sidebar
   }) => {
-    test.slow(); // sidebar.clickTab action timeout (30s) too short for Supabase cold-start
+    test.setTimeout(600_000); // 10 min: 3 module navigations x up to 4 min each for Supabase cold-start
     // Navigate through modules with conditional rendering — verify no crash
     const modules = ['Trabajos', 'Órdenes de Compra', 'Por Cobrar'] as const;
 
