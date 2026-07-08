@@ -15,14 +15,14 @@ export class Sidebar {
   /** Click a nav tab by its label text. */
   async clickTab(label: string) {
     const btn = this.nav.getByRole('button', { name: label });
-    // Wait up to 120s for the nav button — cold-start Supabase can delay nav rendering.
+    // Wait up to 180s for the nav button — cold-start Supabase can delay nav rendering 3+ min.
     // The catch swallows the timeout so force:true click below can still proceed.
-    await btn.waitFor({ state: 'visible', timeout: 120_000 }).catch(() => {});
+    await btn.waitFor({ state: 'visible', timeout: 180_000 }).catch(() => {});
     // Wait for loading overlay to clear before clicking
     const loadingOverlay = this.page.locator('text=Cargando datos del taller');
     await loadingOverlay.waitFor({ state: 'hidden', timeout: 90_000 }).catch(() => {});
-    // force:true bypasses overlay/actionability -- the nav is always interactable
-    await btn.click({ force: true });
+    // force:true bypasses overlay/actionability; 60s timeout handles element-not-yet-in-DOM case
+    await btn.click({ force: true, timeout: 60_000 });
     await this.page.waitForTimeout(500);
   }
 
