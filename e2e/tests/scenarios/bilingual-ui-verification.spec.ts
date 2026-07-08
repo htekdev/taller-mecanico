@@ -115,6 +115,7 @@ test.describe('Bilingual UI Verification — All Modules Spanish', () => {
 
   for (const module of MODULES) {
     test(`${module.label} shows Spanish content`, async ({ page, dashboardPage }) => {
+      test.slow(); // each module navigateToModule can hit Supabase cold-start
       await showPhaseLabel(page, `🇲🇽 ${module.label}`);
       await dashboardPage.navigateToModule(module.key as any);
       await dashboardPage.waitForPageLoad();
