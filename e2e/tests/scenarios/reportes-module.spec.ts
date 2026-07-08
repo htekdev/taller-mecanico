@@ -70,7 +70,7 @@ test.describe('Reportes Module', () => {
     await page.waitForTimeout(1000);
 
     const nuevoTab = page.getByRole('button', { name: /Nuevo Reporte/i }).first();
-    const estadoTab = page.getByRole('button', { name: /Estado/i }).first();
+    const estadoTab = page.getByRole('button', { name: /Ver Reportes/i }).first();
 
     const nuevoVisible = await nuevoTab.isVisible().catch(() => false);
     const estadoVisible = await estadoTab.isVisible().catch(() => false);
