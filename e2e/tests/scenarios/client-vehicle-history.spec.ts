@@ -24,6 +24,7 @@ test.describe('Client Vehicle History', () => {
   test('create client and manage multiple vehicles', async ({
     page, dashboardPage, sidebar
   }) => {
+    test.slow(); // multi-step test with navigateToModule — vulnerable to Supabase cold-start timeout
     const runId = TestData.uniqueId();
     const clientName = `Cliente Multi-Vehículo ${runId}`;
 
