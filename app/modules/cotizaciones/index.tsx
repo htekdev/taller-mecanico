@@ -796,19 +796,23 @@ function ModalReconciliacion({ cotizacion, inventario, proveedores, onAgregarRef
 
   const handleAgregarInventario = async (data: AgregarRefaccionInput) => {
     if (!addingItem) return;
-    const nueva = await onAgregarRefaccion(data);
-    if (nueva) {
-      setResolvedMap(prev => ({
-        ...prev,
-        [addingItem.id]: {
-          refaccionId: nueva.id, nombre: nueva.nombre, codigo: nueva.codigo,
-          precioCompra: nueva.precioCompra,
-          precioVenta: parseNum(addingItem.precioUnitario),
-          cantidad: parseNum(addingItem.cantidad),
-        },
-      }));
+    try {
+      const nueva = await onAgregarRefaccion(data);
+      if (nueva) {
+        setResolvedMap(prev => ({
+          ...prev,
+          [addingItem.id]: {
+            refaccionId: nueva.id, nombre: nueva.nombre, codigo: nueva.codigo,
+            precioCompra: nueva.precioCompra,
+            precioVenta: parseNum(addingItem.precioUnitario),
+            cantidad: parseNum(addingItem.cantidad),
+          },
+        }));
+      }
+      setAddingItem(null);
+    } catch {
+      setErrorMsg('No se pudo agregar la refacción al inventario. Verifica tu conexión e intenta de nuevo.');
     }
-    setAddingItem(null);
   };
 
   const handleCrearTrabajo = async (sinRefacciones = false) => {
