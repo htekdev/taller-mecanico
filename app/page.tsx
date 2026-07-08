@@ -261,35 +261,40 @@ export default function TallerMecanico() {
   };
 
   const editarTrabajo = async (trabajoId: string, data: Omit<Trabajo, 'id' | 'total' | 'iva'>) => {
-    const subtotal = data.manoDeObra + data.refacciones;
-    const iva = data.requiereFactura ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
-    const total = subtotal + iva;
-    const existing = trabajos.find(t => t.id === trabajoId);
-    if (!existing) return;
-    const updated = { ...existing, ...data, iva, total };
-    // updateTrabajo now throws on DB error — propagates to handleSubmit's catch block
-    await db.updateTrabajo(trabajoId, updated);
-    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, ...updated } : t));
-
-    // If this job has a linked invoice, sync it with the updated costs
-    if (existing.facturaId) {
-      const conceptos: FacturaConcepto[] = [
-        ...data.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
-        ...data.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
-      ];
-      const facturaSubtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
-      const facturaIva = data.requiereFactura ? Math.round(facturaSubtotal * 0.16 * 100) / 100 : 0;
-      const facturaTotal = facturaSubtotal + facturaIva;
-      await db.updateFacturaConceptos(existing.facturaId, {
-        conceptos,
-        subtotal: facturaSubtotal,
-        iva: facturaIva > 0 ? facturaIva : undefined,
-        total: facturaTotal,
-      });
-      setFacturas(prev => prev.map(f => f.id === existing.facturaId
-        ? { ...f, conceptos, subtotal: facturaSubtotal, iva: facturaIva > 0 ? facturaIva : undefined, total: facturaTotal }
-        : f,
-      ));
+    try {
+      const subtotal = data.manoDeObra + data.refacciones;
+      const iva = data.requiereFactura ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+      const total = subtotal + iva;
+      const existing = trabajos.find(t => t.id === trabajoId);
+      if (!existing) return;
+      const updated = { ...existing, ...data, iva, total };
+      // updateTrabajo throws on DB error
+      await db.updateTrabajo(trabajoId, updated);
+      setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, ...updated } : t));
+  
+      // If this job has a linked invoice, sync it with the updated costs
+      if (existing.facturaId) {
+        const conceptos: FacturaConcepto[] = [
+          ...data.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
+          ...data.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
+        ];
+        const facturaSubtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
+        const facturaIva = data.requiereFactura ? Math.round(facturaSubtotal * 0.16 * 100) / 100 : 0;
+        const facturaTotal = facturaSubtotal + facturaIva;
+        await db.updateFacturaConceptos(existing.facturaId, {
+          conceptos,
+          subtotal: facturaSubtotal,
+          iva: facturaIva > 0 ? facturaIva : undefined,
+          total: facturaTotal,
+        });
+        setFacturas(prev => prev.map(f => f.id === existing.facturaId
+          ? { ...f, conceptos, subtotal: facturaSubtotal, iva: facturaIva > 0 ? facturaIva : undefined, total: facturaTotal }
+          : f,
+        ));
+      }
+    } catch (err) {
+      console.error('[editarTrabajo] FAILED:', err);
+      setErrorBanner('No se pudo actualizar el trabajo. Verifica tu conexión e intenta de nuevo.');
     }
   };
   const registrarPago = async (trabajoId: string, pago: Omit<Pago, 'id'>) => {
@@ -558,10 +563,15 @@ export default function TallerMecanico() {
   };
 
   const refacturarTrabajo = async (trabajoId: string) => {
-    await db.resetFacturacionTrabajo(trabajoId);
-    setTrabajos(prev => prev.map(t =>
-      t.id === trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
-    ));
+    try {
+      await db.resetFacturacionTrabajo(trabajoId);
+      setTrabajos(prev => prev.map(t =>
+        t.id === trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
+      ));
+    } catch (err) {
+      console.error('[refacturarTrabajo] FAILED:', err);
+      setErrorBanner('No se pudo resetear la facturación. Verifica tu conexión e intenta de nuevo.');
+    }
   };
 
   const cancelarTrabajo = async (trabajoId: string) => {
