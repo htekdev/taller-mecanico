@@ -34,6 +34,9 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
 
     await expectVisible(dashboardPage.nav, 'Nav visible after ordenes load');
 
+    // Tailwind error banner — stable Taller Mecánico pattern; data-testid tracked in Issue #138
+
+
     const errorBanner = page
       .locator('.bg-rose-50:has-text("Error"), .text-red-600:has-text("Error")')
       .first();
@@ -96,6 +99,9 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
     await page.waitForTimeout(1000);
 
     await expectVisible(dashboardPage.nav, 'Nav visible after facturas load');
+
+    // Tailwind error banner — stable Taller Mecánico pattern; data-testid tracked in Issue #138
+
 
     const errorBanner = page
       .locator('.bg-rose-50:has-text("Error"), .text-red-600:has-text("Error")')
