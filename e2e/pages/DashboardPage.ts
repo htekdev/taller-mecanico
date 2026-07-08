@@ -11,7 +11,7 @@ import { BasePage } from './BasePage';
 export type ModuleKey =
   | 'clientes' | 'inventario' | 'trabajos' | 'proveedores'
   | 'ordenes' | 'facturas' | 'cuentas' | 'pagos'
-  | 'resumen' | 'gastos' | 'historial' | 'cotizaciones' | 'configuracion';
+  | 'resumen' | 'gastos' | 'historial' | 'cotizaciones' | 'configuracion' | 'reportes';
 
 export const MODULE_LABELS: Record<ModuleKey, string> = {
   clientes: 'Clientes',
@@ -27,6 +27,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   historial: 'Historial',
   cotizaciones: 'Cotizaciones',
   configuracion: 'Configuración',
+  reportes: 'Reportes',
 };
 
 export class DashboardPage extends BasePage {
