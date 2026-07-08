@@ -16,12 +16,13 @@ import type {
 // ── Clientes ──────────────────────────────────────────────────
 
 export async function getClientes(tallerId: string): Promise<Cliente[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('clientes')
     .select('*')
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
+  if (error) throw new Error('[getClientes] ' + error.message);
   return (data ?? []).map(r => ({
     id: r.id,
     nombre: r.nombre,
@@ -80,12 +81,13 @@ export async function updateCliente(clienteId: string, data: Omit<Cliente, 'id'>
 // ── Vehículos ────────────────────────────────────────────────
 
 export async function getVehiculos(tallerId: string): Promise<Vehiculo[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('vehiculos')
     .select('*')
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
+  if (error) throw new Error('[getVehiculos] ' + error.message);
   return (data ?? []).map(r => ({
     id: r.id, clienteId: r.cliente_id ?? '',
     marca: r.marca, modelo: r.modelo, anio: r.anio, placa: r.placa,
@@ -194,12 +196,13 @@ export async function deleteRefaccion(tallerId: string, id: string): Promise<voi
 // ── Proveedores ───────────────────────────────────────────────
 
 export async function getProveedores(tallerId: string): Promise<Proveedor[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('proveedores')
     .select('*')
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
+  if (error) throw new Error('[getProveedores] ' + error.message);
   return (data ?? []).map(r => ({
     id: r.id, nombre: r.nombre, telefono: r.telefono,
     contacto: r.contacto ?? undefined, notas: r.notas ?? undefined,
@@ -223,12 +226,13 @@ export async function insertProveedor(tallerId: string, data: Omit<Proveedor, 'i
 // ── Trabajos ──────────────────────────────────────────────────
 
 export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('trabajos')
     .select('*')
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
+  if (error) throw new Error('[getTrabajos] ' + error.message);
   return (data ?? []).map(r => ({
     id: r.id,
     clienteId: r.cliente_id ?? '',
@@ -566,12 +570,13 @@ export async function updateTrabajoTft(trabajoId: string, tftNumero: string): Pr
 // ── Órdenes de Compra ─────────────────────────────────────────
 
 export async function getOrdenes(tallerId: string): Promise<OrdenCompra[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('ordenes_compra')
     .select('*')
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
+  if (error) throw new Error('[getOrdenes] ' + error.message);
   return (data ?? []).map(r => {
     const conIVA = r.con_iva ?? false;
     const subtotalSinIVA = r.subtotal_sin_iva != null ? Number(r.subtotal_sin_iva) : Number(r.total) / (conIVA ? 1.16 : 1);
@@ -707,12 +712,13 @@ export async function updateOrden(
 // ── Facturas ──────────────────────────────────────────────────
 
 export async function getFacturas(tallerId: string): Promise<Factura[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('facturas')
     .select('*')
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
+  if (error) throw new Error('[getFacturas] ' + error.message);
   return (data ?? []).map(r => ({
     id: r.id,
     numeroFactura: r.numero_factura ?? '',
@@ -860,12 +866,13 @@ export interface TallerMember {
 }
 
 export async function getMembers(tallerId: string): Promise<TallerMember[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('taller_members')
     .select('*')
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
+  if (error) throw new Error('[getMembers] ' + error.message);
   return (data ?? []).map(r => ({
     id: r.id,
     tallerId: r.taller_id,
@@ -907,13 +914,14 @@ export interface TallerInvite {
 }
 
 export async function getInvites(tallerId: string): Promise<TallerInvite[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('taller_invites')
     .select('*')
     .eq('taller_id', tallerId)
     .is('used_at', null)
     .order('created_at', { ascending: false });
 
+  if (error) throw new Error('[getInvites] ' + error.message);
   return (data ?? []).map(r => ({
     id: r.id,
     tallerId: r.taller_id,
@@ -1061,11 +1069,12 @@ function rowToGasto(r: Record<string, unknown>): Gasto {
 }
 
 export async function getGastos(tallerId: string): Promise<Gasto[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('gastos')
     .select('*')
     .eq('taller_id', tallerId)
     .order('fecha', { ascending: false });
+  if (error) throw new Error('[getGastos] ' + error.message);
   return (data ?? []).map(rowToGasto);
 }
 
@@ -1153,12 +1162,13 @@ function mapCotizacion(r: Record<string, unknown>): CotizacionRow {
 }
 
 export async function getCotizaciones(tallerId: string): Promise<CotizacionRow[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('cotizaciones')
     .select('*')
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: false });
 
+  if (error) throw new Error('[getCotizaciones] ' + error.message);
   return (data ?? []).map(r => mapCotizacion(r as Record<string, unknown>));
 }
 
@@ -1240,3 +1250,4 @@ export async function nextCotizacionNumber(tallerId: string): Promise<string> {
 
   return `COT-${String(next).padStart(3, '0')}`;
 }
+
