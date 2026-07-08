@@ -1143,6 +1143,7 @@ export function VistaCotizaciones({
   const [plantilla, setPlantilla]   = useState<Plantilla>('general');
   const [history, setHistory]       = useState<CotizacionGuardada[]>([]);
   const [loading, setLoading]       = useState(true);
+  const [initError, setInitError]   = useState<string | null>(null);
   // When editing an existing entry, track its id so we reuse its number
   const [editingId, setEditingId]       = useState<string | null>(null);
   const [viewEntry, setViewEntry]       = useState<CotizacionGuardada | null>(null);
@@ -1230,6 +1231,7 @@ export function VistaCotizaciones({
         await recargarHistory();
       } catch (err) {
         console.error('[cotizaciones] init error:', err);
+        setInitError('No se pudieron cargar las cotizaciones. Verifica tu conexión e intenta de nuevo.');
       } finally {
         setLoading(false);
       }
@@ -1413,7 +1415,15 @@ export function VistaCotizaciones({
             </button>
           ))}
         </div>
-        {loading ? (
+        {initError ? (
+          <div className="mt-8 text-center text-red-400 py-10">
+            <div className="text-2xl mb-2">⚠️</div>
+            <p className="text-sm">{initError}</p>
+            <button onClick={() => { setInitError(null); recargarHistory(); }} className="mt-3 text-xs text-slate-400 underline">
+              Reintentar
+            </button>
+          </div>
+        ) : loading ? (
           <div className="mt-8 text-center text-slate-400 py-10">
             <div className="text-2xl mb-2">⏳</div>
             <p className="text-sm">Cargando cotizaciones...</p>
