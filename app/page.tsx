@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import type {
@@ -130,9 +130,16 @@ export default function TallerMecanico() {
   /** Adds a refaccion + optional PO from cotización reconciliation */
   const agregarRefaccionDesdeCotizacion = async (input: import('@/app/modules/cotizaciones').AgregarRefaccionInput): Promise<Refaccion | null> => {
     if (!taller) return null;
-    const nueva = await db.insertRefaccion(taller.id, input.refaccion);
+    let nueva: Refaccion | null = null;
+    try {
+      nueva = await db.insertRefaccion(taller.id, input.refaccion);
+    } catch (err) {
+      console.error('[agregarRefaccionDesdeCotizacion] insertRefaccion failed:', err);
+      setErrorBanner('No se pudo agregar la refacción al inventario. Verifica tu conexión e intenta de nuevo.');
+      return null;
+    }
     if (!nueva) return null;
-    setInventario(prev => [...prev, nueva]);
+    setInventario(prev => [...prev, nueva!]);
     // Create a "received" purchase order if any PO data provided
     if (input.ordenCompra) {
       const hoy = getHoy();
