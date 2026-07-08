@@ -49,6 +49,7 @@ test.describe('Inventory Management', () => {
   test('proveedor visible when adding parts', async ({
     page, dashboardPage, inventarioPage
   }) => {
+    test.slow(); // navigateToModule(inventario) can retry 3.5min on Supabase cold-start
     await showPhaseLabel(page, '🏪 Proveedor Visible Check');
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
