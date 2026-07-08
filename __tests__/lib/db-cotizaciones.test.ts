@@ -157,7 +157,7 @@ describe('insertCotizacion', () => {
   it('defaults cancelada/editada/convertida to false when not provided', async () => {
     const { insert } = mockInsertChain(rawCotizacion);
     const minPayload = { ...payload, cancelada: undefined, editada: undefined, convertida: undefined };
-    await insertCotizacion('taller-1', minPayload as Parameters<typeof insertCotizacion>[1]);
+    await insertCotizacion('taller-1', minPayload as unknown as Parameters<typeof insertCotizacion>[1]);
     const insertedData = insert.mock.calls[0][0];
     expect(insertedData.cancelada).toBe(false);
     expect(insertedData.editada).toBe(false);
