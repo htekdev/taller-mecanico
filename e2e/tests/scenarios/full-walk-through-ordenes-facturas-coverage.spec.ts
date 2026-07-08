@@ -25,6 +25,9 @@ test('full-walk-through-ordenes-facturas-coverage', async ({ page, loginPage, da
 
   await expect(page.locator('nav')).toBeVisible();
 
+  // Tailwind error banner — stable Taller Mecánico pattern; data-testid tracked in Issue #138
+
+
   const ordenesError = page
     .locator('.bg-rose-50:has-text("Error"), .text-red-600:has-text("Error")')
     .first();
@@ -60,6 +63,9 @@ test('full-walk-through-ordenes-facturas-coverage', async ({ page, loginPage, da
   await page.waitForTimeout(1500);
 
   await expect(page.locator('nav')).toBeVisible();
+
+  // Tailwind error banner — stable Taller Mecánico pattern; data-testid tracked in Issue #138
+
 
   const facturasError = page
     .locator('.bg-rose-50:has-text("Error"), .text-red-600:has-text("Error")')
