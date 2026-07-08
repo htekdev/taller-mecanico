@@ -109,6 +109,7 @@ test.describe('change-proof-ordenes-facturas-silent-failures', () => {
   test('facturas monetary values contain no NaN or undefined', async ({
     page, dashboardPage,
   }) => {
+    test.slow(); // navigateToModule('facturas') vulnerable to Supabase cold-start
     await showPhaseLabel(page, '💰 Verificando valores en Facturas');
     await dashboardPage.navigateToModule('facturas');
     await dashboardPage.waitForPageLoad();
