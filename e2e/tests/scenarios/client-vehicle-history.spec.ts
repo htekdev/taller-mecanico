@@ -24,6 +24,7 @@ test.describe('Client Vehicle History', () => {
   test('create client and manage multiple vehicles', async ({
     page, dashboardPage, sidebar
   }) => {
+    test.setTimeout(600_000); // 10 min: multi-step with clientes navigation vulnerable to 3+ min cold-starts
     const runId = TestData.uniqueId();
     const clientName = `Cliente Multi-Vehículo ${runId}`;
 

@@ -21,9 +21,10 @@ test.describe('Inventory Management', () => {
     await loginPage.loginAsTestUser();
   });
 
-  test('add new part with full details', async ({
+  test('add new part with full details', { retries: 1 }, async ({
     page, dashboardPage, inventarioPage
   }) => {
+    test.slow(); // inventario module navigation + Supabase write timing
     await showPhaseLabel(page, '📦 Phase 1: Navigate to Inventario');
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
@@ -39,6 +40,8 @@ test.describe('Inventory Management', () => {
       stock: partData.stock,
       stockMinimo: partData.stockMinimo,
     });
+    // Wait for Supabase INSERT to commit and UI to reflect the new part
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
 
     // ─── Phase 3: Verify part added ─────────────────────────────────────────
     await showPhaseLabel(page, '✅ Phase 3: Verify Part Added');

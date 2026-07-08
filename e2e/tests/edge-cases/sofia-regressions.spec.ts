@@ -205,6 +205,7 @@ test.describe('Sofia Regression Tests', () => {
   test('REGRESSION: conditional columns render correctly', async ({
     page, dashboardPage, sidebar
   }) => {
+    test.slow(); // sidebar.clickTab action timeout (30s) too short for Supabase cold-start
     // Navigate through modules with conditional rendering — verify no crash
     const modules = ['Trabajos', 'Órdenes de Compra', 'Por Cobrar'] as const;
 
