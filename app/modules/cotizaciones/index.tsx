@@ -1168,8 +1168,12 @@ export function VistaCotizaciones({
 
   const recargarHistory = useCallback(async () => {
     if (!tallerId) return;
-    const rows = await db.getCotizaciones(tallerId);
-    setHistory(rows.map(rowToEntry));
+    try {
+      const rows = await db.getCotizaciones(tallerId);
+      setHistory(rows.map(rowToEntry));
+    } catch (err) {
+      console.error('[cotizaciones] recargarHistory error:', err);
+    }
   }, [tallerId]);
 
   useEffect(() => {
@@ -1177,48 +1181,54 @@ export function VistaCotizaciones({
 
     (async () => {
       setLoading(true);
-
-      // One-time migration: if localStorage has cotizaciones not yet migrated,
-      // push them to Supabase so existing data isn't lost.
-      const migratedKey = LS_MIGRATED_KEY(tallerId);
-      if (!migrationDone.current && typeof window !== 'undefined' && !localStorage.getItem(migratedKey)) {
-        migrationDone.current = true;
-        const legacy = readLegacyHistory();
-        if (legacy.length > 0) {
-          // Migrate each legacy cotización to Supabase (ignore errors — best effort)
-          for (const entry of legacy) {
-            await db.insertCotizacion(tallerId, {
-              numeroCotizacion: entry.numeroCotizacion,
-              plantilla:        entry.plantilla as CotizacionRow['plantilla'],
-              cliente:          entry.cliente,
-              fecha:            entry.fecha || null,
-              total:            entry.total,
-              cancelada:        entry.cancelada ?? false,
-              editada:          entry.editada ?? false,
-              convertida:       entry.convertida ?? false,
-              form:             entry.form as unknown as Record<string, unknown>,
-            });
+      try {
+        // One-time migration: if localStorage has cotizaciones not yet migrated,
+        // push them to Supabase so existing data isn't lost.
+        const migratedKey = LS_MIGRATED_KEY(tallerId);
+        if (!migrationDone.current && typeof window !== 'undefined' && !localStorage.getItem(migratedKey)) {
+          migrationDone.current = true;
+          const legacy = readLegacyHistory();
+          if (legacy.length > 0) {
+            // Migrate each legacy cotización to Supabase (best effort — ignore individual errors)
+            for (const entry of legacy) {
+              try {
+                await db.insertCotizacion(tallerId, {
+                  numeroCotizacion: entry.numeroCotizacion,
+                  plantilla:        entry.plantilla as CotizacionRow['plantilla'],
+                  cliente:          entry.cliente,
+                  fecha:            entry.fecha || null,
+                  total:            entry.total,
+                  cancelada:        entry.cancelada ?? false,
+                  editada:          entry.editada ?? false,
+                  convertida:       entry.convertida ?? false,
+                  form:             entry.form as unknown as Record<string, unknown>,
+                });
+              } catch { /* best effort migration — skip failed entries */ }
+            }
+            // Update the counter to match the highest legacy number
+            const maxNum = legacy.reduce((m, e) => {
+              const n = parseInt(e.numeroCotizacion.replace('COT-', ''), 10);
+              return isNaN(n) ? m : Math.max(m, n);
+            }, 0);
+            if (maxNum > 0) {
+              await supabaseUpsertCounter(tallerId, maxNum);
+            }
+            // Mark migration done
+            localStorage.setItem(migratedKey, '1');
+            // Clear legacy keys so they don't take up space
+            localStorage.removeItem(LS_COT_HISTORY_KEY);
+            localStorage.removeItem(LS_COT_COUNTER_KEY);
+          } else {
+            localStorage.setItem(migratedKey, '1');
           }
-          // Update the counter to match the highest legacy number
-          const maxNum = legacy.reduce((m, e) => {
-            const n = parseInt(e.numeroCotizacion.replace('COT-', ''), 10);
-            return isNaN(n) ? m : Math.max(m, n);
-          }, 0);
-          if (maxNum > 0) {
-            await supabaseUpsertCounter(tallerId, maxNum);
-          }
-          // Mark migration done
-          localStorage.setItem(migratedKey, '1');
-          // Clear legacy keys so they don't take up space
-          localStorage.removeItem(LS_COT_HISTORY_KEY);
-          localStorage.removeItem(LS_COT_COUNTER_KEY);
-        } else {
-          localStorage.setItem(migratedKey, '1');
         }
-      }
 
-      await recargarHistory();
-      setLoading(false);
+        await recargarHistory();
+      } catch (err) {
+        console.error('[cotizaciones] init error:', err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [tallerId, recargarHistory]);
 
@@ -1319,9 +1329,14 @@ export function VistaCotizaciones({
 
   // ── Cancel a quote (soft) ─────────────────────────────────────────────────
   const handleCancelar = async (id: string) => {
-    await db.updateCotizacion(id, { cancelada: true });
-    await recargarHistory();
-    if (viewEntry?.id === id) setViewEntry(v => v ? { ...v, cancelada: true } : v);
+    try {
+      await db.updateCotizacion(id, { cancelada: true });
+      await recargarHistory();
+      if (viewEntry?.id === id) setViewEntry(v => v ? { ...v, cancelada: true } : v);
+    } catch (err) {
+      setErrorGuardar('⚠️ No se pudo cancelar la cotización. Verifica tu conexión e intenta de nuevo.');
+      console.error('[cotizaciones] handleCancelar error:', err);
+    }
   };
 
   // ── Conversion handlers ──────────────────────────────────────────────────
@@ -1345,9 +1360,14 @@ export function VistaCotizaciones({
       pendienteRefacciones,
       refaccionesPendientesNombres,
     });
-    // Mark cotización as convertida in Supabase
-    await db.updateCotizacion(cot.id, { convertida: true });
-    await recargarHistory();
+    // Mark cotización as convertida in Supabase (best effort — trabajo already created)
+    try {
+      await db.updateCotizacion(cot.id, { convertida: true });
+      await recargarHistory();
+    } catch (err) {
+      console.error('[cotizaciones] markConvertida error:', err);
+      await recargarHistory().catch(() => {}); // Still reload even if mark fails
+    }
   };
 
   // ── Open saved entry for viewing ──────────────────────────────────────────

@@ -33,13 +33,19 @@ export function VistaConfiguracion() {
   const cargar = useCallback(async () => {
     if (!taller) return;
     setCargando(true);
-    const [m, i] = await Promise.all([
-      db.getMembers(taller.id),
-      db.getInvites(taller.id),
-    ]);
-    setMembers(m);
-    setInvites(i);
-    setCargando(false);
+    try {
+      const [m, i] = await Promise.all([
+        db.getMembers(taller.id),
+        db.getInvites(taller.id),
+      ]);
+      setMembers(m);
+      setInvites(i);
+    } catch (err) {
+      setMensaje({ tipo: 'error', texto: '⚠️ No se pudieron cargar los datos. Verifica tu conexión e intenta de nuevo.' });
+      console.error('[configuracion] cargar error:', err);
+    } finally {
+      setCargando(false);
+    }
   }, [taller]);
 
   useEffect(() => { cargar(); }, [cargar]);
@@ -55,28 +61,41 @@ export function VistaConfiguracion() {
 
     const trimmedEmail = email.trim().toLowerCase();
 
-    const result = await db.sendInvite(taller.id, trimmedEmail, user.id);
+    try {
+      const result = await db.sendInvite(taller.id, trimmedEmail, user.id);
 
-    if (result === null) {
+      if (result === null) {
+        setMensaje({
+          tipo: 'error',
+          texto: `⚠️ Ya existe una invitación pendiente para ${trimmedEmail}.`,
+        });
+      } else {
+        setMensaje({
+          tipo: 'ok',
+          texto: `✅ Invitación creada para ${result.email}. Cuando esa persona inicie sesión, verá este taller automáticamente.`,
+        });
+        setEmail('');
+        await cargar();
+      }
+    } catch (err) {
       setMensaje({
         tipo: 'error',
-        texto: `⚠️ Ya existe una invitación pendiente para ${trimmedEmail}.`,
+        texto: '⚠️ No se pudo enviar la invitación. Verifica tu conexión e intenta de nuevo.',
       });
-    } else {
-      setMensaje({
-        tipo: 'ok',
-        texto: `✅ Invitación creada para ${result.email}. Cuando esa persona inicie sesión, verá este taller automáticamente.`,
-      });
-      setEmail('');
-      await cargar();
+      console.error('[configuracion] sendInvite error:', err);
+    } finally {
+      setEnviando(false);
     }
-
-    setEnviando(false);
   };
 
   const handleCancelarInvite = async (inviteId: string) => {
-    await db.cancelInvite(inviteId);
-    setInvites(prev => prev.filter(i => i.id !== inviteId));
+    try {
+      await db.cancelInvite(inviteId);
+      setInvites(prev => prev.filter(i => i.id !== inviteId));
+    } catch (err) {
+      setMensaje({ tipo: 'error', texto: '⚠️ No se pudo cancelar la invitación. Verifica tu conexión e intenta de nuevo.' });
+      console.error('[configuracion] cancelInvite error:', err);
+    }
   };
 
   // ── Role editing ──
