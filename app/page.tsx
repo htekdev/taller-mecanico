@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import type {
@@ -52,19 +52,25 @@ export default function TallerMecanico() {
   const cargarDatos = useCallback(async () => {
     if (!taller) return;
     setCargando(true);
-    const [c, v, r, t, p, o, f, g] = await Promise.all([
-      db.getClientes(taller.id),
-      db.getVehiculos(taller.id),
-      db.getRefacciones(taller.id),
-      db.getTrabajos(taller.id),
-      db.getProveedores(taller.id),
-      db.getOrdenes(taller.id),
-      db.getFacturas(taller.id),
-      db.getGastos(taller.id),
-    ]);
-    setClientes(c); setVehiculos(v); setInventario(r); setTrabajos(t);
-    setProveedores(p); setOrdenes(o); setFacturas(f); setGastos(g);
-    setCargando(false);
+    try {
+      const [c, v, r, t, p, o, f, g] = await Promise.all([
+        db.getClientes(taller.id),
+        db.getVehiculos(taller.id),
+        db.getRefacciones(taller.id),
+        db.getTrabajos(taller.id),
+        db.getProveedores(taller.id),
+        db.getOrdenes(taller.id),
+        db.getFacturas(taller.id),
+        db.getGastos(taller.id),
+      ]);
+      setClientes(c); setVehiculos(v); setInventario(r); setTrabajos(t);
+      setProveedores(p); setOrdenes(o); setFacturas(f); setGastos(g);
+    } catch (err) {
+      console.error('[cargarDatos] FAILED:', err);
+      setErrorBanner('Error al cargar datos. Verifica tu conexión e intenta de nuevo.');
+    } finally {
+      setCargando(false);
+    }
   }, [taller]);
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
@@ -372,7 +378,8 @@ export default function TallerMecanico() {
   const crearOrden = async (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => {
     if (!taller) return;
     const nueva = await db.insertOrden(taller.id, { ...data, numeroOrden: data.numeroOrden || generarNumeroOrden(ordenes) });
-    if (nueva) setOrdenes(prev => [...prev, nueva]);
+    if (!nueva) throw new Error('No se pudo crear la orden de compra');
+    setOrdenes(prev => [...prev, nueva]);
   };
   const recibirOrden = async (ordenId: string) => {
     if (!taller) return;
@@ -528,7 +535,7 @@ export default function TallerMecanico() {
       fecha: fechaFactura,
       conceptos, subtotal, iva: iva > 0 ? iva : undefined, total, pagos: [],
     });
-    if (!nuevaFactura) return;
+    if (!nuevaFactura) throw new Error('No se pudo crear la factura');
     setFacturas(prev => [...prev, nuevaFactura]);
     await db.updateTrabajoFactura(trabajoId, nuevaFactura.id);
     setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 'facturado' as const } : t));
