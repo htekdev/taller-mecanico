@@ -18,7 +18,7 @@ const rawCotizacion = {
   id: 'cot-1',
   taller_id: 'taller-1',
   numero_cotizacion: 'COT-001',
-  plantilla: 'estandar',
+  plantilla: 'general',
   cliente: 'Juan Garcia',
   fecha: '2026-07-01',
   total: 1500.0,
@@ -81,7 +81,7 @@ describe('getCotizaciones', () => {
     expect(result[0].editada).toBe(true);
   });
 
-  it('parses total as float from string', async () => {
+  it('parses total as float from string value', async () => {
     const row = { ...rawCotizacion, total: '2500.50' };
     mockSelectChain([row]);
     const result = await getCotizaciones('taller-1');
@@ -96,7 +96,7 @@ describe('getCotizaciones', () => {
     expect(result[1].numeroCotizacion).toBe('COT-002');
   });
 
-  it('uses savedAt from saved_at column, falls back to created_at', async () => {
+  it('uses saved_at column, falls back to created_at when saved_at is null', async () => {
     const row = { ...rawCotizacion, saved_at: null, created_at: '2026-07-01T08:00:00Z' };
     mockSelectChain([row]);
     const result = await getCotizaciones('taller-1');
@@ -118,14 +118,14 @@ describe('insertCotizacion', () => {
 
   const payload = {
     numeroCotizacion: 'COT-001',
-    plantilla: 'estandar' as const,
+    plantilla: 'general' as const,
     cliente: 'Pedro Ramirez',
     fecha: '2026-07-07',
     total: 3200,
     cancelada: false,
     editada: false,
     convertida: false,
-    form: { items: [] as never[] },
+    form: {} as Record<string, unknown>,
   };
 
   it('returns mapped CotizacionRow on success', async () => {
@@ -154,18 +154,17 @@ describe('insertCotizacion', () => {
     expect(mockFrom).toHaveBeenCalledWith('cotizaciones');
   });
 
-  it('defaults cancelada/editada/convertida to false when undefined', async () => {
+  it('defaults cancelada/editada/convertida to false when not provided', async () => {
     const { insert } = mockInsertChain(rawCotizacion);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const minPayload = { ...payload, cancelada: undefined as any, editada: undefined as any, convertida: undefined as any };
-    await insertCotizacion('taller-1', minPayload);
+    const minPayload = { ...payload, cancelada: undefined, editada: undefined, convertida: undefined };
+    await insertCotizacion('taller-1', minPayload as Parameters<typeof insertCotizacion>[1]);
     const insertedData = insert.mock.calls[0][0];
     expect(insertedData.cancelada).toBe(false);
     expect(insertedData.editada).toBe(false);
     expect(insertedData.convertida).toBe(false);
   });
 
-  it('maps camelCase payload to snake_case DB columns', async () => {
+  it('maps camelCase payload fields to snake_case DB columns', async () => {
     const { insert } = mockInsertChain(rawCotizacion);
     await insertCotizacion('taller-1', payload);
     const insertedData = insert.mock.calls[0][0];
