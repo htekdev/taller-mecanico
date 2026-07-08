@@ -99,9 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // only place invite redemption is guaranteed to run on every login.
       if (user.email) {
         const redeemed = await redeemInvite(user.email, user.id);
-        if (redeemed) {
-          console.log('[Auth] Invite redeemed — new taller:', redeemed);
-        }
+
 
         // Backfill email on membership rows created before migration 002.
         // This ensures the current user's email displays correctly in Configuración.
