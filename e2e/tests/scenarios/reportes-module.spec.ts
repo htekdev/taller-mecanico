@@ -19,6 +19,7 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
  */
 
 test.describe('Reportes Module', () => {
+  test.use({ retries: 1 }); // Retry once — Supabase unresponsive can cause 3.5min navigation hang
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.loginAsTestUser();
   });
