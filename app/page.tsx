@@ -81,7 +81,7 @@ export default function TallerMecanico() {
     if (!taller) return;
     try {
       const nuevo = await db.insertCliente(taller.id, data);
-      if (!nuevo) throw new Error('[guardarCliente] insertCliente returned null');
+      if (!nuevo) throw new Error('No se pudo guardar el cliente');
       setClientes(prev => [...prev, nuevo]);
     } catch (err) {
       console.error('[guardarCliente] FAILED:', err);
@@ -91,7 +91,7 @@ export default function TallerMecanico() {
   const actualizarCliente = async (id: string, data: Omit<Cliente, 'id'>) => {
     try {
       const actualizado = await db.updateCliente(id, data);
-      if (!actualizado) throw new Error('[actualizarCliente] updateCliente returned null');
+      if (!actualizado) throw new Error('No se pudo actualizar el cliente');
       setClientes(prev => prev.map(c => c.id === id ? actualizado : c));
     } catch (err) {
       console.error('[actualizarCliente] FAILED:', err);
