@@ -67,9 +67,10 @@ test.describe('Auth Session Flows', () => {
     await showPhaseLabel(page, '✅ Session Stable Across Modules');
   });
 
-  test('authenticated user identity visible in sidebar', async ({
+  test('authenticated user identity visible in sidebar', { retries: 1 }, async ({
     page, loginPage, dashboardPage,
   }) => {
+    test.slow(); // Supabase cold-start in CI can cause waitForPageLoad() to take 2+ min
     await showPhaseLabel(page, '👤 Phase 1: Login and Verify Identity');
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
