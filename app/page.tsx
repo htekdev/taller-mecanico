@@ -176,30 +176,35 @@ export default function TallerMecanico() {
     }
     if (!nueva) return null;
     setInventario(prev => [...prev, nueva!]);
-    // Create a "received" purchase order if any PO data provided
+    // Create a "received" purchase order if any PO data provided (best-effort — non-fatal)
     if (input.ordenCompra) {
-      const hoy = getHoy();
-      const piezasSubtotal = nueva.precioCompra * input.ordenCompra.cantidad;
-      const orden = await db.insertOrden(taller.id, {
-        proveedorId:  input.ordenCompra.proveedorId || '',
-        fecha:        hoy,
-        numeroOrden:  input.ordenCompra.numeroOrden,
-        descripcion:  input.ordenCompra.descripcion || `Alta desde cotización — ${input.refaccion.nombre}`,
-        partes: [{
-          refaccionId:  nueva.id,
-          nombre:       nueva.nombre,
-          cantidad:     input.ordenCompra.cantidad,
-          precioCompra: nueva.precioCompra,
-          subtotal:     piezasSubtotal,
-        }],
-        subtotalSinIVA: piezasSubtotal,
-        ivaAmount: 0,
-        total: piezasSubtotal,
-        conIVA: false,
-      });
-      if (orden) {
-        await db.updateOrdenEstado(orden.id, 'recibida', hoy);
-        setOrdenes(prev => [...prev, { ...orden, estado: 'recibida', fechaRecibida: hoy }]);
+      try {
+        const hoy = getHoy();
+        const piezasSubtotal = nueva.precioCompra * input.ordenCompra.cantidad;
+        const orden = await db.insertOrden(taller.id, {
+          proveedorId:  input.ordenCompra.proveedorId || '',
+          fecha:        hoy,
+          numeroOrden:  input.ordenCompra.numeroOrden,
+          descripcion:  input.ordenCompra.descripcion || `Alta desde cotización — ${input.refaccion.nombre}`,
+          partes: [{
+            refaccionId:  nueva.id,
+            nombre:       nueva.nombre,
+            cantidad:     input.ordenCompra.cantidad,
+            precioCompra: nueva.precioCompra,
+            subtotal:     piezasSubtotal,
+          }],
+          subtotalSinIVA: piezasSubtotal,
+          ivaAmount: 0,
+          total: piezasSubtotal,
+          conIVA: false,
+        });
+        if (orden) {
+          await db.updateOrdenEstado(orden.id, 'recibida', hoy);
+          setOrdenes(prev => [...prev, { ...orden, estado: 'recibida', fechaRecibida: hoy }]);
+        }
+      } catch (err) {
+        // Non-critical: refaccion was inserted successfully — PO creation is best-effort
+        console.error('[agregarRefaccionDesdeCotizacion] PO creation failed:', err);
       }
     }
     return nueva;
