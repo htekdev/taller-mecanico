@@ -139,6 +139,15 @@ export default function TallerMecanico() {
       setErrorBanner('No se pudo eliminar la refacción. Verifica tu conexión e intenta de nuevo.');
     }
   };
+  const actualizarProveedorRefaccion = async (id: string, proveedorId: string) => {
+    try {
+      await db.updateRefaccionProveedor(id, proveedorId || null);
+      setInventario(prev => prev.map(r => r.id === id ? { ...r, proveedorId: proveedorId || undefined } : r));
+    } catch (err) {
+      console.error('[actualizarProveedorRefaccion] FAILED:', err);
+      setErrorBanner('No se pudo actualizar el proveedor. Verifica tu conexión e intenta de nuevo.');
+    }
+  };
   const recibirStock = async (refaccionId: string, cantidad: number) => {
     const ref = inventario.find(r => r.id === refaccionId);
     if (!ref) return;
@@ -456,9 +465,11 @@ export default function TallerMecanico() {
         const nuevasRefs: Refaccion[] = [];
         try {
           for (const part of librePartes) {
+            // BUG FIX: pass proveedorId from the PO so new inventory items keep the supplier
             const nueva = await db.insertRefaccion(taller.id, {
               nombre: part.nombre, codigo: '', categoria: '', unidad: 'pza',
               precioCompra: part.precioCompra, stock: 0, stockMinimo: 1,
+              proveedorId: orden.proveedorId || undefined,
             });
             if (nueva) {
               partesFinal = partesFinal.map(p => p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p);
@@ -485,7 +496,25 @@ export default function TallerMecanico() {
           return item ? { ...r, stock: r.stock + item.cantidad } : r;
         });
         await db.updateRefacciones(nuevoInv.filter(r => partesFinal.some(p => p.refaccionId === r.id)));
-        setInventario(nuevoInv);
+        // BUG FIX: backfill proveedorId on existing inventory items that came from this PO
+        if (orden.proveedorId) {
+          const itemsToBackfill = partesFinal.filter(p => {
+            const inv = inventario.find(r => r.id === p.refaccionId);
+            return inv && !inv.proveedorId;
+          });
+          await Promise.all(itemsToBackfill.map(p =>
+            db.updateRefaccionProveedor(p.refaccionId, orden.proveedorId!).catch(e =>
+              console.error('[recibirOrden] backfill proveedor FAILED for', p.refaccionId, e)
+            )
+          ));
+          const nuevoInvConProv = nuevoInv.map(r => {
+            const needsBackfill = itemsToBackfill.some(p => p.refaccionId === r.id);
+            return needsBackfill ? { ...r, proveedorId: orden.proveedorId } : r;
+          });
+          setInventario(nuevoInvConProv);
+        } else {
+          setInventario(nuevoInv);
+        }
       }
     } catch (err) {
       console.error('[recibirOrden] FAILED:', err);
@@ -1033,6 +1062,7 @@ export default function TallerMecanico() {
               onGuardarRefaccion={guardarRefaccion} onRecibirStock={recibirStock}
               onActualizarCompatibilidad={actualizarCompatibilidad}
               onEliminarRefaccion={eliminarRefaccion}
+              onActualizarProveedor={actualizarProveedorRefaccion}
               onGuardarProveedor={guardarProveedor} />
           )}
           {vista === 'trabajos' && (
@@ -1196,3 +1226,5 @@ export default function TallerMecanico() {
     </div>
   );
 }
+
+

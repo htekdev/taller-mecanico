@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo } from '@/app/types';
@@ -14,6 +14,7 @@ export function VistaInventario({
   onRecibirStock,
   onActualizarCompatibilidad,
   onEliminarRefaccion,
+  onActualizarProveedor,
   onGuardarProveedor,
 }: {
   inventario: Refaccion[];
@@ -24,6 +25,7 @@ export function VistaInventario({
   onRecibirStock: (id: string, cantidad: number) => void;
   onActualizarCompatibilidad: (id: string, compatibilidad: CompatibilidadVehiculo[]) => void;
   onEliminarRefaccion: (id: string) => Promise<void>;
+  onActualizarProveedor: (id: string, proveedorId: string) => Promise<void>;
   onGuardarProveedor: (data: Omit<Proveedor, 'id'>) => Promise<void>;
 }) {
   const [form, setForm] = useState({
@@ -35,6 +37,7 @@ export function VistaInventario({
   const [modeloInputs, setModeloInputs] = useState<Record<number, string>>({});
   const [expandido, setExpandido] = useState<string | null>(null);
   const [recibirCantidad, setRecibirCantidad] = useState<Record<string, number>>({});
+  const [filtroTexto, setFiltroTexto] = useState('');
   const [filtroProveedor, setFiltroProveedor] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [guardandoForm, setGuardandoForm] = useState(false);
@@ -51,6 +54,12 @@ export function VistaInventario({
   const [nuevoProveedorTel, setNuevoProveedorTel]       = useState('');
   const [guardandoProveedor, setGuardandoProveedor]     = useState(false);
   const [errorProveedor, setErrorProveedor]             = useState<string | null>(null);
+
+  // ── Estado para editar proveedor de refacción existente ──
+  const [editandoProveedor, setEditandoProveedor]       = useState<string | null>(null);
+  const [proveedorEditValue, setProveedorEditValue]     = useState('');
+  const [guardandoProveedorEdit, setGuardandoProveedorEdit] = useState(false);
+  const [errorProveedorEdit, setErrorProveedorEdit]     = useState<string | null>(null);
 
   // ── Estado para edición de compatibilidad de piezas existentes ──
   // Modelo plano: cada entrada es un par (marca, modelo)
@@ -222,9 +231,37 @@ export function VistaInventario({
     .filter(r => {
       if (filtroProveedor && r.proveedorId !== filtroProveedor) return false;
       if (filtroCategoria && r.categoria !== filtroCategoria) return false;
+      if (filtroTexto) {
+        const q = filtroTexto.toLowerCase();
+        const matchNombre = r.nombre.toLowerCase().includes(q);
+        const matchCodigo = r.codigo?.toLowerCase().includes(q) ?? false;
+        const matchProveedor = proveedorNombre(r.proveedorId)?.toLowerCase().includes(q) ?? false;
+        if (!matchNombre && !matchCodigo && !matchProveedor) return false;
+      }
       return true;
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+  const abrirEditProveedor = (r: Refaccion) => {
+    setProveedorEditValue(r.proveedorId ?? '');
+    setErrorProveedorEdit(null);
+    setEditandoProveedor(r.id);
+    setExpandido(null);
+    setEditandoCompat(null);
+  };
+
+  const guardarProveedorEdit = async (id: string) => {
+    setGuardandoProveedorEdit(true);
+    setErrorProveedorEdit(null);
+    try {
+      await onActualizarProveedor(id, proveedorEditValue);
+      setEditandoProveedor(null);
+    } catch {
+      setErrorProveedorEdit('No se pudo guardar. Intenta de nuevo.');
+    } finally {
+      setGuardandoProveedorEdit(false);
+    }
+  };
 
   return (
     <div>
@@ -442,28 +479,49 @@ export function VistaInventario({
         </div>
       ) : (
         <div>
-          <div className="flex gap-3 mb-4 flex-wrap">
-            <div className="min-w-40">
-              <Select value={filtroProveedor} onChange={e => setFiltroProveedor(e.target.value)}>
-                <option value="">Todos los proveedores</option>
-                {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-              </Select>
+          {/* ── Búsqueda y filtros ── */}
+          <div className="mb-4 space-y-2">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">🔍</span>
+              <input
+                type="text"
+                placeholder="Buscar por nombre, código o proveedor..."
+                value={filtroTexto}
+                onChange={e => setFiltroTexto(e.target.value)}
+                className="w-full pl-9 pr-9 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+              />
+              {filtroTexto && (
+                <button
+                  type="button"
+                  onClick={() => setFiltroTexto('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-lg leading-none p-2"
+                  aria-label="Limpiar búsqueda"
+                >✕</button>
+              )}
             </div>
-            <div className="min-w-40">
-              <Select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
-                <option value="">Todas las categorías</option>
-                {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-              </Select>
+            <div className="flex gap-3 flex-wrap">
+              <div className="min-w-40">
+                <Select value={filtroProveedor} onChange={e => setFiltroProveedor(e.target.value)}>
+                  <option value="">Todos los proveedores</option>
+                  {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                </Select>
+              </div>
+              <div className="min-w-40">
+                <Select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
+                  <option value="">Todas las categorías</option>
+                  {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                </Select>
+              </div>
+              {(filtroProveedor || filtroCategoria || filtroTexto) && (
+                <button
+                  type="button"
+                  onClick={() => { setFiltroProveedor(''); setFiltroCategoria(''); setFiltroTexto(''); }}
+                  className="text-xs text-slate-500 hover:text-rose-600 font-medium py-1.5 px-3"
+                >
+                  ✕ Limpiar filtros
+                </button>
+              )}
             </div>
-            {(filtroProveedor || filtroCategoria) && (
-              <button
-                type="button"
-                onClick={() => { setFiltroProveedor(''); setFiltroCategoria(''); }}
-                className="text-xs text-slate-500 hover:text-rose-600 font-medium"
-              >
-                ✕ Limpiar filtros
-              </button>
-            )}
           </div>
           {(() => {
           return (
@@ -527,6 +585,32 @@ export function VistaInventario({
                           ) : (
                             <span className="text-xs text-slate-400 italic">Sin proveedor</span>
                           )}
+                          {/* Inline proveedor editor */}
+                          {editandoProveedor === r.id && (
+                            <div className="mt-2 space-y-1">
+                              <Select
+                                value={proveedorEditValue}
+                                onChange={e => setProveedorEditValue(e.target.value)}
+                                className="text-xs"
+                              >
+                                <option value="">Sin proveedor</option>
+                                {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                              </Select>
+                              <div className="flex gap-1 mt-1">
+                                <Btn size="sm" variant="primary" disabled={guardandoProveedorEdit}
+                                  onClick={() => guardarProveedorEdit(r.id)}>
+                                  {guardandoProveedorEdit ? '⏳' : '✓ Guardar'}
+                                </Btn>
+                                <Btn size="sm" variant="ghost"
+                                  onClick={() => { setEditandoProveedor(null); setErrorProveedorEdit(null); }}>
+                                  Cancelar
+                                </Btn>
+                              </div>
+                              {errorProveedorEdit && (
+                                <p className="text-xs text-rose-600">⚠️ {errorProveedorEdit}</p>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right text-slate-700">${fmt(r.precioCompra)} / {r.unidad}</td>
                         <td className="px-4 py-3 text-right">
@@ -535,12 +619,17 @@ export function VistaInventario({
                         <td className="px-4 py-3 text-center">
                             <div className="flex flex-col gap-1 items-center">
                               <Btn size="sm" variant={isExp ? 'ghost' : 'success'}
-                                onClick={() => { setExpandido(isExp ? null : r.id); setEditandoCompat(null); }}>
+                                onClick={() => { setExpandido(isExp ? null : r.id); setEditandoCompat(null); setEditandoProveedor(null); }}>
                                 {isExp ? '✕ Cerrar' : '+ Existencias'}
                               </Btn>
                               <Btn size="sm" variant={isEditCompat ? 'ghost' : 'primary'}
                                 onClick={() => isEditCompat ? setEditandoCompat(null) : abrirEditCompat(r)}>
                                 {isEditCompat ? '✕ Cerrar' : '🚗 Compatibilidad'}
+                              </Btn>
+                              <Btn size="sm" variant={editandoProveedor === r.id ? 'ghost' : 'primary'}
+                                onClick={() => editandoProveedor === r.id ? setEditandoProveedor(null) : abrirEditProveedor(r)}
+                                className="border border-slate-300">
+                                {editandoProveedor === r.id ? '✕ Cerrar' : '🏪 Proveedor'}
                               </Btn>
                               {confirmandoEliminar === r.id ? (
                                 <div className="flex flex-col gap-1 mt-0.5 items-center">
