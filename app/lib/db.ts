@@ -122,7 +122,7 @@ export async function getRefacciones(tallerId: string): Promise<Refaccion[]> {
     .eq('taller_id', tallerId)
     .order('created_at', { ascending: true });
 
-  if (error) console.error('[getRefacciones] Supabase error:', error.message, error.code);
+  if (error) throw new Error('[getRefacciones] ' + error.message);
   return (data ?? []).map(r => ({
     id: r.id, nombre: r.nombre, codigo: r.codigo, categoria: r.categoria,
     unidad: r.unidad, precioCompra: r.precio_compra,
