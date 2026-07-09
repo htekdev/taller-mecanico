@@ -1403,6 +1403,9 @@ export function VistaCotizaciones({
     return (
       <div>
         <SectionTitle title="Cotizaciones" subtitle="Crea y guarda cotizaciones para tus clientes"/>
+        {errorGuardar && (
+          <div className="mb-3 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded px-3 py-2">❌ {errorGuardar}</div>
+        )}
         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Nueva Cotización</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {PLANTILLAS.map(p => (
@@ -1652,4 +1655,6 @@ export function VistaCotizaciones({
     />
   );
 }
+
+
 
