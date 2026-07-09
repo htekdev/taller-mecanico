@@ -467,7 +467,7 @@ export default function TallerMecanico() {
           for (const part of librePartes) {
             // BUG FIX: pass proveedorId from the PO so new inventory items keep the supplier
             const nueva = await db.insertRefaccion(taller.id, {
-              nombre: part.nombre, codigo: '', categoria: '', unidad: 'pza',
+              nombre: part.nombre, codigo: '', categoria: part.categoria ?? '', unidad: 'pza',
               precioCompra: part.precioCompra, stock: 0, stockMinimo: 1,
               proveedorId: orden.proveedorId || undefined,
             });
@@ -551,7 +551,7 @@ export default function TallerMecanico() {
         const nueva = await db.insertRefaccion(taller.id, {
           nombre: part.nombre,
           codigo: '',
-          categoria: '',
+          categoria: part.categoria ?? '',
           unidad: 'pza',
           precioCompra: part.precioCompra,
           stock: stockInicial,
