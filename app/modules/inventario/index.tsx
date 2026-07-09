@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo } from '@/app/types';
@@ -134,6 +134,7 @@ export function VistaInventario({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nombre || form.precioCompra <= 0) return;
+    if (form.categoria === '__custom__' && !formCategoriaCustom.trim()) return;
     const compatFinal = compatibilidad.filter(c => c.marca.trim());
     // Resolve custom category
     const categoriaFinal = form.categoria === '__custom__' ? formCategoriaCustom.trim() : form.categoria;
@@ -267,6 +268,7 @@ export function VistaInventario({
               {form.categoria === '__custom__' && (
                 <Input
                   type="text"
+                  aria-label="Nombre de categoría personalizada"
                   placeholder="Ej. Dirección hidráulica"
                   value={formCategoriaCustom}
                   onChange={e => setFormCategoriaCustom(e.target.value)}
