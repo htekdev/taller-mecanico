@@ -1646,13 +1646,18 @@ export function VistaCotizaciones({
   // Pantalla: PREVIEW
   // ══════════════════════════════════════════════════════════════════════════
   return (
-    <VistaPreviaContenido
-      plantilla={viewEntry?.plantilla ?? plantilla}
-      form={form}
-      entry={viewEntry}
-      onEditar={handleEditar}
-      onNueva={() => setPantalla('inicio')}
-    />
+    <>
+      {errorGuardar && (
+        <div className="mb-3 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded px-3 py-2">❌ {errorGuardar}</div>
+      )}
+      <VistaPreviaContenido
+        plantilla={viewEntry?.plantilla ?? plantilla}
+        form={form}
+        entry={viewEntry}
+        onEditar={handleEditar}
+        onNueva={() => setPantalla('inicio')}
+      />
+    </>
   );
 }
 
