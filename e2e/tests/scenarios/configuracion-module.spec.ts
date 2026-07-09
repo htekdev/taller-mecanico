@@ -12,6 +12,7 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
  */
 
 test.describe('Configuración', () => {
+  test.describe.configure({ retries: 1 });
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.loginAsTestUser();
   });
@@ -19,6 +20,7 @@ test.describe('Configuración', () => {
   test('configuracion module loads without crash', async ({
     page, dashboardPage,
   }) => {
+    test.slow(); // Supabase cold-start: navigateToModule can take 3+ min
     await showPhaseLabel(page, '⚙️ Phase 1: Navigate to Configuración');
     await dashboardPage.navigateToModule('configuracion');
     await dashboardPage.waitForPageLoad();
