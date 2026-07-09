@@ -1773,7 +1773,7 @@ export function VistaTrabajo({
                                     </Btn>
                                   </div>
                                   {errorTft && (
-                                    <p className="text-xs text-rose-600">{errorTft}</p>
+                                    <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">⚠️ {errorTft}</p>
                                   )}
                                 </div>
                               ) : (
