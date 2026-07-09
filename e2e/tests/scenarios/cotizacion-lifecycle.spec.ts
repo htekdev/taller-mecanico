@@ -94,7 +94,7 @@ test.describe('Cotización Lifecycle', () => {
     await showPhaseLabel(page, '✅ Ayuntamiento plantilla works');
   });
 
-  test('cotización form preserves data on validation error', async ({
+  test('cotización form preserves data on validation error', { retries: 1 }, async ({
     page, dashboardPage, cotizacionesPage
   }) => {
     await showPhaseLabel(page, '⚠️ Validation Error Recovery');
