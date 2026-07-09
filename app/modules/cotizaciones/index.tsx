@@ -1297,7 +1297,7 @@ export function VistaCotizaciones({
         form:     savedForm as unknown as Record<string, unknown>,
         savedAt:  new Date().toISOString(),
       });
-      await recargarHistory();
+      await recargarHistory().catch(() => {}); // save committed — reload failure is non-critical
       const updated = history.find(e => e.id === editingId);
       const entry: CotizacionGuardada = updated
         ? { ...updated, cliente: clienteNombre, fecha: form.fecha, total, form: savedForm, editada: true }
@@ -1319,7 +1319,7 @@ export function VistaCotizaciones({
         convertida:       false,
         form:             savedForm as unknown as Record<string, unknown>,
       });
-      await recargarHistory();
+      await recargarHistory().catch(() => {}); // save committed — reload failure is non-critical
       if (!row) throw new Error('No se pudo guardar la cotización');
       const entry: CotizacionGuardada = rowToEntry(row);
       setForm(savedForm);
