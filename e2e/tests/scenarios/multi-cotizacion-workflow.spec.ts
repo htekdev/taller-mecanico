@@ -20,10 +20,10 @@ test.describe('Multi-Cotización Workflow', () => {
     await loginPage.loginAsTestUser();
   });
 
-  // test.fixme: Known CI flakiness - timing/env issue. See #138 for proper fix.
-  test.fixme('create multiple cotizaciones and verify list management', async ({
+  test('create multiple cotizaciones and verify list management', { retries: 1 }, async ({
     page, dashboardPage, cotizacionesPage, sidebar
   }) => {
+    test.slow();
     const runId = TestData.uniqueId();
 
     const createCotizacion = async (serviceName: string, clientIndex: number) => {
