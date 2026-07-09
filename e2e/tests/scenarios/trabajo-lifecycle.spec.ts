@@ -19,6 +19,8 @@ import { TestData } from '../../utils/test-data';
  */
 
 test.describe('Trabajo Lifecycle', () => {
+  // Cold-start Supabase + Vercel preview can exceed 180s — triple timeout + one retry
+  test.use({ retries: 1 });
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.loginAsTestUser();
   });
@@ -26,6 +28,7 @@ test.describe('Trabajo Lifecycle', () => {
   test('create trabajo with labor only — no parts required', async ({
     page, dashboardPage, trabajosPage
   }) => {
+    test.slow();
     // ─── Phase 1: Navigate to Trabajos ──────────────────────────────────────
     await showPhaseLabel(page, '🔧 Phase 1: Navigate to Trabajos');
     await dashboardPage.navigateToModule('trabajos');
@@ -62,6 +65,7 @@ test.describe('Trabajo Lifecycle', () => {
   test('create trabajo with parts and labor', async ({
     page, dashboardPage, trabajosPage, inventarioPage, sidebar
   }) => {
+    test.slow();
     // First ensure there's inventory to use
     await showPhaseLabel(page, '📦 Setup: Check Inventory');
     await dashboardPage.navigateToModule('inventario');
