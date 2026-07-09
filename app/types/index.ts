@@ -97,6 +97,7 @@ export interface CompraItem {
   precioCompra: number;
   subtotal: number;
   compatibilidad?: ItemCompatibilidad[]; // vehículos compatibles con esta pieza
+  categoria?: string; // optional — captured for libre parts so it persists to inventory
 }
 
 export interface PagoCompra {
