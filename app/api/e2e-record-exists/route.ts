@@ -59,7 +59,10 @@ export async function GET(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Resolve user by email
+  // Resolve user by email. The Supabase Admin API does not support server-side
+  // email filtering in listUsers(), so we fetch and filter client-side. This is
+  // acceptable for E2E test endpoints: the test DB holds at most a handful of
+  // users, so perPage: 1000 never incurs meaningful overhead.
   const { data: usersData } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
   const user = usersData?.users?.find((u: { email?: string }) => u.email === email);
   if (!user) {
