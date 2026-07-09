@@ -49,6 +49,7 @@ test.describe('Zero & Edge Value Handling', () => {
   test('large monetary amounts format correctly', async ({
     page, dashboardPage, inventarioPage
   }) => {
+    test.slow(); // Supabase cold-start can delay module navigation in CI
     await showPhaseLabel(page, '💰 Large Amount');
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();

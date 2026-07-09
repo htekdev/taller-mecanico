@@ -43,9 +43,9 @@ test('change-proof-migrate-workflow-fix', async ({
   const hasTrabajosError = await trabajosError.isVisible({ timeout: 3_000 }).catch(() => false);
   expect(hasTrabajosError, 'Trabajos no debe tener error de carga').toBe(false);
 
-  // Trabajos section must load
+  // Trabajos section must load — increased timeout for Supabase cold-start in CI
   const trabajosTitle = page.locator('h2:has-text("Trabajos"), h2:has-text("Nuevo Trabajo")').first();
-  const hasTrabajosTitle = await trabajosTitle.isVisible({ timeout: 15_000 }).catch(() => false);
+  const hasTrabajosTitle = await trabajosTitle.isVisible({ timeout: 60_000 }).catch(() => false);
   expect(hasTrabajosTitle, 'Sección Trabajos debe cargar').toBe(true);
 
   // ── Check historial tab for No.Orden column header ─────────────────────────
