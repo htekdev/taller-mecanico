@@ -33,19 +33,13 @@ export function VistaConfiguracion() {
   const cargar = useCallback(async () => {
     if (!taller) return;
     setCargando(true);
-    try {
-      const [m, i] = await Promise.all([
-        db.getMembers(taller.id),
-        db.getInvites(taller.id),
-      ]);
-      setMembers(m);
-      setInvites(i);
-    } catch (err) {
-      setMensaje({ tipo: 'error', texto: '⚠️ No se pudieron cargar los datos. Verifica tu conexión e intenta de nuevo.' });
-      console.error('[configuracion] cargar error:', err);
-    } finally {
-      setCargando(false);
-    }
+    const [m, i] = await Promise.all([
+      db.getMembers(taller.id),
+      db.getInvites(taller.id),
+    ]);
+    setMembers(m);
+    setInvites(i);
+    setCargando(false);
   }, [taller]);
 
   useEffect(() => { cargar(); }, [cargar]);
@@ -61,41 +55,28 @@ export function VistaConfiguracion() {
 
     const trimmedEmail = email.trim().toLowerCase();
 
-    try {
-      const result = await db.sendInvite(taller.id, trimmedEmail, user.id);
+    const result = await db.sendInvite(taller.id, trimmedEmail, user.id);
 
-      if (result === null) {
-        setMensaje({
-          tipo: 'error',
-          texto: `⚠️ Ya existe una invitación pendiente para ${trimmedEmail}.`,
-        });
-      } else {
-        setMensaje({
-          tipo: 'ok',
-          texto: `✅ Invitación creada para ${result.email}. Cuando esa persona inicie sesión, verá este taller automáticamente.`,
-        });
-        setEmail('');
-        await cargar();
-      }
-    } catch (err) {
+    if (result === null) {
       setMensaje({
         tipo: 'error',
-        texto: '⚠️ No se pudo enviar la invitación. Verifica tu conexión e intenta de nuevo.',
+        texto: `⚠️ Ya existe una invitación pendiente para ${trimmedEmail}.`,
       });
-      console.error('[configuracion] sendInvite error:', err);
-    } finally {
-      setEnviando(false);
+    } else {
+      setMensaje({
+        tipo: 'ok',
+        texto: `✅ Invitación creada para ${result.email}. Cuando esa persona inicie sesión, verá este taller automáticamente.`,
+      });
+      setEmail('');
+      await cargar();
     }
+
+    setEnviando(false);
   };
 
   const handleCancelarInvite = async (inviteId: string) => {
-    try {
-      await db.cancelInvite(inviteId);
-      setInvites(prev => prev.filter(i => i.id !== inviteId));
-    } catch (err) {
-      setMensaje({ tipo: 'error', texto: '⚠️ No se pudo cancelar la invitación. Verifica tu conexión e intenta de nuevo.' });
-      console.error('[configuracion] cancelInvite error:', err);
-    }
+    await db.cancelInvite(inviteId);
+    setInvites(prev => prev.filter(i => i.id !== inviteId));
   };
 
   // ── Role editing ──
@@ -109,24 +90,32 @@ export function VistaConfiguracion() {
     setUpdatingRole(member.id);
     setRoleMensaje(null);
 
-    const ok = await db.updateMemberRole(member.id, taller.id, newRole);
+    try {
+      const ok = await db.updateMemberRole(member.id, taller.id, newRole);
 
-    if (ok) {
-      setMembers(prev => prev.map(m =>
-        m.id === member.id ? { ...m, role: newRole } : m,
-      ));
-      setRoleMensaje({
-        tipo: 'ok',
-        texto: `✅ Rol de ${displayEmail(member)} actualizado a ${ROLE_LABEL[newRole]}.`,
-      });
-    } else {
+      if (ok) {
+        setMembers(prev => prev.map(m =>
+          m.id === member.id ? { ...m, role: newRole } : m,
+        ));
+        setRoleMensaje({
+          tipo: 'ok',
+          texto: `✅ Rol de ${displayEmail(member)} actualizado a ${ROLE_LABEL[newRole]}.`,
+        });
+      } else {
+        setRoleMensaje({
+          tipo: 'error',
+          texto: `⚠️ No se pudo cambiar el rol. Solo los dueños pueden editar roles.`,
+        });
+      }
+    } catch (err) {
+      console.error('[configuracion] updateMemberRole error:', err);
       setRoleMensaje({
         tipo: 'error',
-        texto: `⚠️ No se pudo cambiar el rol. Solo los dueños pueden editar roles.`,
+        texto: '⚠️ Error al cambiar el rol. Verifica tu conexión e intenta de nuevo.',
       });
+    } finally {
+      setUpdatingRole(null);
     }
-
-    setUpdatingRole(null);
   };
 
   if (!taller) return null;
