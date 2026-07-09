@@ -109,24 +109,32 @@ export function VistaConfiguracion() {
     setUpdatingRole(member.id);
     setRoleMensaje(null);
 
-    const ok = await db.updateMemberRole(member.id, taller.id, newRole);
+    try {
+      const ok = await db.updateMemberRole(member.id, taller.id, newRole);
 
-    if (ok) {
-      setMembers(prev => prev.map(m =>
-        m.id === member.id ? { ...m, role: newRole } : m,
-      ));
-      setRoleMensaje({
-        tipo: 'ok',
-        texto: `✅ Rol de ${displayEmail(member)} actualizado a ${ROLE_LABEL[newRole]}.`,
-      });
-    } else {
+      if (ok) {
+        setMembers(prev => prev.map(m =>
+          m.id === member.id ? { ...m, role: newRole } : m,
+        ));
+        setRoleMensaje({
+          tipo: 'ok',
+          texto: `✅ Rol de ${displayEmail(member)} actualizado a ${ROLE_LABEL[newRole]}.`,
+        });
+      } else {
+        setRoleMensaje({
+          tipo: 'error',
+          texto: `⚠️ No se pudo cambiar el rol. Solo los dueños pueden editar roles.`,
+        });
+      }
+    } catch (err) {
       setRoleMensaje({
         tipo: 'error',
-        texto: `⚠️ No se pudo cambiar el rol. Solo los dueños pueden editar roles.`,
+        texto: '⚠️ No se pudo cambiar el rol. Verifica tu conexión e intenta de nuevo.',
       });
+      console.error('[configuracion] handleCambiarRol error:', err);
+    } finally {
+      setUpdatingRole(null);
     }
-
-    setUpdatingRole(null);
   };
 
   if (!taller) return null;
