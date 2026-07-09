@@ -1178,6 +1178,7 @@ export function VistaCotizaciones({
       setHistory(rows.map(rowToEntry));
     } catch (err) {
       console.error('[cotizaciones] recargarHistory error:', err);
+      setErrorGuardar('⚠️ No se pudo actualizar la lista. Los datos se guardaron correctamente.');
     }
   }, [tallerId]);
 
