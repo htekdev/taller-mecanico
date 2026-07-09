@@ -5,6 +5,49 @@ import type { Page } from '@playwright/test';
  */
 
 /**
+ * Retry an async operation with exponential backoff.
+ *
+ * Use for Supabase-dependent assertions that may fail on cold-start.
+ * Each failed attempt waits `delayMs * backoff^attempt` before retrying.
+ *
+ * @example
+ *   const visible = await withRetry(() => page.getByText(name).isVisible(), { retries: 3 });
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  {
+    retries = 3,
+    delayMs = 1_500,
+    backoff = 2,
+  }: { retries?: number; delayMs?: number; backoff?: number } = {}
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        const wait = delayMs * Math.pow(backoff, attempt);
+        await new Promise(resolve => setTimeout(resolve, wait));
+      }
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Reload the page and wait for the app content sentinel to appear.
+ * Used to force a fresh cargarDatos() call after re-login.
+ */
+export async function reloadAndWaitForContent(page: Page, timeoutMs = 90_000): Promise<void> {
+  await page.reload();
+  await page.locator('[data-testid="app-content-loaded"]')
+    .waitFor({ state: 'visible', timeout: timeoutMs })
+    .catch(() => {});
+}
+
+/**
  * Get visible text from the main content area (excludes script tags, RSC payloads).
  * Use this instead of `page.locator('body').textContent()` which includes Next.js internals.
  */

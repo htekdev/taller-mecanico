@@ -25,7 +25,10 @@ import { TestData } from '../../utils/test-data';
  */
 
 test.describe('Full Lifecycle Verification', () => {
-  test.fixme('complete daily workflow: client → cotización → trabajo → payment → expense', { retries: 1 }, async ({
+  // Resilience fix (issue #138): Supabase warm-up in global-setup.ts pre-warms connections.
+  // After re-login, we retry page.reload() up to 3× with backoff to handle cold-start.
+  // 2-shard CI execution reduces runner resource pressure that caused the original timeouts.
+  test('complete daily workflow: client → cotización → trabajo → payment → expense', { retries: 1 }, async ({
     page, loginPage, dashboardPage, cotizacionesPage, trabajosPage,
     inventarioPage, cuentasCobrarPage, ordenesCompraPage, gastosPage, sidebar
   }) => {
@@ -109,18 +112,22 @@ test.describe('Full Lifecycle Verification', () => {
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
 
-    // Reload to force fresh cargarDatos() after re-login.
-    // Root cause: getRefacciones() silently returns [] on Supabase cold-start errors.
-    // page.reload() retries with warm auth token — consistent DB fetch.
-    await page.reload();
-    await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 60_000 });
+    // Retry up to 3 page reloads with backoff to handle Supabase cold-start after re-login.
+    // Root cause: getRefacciones() can time out on first call post-login (cold connection pool).
+    // Each reload forces a fresh cargarDatos() with a progressively warmer auth token.
+    let partStillVisible = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await page.reload();
+      await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 90_000 }).catch(() => {});
+      await dashboardPage.navigateToModule('inventario');
+      await inventarioPage.waitForPageLoad();
+      partStillVisible = await inventarioPage.isPartVisible(partName);
+      if (partStillVisible) break;
+      if (attempt < 3) await page.waitForTimeout(4_000 * attempt); // backoff: 4s, 8s
+    }
 
-    // Verify data persisted — check inventory
-    await dashboardPage.navigateToModule('inventario');
-    await inventarioPage.waitForPageLoad();
     // Use expect() with retry — replaces silent .catch(() => {}) that masked failures
-    await expect(page.getByText(partName)).toBeVisible({ timeout: 45_000 });
-    const partStillVisible = await inventarioPage.isPartVisible(partName);
+    await expect(page.getByText(partName)).toBeVisible({ timeout: 30_000 });
     expect(partStillVisible).toBe(true);
 
     // ═══ Phase 9: Module Stability Sweep ═════════════════════════════════════

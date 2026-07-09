@@ -16,11 +16,10 @@ import { showPhaseLabel } from '../visual-assert';
 
 const UNIQUE_DESC = `PRUEBA-VIDEO-${Date.now()}`;
 
-test('change-proof-historial-numero-orden', async ({ page, loginPage }) => {
-  // This change-proof spec is a video demo — it requires a client+vehicle to exist
-  // in the test account. Marked fixme to avoid blocking CI on test data availability.
-  // The UI feature (column rename) is verified by the working tests above.
-  test.fixme(true, 'Change-proof spec — requires test data (client + vehicle) in preview DB. UI changes verified by other passing specs.');
+test('change-proof-historial-numero-orden', { retries: 1 }, async ({ page, loginPage }) => {
+  // Resilience fix (issue #138): instead of test.fixme(true), we now skip gracefully
+  // when the test account has no client+vehicle data, rather than failing hard.
+  // test.slow() triples the action timeout budget for cold-start Supabase queries.
   test.slow();
 
   // ── 1. Login ──────────────────────────────────────────────────────────────
@@ -50,10 +49,15 @@ test('change-proof-historial-numero-orden', async ({ page, loginPage }) => {
 
   const clientSelect = page.locator('select').first();
   const clientOptCount = await clientSelect.locator('option').count().catch(() => 0);
-  if (clientOptCount > 1) {
-    await clientSelect.selectOption({ index: 1 });
-    await page.waitForTimeout(1500); // wait for vehicle options to load
+  if (clientOptCount <= 1) {
+    // No clients in test account — skip gracefully rather than failing hard.
+    // The historial column rename (No. Orden / Kilometraje) is already verified by
+    // other passing specs that do not require pre-existing test data.
+    test.skip(true, 'No client data in test account — column rename verified by passing specs');
+    return;
   }
+  await clientSelect.selectOption({ index: 1 });
+  await page.waitForTimeout(1500); // wait for vehicle options to load
 
   // ── 3b. Select vehicle (required when client has vehicles) ───────────────
   const vehicleSelect = page.locator('select').nth(1);

@@ -10,26 +10,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e:
-    # Only run when Vercel deploys successfully
+  # ── Resolve the PR number once, share it across all shard jobs ───────────
+  resolve-pr:
     if: github.event.deployment_status.state == 'success'
     runs-on: ubuntu-latest
-    # Suite has grown to 55+ tests (~49s avg each). 90min covers up to ~110 tests.
-    # TODO: implement Playwright sharding (--shard=X/N) once suite exceeds ~80 tests.
-    timeout-minutes: 90
-
-    # Required for posting PR comments
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
-
-    env:
-      BASE_URL: ${{ github.event.deployment_status.target_url }}
-
+    outputs:
+      number: ${{ steps.pr.outputs.number }}
     steps:
-      - uses: actions/checkout@v4
-
       - name: Resolve PR number
         id: pr
         uses: actions/github-script@v7
@@ -45,6 +32,31 @@ jobs:
             core.setOutput('number', prNumber);
             console.log(`Resolved PR #${prNumber} from commit ${commitSha}`);
 
+  # ── Run two parallel shards to halve CI time and reduce per-runner load ──
+  e2e:
+    needs: resolve-pr
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    # Each shard runs ~half the suite (~70 tests × ~49 s avg). 60 min + buffer.
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false   # Let both shards finish even if one fails
+      matrix:
+        shard: [1, 2]
+
+    # Required for posting PR comments (used by post-comment job)
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    env:
+      BASE_URL: ${{ github.event.deployment_status.target_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -56,91 +68,119 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run E2E tests
+      - name: Run E2E tests (shard ${{ matrix.shard }}/2)
         env:
           E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
           E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-        run: npx playwright test --config=e2e/playwright.config.ts
+          PR_NUMBER: ${{ needs.resolve-pr.outputs.number }}
+        run: npx playwright test --config=e2e/playwright.config.ts --shard=${{ matrix.shard }}/2
 
-      - name: Upload results to S3
+      - name: Upload results to S3 (shard ${{ matrix.shard }})
         if: always()
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: us-east-1
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-        run: npx tsx e2e/upload-results.ts --project taller-mecanico --pr ${{ steps.pr.outputs.number }}
+          PR_NUMBER: ${{ needs.resolve-pr.outputs.number }}
+        run: npx tsx e2e/upload-results.ts --project taller-mecanico --pr ${{ needs.resolve-pr.outputs.number }}
 
-      - name: Read results
+      - name: Save shard results artifact
         if: always()
-        id: results
-        run: |
-          if [ -f e2e/results/results.json ]; then
-            echo "has_results=true" >> $GITHUB_OUTPUT
-            TOTAL=$(jq '.summary.total' e2e/results/results.json)
-            PASSED=$(jq '.summary.passed' e2e/results/results.json)
-            FAILED=$(jq '.summary.failed' e2e/results/results.json)
-            echo "total=$TOTAL" >> $GITHUB_OUTPUT
-            echo "passed=$PASSED" >> $GITHUB_OUTPUT
-            echo "failed=$FAILED" >> $GITHUB_OUTPUT
-          else
-            echo "has_results=false" >> $GITHUB_OUTPUT
-          fi
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-shard-${{ matrix.shard }}
+          path: e2e/results/results.json
+          retention-days: 1
 
-      - name: Post results to PR
-        if: always() && steps.results.outputs.has_results == 'true' && steps.pr.outputs.number != '0'
+      - name: Upload Playwright report artifact (shard ${{ matrix.shard }})
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-shard-${{ matrix.shard }}
+          path: e2e/results/
+          retention-days: 30
+
+  # ── Combined PR comment after all shards complete ─────────────────────────
+  post-comment:
+    needs: [resolve-pr, e2e]
+    if: always() && needs.resolve-pr.outputs.number != '0'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Download shard results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-results-shard-*
+          path: shard-results/
+
+      - name: Post combined results to PR
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const results = JSON.parse(fs.readFileSync('e2e/results/results.json', 'utf-8'));
+            const path = require('path');
 
-            const statusEmoji = results.summary.failed > 0 ? '❌' : '✅';
-            const rows = results.tests.map(t => {
-              const status = t.status === 'passed' ? '✅' : t.status === 'failed' ? '❌' : '⏭️';
-              const video = t.video
-                ? `[📹 Watch](${t.video.replace('s3://htek-dev-media/', 'https://htek-dev-media.s3.amazonaws.com/')})`
-                : '—';
-              return `| ${t.name} | ${status} | ${video} |`;
-            });
+            const prNumber = ${{ needs.resolve-pr.outputs.number }};
 
-            const reportUrl = results.report.replace(
-              's3://htek-dev-media/',
-              'https://htek-dev-media.s3.amazonaws.com/'
-            );
+            let totalPassed = 0, totalFailed = 0, totalSkipped = 0;
+            const shardRows = [];
 
-            const prNumber = ${{ steps.pr.outputs.number }};
+            for (const shard of ['1', '2']) {
+              const resultsPath = path.join(
+                'shard-results',
+                `e2e-results-shard-${shard}`,
+                'results.json'
+              );
+              if (!fs.existsSync(resultsPath)) {
+                shardRows.push(`| Shard ${shard}/2 | ⚠️ No results uploaded | — |`);
+                continue;
+              }
+              const results = JSON.parse(fs.readFileSync(resultsPath, 'utf-8'));
+              const { passed, failed, skipped, total } = results.summary;
+              totalPassed += passed;
+              totalFailed += failed;
+              totalSkipped += skipped;
+
+              const statusEmoji = failed > 0 ? '❌' : '✅';
+              const reportUrl = results.report
+                ? results.report.replace('s3://htek-dev-media/', 'https://htek-dev-media.s3.amazonaws.com/')
+                : null;
+              const reportLink = reportUrl ? `[📊 Report](${reportUrl})` : '—';
+              shardRows.push(`| Shard ${shard}/2 | ${statusEmoji} ${passed}/${total} passed | ${reportLink} |`);
+            }
+
+            const overallStatus = totalFailed > 0 ? '❌' : '✅';
+            const totalAll = totalPassed + totalFailed + totalSkipped;
 
             const bodyLines = [
               '## 🎬 E2E Test Results',
               '',
-              `**Suite:** ${results.suite} | **PR:** #${prNumber} | **URL:** ${results.baseURL}`,
-              `**Result:** ${statusEmoji} ${results.summary.passed}/${results.summary.total} passed | ❌ ${results.summary.failed} failed | ⏱️ ${(results.duration / 1000).toFixed(1)}s`,
+              `**PR:** #${prNumber} | **Result:** ${overallStatus} ${totalPassed}/${totalAll} passed | ❌ ${totalFailed} failed | ⏭️ ${totalSkipped} skipped`,
               '',
-              '| Test | Status | Video |',
-              '|------|--------|-------|',
-              rows.join('\n'),
-              '',
-              `[📊 Full HTML Report](${reportUrl})`,
+              '| Shard | Status | Report |',
+              '|-------|--------|--------|',
+              ...shardRows,
             ];
 
             const body = bodyLines.join('\n');
 
-            // Delete previous E2E comment if exists (keep PR clean)
+            // Replace any previous E2E comment (keeps PR clean)
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
             });
 
-            const existingComment = comments.find(c => c.body?.includes('## 🎬 E2E Test Results'));
-            if (existingComment) {
+            const existing = comments.find(c => c.body?.includes('## 🎬 E2E Test Results'));
+            if (existing) {
               await github.rest.issues.deleteComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                comment_id: existingComment.id,
+                comment_id: existing.id,
               });
             }
 
@@ -151,12 +191,4 @@ jobs:
               body,
             });
 
-            console.log(`Posted E2E results to PR #${prNumber}`);
-
-      - name: Upload Playwright report artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: e2e/results/
-          retention-days: 30
+            console.log(`Posted combined E2E results to PR #${prNumber}`);

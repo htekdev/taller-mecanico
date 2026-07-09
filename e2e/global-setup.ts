@@ -57,4 +57,26 @@ export default async function globalSetup(config: FullConfig) {
     // Non-fatal -- tests run even without cleanup (just slower with bloated DB)
     console.warn('[E2E Setup] Could not clean test data:', String(err));
   }
+
+  // -- 3. Supabase warm-up ------------------------------------------------
+  // Pre-warm the Supabase connection pool so the first test does not time out
+  // waiting for cold-start DB queries. Without this, cargarDatos() can take
+  // 30-60 s on the first call after a Vercel cold deploy, causing spurious failures.
+  console.log('[E2E Setup] Warming up Supabase connection...');
+  try {
+    const warmupResponse = await fetch(`${baseURL}/api/e2e-warmup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const warmupBody = await warmupResponse.json().catch(() => ({}));
+    if (warmupResponse.ok) {
+      console.log(`[E2E Setup] Supabase warm: ${warmupBody.tables ?? 0}/${9} tables ready`);
+    } else {
+      console.warn(`[E2E Setup] Warm-up responded ${warmupResponse.status}:`, warmupBody);
+    }
+  } catch (err) {
+    // Non-fatal — tests will run with Supabase cold, first test may be slow
+    console.warn('[E2E Setup] Could not warm up Supabase:', String(err));
+  }
 }

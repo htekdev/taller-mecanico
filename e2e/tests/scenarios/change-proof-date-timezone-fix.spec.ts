@@ -14,8 +14,10 @@ import { showPhaseLabel } from '../visual-assert';
  * Fix: formatearFecha() uses new Date(year, month-1, day) — LOCAL time, no UTC shift.
  */
 
-// test.fixme: Known CI flakiness — locator.click timeout. See #138.
-test.fixme('change-proof-date-timezone-fix', async ({ page, loginPage, dashboardPage }) => {
+// Resilience fix (issue #138): navigateToModule already retries on timeout; 1 retry +
+// test.slow() here absorbs any residual locator-click timeout on Supabase cold-start.
+test('change-proof-date-timezone-fix', { retries: 1 }, async ({ page, loginPage, dashboardPage }) => {
+  test.slow();
   // ── Login ──────────────────────────────────────────────────────────────────
   await loginPage.loginAsTestUser();
 

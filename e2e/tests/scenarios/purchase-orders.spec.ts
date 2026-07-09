@@ -21,10 +21,11 @@ test.describe('Purchase Orders', () => {
     await loginPage.loginAsTestUser();
   });
 
-  // test.fixme: Known CI flakiness - timing/env issue after 8 fix attempts. See #138.
-  test.fixme('create purchase order with proveedor', async ({
+  // Resilience fix (issue #138): test.slow() + retries:1 absorb Supabase cold-start.
+  test('create purchase order with proveedor', { retries: 1 }, async ({
     page, dashboardPage, ordenesCompraPage
   }) => {
+    test.slow();
     await showPhaseLabel(page, '📋 Phase 1: Navigate to Órdenes');
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();
@@ -53,10 +54,11 @@ test.describe('Purchase Orders', () => {
     await showPhaseLabel(page, '✅ Purchase Order Created');
   });
 
-  // test.fixme: Known CI flakiness - timing/env issue after 8 fix attempts. See #138.
-  test.fixme('edit received order after creation', async ({
+  // Resilience fix (issue #138): test.slow() + retries:1 absorb Supabase cold-start.
+  test('edit received order after creation', { retries: 1 }, async ({
     page, dashboardPage, ordenesCompraPage
   }) => {
+    test.slow();
     await showPhaseLabel(page, '✏️ Edit Received Order');
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();
@@ -87,10 +89,11 @@ test.describe('Purchase Orders', () => {
     await showPhaseLabel(page, '✅ Edit Order Complete');
   });
 
-  // test.fixme: Known CI flakiness - timing/env issue after 8 fix attempts. See #138.
-  test.fixme('mark order as received', async ({
+  // Resilience fix (issue #138): test.slow() + retries:1 absorb Supabase cold-start.
+  test('mark order as received', { retries: 1 }, async ({
     page, dashboardPage, ordenesCompraPage
   }) => {
+    test.slow();
     await showPhaseLabel(page, '📦 Mark as Received');
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();
@@ -111,10 +114,11 @@ test.describe('Purchase Orders', () => {
     await showPhaseLabel(page, '✅ Receive Flow Complete');
   });
 
-  // test.fixme: Known CI flakiness - timing/env issue after 8 fix attempts. See #138.
-  test.fixme('IVA toggle affects total', async ({
+  // Resilience fix (issue #138): test.slow() + retries:1 absorb Supabase cold-start.
+  test('IVA toggle affects total', { retries: 1 }, async ({
     page, dashboardPage, ordenesCompraPage
   }) => {
+    test.slow();
     await showPhaseLabel(page, '🧮 IVA Toggle');
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();

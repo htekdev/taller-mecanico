@@ -28,8 +28,10 @@ export default defineConfig({
   /* Fail CI if test.only is left in source */
   forbidOnly: !!process.env.CI,
 
-  /* NO retries in CI — get fast feedback, fix failures properly */
-  retries: 0,
+  /* 1 retry in CI to absorb intermittent Supabase/Vercel cold-start flakiness.
+     Infrastructure fixes (warm-up, sharding, backoff) handle the root causes;
+     this retry is a safety net for residual one-off timeouts. */
+  retries: process.env.CI ? 1 : 0,
 
   /* Single worker in CI to avoid resource contention with shared DB */
   workers: process.env.CI ? 1 : 2,

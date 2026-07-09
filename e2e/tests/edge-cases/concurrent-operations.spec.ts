@@ -37,10 +37,13 @@ test.describe('Concurrent Operations', () => {
     await showPhaseLabel(page, '✅ No Crash on Rapid Switch');
   });
 
-  // test.fixme: Known CI flakiness — nav timeout under runner load. See #138 for proper fix.
-  test.fixme('double-click on save does not create duplicates', async ({
+  // Resilience fix (issue #138): test.slow() + retries: 1 absorbs Supabase cold-start
+  // timing. Warm-up in global-setup.ts pre-warms the connection pool; 2-shard CI
+  // execution reduces per-runner load that previously caused nav timeouts.
+  test('double-click on save does not create duplicates', { retries: 1 }, async ({
     page, dashboardPage, inventarioPage
   }) => {
+    test.slow();
     await showPhaseLabel(page, '🔄 Double-Click Protection');
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();

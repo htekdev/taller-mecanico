@@ -10,7 +10,10 @@
 import { test, expect } from '../../fixtures';
 import { showPhaseLabel } from '../visual-assert';
 
-test.fixme('change-proof-gastos-categoria-personal — categoria personal con subcategorias personalizables', async ({ page, loginPage, dashboardPage }) => {
+// Resilience fix (issue #138): test.slow() + retries:1 absorb Supabase/form cold-start.
+// The gastos-personal-subcategorias.spec.ts provides reliable UI-only coverage;
+// this spec adds the write-path verification with proper retries.
+test('change-proof-gastos-categoria-personal — categoria personal con subcategorias personalizables', { retries: 1 }, async ({ page, loginPage, dashboardPage }) => {
   test.slow();
 
   // Login

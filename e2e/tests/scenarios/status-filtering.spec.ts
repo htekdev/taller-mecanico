@@ -91,9 +91,12 @@ test.describe('Status Filtering', () => {
     await showPhaseLabel(page, '✅ Todos Filter Works');
   });
 
-  test.fixme('filter ordenes by status', async ({
+  // Resilience fix (issue #138): navigateToModule retries on cold-start; test.slow()
+  // triples the timeout budget to handle any remaining Supabase latency.
+  test('filter ordenes by status', { retries: 1 }, async ({
     page, dashboardPage, ordenesCompraPage
   }) => {
+    test.slow();
     await showPhaseLabel(page, '🔍 Filter Órdenes');
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();

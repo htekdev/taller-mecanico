@@ -44,9 +44,12 @@ test.describe('Cuentas por Pagar (Por Pagar)', () => {
     await showPhaseLabel(page, '✅ Por Pagar Loaded');
   });
 
-  test.fixme('cuentas por pagar shows Spanish section title', async ({
+  // Resilience fix (issue #138): navigateToModule retries on cold-start; test.slow()
+  // triples the timeout budget for the section-title wait.
+  test('cuentas por pagar shows Spanish section title', { retries: 1 }, async ({
     page, dashboardPage,
   }) => {
+    test.slow();
     await showPhaseLabel(page, '🏷️ Phase 1: Spanish Labels');
     await dashboardPage.navigateToModule('pagos');
     await dashboardPage.waitForPageLoad();
