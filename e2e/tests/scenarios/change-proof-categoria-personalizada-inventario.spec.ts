@@ -89,8 +89,9 @@ test('change-proof-categoria-personalizada-inventario', { retries: 1 }, async ({
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForTimeout(1000);
 
-  // Look for the custom category badge text in the list
-  const categoryBadge = page.locator(`text=${CUSTOM_CATEGORIA}`).first();
+  // Look for the custom category badge span in the parts list
+  // Use span:has-text() to avoid matching hidden <option> elements inside selects
+  const categoryBadge = page.locator(`span:has-text("${CUSTOM_CATEGORIA}")`).first();
   await expect(categoryBadge).toBeVisible({ timeout: 10_000 });
   await showPhaseLabel(page, `✅ Categoría personalizada "${CUSTOM_CATEGORIA}" visible en la pieza`);
   await page.waitForTimeout(1200);
