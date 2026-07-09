@@ -85,20 +85,21 @@ export async function debugScreenshot(page: Page, name: string) {
  * This decouples the "DB write committed" check from the app-level Supabase auth client,
  * which can be slow to warm up on Vercel preview cold starts.
  *
- * @param page        - Playwright page (used for same-origin request context)
- * @param tableName   - Supabase table name (must be in the endpoint's allowlist)
- * @param recordName  - Value of the `nombre` column to look for (case-insensitive)
- * @param timeoutMs   - Maximum wait time in ms (default: 60 000)
- * @throws            - If the record is not found within timeoutMs
+ * @param page           - Playwright page (used for same-origin request context)
+ * @param tableName      - Supabase table name (must be in the endpoint's allowlist)
+ * @param recordName     - Value of the `nombre` column to look for (case-insensitive)
+ * @param timeoutMs      - Maximum wait time in ms (default: 60 000)
+ * @param pollIntervalMs - How often to poll in ms (default: 3 000)
+ * @throws               - If the record is not found within timeoutMs
  */
 export async function waitForDbRecord(
   page: Page,
   tableName: string,
   recordName: string,
-  timeoutMs = 60_000
+  timeoutMs = 60_000,
+  pollIntervalMs = 3_000
 ): Promise<void> {
   const email = process.env.E2E_TEST_EMAIL || 'sofia@test.com';
-  const pollIntervalMs = 3_000;
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {

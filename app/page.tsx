@@ -58,6 +58,7 @@ export default function TallerMecanico() {
     let lastError: unknown;
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       if (attempt > 0) {
+        // Exponential backoff: attempt 1 → 2 s, attempt 2 → 4 s
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 2000));
         console.warn(`[cargarDatos] retry attempt ${attempt + 1}...`);
       }
