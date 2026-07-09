@@ -32,6 +32,7 @@ export function VistaInventario({
     nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza',
     precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '', proveedorId: '',
   });
+  const [formCategoriaCustom, setFormCategoriaCustom] = useState('');
   const [formClienteId, setFormClienteId] = useState('');
   const [compatibilidad, setCompatibilidad] = useState<CompatibilidadVehiculo[]>([]);
   const [modeloInputs, setModeloInputs] = useState<Record<number, string>>({});
@@ -142,13 +143,17 @@ export function VistaInventario({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nombre || form.precioCompra <= 0) return;
+    if (form.categoria === '__custom__' && !formCategoriaCustom.trim()) return;
     const compatFinal = compatibilidad.filter(c => c.marca.trim());
+    // Resolve custom category
+    const categoriaFinal = form.categoria === '__custom__' ? formCategoriaCustom.trim() : form.categoria;
     setGuardandoForm(true);
     setErrorGuardado(null);
     try {
-      await onGuardarRefaccion({ ...form, compatibilidad: compatFinal.length > 0 ? compatFinal : undefined });
+      await onGuardarRefaccion({ ...form, categoria: categoriaFinal, compatibilidad: compatFinal.length > 0 ? compatFinal : undefined });
       // only reset AFTER successful save
       setForm({ nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza', precioCompra: 0, stock: 0, stockMinimo: 1, vehiculoId: '', proveedorId: '' });
+      setFormCategoriaCustom('');
       setFormClienteId('');
       setCompatibilidad([]);
       setModeloInputs({});
@@ -263,6 +268,11 @@ export function VistaInventario({
     }
   };
 
+  // ── Dynamic category list: CATEGORIAS base + any custom categories in inventory ──
+  const categoriasInventario = Array.from(
+    new Set([...CATEGORIAS, ...inventario.map(r => r.categoria).filter(Boolean)])
+  ).sort((a, b) => a.localeCompare(b, 'es'));
+
   return (
     <div>
       <SectionTitle
@@ -290,7 +300,18 @@ export function VistaInventario({
               <Label>Categoría</Label>
               <Select value={form.categoria} onChange={e => setForm(f => ({ ...f, categoria: e.target.value }))}>
                 {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
+                <option value="__custom__">Otra (escribir)...</option>
               </Select>
+              {form.categoria === '__custom__' && (
+                <Input
+                  type="text"
+                  aria-label="Nombre de categoría personalizada"
+                  placeholder="Ej. Dirección hidráulica"
+                  value={formCategoriaCustom}
+                  onChange={e => setFormCategoriaCustom(e.target.value)}
+                  className="mt-2"
+                />
+              )}
             </div>
           </div>
 
@@ -509,7 +530,7 @@ export function VistaInventario({
               <div className="min-w-40">
                 <Select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
                   <option value="">Todas las categorías</option>
-                  {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                  {categoriasInventario.map(c => <option key={c} value={c}>{c}</option>)}
                 </Select>
               </div>
               {(filtroProveedor || filtroCategoria || filtroTexto) && (
