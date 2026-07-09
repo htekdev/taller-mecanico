@@ -14,17 +14,19 @@ import { TestData } from '../../utils/test-data';
  * 6. Edit received order after creation
  * 7. Mark as received
  * 8. Verify stock updated
+ *
+ * Stability: test.slow() triples all timeouts; retries:1 handles Supabase cold-start flakiness.
  */
 
-test.describe('Purchase Orders', () => {
+test.describe('Purchase Orders', { retries: 1 }, () => {
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.loginAsTestUser();
   });
 
-  // test.fixme: Known CI flakiness - timing/env issue after 8 fix attempts. See #138.
-  test.fixme('create purchase order with proveedor', async ({
+  test('create purchase order with proveedor', async ({
     page, dashboardPage, ordenesCompraPage
   }) => {
+    test.slow();
     await showPhaseLabel(page, '📋 Phase 1: Navigate to Órdenes');
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();
@@ -53,10 +55,10 @@ test.describe('Purchase Orders', () => {
     await showPhaseLabel(page, '✅ Purchase Order Created');
   });
 
-  // test.fixme: Known CI flakiness - timing/env issue after 8 fix attempts. See #138.
-  test.fixme('edit received order after creation', async ({
+  test('edit received order after creation', async ({
     page, dashboardPage, ordenesCompraPage
   }) => {
+    test.slow();
     await showPhaseLabel(page, '✏️ Edit Received Order');
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();
@@ -87,10 +89,10 @@ test.describe('Purchase Orders', () => {
     await showPhaseLabel(page, '✅ Edit Order Complete');
   });
 
-  // test.fixme: Known CI flakiness - timing/env issue after 8 fix attempts. See #138.
-  test.fixme('mark order as received', async ({
+  test('mark order as received', async ({
     page, dashboardPage, ordenesCompraPage
   }) => {
+    test.slow();
     await showPhaseLabel(page, '📦 Mark as Received');
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();
@@ -111,10 +113,10 @@ test.describe('Purchase Orders', () => {
     await showPhaseLabel(page, '✅ Receive Flow Complete');
   });
 
-  // test.fixme: Known CI flakiness - timing/env issue after 8 fix attempts. See #138.
-  test.fixme('IVA toggle affects total', async ({
+  test('IVA toggle affects total', async ({
     page, dashboardPage, ordenesCompraPage
   }) => {
+    test.slow();
     await showPhaseLabel(page, '🧮 IVA Toggle');
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();

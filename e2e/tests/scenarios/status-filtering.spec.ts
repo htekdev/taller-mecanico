@@ -91,9 +91,10 @@ test.describe('Status Filtering', () => {
     await showPhaseLabel(page, '✅ Todos Filter Works');
   });
 
-  test.fixme('filter ordenes by status', async ({
+  test('filter ordenes by status', async ({
     page, dashboardPage, ordenesCompraPage
   }) => {
+    test.slow();
     await showPhaseLabel(page, '🔍 Filter Órdenes');
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();
