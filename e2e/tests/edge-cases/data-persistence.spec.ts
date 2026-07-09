@@ -46,6 +46,7 @@ test.describe('Data Persistence', () => {
   test('data persists after logout/login cycle', { retries: 1 }, async ({
     page, loginPage, dashboardPage, inventarioPage, sidebar
   }) => {
+    test.slow(); // Supabase cold-start after re-login can take 3-5 min on Vercel preview
     await showPhaseLabel(page, '🔄 Persistence: Login Cycle');
 
     // Add a distinctive part

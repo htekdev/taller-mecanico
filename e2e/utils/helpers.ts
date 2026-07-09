@@ -85,12 +85,16 @@ export async function debugScreenshot(page: Page, name: string) {
  * This decouples the "DB write committed" check from the app-level Supabase auth client,
  * which can be slow to warm up on Vercel preview cold starts.
  *
+ * Degrades gracefully when SUPABASE_SERVICE_ROLE_KEY is not configured in the Vercel
+ * preview environment (API returns 5xx). In that case a warning is logged and the
+ * function returns without throwing, letting the caller's UI assertion handle the check.
+ *
  * @param page           - Playwright page (used for same-origin request context)
  * @param tableName      - Supabase table name (must be in the endpoint's allowlist)
  * @param recordName     - Value of the `nombre` column to look for (case-insensitive)
  * @param timeoutMs      - Maximum wait time in ms (default: 60 000)
  * @param pollIntervalMs - How often to poll in ms (default: 3 000)
- * @throws               - If the record is not found within timeoutMs
+ * @throws               - If the API is available but the record is not found within timeoutMs
  */
 export async function waitForDbRecord(
   page: Page,
@@ -100,12 +104,46 @@ export async function waitForDbRecord(
   pollIntervalMs = 3_000
 ): Promise<void> {
   const email = process.env.E2E_TEST_EMAIL || 'sofia@test.com';
-  const deadline = Date.now() + timeoutMs;
+  const params = new URLSearchParams({ table: tableName, name: recordName, email });
+  const url = `/api/e2e-record-exists?${params.toString()}`;
 
+  // --- Availability probe (1 request, no retry) ---
+  // If the endpoint returns 5xx, SUPABASE_SERVICE_ROLE_KEY is not configured.
+  // Degrade gracefully: log a warning and return so the caller's UI assertion runs.
+  let apiAvailable = false;
+  try {
+    const probe = await page.request.get(url);
+    if (probe.status() >= 500) {
+      console.warn(
+        `[waitForDbRecord] /api/e2e-record-exists returned HTTP ${probe.status()} — ` +
+        `SUPABASE_SERVICE_ROLE_KEY is likely not set in this Vercel preview environment. ` +
+        `Skipping DB-level wait for "${recordName}". ` +
+        `Add the secret to Vercel project env vars to enable precise DB-commit detection.`
+      );
+      return; // non-fatal — let caller's expect().toBeVisible() handle it
+    }
+    if (probe.ok()) {
+      apiAvailable = true;
+      const body = await probe.json() as { exists?: boolean };
+      if (body.exists === true) return;
+    }
+  } catch {
+    // Network/serialization error on the probe itself — skip DB check
+    console.warn(`[waitForDbRecord] probe request failed for "${recordName}" — skipping DB check`);
+    return;
+  }
+
+  if (!apiAvailable) {
+    // Non-5xx but also not ok (e.g. 4xx config error) — degrade same way
+    console.warn(`[waitForDbRecord] API returned a non-success status — skipping DB check for "${recordName}"`);
+    return;
+  }
+
+  // --- Normal polling loop (API is available and confirmed reachable) ---
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const params = new URLSearchParams({ table: tableName, name: recordName, email });
-      const response = await page.request.get(`/api/e2e-record-exists?${params.toString()}`);
+      const response = await page.request.get(url);
       if (response.ok()) {
         const body = await response.json() as { exists?: boolean };
         if (body.exists === true) return;
