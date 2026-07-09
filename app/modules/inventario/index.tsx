@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo } from '@/app/types';
@@ -494,7 +494,7 @@ export function VistaInventario({
                 <button
                   type="button"
                   onClick={() => setFiltroTexto('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-lg leading-none"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-lg leading-none p-2"
                   aria-label="Limpiar búsqueda"
                 >✕</button>
               )}
@@ -516,7 +516,7 @@ export function VistaInventario({
                 <button
                   type="button"
                   onClick={() => { setFiltroProveedor(''); setFiltroCategoria(''); setFiltroTexto(''); }}
-                  className="text-xs text-slate-500 hover:text-rose-600 font-medium"
+                  className="text-xs text-slate-500 hover:text-rose-600 font-medium py-1.5 px-3"
                 >
                   ✕ Limpiar filtros
                 </button>
@@ -626,7 +626,7 @@ export function VistaInventario({
                                 onClick={() => isEditCompat ? setEditandoCompat(null) : abrirEditCompat(r)}>
                                 {isEditCompat ? '✕ Cerrar' : '🚗 Compatibilidad'}
                               </Btn>
-                              <Btn size="sm" variant={editandoProveedor === r.id ? 'ghost' : 'ghost'}
+                              <Btn size="sm" variant={editandoProveedor === r.id ? 'ghost' : 'primary'}
                                 onClick={() => editandoProveedor === r.id ? setEditandoProveedor(null) : abrirEditProveedor(r)}
                                 className="border border-slate-300">
                                 {editandoProveedor === r.id ? '✕ Cerrar' : '🏪 Proveedor'}
