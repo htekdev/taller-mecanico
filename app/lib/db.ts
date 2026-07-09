@@ -193,6 +193,14 @@ export async function deleteRefaccion(tallerId: string, id: string): Promise<voi
   if (error) throw new Error(`deleteRefaccion: ${error.message}`);
 }
 
+
+export async function updateRefaccionProveedor(id: string, proveedorId: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('refacciones')
+    .update({ proveedor_id: proveedorId || null })
+    .eq('id', id);
+  if (error) throw new Error('updateRefaccionProveedor: ' + error.message);
+}
 // ── Proveedores ───────────────────────────────────────────────
 
 export async function getProveedores(tallerId: string): Promise<Proveedor[]> {
@@ -1250,4 +1258,5 @@ export async function nextCotizacionNumber(tallerId: string): Promise<string> {
 
   return `COT-${String(next).padStart(3, '0')}`;
 }
+
 
