@@ -188,6 +188,15 @@ export async function updateRefacciones(items: Refaccion[]): Promise<void> {
   }
 }
 
+/** Assign or clear the supplier on an inventory item — used for manual correction and PO receive flow. */
+export async function updateRefaccionProveedor(id: string, proveedorId: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('refacciones')
+    .update({ proveedor_id: proveedorId || null })
+    .eq('id', id);
+  if (error) throw new Error('updateRefaccionProveedor: ' + error.message);
+}
+
 export async function deleteRefaccion(tallerId: string, id: string): Promise<void> {
   const { error } = await supabase.from('refacciones').delete().eq('id', id).eq('taller_id', tallerId);
   if (error) throw new Error(`deleteRefaccion: ${error.message}`);
