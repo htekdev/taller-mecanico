@@ -45,8 +45,8 @@ test('change-proof-categoria-personalizada-inventario', { retries: 1 }, async ({
   const categoriaSelect = inventarioPage.categoriaSelect;
   await categoriaSelect.waitFor({ state: 'visible', timeout: 15_000 });
 
-  // Verify the __custom__ option exists
-  const customOption = page.locator('select:has(option:has-text("Filtros")) option[value="__custom__"]').first();
+  // Verify the __custom__ option exists — scope to form select (avoids nested :has-text() CSS issues)
+  const customOption = categoriaSelect.locator('option[value="__custom__"]');
   await expect(customOption).toBeAttached({ timeout: 10_000 });
   await showPhaseLabel(page, '✅ Opción "Otra (escribir)..." encontrada en el select');
   await page.waitForTimeout(800);
