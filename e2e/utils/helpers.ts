@@ -39,6 +39,9 @@ export async function withRetry<T>(
 /**
  * Reload the page and wait for the app content sentinel to appear.
  * Used to force a fresh cargarDatos() call after re-login.
+ *
+ * Prefer `withRetry()` for multi-step patterns that need page navigation after reload.
+ * Use this helper for simple "reload once and confirm the app is ready" cases.
  */
 export async function reloadAndWaitForContent(page: Page, timeoutMs = 90_000): Promise<void> {
   await page.reload();

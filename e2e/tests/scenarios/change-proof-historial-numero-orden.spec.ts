@@ -59,7 +59,9 @@ test('change-proof-historial-numero-orden', { retries: 1 }, async ({ page, login
   await clientSelect.selectOption({ index: 1 });
   // Wait for vehicle options to load by polling the vehicle select for options
   const vehicleSelect = page.locator('select').nth(1);
-  await expect(vehicleSelect).toBeEnabled({ timeout: 8_000 }).catch(() => {});
+  await expect(vehicleSelect).toBeEnabled({ timeout: 8_000 }).catch((err: unknown) => {
+    console.warn('[historial-orden] vehicle select did not become enabled:', String(err));
+  });
 
   // ── 3b. Select vehicle (required when client has vehicles) ───────────────
   if (await vehicleSelect.isEnabled({ timeout: 5_000 }).catch(() => false)) {

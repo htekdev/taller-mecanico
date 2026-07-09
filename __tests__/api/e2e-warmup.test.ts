@@ -10,9 +10,8 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
  * - total matches the number of tables queried
  */
 
-// Mock Supabase client — route uses from(t).select(...).limit(1)
-const mockLimit = vi.fn();
-const mockSelect = vi.fn(() => ({ limit: mockLimit }));
+// Mock Supabase client — route uses from(t).select(...) with head:true
+const mockSelect = vi.fn();
 const mockFrom = vi.fn(() => ({ select: mockSelect }));
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({ from: mockFrom })),
@@ -53,7 +52,8 @@ describe('POST /api/e2e-warmup — production environment', () => {
 
   it('returns 200 in production when E2E_ALLOW_PRODUCTION is set', async () => {
     process.env.E2E_ALLOW_PRODUCTION = '1';
-    mockLimit.mockResolvedValue({ data: null, error: null, count: 0 });
+    // Make Supabase queries resolve successfully
+    mockSelect.mockResolvedValue({ data: null, error: null, count: 0 });
     const req = await makeNextRequest();
     const res = await POST(req as unknown as Request);
     expect(res.status).toBe(200);
@@ -98,7 +98,7 @@ describe('POST /api/e2e-warmup — happy path', () => {
     delete process.env.E2E_ALLOW_PRODUCTION;
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
-    mockLimit.mockResolvedValue({ data: null, error: null, count: 0 });
+    mockSelect.mockResolvedValue({ data: null, error: null, count: 0 });
     const mod = await import('@/app/api/e2e-warmup/route');
     POST = mod.POST as unknown as typeof POST;
   });

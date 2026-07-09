@@ -48,7 +48,7 @@ export async function POST(_request: NextRequest) {
 
   const results = await Promise.allSettled(
     tables.map(t =>
-      adminClient.from(t).select('id', { count: 'exact', head: true }).limit(1)
+      adminClient.from(t).select('id', { count: 'exact', head: true })
     )
   );
 

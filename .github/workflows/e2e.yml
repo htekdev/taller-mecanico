@@ -153,13 +153,15 @@ jobs:
               shardRows.push(`| Shard ${shard}/2 | ${statusEmoji} ${passed}/${total} passed | ${reportLink} |`);
             }
 
-            const overallStatus = totalFailed > 0 ? '❌' : '✅';
+            const missingShardsCount = shardRows.filter(r => r.includes('No results')).length;
+            const overallStatus = totalFailed > 0 ? '❌' : (missingShardsCount > 0 ? '⚠️' : '✅');
             const totalAll = totalPassed + totalFailed + totalSkipped;
 
             const bodyLines = [
               '## 🎬 E2E Test Results',
               '',
               `**PR:** #${prNumber} | **Result:** ${overallStatus} ${totalPassed}/${totalAll} passed | ❌ ${totalFailed} failed | ⏭️ ${totalSkipped} skipped`,
+              ...(missingShardsCount > 0 ? [`> ⚠️ **${missingShardsCount} shard(s) missing results** — totals above are incomplete.`] : []),
               '',
               '| Shard | Status | Report |',
               '|-------|--------|--------|',

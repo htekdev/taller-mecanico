@@ -137,7 +137,7 @@ test.describe('Resumen — Data Integrity', () => {
     await prevBtn.click();
 
     // Wait for the month label to actually change instead of using a fixed delay
-    await expect(monthLabel).not.toHaveText(beforeLabel!, { timeout: 5_000 });
+    await expect(monthLabel).not.toHaveText(beforeLabel, { timeout: 5_000 });
 
     // The month label must have changed after clicking prev
     const afterLabel = await monthLabel.textContent();
