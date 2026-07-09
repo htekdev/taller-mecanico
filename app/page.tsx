@@ -139,6 +139,16 @@ export default function TallerMecanico() {
       setErrorBanner('No se pudo eliminar la refacción. Verifica tu conexión e intenta de nuevo.');
     }
   };
+  const actualizarProveedorRefaccion = async (id: string, proveedorId: string) => {
+    try {
+      await db.updateRefaccionProveedor(id, proveedorId || null);
+      setInventario(prev => prev.map(r => r.id === id ? { ...r, proveedorId: proveedorId || undefined } : r));
+    } catch (err) {
+      console.error('[actualizarProveedorRefaccion] FAILED:', err);
+      setErrorBanner('No se pudo actualizar el proveedor. Verifica tu conexión e intenta de nuevo.');
+      throw err;
+    }
+  };
   const recibirStock = async (refaccionId: string, cantidad: number) => {
     const ref = inventario.find(r => r.id === refaccionId);
     if (!ref) return;
@@ -176,35 +186,30 @@ export default function TallerMecanico() {
     }
     if (!nueva) return null;
     setInventario(prev => [...prev, nueva!]);
-    // Create a "received" purchase order if any PO data provided (best-effort — non-fatal)
+    // Create a "received" purchase order if any PO data provided
     if (input.ordenCompra) {
-      try {
-        const hoy = getHoy();
-        const piezasSubtotal = nueva.precioCompra * input.ordenCompra.cantidad;
-        const orden = await db.insertOrden(taller.id, {
-          proveedorId:  input.ordenCompra.proveedorId || '',
-          fecha:        hoy,
-          numeroOrden:  input.ordenCompra.numeroOrden,
-          descripcion:  input.ordenCompra.descripcion || `Alta desde cotización — ${input.refaccion.nombre}`,
-          partes: [{
-            refaccionId:  nueva.id,
-            nombre:       nueva.nombre,
-            cantidad:     input.ordenCompra.cantidad,
-            precioCompra: nueva.precioCompra,
-            subtotal:     piezasSubtotal,
-          }],
-          subtotalSinIVA: piezasSubtotal,
-          ivaAmount: 0,
-          total: piezasSubtotal,
-          conIVA: false,
-        });
-        if (orden) {
-          await db.updateOrdenEstado(orden.id, 'recibida', hoy);
-          setOrdenes(prev => [...prev, { ...orden, estado: 'recibida', fechaRecibida: hoy }]);
-        }
-      } catch (err) {
-        // Non-critical: refaccion was inserted successfully — PO creation is best-effort
-        console.error('[agregarRefaccionDesdeCotizacion] PO creation failed:', err);
+      const hoy = getHoy();
+      const piezasSubtotal = nueva.precioCompra * input.ordenCompra.cantidad;
+      const orden = await db.insertOrden(taller.id, {
+        proveedorId:  input.ordenCompra.proveedorId || '',
+        fecha:        hoy,
+        numeroOrden:  input.ordenCompra.numeroOrden,
+        descripcion:  input.ordenCompra.descripcion || `Alta desde cotización — ${input.refaccion.nombre}`,
+        partes: [{
+          refaccionId:  nueva.id,
+          nombre:       nueva.nombre,
+          cantidad:     input.ordenCompra.cantidad,
+          precioCompra: nueva.precioCompra,
+          subtotal:     piezasSubtotal,
+        }],
+        subtotalSinIVA: piezasSubtotal,
+        ivaAmount: 0,
+        total: piezasSubtotal,
+        conIVA: false,
+      });
+      if (orden) {
+        await db.updateOrdenEstado(orden.id, 'recibida', hoy);
+        setOrdenes(prev => [...prev, { ...orden, estado: 'recibida', fechaRecibida: hoy }]);
       }
     }
     return nueva;
@@ -428,14 +433,9 @@ export default function TallerMecanico() {
   // ── Purchase Order handlers ──
   const crearOrden = async (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => {
     if (!taller) return;
-    try {
-      const nueva = await db.insertOrden(taller.id, { ...data, numeroOrden: data.numeroOrden || generarNumeroOrden(ordenes) });
-      if (!nueva) throw new Error('[crearOrden] insertOrden returned null');
-      setOrdenes(prev => [...prev, nueva]);
-    } catch (err) {
-      console.error('[crearOrden] FAILED:', err);
-      setErrorBanner('No se pudo crear la orden de compra. Verifica tu conexion e intenta de nuevo.');
-    }
+    const nueva = await db.insertOrden(taller.id, { ...data, numeroOrden: data.numeroOrden || generarNumeroOrden(ordenes) });
+    if (!nueva) throw new Error('No se pudo crear la orden de compra');
+    setOrdenes(prev => [...prev, nueva]);
   };
   const recibirOrden = async (ordenId: string) => {
     if (!taller) return;
@@ -450,13 +450,15 @@ export default function TallerMecanico() {
       if (librePartes.length > 0) {
         const nuevasRefs: Refaccion[] = [];
         for (const part of librePartes) {
+          // BUG FIX: pass proveedorId from the PO so new inventory items keep the supplier
           const nueva = await db.insertRefaccion(taller.id, {
             nombre: part.nombre, codigo: '', categoria: '', unidad: 'pza',
             precioCompra: part.precioCompra, stock: 0, stockMinimo: 1,
+            proveedorId: orden.proveedorId || undefined,
           });
           if (nueva) {
             partesFinal = partesFinal.map(p => p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p);
-            nuevasRefs.push(nueva);
+            nuevasRefs.push({ ...nueva, proveedorId: orden.proveedorId || undefined });
           }
         }
         if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
@@ -474,7 +476,26 @@ export default function TallerMecanico() {
           return item ? { ...r, stock: r.stock + item.cantidad } : r;
         });
         await db.updateRefacciones(nuevoInv.filter(r => partesFinal.some(p => p.refaccionId === r.id)));
-        setInventario(nuevoInv);
+        // BUG FIX: backfill proveedorId on existing inventory items that came from this PO
+        // Only update items that currently have no supplier assigned
+        if (orden.proveedorId) {
+          const itemsToBackfill = partesFinal.filter(p => {
+            const inv = inventario.find(r => r.id === p.refaccionId);
+            return inv && !inv.proveedorId;
+          });
+          await Promise.all(itemsToBackfill.map(p =>
+            db.updateRefaccionProveedor(p.refaccionId, orden.proveedorId!).catch(e =>
+              console.error('[recibirOrden] backfill proveedor FAILED for', p.refaccionId, e)
+            )
+          ));
+          const nuevoInvConProv = nuevoInv.map(r => {
+            const needsBackfill = itemsToBackfill.some(p => p.refaccionId === r.id);
+            return needsBackfill ? { ...r, proveedorId: orden.proveedorId } : r;
+          });
+          setInventario(nuevoInvConProv);
+        } else {
+          setInventario(nuevoInv);
+        }
       }
     } catch (err) {
       console.error('[recibirOrden] FAILED:', err);
@@ -508,21 +529,23 @@ export default function TallerMecanico() {
       for (const part of librePartes) {
         // For received orders the goods are already in stock; pending orders start at 0
         const stockInicial = orden?.estado === 'recibida' ? part.cantidad : 0;
-        const nueva = await db.insertRefaccion(taller.id, {
-          nombre: part.nombre,
-          codigo: '',
-          categoria: '',
-          unidad: 'pza',
-          precioCompra: part.precioCompra,
-          stock: stockInicial,
-          stockMinimo: 1,
-        });
-        if (nueva) {
-          partesFinal = partesFinal.map(p =>
-            p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p
-          );
-          nuevasRefs.push(nueva);
-        }
+          // BUG FIX: pass proveedorId from the PO so new inventory items keep the supplier
+          const nueva = await db.insertRefaccion(taller.id, {
+            nombre: part.nombre,
+            codigo: '',
+            categoria: '',
+            unidad: 'pza',
+            precioCompra: part.precioCompra,
+            stock: stockInicial,
+            stockMinimo: 1,
+            proveedorId: orden?.proveedorId || undefined,
+          });
+          if (nueva) {
+            partesFinal = partesFinal.map(p =>
+              p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p
+            );
+            nuevasRefs.push({ ...nueva, proveedorId: orden?.proveedorId || undefined });
+          }
       }
       if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
     }
@@ -591,7 +614,7 @@ export default function TallerMecanico() {
       fecha: fechaFactura,
       conceptos, subtotal, iva: iva > 0 ? iva : undefined, total, pagos: [],
     });
-    if (!nuevaFactura) throw new Error('[generarFactura] insertFactura returned null');
+    if (!nuevaFactura) throw new Error('No se pudo crear la factura');
     setFacturas(prev => [...prev, nuevaFactura]);
     await db.updateTrabajoFactura(trabajoId, nuevaFactura.id);
     setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 'facturado' as const } : t));
@@ -639,14 +662,9 @@ export default function TallerMecanico() {
 
   const confirmarFactura = async () => {
     if (!pendingFactura || !pendingFactura.numero.trim()) return;
-    try {
-      await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
-      setPendingFactura(null);
-      setVista('facturas');
-    } catch (err) {
-      console.error('[confirmarFactura] FAILED:', err);
-      setErrorBanner('No se pudo generar la factura. Verifica tu conexion e intenta de nuevo.');
-    }
+    await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
+    setPendingFactura(null);
+    setVista('facturas');
   };
   const registrarPagoFactura = async (facturaId: string, pago: Omit<PagoFactura, 'id'>) => {
     const facturaActual = facturas.find(f => f.id === facturaId);
@@ -1012,6 +1030,7 @@ export default function TallerMecanico() {
               onGuardarRefaccion={guardarRefaccion} onRecibirStock={recibirStock}
               onActualizarCompatibilidad={actualizarCompatibilidad}
               onEliminarRefaccion={eliminarRefaccion}
+              onActualizarProveedor={actualizarProveedorRefaccion}
               onGuardarProveedor={guardarProveedor} />
           )}
           {vista === 'trabajos' && (
