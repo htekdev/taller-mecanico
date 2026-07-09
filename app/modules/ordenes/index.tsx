@@ -33,6 +33,8 @@ function ModalEditarOrden({
   const [newLibreNombre, setNewLibreNombre] = useState('');
   const [newLibreCantidad, setNewLibreCantidad] = useState(1);
   const [newLibrePrecio, setNewLibrePrecio] = useState(0);
+  const [newLibreCategoria, setNewLibreCategoria] = useState('');
+  const [newLibreCategoriaCustom, setNewLibreCategoriaCustom] = useState('');
   // Compatibilidad por pieza: { marca, modelo } en curso por refaccionId
   const [compatInputs, setCompatInputs] = useState<Record<string, { marca: string; modelo: string }>>({});
 
@@ -66,6 +68,7 @@ function ModalEditarOrden({
   const agregarLibre = () => {
     if (!newLibreNombre.trim() || newLibreCantidad <= 0 || newLibrePrecio <= 0) return;
     const tempId = `libre-${Date.now()}`;
+    const categoriaLibre = newLibreCategoria === '__custom__' ? newLibreCategoriaCustom.trim() : newLibreCategoria;
     setItems(prev => [...prev, {
       refaccionId: tempId,
       nombre: newLibreNombre.trim(),
@@ -73,8 +76,10 @@ function ModalEditarOrden({
       precioCompra: newLibrePrecio,
       subtotal: newLibreCantidad * newLibrePrecio,
       compatibilidad: [],
+      categoria: categoriaLibre,
     }]);
     setNewLibreNombre(''); setNewLibreCantidad(1); setNewLibrePrecio(0);
+    setNewLibreCategoria(''); setNewLibreCategoriaCustom('');
   };
 
   const quitarItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
@@ -281,6 +286,25 @@ function ModalEditarOrden({
                   <div>
                     <Label>Precio compra ($)</Label>
                     <Input type="number" min="0.01" step="0.01" placeholder="0.00" value={newLibrePrecio || ''} onChange={e => setNewLibrePrecio(Number(e.target.value))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Categoría</Label>
+                    <Select value={newLibreCategoria} onChange={e => setNewLibreCategoria(e.target.value)}>
+                      <option value="">Sin categoría</option>
+                      {CATEGORIAS_COMUNES.map(c => <option key={c} value={c}>{c}</option>)}
+                      <option value="__custom__">Otra (escribir)...</option>
+                    </Select>
+                    {newLibreCategoria === '__custom__' && (
+                      <Input
+                        type="text"
+                        placeholder="Ej. Dirección hidráulica"
+                        value={newLibreCategoriaCustom}
+                        onChange={e => setNewLibreCategoriaCustom(e.target.value)}
+                        className="mt-2"
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="flex justify-end">

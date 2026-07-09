@@ -457,7 +457,7 @@ export default function TallerMecanico() {
         try {
           for (const part of librePartes) {
             const nueva = await db.insertRefaccion(taller.id, {
-              nombre: part.nombre, codigo: '', categoria: '', unidad: 'pza',
+              nombre: part.nombre, codigo: '', categoria: part.categoria ?? '', unidad: 'pza',
               precioCompra: part.precioCompra, stock: 0, stockMinimo: 1,
             });
             if (nueva) {
@@ -522,7 +522,7 @@ export default function TallerMecanico() {
         const nueva = await db.insertRefaccion(taller.id, {
           nombre: part.nombre,
           codigo: '',
-          categoria: '',
+          categoria: part.categoria ?? '',
           unidad: 'pza',
           precioCompra: part.precioCompra,
           stock: stockInicial,
