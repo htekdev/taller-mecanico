@@ -192,6 +192,7 @@ test.describe('Sofia Regression Tests', () => {
   test('REGRESSION: gastos module loads without crash', async ({
     page, dashboardPage, gastosPage
   }) => {
+    test.setTimeout(300_000); // Supabase cold-start can exceed 180s --- give 5 min
     await showPhaseLabel(page, '💸 REGRESSION: Gastos Module');
     await dashboardPage.navigateToModule('gastos');
     await gastosPage.waitForPageLoad();
