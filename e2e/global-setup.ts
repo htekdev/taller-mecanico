@@ -71,7 +71,7 @@ export default async function globalSetup(config: FullConfig) {
     });
     const warmupBody = await warmupResponse.json().catch(() => ({}));
     if (warmupResponse.ok) {
-      console.log(`[E2E Setup] Supabase warm: ${warmupBody.tables ?? 0}/${9} tables ready`);
+      console.log(`[E2E Setup] Supabase warm: ${warmupBody.tables ?? 0}/${warmupBody.total ?? '?'} tables ready`);
     } else {
       console.warn(`[E2E Setup] Warm-up responded ${warmupResponse.status}:`, warmupBody);
     }

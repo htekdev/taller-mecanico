@@ -57,10 +57,11 @@ test('change-proof-historial-numero-orden', { retries: 1 }, async ({ page, login
     return;
   }
   await clientSelect.selectOption({ index: 1 });
-  await page.waitForTimeout(1500); // wait for vehicle options to load
+  // Wait for vehicle options to load by polling the vehicle select for options
+  const vehicleSelect = page.locator('select').nth(1);
+  await expect(vehicleSelect).toBeEnabled({ timeout: 8_000 }).catch(() => {});
 
   // ── 3b. Select vehicle (required when client has vehicles) ───────────────
-  const vehicleSelect = page.locator('select').nth(1);
   if (await vehicleSelect.isEnabled({ timeout: 5_000 }).catch(() => false)) {
     const vCount = await vehicleSelect.locator('option').count().catch(() => 0);
     if (vCount > 1) {

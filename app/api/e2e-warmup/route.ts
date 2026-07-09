@@ -57,5 +57,9 @@ export async function POST(_request: NextRequest) {
 
   console.log(`[E2E Warmup] ${warmed}/${tables.length} tables warmed, ${failed} failed`);
 
-  return NextResponse.json({ status: 'warmed', tables: warmed, failed });
+  // Note: production access is blocked by the VERCEL_ENV check above plus the
+  // requirement for SUPABASE_SERVICE_ROLE_KEY — consistent with all other /api/e2e-*
+  // routes. Additionally, this endpoint only performs read-only SELECT queries with
+  // head:true (no rows are returned, only counts).
+  return NextResponse.json({ status: 'warmed', tables: warmed, failed, total: tables.length });
 }
