@@ -12,6 +12,8 @@ import { expectVisible, showPhaseLabel } from '../visual-assert';
  */
 
 test.describe('Historial por Unidad', () => {
+  // Cold-start Supabase nav can exceed 180s — triple timeout + one retry
+  test.use({ retries: 1 });
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.loginAsTestUser();
   });
@@ -19,6 +21,7 @@ test.describe('Historial por Unidad', () => {
   test('historial module loads without crash', async ({
     page, dashboardPage,
   }) => {
+    test.slow();
     await showPhaseLabel(page, '📋 Phase 1: Navigate to Historial');
     await dashboardPage.navigateToModule('historial');
     await dashboardPage.waitForPageLoad();
@@ -37,6 +40,7 @@ test.describe('Historial por Unidad', () => {
   test('historial shows "Historial por Unidad" heading', async ({
     page, dashboardPage,
   }) => {
+    test.slow();
     await showPhaseLabel(page, '🔍 Phase 1: Check Heading');
     await dashboardPage.navigateToModule('historial');
     await dashboardPage.waitForPageLoad();
@@ -52,6 +56,7 @@ test.describe('Historial por Unidad', () => {
   test('historial has a client search input', async ({
     page, dashboardPage,
   }) => {
+    test.slow();
     await showPhaseLabel(page, '🔍 Phase 1: Check Search Input');
     await dashboardPage.navigateToModule('historial');
     await dashboardPage.waitForPageLoad();
@@ -67,6 +72,7 @@ test.describe('Historial por Unidad', () => {
   test('historial client search filters results without crash', async ({
     page, dashboardPage,
   }) => {
+    test.slow();
     await showPhaseLabel(page, '⌨️ Phase 1: Type in Search');
     await dashboardPage.navigateToModule('historial');
     await dashboardPage.waitForPageLoad();
@@ -93,6 +99,7 @@ test.describe('Historial por Unidad', () => {
   test('historial is reachable from gastos tab', async ({
     page, dashboardPage,
   }) => {
+    test.slow();
     await showPhaseLabel(page, '🔀 Phase 1: Navigate Gastos → Historial');
 
     await dashboardPage.navigateToModule('gastos');
