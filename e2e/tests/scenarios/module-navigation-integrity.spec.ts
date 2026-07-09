@@ -11,7 +11,6 @@ import { TestData } from '../../utils/test-data';
  */
 
 test.describe('Module Navigation Integrity', () => {
-  test.use({ retries: 1 });
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.loginAsTestUser();
   });
@@ -94,7 +93,6 @@ test.describe('Module Navigation Integrity', () => {
   test('totals are mathematically correct in Inventario', async ({
     page, dashboardPage, inventarioPage
   }) => {
-    test.slow(); // Supabase cold-start can take 3-7min on CI
     await showPhaseLabel(page, '🧮 Math Check: Inventario');
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
@@ -117,9 +115,10 @@ test.describe('Module Navigation Integrity', () => {
     await showPhaseLabel(page, '✅ Inventory Math Correct');
   });
 
-  test('module switching preserves no stale data', async ({
+  test('module switching preserves no stale data', { retries: 1 }, async ({
     page, dashboardPage, sidebar
   }) => {
+    test.slow();
     // Ensure app is fully loaded before switching -- cargarDatos() must complete first
     await dashboardPage.waitForPageLoad();
     // Rapidly switch modules and verify each renders without crash
@@ -162,4 +161,3 @@ test.describe('Module Navigation Integrity', () => {
     await showPhaseLabel(page, '✅ Badge Value Valid');
   });
 });
-
