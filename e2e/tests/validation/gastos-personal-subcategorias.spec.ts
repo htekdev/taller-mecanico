@@ -17,7 +17,7 @@ import { showPhaseLabel } from '../visual-assert';
  * 6. Other categories do NOT show Personal subcategories after re-selecting
  */
 
-test.describe('Gastos — Personal Category Subcategories', () => {
+test.describe('Gastos — Personal Category Subcategories', { retries: 1 }, () => {
   test.describe.configure({ retries: 1 }); // Supabase cold-start flaky
   test.beforeEach(async ({ loginPage, dashboardPage }) => {
     await loginPage.loginAsTestUser();
@@ -149,6 +149,7 @@ test.describe('Gastos — Personal Category Subcategories', () => {
   test('switching back from Personal resets subcategory list', async ({
     page, dashboardPage, gastosPage,
   }) => {
+    test.slow();
     await showPhaseLabel(page, '🔄 Phase 1: Category Switch Reset');
 
     // Open form
