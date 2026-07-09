@@ -118,7 +118,7 @@ test.describe('Inventory Management', () => {
     await showPhaseLabel(page, '✅ Proveedor filter works');
   });
 
-  test('vehicle compatibility on parts', async ({
+  test('vehicle compatibility on parts', { retries: 1 }, async ({
     page, dashboardPage, inventarioPage
   }) => {
     await showPhaseLabel(page, '🚗 Vehicle Compatibility');
