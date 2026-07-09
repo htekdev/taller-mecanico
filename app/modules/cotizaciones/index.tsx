@@ -1178,7 +1178,7 @@ export function VistaCotizaciones({
       setHistory(rows.map(rowToEntry));
     } catch (err) {
       console.error('[cotizaciones] recargarHistory error:', err);
-      setErrorGuardar('No se pudo actualizar la lista. Intenta de nuevo.');
+      throw err; // let callers decide how to handle reload failures
     }
   }, [tallerId]);
 
@@ -1404,7 +1404,7 @@ export function VistaCotizaciones({
       <div>
         <SectionTitle title="Cotizaciones" subtitle="Crea y guarda cotizaciones para tus clientes"/>
         {errorGuardar && (
-          <div className="mb-3 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded px-3 py-2">❌ {errorGuardar}</div>
+          <div className="mb-3 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded px-3 py-2">❌ {errorGuardar}</div>
         )}
         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Nueva Cotización</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1635,7 +1635,7 @@ export function VistaCotizaciones({
             </span>
           )}
           {errorGuardar && (
-            <span className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded px-2 py-1 w-full">❌ {errorGuardar}</span>
+            <span className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded px-2 py-1 w-full">❌ {errorGuardar}</span>
           )}
         </div>
       </div>
@@ -1648,7 +1648,7 @@ export function VistaCotizaciones({
   return (
     <>
       {errorGuardar && (
-        <div className="mb-3 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded px-3 py-2">❌ {errorGuardar}</div>
+        <div className="mb-3 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded px-3 py-2">❌ {errorGuardar}</div>
       )}
       <VistaPreviaContenido
         plantilla={viewEntry?.plantilla ?? plantilla}
