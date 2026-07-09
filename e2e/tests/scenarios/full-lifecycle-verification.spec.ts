@@ -1,6 +1,7 @@
 import { test, expect } from '../../fixtures';
 import { expectVisible, expectText, showPhaseLabel } from '../visual-assert';
 import { TestData } from '../../utils/test-data';
+import { withRetry } from '../../utils/helpers';
 
 /**
  * Full Lifecycle Verification — End-to-end flow across all modules.
@@ -112,23 +113,20 @@ test.describe('Full Lifecycle Verification', () => {
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
 
-    // Retry up to 3 page reloads with backoff to handle Supabase cold-start after re-login.
+    // Use withRetry() to reload until inventory item is visible.
     // Root cause: getRefacciones() can time out on first call post-login (cold connection pool).
-    // Each reload forces a fresh cargarDatos() with a progressively warmer auth token.
-    let partStillVisible = false;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    // withRetry retries 3× with exponential backoff (1.5s, 3s, 6s).
+    await withRetry(async () => {
       await page.reload();
-      await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 90_000 }).catch(() => {});
+      await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 90_000 })
+        .catch((err: unknown) => { console.warn('[lifecycle] content sentinel timeout:', String(err)); });
       await dashboardPage.navigateToModule('inventario');
       await inventarioPage.waitForPageLoad();
-      partStillVisible = await inventarioPage.isPartVisible(partName);
-      if (partStillVisible) break;
-      if (attempt < 3) await page.waitForTimeout(4_000 * attempt); // backoff: 4s, 8s
-    }
+      const visible = await inventarioPage.isPartVisible(partName);
+      if (!visible) throw new Error(`Inventory item "${partName}" not yet visible after reload`);
+    }, { retries: 2, delayMs: 4_000, backoff: 2 });
 
-    // Use expect() with retry — replaces silent .catch(() => {}) that masked failures
     await expect(page.getByText(partName)).toBeVisible({ timeout: 30_000 });
-    expect(partStillVisible).toBe(true);
 
     // ═══ Phase 9: Module Stability Sweep ═════════════════════════════════════
     await showPhaseLabel(page, '🧪 Phase 9: Stability Sweep');

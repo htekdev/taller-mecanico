@@ -44,7 +44,9 @@ export async function reloadAndWaitForContent(page: Page, timeoutMs = 90_000): P
   await page.reload();
   await page.locator('[data-testid="app-content-loaded"]')
     .waitFor({ state: 'visible', timeout: timeoutMs })
-    .catch(() => {});
+    .catch((err: unknown) => {
+      console.warn('[reloadAndWaitForContent] app-content-loaded sentinel timed out:', String(err));
+    });
 }
 
 /**

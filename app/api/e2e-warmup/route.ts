@@ -12,7 +12,7 @@ import { createClient } from '@supabase/supabase-js';
  * The first authenticated query after a cold start can take 30-60 s, causing
  * test timeouts that have nothing to do with the application logic.
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   const env = process.env.VERCEL_ENV || process.env.NODE_ENV;
   if (env === 'production' && !process.env.E2E_ALLOW_PRODUCTION) {
     return NextResponse.json({ error: 'Blocked in production' }, { status: 403 });

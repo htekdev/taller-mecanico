@@ -122,7 +122,8 @@ test.describe('Resumen — Data Integrity', () => {
 
     // Read the current month label from the month-nav widget in the Resumen header.
     // The widget renders: ‹ <mesLabel> ›  where mesLabel is "Mes Año" in Spanish.
-    const monthLabel = page.locator('span.font-semibold').filter({ hasText: /enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i }).first();
+    const MONTH_PATTERN = /enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i;
+    const monthLabel = page.locator('span.font-semibold').filter({ hasText: MONTH_PATTERN }).first();
     await expect(monthLabel).toBeVisible({ timeout: 15_000 });
     const beforeLabel = await monthLabel.textContent();
 
@@ -130,10 +131,8 @@ test.describe('Resumen — Data Integrity', () => {
     const prevBtn = page.locator('button').filter({ hasText: '‹' }).first();
     const hasPrev = await prevBtn.isVisible({ timeout: 5_000 }).catch(() => false);
 
-    if (!hasPrev) {
-      test.info().annotations.push({ type: 'skip', description: 'Month nav buttons not found in this build' });
-      return;
-    }
+    test.skip(!hasPrev, 'Month nav buttons not found in this build — skipping nav interaction');
+    if (!hasPrev) return;
 
     await prevBtn.click();
     await page.waitForTimeout(500);
@@ -143,8 +142,7 @@ test.describe('Resumen — Data Integrity', () => {
     expect(afterLabel, 'Month label must change after clicking prev').not.toBe(beforeLabel);
 
     // The new label must still be a valid Spanish month/year string
-    const monthPattern = /enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i;
-    expect(afterLabel ?? '', 'New label must contain a Spanish month name').toMatch(monthPattern);
+    expect(afterLabel ?? '', 'New label must contain a Spanish month name').toMatch(MONTH_PATTERN);
 
     await showPhaseLabel(page, `✅ Month changed: ${beforeLabel} → ${afterLabel}`);
   });

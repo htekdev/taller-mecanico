@@ -1,6 +1,7 @@
 import { test, expect } from '../../fixtures';
 import { expectVisible, showPhaseLabel } from '../visual-assert';
 import { TestData } from '../../utils/test-data';
+import { withRetry } from '../../utils/helpers';
 
 /**
  * Data Persistence Tests — Verify data survives page reloads and re-logins.
@@ -81,21 +82,19 @@ test.describe('Data Persistence', () => {
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
 
-    // Retry page.reload() up to 3× with backoff to handle Supabase cold-start after re-login.
-    // Each reload forces a fresh cargarDatos() with a progressively warmer auth token.
-    let exists2 = false;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    // Use withRetry() to reload until inventory item is visible after re-login.
+    // Each retry reloads the page to force a fresh cargarDatos() with a warmer auth token.
+    await withRetry(async () => {
       await page.reload();
-      await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 90_000 }).catch(() => {});
+      await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 90_000 })
+        .catch((err: unknown) => { console.warn('[persistence] content sentinel timeout:', String(err)); });
       await dashboardPage.navigateToModule('inventario');
       await inventarioPage.waitForPageLoad();
-      exists2 = await inventarioPage.isPartVisible(partName);
-      if (exists2) break;
-      if (attempt < 3) await page.waitForTimeout(4_000 * attempt); // backoff: 4s, 8s
-    }
+      const visible = await inventarioPage.isPartVisible(partName);
+      if (!visible) throw new Error(`Part "${partName}" not yet visible after reload`);
+    }, { retries: 2, delayMs: 4_000, backoff: 2 });
 
     await expect(page.getByText(partName)).toBeVisible({ timeout: 30_000 });
-    expect(exists2).toBe(true);
 
     await showPhaseLabel(page, '✅ Data Survives Login Cycle');
   });
