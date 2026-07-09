@@ -153,6 +153,9 @@ export async function insertRefaccion(tallerId: string, data: Omit<Refaccion, 'i
     id: row.id, nombre: row.nombre, codigo: row.codigo, categoria: row.categoria,
     unidad: row.unidad, precioCompra: row.precio_compra,
     stock: row.stock, stockMinimo: row.stock_minimo,
+    proveedorId: row.proveedor_id ?? undefined,
+    vehiculoId: row.vehiculo_id ?? undefined,
+    compatibilidad: row.compatibilidad ?? undefined,
   };
 }
 
