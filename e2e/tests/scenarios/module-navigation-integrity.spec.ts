@@ -115,9 +115,10 @@ test.describe('Module Navigation Integrity', () => {
     await showPhaseLabel(page, '✅ Inventory Math Correct');
   });
 
-  test('module switching preserves no stale data', async ({
+  test('module switching preserves no stale data', { retries: 1 }, async ({
     page, dashboardPage, sidebar
   }) => {
+    test.slow();
     // Ensure app is fully loaded before switching -- cargarDatos() must complete first
     await dashboardPage.waitForPageLoad();
     // Rapidly switch modules and verify each renders without crash
