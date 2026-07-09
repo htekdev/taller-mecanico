@@ -60,7 +60,7 @@ export class InventarioPage extends BasePage {
 
     // Filters
     this.filtroProveedorSelect = page.locator('select:has(option:has-text("Todos los proveedores"))').first();
-    this.filtroCategoriaSelect = page.locator('select:has(option:has-text("Todas las categorias"))').first();
+    this.filtroCategoriaSelect = page.locator('select:has(option:has-text("Todas las categor"))').first();
 
     // List
     this.inventarioList = page.locator('.space-y-2, .divide-y').first();
