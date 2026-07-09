@@ -52,25 +52,38 @@ export default function TallerMecanico() {
   const cargarDatos = useCallback(async () => {
     if (!taller) return;
     setCargando(true);
-    try {
-      const [c, v, r, t, p, o, f, g] = await Promise.all([
-        db.getClientes(taller.id),
-        db.getVehiculos(taller.id),
-        db.getRefacciones(taller.id),
-        db.getTrabajos(taller.id),
-        db.getProveedores(taller.id),
-        db.getOrdenes(taller.id),
-        db.getFacturas(taller.id),
-        db.getGastos(taller.id),
-      ]);
-      setClientes(c); setVehiculos(v); setInventario(r); setTrabajos(t);
-      setProveedores(p); setOrdenes(o); setFacturas(f); setGastos(g);
-    } catch (err) {
-      console.error('[cargarDatos] FAILED:', err);
-      setErrorBanner('Error al cargar datos. Verifica tu conexión e intenta de nuevo.');
-    } finally {
-      setCargando(false);
+    // Retry up to 3 times with exponential backoff to handle Vercel cold-start
+    // latency where the Supabase auth session isn't immediately warm after login.
+    const MAX_ATTEMPTS = 3;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+        console.warn(`[cargarDatos] retry attempt ${attempt + 1}...`);
+      }
+      try {
+        const [c, v, r, t, p, o, f, g] = await Promise.all([
+          db.getClientes(taller.id),
+          db.getVehiculos(taller.id),
+          db.getRefacciones(taller.id),
+          db.getTrabajos(taller.id),
+          db.getProveedores(taller.id),
+          db.getOrdenes(taller.id),
+          db.getFacturas(taller.id),
+          db.getGastos(taller.id),
+        ]);
+        setClientes(c); setVehiculos(v); setInventario(r); setTrabajos(t);
+        setProveedores(p); setOrdenes(o); setFacturas(f); setGastos(g);
+        setCargando(false);
+        return;
+      } catch (err) {
+        lastError = err;
+        console.warn(`[cargarDatos] attempt ${attempt + 1} failed:`, err);
+      }
     }
+    console.error('[cargarDatos] FAILED after all attempts:', lastError);
+    setErrorBanner('Error al cargar datos. Verifica tu conexión e intenta de nuevo.');
+    setCargando(false);
   }, [taller]);
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);

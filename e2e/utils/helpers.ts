@@ -76,3 +76,46 @@ export async function waitForDataLoaded(page: Page) {
 export async function debugScreenshot(page: Page, name: string) {
   await page.screenshot({ path: `e2e/results/debug-${name}.png`, fullPage: true });
 }
+
+/**
+ * Poll /api/e2e-record-exists until the named record appears in the given Supabase table.
+ *
+ * Use this after a Supabase INSERT — and especially after logout/re-login — to confirm
+ * the record is committed to the DB before asserting its visibility in the UI.
+ * This decouples the "DB write committed" check from the app-level Supabase auth client,
+ * which can be slow to warm up on Vercel preview cold starts.
+ *
+ * @param page        - Playwright page (used for same-origin request context)
+ * @param tableName   - Supabase table name (must be in the endpoint's allowlist)
+ * @param recordName  - Value of the `nombre` column to look for (case-insensitive)
+ * @param timeoutMs   - Maximum wait time in ms (default: 60 000)
+ * @throws            - If the record is not found within timeoutMs
+ */
+export async function waitForDbRecord(
+  page: Page,
+  tableName: string,
+  recordName: string,
+  timeoutMs = 60_000
+): Promise<void> {
+  const email = process.env.E2E_TEST_EMAIL || 'sofia@test.com';
+  const pollIntervalMs = 3_000;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      const params = new URLSearchParams({ table: tableName, name: recordName, email });
+      const response = await page.request.get(`/api/e2e-record-exists?${params.toString()}`);
+      if (response.ok()) {
+        const body = await response.json() as { exists?: boolean };
+        if (body.exists === true) return;
+      }
+    } catch {
+      // Network/parse error — continue polling
+    }
+    await page.waitForTimeout(pollIntervalMs);
+  }
+
+  throw new Error(
+    `[waitForDbRecord] "${recordName}" not found in table "${tableName}" after ${timeoutMs}ms`
+  );
+}

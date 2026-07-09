@@ -1,6 +1,7 @@
 import { test, expect } from '../../fixtures';
 import { expectVisible, expectText, showPhaseLabel } from '../visual-assert';
 import { TestData } from '../../utils/test-data';
+import { waitForDbRecord } from '../../utils/helpers';
 
 /**
  * Full Lifecycle Verification — End-to-end flow across all modules.
@@ -25,7 +26,7 @@ import { TestData } from '../../utils/test-data';
  */
 
 test.describe('Full Lifecycle Verification', () => {
-  test.fixme('complete daily workflow: client → cotización → trabajo → payment → expense', { retries: 1 }, async ({
+  test('complete daily workflow: client → cotización → trabajo → payment → expense', { retries: 1 }, async ({
     page, loginPage, dashboardPage, cotizacionesPage, trabajosPage,
     inventarioPage, cuentasCobrarPage, ordenesCompraPage, gastosPage, sidebar
   }) => {
@@ -109,16 +110,19 @@ test.describe('Full Lifecycle Verification', () => {
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
 
-    // Reload to force fresh cargarDatos() after re-login.
-    // Root cause: getRefacciones() silently returns [] on Supabase cold-start errors.
-    // page.reload() retries with warm auth token — consistent DB fetch.
+    // Confirm the part is in Supabase via service-role API before asserting in UI.
+    // This separates "did the DB commit?" from "did the app fetch succeed?" — the
+    // latter can lag on Vercel preview cold starts. cargarDatos() retries up to 3×
+    // (page.tsx), so once the record is confirmed present the UI reload is reliable.
+    await waitForDbRecord(page, 'refacciones', partName, 60_000);
+
+    // Reload to trigger a fresh cargarDatos() with the now-warm auth token.
     await page.reload();
     await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 60_000 });
 
     // Verify data persisted — check inventory
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
-    // Use expect() with retry — replaces silent .catch(() => {}) that masked failures
     await expect(page.getByText(partName)).toBeVisible({ timeout: 45_000 });
     const partStillVisible = await inventarioPage.isPartVisible(partName);
     expect(partStillVisible).toBe(true);

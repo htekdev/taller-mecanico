@@ -1,6 +1,7 @@
 import { test, expect } from '../../fixtures';
 import { expectVisible, showPhaseLabel } from '../visual-assert';
 import { TestData } from '../../utils/test-data';
+import { waitForDbRecord } from '../../utils/helpers';
 
 /**
  * Data Persistence Tests — Verify data survives page reloads and re-logins.
@@ -45,9 +46,6 @@ test.describe('Data Persistence', () => {
   test('data persists after logout/login cycle', { retries: 1 }, async ({
     page, loginPage, dashboardPage, inventarioPage, sidebar
   }) => {
-    // FIXME #137: Supabase inventory fetch after re-login times out on Vercel preview cold starts.
-    // 8 fix attempts failed. Marking fixme to unblock PRs #125/#128/#129/#130/#131.
-    test.fixme(true, 'Flaky: Supabase fetch incomplete after re-login on Vercel preview cold starts. See issue #137.');
     await showPhaseLabel(page, '🔄 Persistence: Login Cycle');
 
     // Add a distinctive part
@@ -80,19 +78,21 @@ test.describe('Data Persistence', () => {
     // Login again
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
-    // Reload after re-login to force a fresh cargarDatos() with warm auth token.
-    // Root cause of fix#1-#8 failures: getRefacciones() silently returns [] on
-    // Supabase cold-start/transient errors (drops { error } from destructuring).
-    // cargarDatos() then sets inventario=[] without throwing. page.reload() retries
-    // cargarDatos() when the auth token is fully warm — consistent DB fetch.
+
+    // Confirm the record is in Supabase via the service-role API endpoint before
+    // asserting in the UI. This separates "did the DB commit?" from "did the app
+    // fetch succeed?" — the latter can lag on Vercel preview cold starts.
+    await waitForDbRecord(page, 'refacciones', partName, 60_000);
+
+    // Reload to force a fresh cargarDatos() with warm auth token.
+    // cargarDatos() now retries up to 3 times with exponential backoff (see page.tsx),
+    // so a single reload is sufficient once we know the record is in the DB.
     await page.reload();
     await page.locator('[data-testid="app-content-loaded"]').waitFor({ state: 'visible', timeout: 60_000 });
 
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();
 
-    // Use expect() with built-in retry — replaces silent .catch(() => {}) pattern
-    // that masked timeout failures as assertion failures.
     await expect(page.getByText(partName)).toBeVisible({ timeout: 45_000 });
     const exists2 = await inventarioPage.isPartVisible(partName);
     expect(exists2).toBe(true);
