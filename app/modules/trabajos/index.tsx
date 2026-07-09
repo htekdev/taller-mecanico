@@ -405,6 +405,7 @@ export function VistaTrabajo({
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
   const [capturandoTftId, setCapturandoTftId] = useState<string | null>(null);
   const [tftNumeroDraft, setTftNumeroDraft] = useState('');
+  const [errorTft, setErrorTft] = useState<string | null>(null);
   const [verCancelados, setVerCancelados] = useState(false);
 
   // ── Departamentos CRUD ──────────────────────────────────────────────────
@@ -681,9 +682,14 @@ export function VistaTrabajo({
   const guardarTft = async (trabajoId: string) => {
     const numero = tftNumeroDraft.trim();
     if (!numero) return;
-    await onActualizarTft(trabajoId, numero);
-    setCapturandoTftId(null);
-    setTftNumeroDraft('');
+    setErrorTft(null);
+    try {
+      await onActualizarTft(trabajoId, numero);
+      setCapturandoTftId(null);
+      setTftNumeroDraft('');
+    } catch {
+      setErrorTft('No se pudo guardar el número TFT. Intenta de nuevo.');
+    }
   };
 
   const finalizarDesdeFila = (trabajo: Trabajo) => {
@@ -1762,15 +1768,18 @@ export function VistaTrabajo({
                                     <Btn size="sm" variant="primary" onClick={() => guardarTft(trabajo.id)} disabled={!tftNumeroDraft.trim()}>
                                       Guardar
                                     </Btn>
-                                    <Btn size="sm" variant="ghost" onClick={() => { setCapturandoTftId(null); setTftNumeroDraft(''); }}>
+                                    <Btn size="sm" variant="ghost" onClick={() => { setCapturandoTftId(null); setTftNumeroDraft(''); setErrorTft(null); }}>
                                       Cancelar
                                     </Btn>
                                   </div>
+                                  {errorTft && (
+                                    <p className="text-xs text-rose-600">{errorTft}</p>
+                                  )}
                                 </div>
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => { setCapturandoTftId(trabajo.id); setTftNumeroDraft(''); }}
+                                  onClick={() => { setCapturandoTftId(trabajo.id); setTftNumeroDraft(''); setErrorTft(null); }}
                                   className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                                 >
                                   + Registrar TFT
