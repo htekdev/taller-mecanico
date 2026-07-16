@@ -81,27 +81,23 @@ describe('getVehiculos — error handling (PR #148)', () => {
 
 // ── getRefacciones ──────────────────────────────────────────────────────────
 
-describe('getRefacciones — logs error, does not throw (PR #148)', () => {
-  it('does NOT throw on Supabase error — returns empty array', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+describe('getRefacciones - throws on error (PR #171)', () => {
+  it('throws with [getRefacciones] prefix on Supabase error', async () => {
     mockSelectError(DB_ERROR);
-    await expect(getRefacciones('t1')).resolves.toEqual([]);
-    consoleSpy.mockRestore();
+    await expect(getRefacciones('t1')).rejects.toThrow('[getRefacciones] Connection timeout');
   });
 
-  it('logs error message and code via console.error with [getRefacciones] prefix', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockSelectError(DB_ERROR);
+  it('returns empty array when data is null and no error', async () => {
+    mockSelectError(null);
+    await expect(getRefacciones('t1')).resolves.toEqual([]);
+  });
+
+  it('queries the refacciones table', async () => {
+    mockSelectError(null);
     await getRefacciones('t1');
-    expect(consoleSpy).toHaveBeenCalledWith(
-      '[getRefacciones] Supabase error:',
-      'Connection timeout',
-      '57P01',
-    );
-    consoleSpy.mockRestore();
+    expect(mockFrom).toHaveBeenCalledWith('refacciones');
   });
 });
-
 // ── getProveedores ──────────────────────────────────────────────────────────
 
 describe('getProveedores — error handling (PR #148)', () => {
