@@ -5,7 +5,7 @@
  * Before PR #148, all getters silently returned [] on DB errors.
  * After PR #148:
  *   - 10 getters throw new Error('[getFnName] <message>') so cargarDatos catches & shows errorBanner
- *   - getRefacciones logs via console.error (partial fix)
+ *   - getRefacciones throws on error (updated PR #171)
  */
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { supabase } from '@/app/lib/supabase';
