@@ -28,6 +28,7 @@ import { VistaGastos } from '@/app/modules/gastos';
 import { VistaReportes } from '@/app/modules/reportes';
 import { useAuth }      from '@/app/context/auth';
 import * as db          from '@/app/lib/db';
+import { ThemeToggle }  from '@/app/components/ThemeToggle';
 
 type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones'|'gastos'|'reportes';
 
@@ -950,7 +951,7 @@ export default function TallerMecanico() {
   ] as const;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
       {/* Error banner — replaces alert() for mobile-friendly error display */}
       {errorBanner && (
         <div role="alert" aria-live="assertive"
@@ -983,22 +984,22 @@ export default function TallerMecanico() {
                     {/* Backdrop */}
                     <div className="fixed inset-0 z-10" onClick={() => setShowTallerMenu(false)} />
                     {/* Dropdown */}
-                    <div className="absolute left-0 top-full mt-2 z-20 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 min-w-[220px]">
-                      <p className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Cambiar taller</p>
+                    <div className="absolute left-0 top-full mt-2 z-20 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 min-w-[220px]">
+                      <p className="px-3 py-1.5 text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Cambiar taller</p>
                       {talleres.map(t => (
                         <button
                           key={t.id}
                           onClick={() => { selectTaller(t.id); setShowTallerMenu(false); }}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors ${
-                            t.id === taller?.id ? 'bg-indigo-50' : ''
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${
+                            t.id === taller?.id ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''
                           }`}
                         >
                           <span className="text-lg">🔧</span>
                           <div className="flex-1 min-w-0">
-                            <div className={`text-sm font-semibold truncate ${t.id === taller?.id ? 'text-indigo-700' : 'text-slate-800'}`}>
+                            <div className={`text-sm font-semibold truncate ${t.id === taller?.id ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>
                               {t.nombre}
                             </div>
-                            <div className="text-xs text-slate-400">
+                            <div className="text-xs text-slate-400 dark:text-slate-500">
                               {t.role === 'owner' ? '🏠 Dueño' : '🔧 Mecánico'}
                             </div>
                           </div>
@@ -1015,6 +1016,7 @@ export default function TallerMecanico() {
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             <span className="text-slate-500 text-xs hidden sm:block truncate max-w-[8rem]">{user?.email}</span>
+            <ThemeToggle />
             <button onClick={signOut}
               className="text-xs text-slate-400 hover:text-white border border-slate-600 hover:border-slate-400 px-3 py-1.5 rounded-lg transition-colors">
               Salir
@@ -1024,11 +1026,11 @@ export default function TallerMecanico() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <nav className="flex gap-1 mb-6 bg-white rounded-xl p-1.5 shadow-sm border border-slate-200 overflow-x-auto">
+        <nav className="flex gap-1 mb-6 bg-white dark:bg-slate-800 rounded-xl p-1.5 shadow-sm border border-slate-200 dark:border-slate-700 overflow-x-auto">
           {tabs.map(({ key, icon, label, count }) => (
             <button key={key} onClick={() => setVista(key)}
               className={`relative flex items-center gap-2 px-3 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 whitespace-nowrap ${
-                vista === key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                vista === key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700'
               }`}>
               <span>{icon}</span>
               <span>{label}</span>
@@ -1038,7 +1040,7 @@ export default function TallerMecanico() {
                     : (typeof count === 'string' && count.startsWith('⚠')) ? 'bg-rose-100 text-rose-600'
                     : (typeof count === 'string' && count.startsWith('🕐')) ? 'bg-amber-100 text-amber-700'
                     : (key === 'cuentas' && facturasPendientes > 0) || (key === 'pagos' && ordenesPendientesPago > 0) || (key === 'ordenes' && ordenesPendientesRecibir > 0) ? 'bg-rose-100 text-rose-600'
-                    : 'bg-slate-200 text-slate-600'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                 }`}>{count}</span>
               )}
             </button>
@@ -1047,7 +1049,7 @@ export default function TallerMecanico() {
 
         {cargando ? (
           <div className="flex items-center justify-center py-24">
-            <div className="text-slate-400 text-sm">Cargando datos del taller...</div>
+            <div className="text-slate-400 dark:text-slate-500 text-sm">Cargando datos del taller...</div>
           </div>
         ) : (
         <Card className="p-6 sm:p-8" data-testid="app-content-loaded">
@@ -1156,12 +1158,12 @@ export default function TallerMecanico() {
       {/* ── Modal: Número de Factura ── */}
       {pendingFactura && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-bold text-slate-800 mb-1">🧾 Número de Factura</h2>
-            <p className="text-sm text-slate-500 mb-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">🧾 Número de Factura</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
               Escribe el número de factura que manejan en el taller. Puedes usar la sugerencia o escribir el tuyo propio.
             </p>
-            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1">
               Número de factura
             </label>
             <input
@@ -1179,21 +1181,21 @@ export default function TallerMecanico() {
               }}
               onKeyDown={e => { if (e.key === 'Enter') confirmarFactura(); if (e.key === 'Escape') setPendingFactura(null); }}
               placeholder="A-001 = con IVA · SF-001 = sin IVA"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-1"
+              className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg px-3 py-2.5 text-sm font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-1"
             />
-            <p className="text-xs text-slate-400 mb-4">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
               💡 El IVA se ajusta automáticamente según el prefijo: <span className="font-mono font-semibold">A</span> = con IVA · <span className="font-mono font-semibold">SF</span> = sin IVA
             </p>
-            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1">
               Fecha de factura
             </label>
             <input
               type="date"
               value={pendingFactura.fecha}
               onChange={e => setPendingFactura(prev => prev ? { ...prev, fecha: e.target.value } : null)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
+              className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
             />
-            <label className="flex items-center gap-3 cursor-pointer select-none mb-5 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+            <label className="flex items-center gap-3 cursor-pointer select-none mb-5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg px-4 py-3">
               <input
                 type="checkbox"
                 checked={pendingFactura.incluirIva}
@@ -1201,8 +1203,8 @@ export default function TallerMecanico() {
                 className="w-4 h-4 accent-indigo-600"
               />
               <div>
-                <span className="text-sm font-semibold text-slate-700">Incluir IVA (16%)</span>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Incluir IVA (16%)</span>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   {pendingFactura.incluirIva ? '✅ Se sumará 16% de IVA al total' : '⬜ Sin IVA — cobro informal o cliente exento'}
                 </p>
               </div>
@@ -1210,7 +1212,7 @@ export default function TallerMecanico() {
             <div className="flex gap-3">
               <button
                 onClick={() => setPendingFactura(null)}
-                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
+                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                 Cancelar
               </button>
               <button
