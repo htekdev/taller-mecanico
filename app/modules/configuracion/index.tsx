@@ -153,7 +153,7 @@ export function VistaConfiguracion() {
         <h3 className="text-base font-semibold text-slate-700 mb-4">👥 Miembros del Taller</h3>
 
         {roleMensaje && (
-          <div className={`mb-3 px-4 py-3 rounded-xl text-sm ${
+          <div role="alert" className={`mb-3 px-4 py-3 rounded-xl text-sm ${
             roleMensaje.tipo === 'ok'
               ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
               : 'bg-rose-50 border border-rose-200 text-rose-700'
