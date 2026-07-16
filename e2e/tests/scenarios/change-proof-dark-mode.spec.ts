@@ -34,7 +34,7 @@ test.describe('dark-mode-toggle', () => {
     const toggleBtn = page.locator('[data-testid="theme-toggle"]');
     await toggleBtn.waitFor({ state: 'visible', timeout: 10_000 });
 
-    // Ensure we're starting in light mode (remove dark class if present from prior test)
+    // Ensure we're starting in light mode
     await page.evaluate(() => {
       document.documentElement.classList.remove('dark');
       localStorage.removeItem('taller-theme');
@@ -45,13 +45,9 @@ test.describe('dark-mode-toggle', () => {
 
     // Click → should switch to dark
     await toggleBtn.click();
-    await page.waitForTimeout(500);
 
-    // html element should have .dark class
-    const hasDark = await page.evaluate(() =>
-      document.documentElement.classList.contains('dark')
-    );
-    expect(hasDark).toBe(true);
+    // Wait for .dark class to appear on <html> (not a fixed sleep)
+    await expect(page.locator('html')).toHaveClass(/dark/, { timeout: 3_000 });
 
     // Button should now show sun emoji
     await expect(toggleBtn).toContainText('☀️');
@@ -66,12 +62,10 @@ test.describe('dark-mode-toggle', () => {
     const toggleBtn = page.locator('[data-testid="theme-toggle"]');
     await toggleBtn.waitFor({ state: 'visible', timeout: 10_000 });
 
-    // Start fresh in dark mode
+    // Start fresh in dark mode — set localStorage and reload so blocking script picks it up
     await page.evaluate(() => {
-      document.documentElement.classList.add('dark');
       localStorage.setItem('taller-theme', 'dark');
     });
-    // Force React to re-read state by reloading
     await page.reload();
     await page.locator('[data-testid="app-content-loaded"]')
       .waitFor({ state: 'visible', timeout: 60_000 }).catch(() => {});
@@ -84,12 +78,9 @@ test.describe('dark-mode-toggle', () => {
 
     // Click → back to light
     await toggleBtnReloaded.click();
-    await page.waitForTimeout(500);
 
-    const hasDark = await page.evaluate(() =>
-      document.documentElement.classList.contains('dark')
-    );
-    expect(hasDark).toBe(false);
+    // Wait for .dark class to be removed from <html>
+    await expect(page.locator('html')).not.toHaveClass(/dark/, { timeout: 3_000 });
 
     await expect(toggleBtnReloaded).toContainText('🌙');
   });
@@ -109,23 +100,20 @@ test.describe('dark-mode-toggle', () => {
       localStorage.setItem('taller-theme', 'light');
     });
 
-    // Toggle to dark
+    // Toggle to dark — wait for class to confirm the toggle completed
     await toggleBtn.click();
-    await page.waitForTimeout(500);
+    await expect(page.locator('html')).toHaveClass(/dark/, { timeout: 3_000 });
 
     // Verify localStorage was updated
     const storedTheme = await page.evaluate(() => localStorage.getItem('taller-theme'));
     expect(storedTheme).toBe('dark');
 
-    // Reload — theme should persist
+    // Reload — theme should persist (blocking script in layout.tsx applies .dark before paint)
     await page.reload();
     await page.locator('[data-testid="app-content-loaded"]')
       .waitFor({ state: 'visible', timeout: 60_000 }).catch(() => {});
 
-    const hasDarkAfterReload = await page.evaluate(() =>
-      document.documentElement.classList.contains('dark')
-    );
-    expect(hasDarkAfterReload).toBe(true);
+    await expect(page.locator('html')).toHaveClass(/dark/, { timeout: 5_000 });
 
     // Clean up
     await page.evaluate(() => localStorage.removeItem('taller-theme'));
@@ -146,26 +134,27 @@ test.describe('dark-mode-toggle', () => {
       localStorage.removeItem('taller-theme');
     });
 
-    // Verify light background is NOT dark slate
-    const lightBg = await page.evaluate(() => {
-      const el = document.querySelector('.min-h-screen');
-      return window.getComputedStyle(el!).backgroundColor;
-    });
-    // Light mode: bg-slate-50 ≈ rgb(248, 250, 252)
-    expect(lightBg).toMatch(/248|249|250/);
+    const appWrapper = page.locator('[data-testid="app-wrapper"]');
+    await expect(appWrapper).toBeVisible({ timeout: 5_000 });
 
-    // Switch to dark
+    // Light mode: bg-slate-50 = rgb(248, 250, 252)
+    const lightBg = await appWrapper.evaluate(el =>
+      window.getComputedStyle(el).backgroundColor
+    );
+    expect(lightBg).toBe('rgb(248, 250, 252)');
+
+    // Switch to dark and wait for class to apply
     await toggleBtn.click();
-    await page.waitForTimeout(500);
+    await expect(page.locator('html')).toHaveClass(/dark/, { timeout: 3_000 });
 
-    // Dark mode: bg-slate-900 ≈ rgb(15, 23, 42)
-    const darkBg = await page.evaluate(() => {
-      const el = document.querySelector('.min-h-screen');
-      return window.getComputedStyle(el!).backgroundColor;
-    });
-    expect(darkBg).toMatch(/15|23|42/);
+    // Dark mode: bg-slate-900 = rgb(15, 23, 42)
+    const darkBg = await appWrapper.evaluate(el =>
+      window.getComputedStyle(el).backgroundColor
+    );
+    expect(darkBg).toBe('rgb(15, 23, 42)');
 
     // Clean up
     await page.evaluate(() => localStorage.removeItem('taller-theme'));
   });
 });
+

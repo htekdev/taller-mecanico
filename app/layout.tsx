@@ -31,6 +31,13 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Blocking theme script — prevents FOUC on dark-mode reload.
+            Runs synchronously before React hydration so .dark class is set
+            before the first paint. suppressHydrationWarning on <html> hides
+            the React class mismatch warning. */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('taller-theme');if(t==='dark'||(t==null&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();` }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
           <AuthProvider>
