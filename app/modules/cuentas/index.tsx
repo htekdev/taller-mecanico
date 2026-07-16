@@ -265,6 +265,7 @@ function ReporteCliente({
 }) {
   const reporteRef = useRef<HTMLDivElement>(null);
   const [generandoPDF, setGenerandoPDF] = useState(false);
+  const [errorPDF, setErrorPDF] = useState<string | null>(null);
 
   const facsPend = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado');
   // trabajos ya viene filtrado (solo completados, desde legacyPorCliente) — notas incluidas
