@@ -502,15 +502,19 @@ export default function TallerMecanico() {
             const inv = inventario.find(r => r.id === p.refaccionId);
             return inv && !inv.proveedorId;
           });
-          await Promise.all(itemsToBackfill.map(p =>
-            db.updateRefaccionProveedor(p.refaccionId, orden.proveedorId!).catch(e =>
-              console.error('[recibirOrden] backfill proveedor FAILED for', p.refaccionId, e)
-            )
-          ));
-          const nuevoInvConProv = nuevoInv.map(r => {
-            const needsBackfill = itemsToBackfill.some(p => p.refaccionId === r.id);
-            return needsBackfill ? { ...r, proveedorId: orden.proveedorId } : r;
+          const backfillResults = await Promise.allSettled(
+            itemsToBackfill.map(p => db.updateRefaccionProveedor(p.refaccionId, orden.proveedorId!))
+          );
+          backfillResults.forEach((result, i) => {
+            if (result.status === 'rejected')
+              console.error('[recibirOrden] backfill FAILED for', itemsToBackfill[i].refaccionId, result.reason);
           });
+          const succeededIds = new Set(
+            itemsToBackfill.filter((_, i) => backfillResults[i].status === 'fulfilled').map(p => p.refaccionId)
+          );
+          const nuevoInvConProv = nuevoInv.map(r =>
+            succeededIds.has(r.id) ? { ...r, proveedorId: orden.proveedorId } : r
+          );
           setInventario(nuevoInvConProv);
         } else {
           setInventario(nuevoInv);
