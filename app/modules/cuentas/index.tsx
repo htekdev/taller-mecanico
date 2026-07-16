@@ -345,7 +345,7 @@ function ReporteCliente({
 
         {/* PDF error message */}
         {errorPDF && (
-          <div className="mx-6 mt-3 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">
+          <div role="alert" className="mx-6 mt-3 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">
             ⚠️ {errorPDF}
           </div>
         )}
