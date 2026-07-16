@@ -951,7 +951,7 @@ export default function TallerMecanico() {
   ] as const;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+    <div data-testid="app-wrapper" className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
       {/* Error banner — replaces alert() for mobile-friendly error display */}
       {errorBanner && (
         <div role="alert" aria-live="assertive"

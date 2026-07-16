@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -17,24 +17,14 @@ const ThemeContext = createContext<ThemeContextValue>({
 const STORAGE_KEY = 'taller-theme';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light');
-
-  useEffect(() => {
-    // On mount: read localStorage or fall back to system preference
-    let initial: Theme = 'light';
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-      if (stored === 'dark' || stored === 'light') {
-        initial = stored;
-      } else {
-        initial = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-    } catch {
-      // localStorage unavailable (SSR safety)
+  // Initialize from the DOM — the blocking <script> in layout.tsx already applied
+  // .dark synchronously before React hydrates, so we just read the current class.
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== 'undefined') {
+      return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
     }
-    setTheme(initial);
-    document.documentElement.classList.toggle('dark', initial === 'dark');
-  }, []);
+    return 'light'; // SSR default — blocking script handles client-side
+  });
 
   const toggleTheme = () => {
     setTheme(prev => {
