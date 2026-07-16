@@ -109,24 +109,32 @@ export function VistaConfiguracion() {
     setUpdatingRole(member.id);
     setRoleMensaje(null);
 
-    const ok = await db.updateMemberRole(member.id, taller.id, newRole);
+    try {
+      const ok = await db.updateMemberRole(member.id, taller.id, newRole);
 
-    if (ok) {
-      setMembers(prev => prev.map(m =>
-        m.id === member.id ? { ...m, role: newRole } : m,
-      ));
-      setRoleMensaje({
-        tipo: 'ok',
-        texto: `✅ Rol de ${displayEmail(member)} actualizado a ${ROLE_LABEL[newRole]}.`,
-      });
-    } else {
+      if (ok) {
+        setMembers(prev => prev.map(m =>
+          m.id === member.id ? { ...m, role: newRole } : m,
+        ));
+        setRoleMensaje({
+          tipo: 'ok',
+          texto: `✅ Rol de ${displayEmail(member)} actualizado a ${ROLE_LABEL[newRole]}.`,
+        });
+      } else {
+        setRoleMensaje({
+          tipo: 'error',
+          texto: `⚠️ No se pudo cambiar el rol. Solo los dueños pueden editar roles.`,
+        });
+      }
+    } catch (err) {
+      console.error('[configuracion] updateMemberRole error:', err);
       setRoleMensaje({
         tipo: 'error',
-        texto: `⚠️ No se pudo cambiar el rol. Solo los dueños pueden editar roles.`,
+        texto: '⚠️ Error al cambiar el rol. Verifica tu conexión e intenta de nuevo.',
       });
+    } finally {
+      setUpdatingRole(null);
     }
-
-    setUpdatingRole(null);
   };
 
   if (!taller) return null;
@@ -145,7 +153,7 @@ export function VistaConfiguracion() {
         <h3 className="text-base font-semibold text-slate-700 mb-4">👥 Miembros del Taller</h3>
 
         {roleMensaje && (
-          <div className={`mb-3 px-4 py-3 rounded-xl text-sm ${
+          <div role="alert" className={`mb-3 px-4 py-3 rounded-xl text-sm ${
             roleMensaje.tipo === 'ok'
               ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
               : 'bg-rose-50 border border-rose-200 text-rose-700'
