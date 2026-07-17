@@ -327,7 +327,12 @@ function ReporteCliente({
               disabled={generandoPDF}
               onClick={async () => {
                 setGenerandoPDF(true);
+                setErrorPDF(null);
                 try { await generarPDFReporte(cliente, facturas, trabajos, vehiculos); }
+                catch (err) {
+                  console.error('[cuentas] generarPDFReporte error:', err);
+                  setErrorPDF('⚠️ No se pudo generar el PDF. Verifica tu conexión e intenta de nuevo.');
+                }
                 finally { setGenerandoPDF(false); }
               }}
             >
@@ -336,6 +341,11 @@ function ReporteCliente({
             <Btn variant="primary" size="sm" onClick={handleImprimir}>🖨️ Imprimir</Btn>
             <Btn variant="ghost" size="sm" onClick={onCerrar}>✕</Btn>
           </div>
+          {errorPDF && (
+            <div role="alert" className="mx-6 mt-3 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">
+              {errorPDF}
+            </div>
+          )}
         </div>
 
         {/* Printable content */}
