@@ -1770,7 +1770,7 @@ export function VistaTrabajo({
                                   />
                                   <div className="flex gap-1">
                                     <Btn size="sm" variant="primary" onClick={() => guardarTft(trabajo.id)} disabled={!tftNumeroDraft.trim() || isSavingTft}>
-                                      Guardar
+                                      {isSavingTft ? 'Guardando…' : 'Guardar'}
                                     </Btn>
                                     <Btn size="sm" variant="ghost" onClick={() => { setCapturandoTftId(null); setTftNumeroDraft(''); setErrorTft(null); }}>
                                       Cancelar
