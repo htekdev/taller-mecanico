@@ -406,6 +406,7 @@ export function VistaTrabajo({
   const [capturandoTftId, setCapturandoTftId] = useState<string | null>(null);
   const [tftNumeroDraft, setTftNumeroDraft] = useState('');
   const [errorTft, setErrorTft] = useState<string | null>(null);
+  const [isSavingTft, setIsSavingTft] = useState(false);
   const [verCancelados, setVerCancelados] = useState(false);
 
   // ── Departamentos CRUD ──────────────────────────────────────────────────
@@ -681,14 +682,17 @@ export function VistaTrabajo({
 
   const guardarTft = async (trabajoId: string) => {
     const numero = tftNumeroDraft.trim();
-    if (!numero) return;
+    if (!numero || isSavingTft) return;
     setErrorTft(null);
+    setIsSavingTft(true);
     try {
       await onActualizarTft(trabajoId, numero);
       setCapturandoTftId(null);
       setTftNumeroDraft('');
     } catch {
       setErrorTft('No se pudo guardar el número TFT. Intenta de nuevo.');
+    } finally {
+      setIsSavingTft(false);
     }
   };
 
