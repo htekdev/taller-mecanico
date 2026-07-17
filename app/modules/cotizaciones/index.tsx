@@ -1425,7 +1425,13 @@ export function VistaCotizaciones({
           <div className="mt-8 text-center text-red-400 py-10">
             <div className="text-2xl mb-2">⚠️</div>
             <p className="text-sm">{initError}</p>
-            <button onClick={() => { setInitError(null); recargarHistory(); }} className="mt-3 text-sm text-slate-500 underline py-2 px-3 rounded hover:bg-slate-100 active:bg-slate-200">
+            <button onClick={() => {
+                setInitError(null);
+                recargarHistory().catch(err => {
+                  console.error('[cotizaciones] reintentar error:', err);
+                  setInitError('No se pudo cargar el historial. Verifica tu conexión e intenta de nuevo.');
+                });
+              }} className="mt-3 text-sm text-slate-500 underline py-3 px-3 rounded hover:bg-slate-100 active:bg-slate-200">
               Reintentar
             </button>
           </div>
