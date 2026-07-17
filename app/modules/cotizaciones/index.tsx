@@ -1178,6 +1178,7 @@ export function VistaCotizaciones({
       setHistory(rows.map(rowToEntry));
     } catch (err) {
       console.error('[cotizaciones] recargarHistory error:', err);
+      throw err; // let callers decide how to handle reload failures
     }
   }, [tallerId]);
 
@@ -1296,7 +1297,7 @@ export function VistaCotizaciones({
         form:     savedForm as unknown as Record<string, unknown>,
         savedAt:  new Date().toISOString(),
       });
-      await recargarHistory();
+      await recargarHistory().catch(() => {}); // save committed — reload failure is non-critical
       const updated = history.find(e => e.id === editingId);
       const entry: CotizacionGuardada = updated
         ? { ...updated, cliente: clienteNombre, fecha: form.fecha, total, form: savedForm, editada: true }
@@ -1318,7 +1319,7 @@ export function VistaCotizaciones({
         convertida:       false,
         form:             savedForm as unknown as Record<string, unknown>,
       });
-      await recargarHistory();
+      await recargarHistory().catch(() => {}); // save committed — reload failure is non-critical
       if (!row) throw new Error('No se pudo guardar la cotización');
       const entry: CotizacionGuardada = rowToEntry(row);
       setForm(savedForm);
@@ -1335,14 +1336,16 @@ export function VistaCotizaciones({
 
   // ── Cancel a quote (soft) ─────────────────────────────────────────────────
   const handleCancelar = async (id: string) => {
+    setErrorGuardar(null);
     try {
       await db.updateCotizacion(id, { cancelada: true });
-      await recargarHistory();
       if (viewEntry?.id === id) setViewEntry(v => v ? { ...v, cancelada: true } : v);
     } catch (err) {
-      setErrorGuardar('⚠️ No se pudo cancelar la cotización. Verifica tu conexión e intenta de nuevo.');
+      setErrorGuardar('No se pudo cancelar la cotización. Verifica tu conexión e intenta de nuevo.');
       console.error('[cotizaciones] handleCancelar error:', err);
+      return;
     }
+    await recargarHistory().catch(() => {}); // cancel committed — reload failure is non-critical
   };
 
   // ── Conversion handlers ──────────────────────────────────────────────────
@@ -1402,6 +1405,9 @@ export function VistaCotizaciones({
     return (
       <div>
         <SectionTitle title="Cotizaciones" subtitle="Crea y guarda cotizaciones para tus clientes"/>
+        {errorGuardar && (
+          <div className="mb-3 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded px-3 py-2">❌ {errorGuardar}</div>
+        )}
         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Nueva Cotización</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {PLANTILLAS.map(p => (
@@ -1419,7 +1425,13 @@ export function VistaCotizaciones({
           <div className="mt-8 text-center text-red-400 py-10">
             <div className="text-2xl mb-2">⚠️</div>
             <p className="text-sm">{initError}</p>
-            <button onClick={() => { setInitError(null); recargarHistory(); }} className="mt-3 text-xs text-slate-400 underline">
+            <button onClick={() => {
+                setInitError(null);
+                recargarHistory().catch(err => {
+                  console.error('[cotizaciones] reintentar error:', err);
+                  setInitError('No se pudo cargar el historial. Verifica tu conexión e intenta de nuevo.');
+                });
+              }} className="mt-3 text-sm text-slate-500 underline py-3 px-3 rounded hover:bg-slate-100 active:bg-slate-200">
               Reintentar
             </button>
           </div>
@@ -1631,7 +1643,7 @@ export function VistaCotizaciones({
             </span>
           )}
           {errorGuardar && (
-            <span className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded px-2 py-1 w-full">❌ {errorGuardar}</span>
+            <span className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded px-2 py-1 w-full">❌ {errorGuardar}</span>
           )}
         </div>
       </div>
@@ -1642,13 +1654,20 @@ export function VistaCotizaciones({
   // Pantalla: PREVIEW
   // ══════════════════════════════════════════════════════════════════════════
   return (
-    <VistaPreviaContenido
-      plantilla={viewEntry?.plantilla ?? plantilla}
-      form={form}
-      entry={viewEntry}
-      onEditar={handleEditar}
-      onNueva={() => setPantalla('inicio')}
-    />
+    <>
+      {errorGuardar && (
+        <div className="mb-3 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded px-3 py-2">❌ {errorGuardar}</div>
+      )}
+      <VistaPreviaContenido
+        plantilla={viewEntry?.plantilla ?? plantilla}
+        form={form}
+        entry={viewEntry}
+        onEditar={handleEditar}
+        onNueva={() => { setErrorGuardar(null); setPantalla('inicio'); }}
+      />
+    </>
   );
 }
+
+
 

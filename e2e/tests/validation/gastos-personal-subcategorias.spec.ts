@@ -18,6 +18,7 @@ import { showPhaseLabel } from '../visual-assert';
  */
 
 test.describe('Gastos — Personal Category Subcategories', () => {
+  test.describe.configure({ retries: 1 }); // Supabase cold-start flaky
   test.beforeEach(async ({ loginPage, dashboardPage }) => {
     await loginPage.loginAsTestUser();
     await dashboardPage.navigateToModule('gastos');
@@ -148,6 +149,7 @@ test.describe('Gastos — Personal Category Subcategories', () => {
   test('switching back from Personal resets subcategory list', async ({
     page, dashboardPage, gastosPage,
   }) => {
+    test.slow();
     await showPhaseLabel(page, '🔄 Phase 1: Category Switch Reset');
 
     // Open form

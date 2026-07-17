@@ -125,9 +125,10 @@ test.describe('Error Recovery', () => {
     await showPhaseLabel(page, '✅ Graceful Error Handling');
   });
 
-  test('multiple rapid saves do not corrupt state', async ({
+  test('multiple rapid saves do not corrupt state', { retries: 1 }, async ({
     page, dashboardPage, inventarioPage
   }) => {
+    test.slow(); // Supabase cold-start: navigateToModule(inventario) can take 3+ min
     await showPhaseLabel(page, '⚡ Rapid Saves');
     await dashboardPage.navigateToModule('inventario');
     await inventarioPage.waitForPageLoad();

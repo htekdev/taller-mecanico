@@ -19,9 +19,11 @@ test.describe('Expense Tracking (Gastos)', () => {
     await loginPage.loginAsTestUser();
   });
 
-  test('gastos module loads and functions', async ({
+  // Supabase cold-start can delay first module load — test.slow() + retries:1 guards against flakes
+  test('gastos module loads and functions', { retries: 1 }, async ({
     page, dashboardPage, gastosPage
   }) => {
+    test.slow(); // Supabase cold-start on Vercel preview can take 2-3min
     await showPhaseLabel(page, '💸 Phase 1: Load Gastos');
     await dashboardPage.navigateToModule('gastos');
     await gastosPage.waitForPageLoad();
