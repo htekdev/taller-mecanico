@@ -1336,14 +1336,16 @@ export function VistaCotizaciones({
 
   // ── Cancel a quote (soft) ─────────────────────────────────────────────────
   const handleCancelar = async (id: string) => {
+    setErrorGuardar(null);
     try {
       await db.updateCotizacion(id, { cancelada: true });
-      await recargarHistory();
       if (viewEntry?.id === id) setViewEntry(v => v ? { ...v, cancelada: true } : v);
     } catch (err) {
       setErrorGuardar('No se pudo cancelar la cotización. Verifica tu conexión e intenta de nuevo.');
       console.error('[cotizaciones] handleCancelar error:', err);
+      return;
     }
+    await recargarHistory().catch(() => {}); // cancel committed — reload failure is non-critical
   };
 
   // ── Conversion handlers ──────────────────────────────────────────────────
