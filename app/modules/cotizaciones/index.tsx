@@ -274,16 +274,22 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion, 
     } else {
       items.forEach((item, idx) => {
         const rowTotal = calcItem(item);
+        // Split description into lines so long text wraps instead of truncating
+        const descLines: string[] = doc.splitTextToSize(item.descripcion || '', cols.desc - 2);
+        const lineH = 3.8; // mm per line at 7.5pt
+        const rowH = Math.max(rh, descLines.length * lineH + 2);
         const bg: [number, number, number] = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
-        doc.setFillColor(...bg); doc.rect(ml, ty, cw, rh, 'F');
+        doc.setFillColor(...bg); doc.rect(ml, ty, cw, rowH, 'F');
         doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(0, 0, 0);
         cx = ml;
-        doc.text(String(idx + 1), cx + 2, ty + 4.2); cx += cols.no;
-        doc.text(item.cantidad || '1', cx + 2, ty + 4.2); cx += cols.qty;
-        doc.text((doc.splitTextToSize(item.descripcion || '', cols.desc - 2))[0] || '', cx + 2, ty + 4.2); cx += cols.desc;
-        doc.text('$' + fmtPeso(parseNum(item.precioUnitario)), cx + 1, ty + 4.2); cx += cols.price;
-        doc.text('$' + fmtPeso(rowTotal), cx + 1, ty + 4.2);
-        ty += rh; doc.setDrawColor(230, 235, 245); doc.line(ml, ty, ml + cw, ty);
+        const midY = ty + rowH / 2 + 1.2;
+        doc.text(String(idx + 1), cx + 2, midY); cx += cols.no;
+        doc.text(item.cantidad || '1', cx + 2, midY); cx += cols.qty;
+        // Render all description lines top-aligned in the cell
+        doc.text(descLines, cx + 2, ty + 3.8); cx += cols.desc;
+        doc.text('$' + fmtPeso(parseNum(item.precioUnitario)), cx + 1, midY); cx += cols.price;
+        doc.text('$' + fmtPeso(rowTotal), cx + 1, midY);
+        ty += rowH; doc.setDrawColor(230, 235, 245); doc.line(ml, ty, ml + cw, ty);
       });
     }
     // Section subtotal row — just "Subtotal:" without the section name
