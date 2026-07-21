@@ -75,7 +75,7 @@ async function generarPDFReporte(
 
   // ═══ DOCUMENT TITLE + DATE ════════════════════════════════════════════════
   doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...DARK);
-  doc.text('ESTADO DE CUENTA', ml, y + 4);
+  doc.text('CUENTAS POR COBRAR — SALDO PENDIENTE', ml, y + 4);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...MID);
   doc.text(fechaHoy, ml + cw, y + 4, { align: 'right' });
   y += 10;
@@ -143,11 +143,10 @@ async function generarPDFReporte(
 
   // ═══ FACTURAS ═════════════════════════════════════════════════════════════
   const facsPend  = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado');
-  const facsAll   = facturas;
-  const showFacs  = facsAll.length > 0;
+  const showFacs  = facsPend.length > 0;
 
   if (showFacs) {
-    sectionLabel('Facturas emitidas');
+    sectionLabel('Facturas con saldo pendiente');
     const wFolio = 32, wFecha = 28, wTotal = 34, wPagado = 34, wSaldo = 34, wEst = cw - 162;
     thead([
       { label: 'FOLIO',     w: wFolio,  align: 'left'   },
@@ -157,7 +156,7 @@ async function generarPDFReporte(
       { label: 'SALDO',     w: wSaldo,  align: 'right'  },
       { label: 'ESTATUS',   w: wEst,    align: 'center' },
     ]);
-    facsAll.forEach((f, i) => {
+    facsPend.forEach((f, i) => {
       const estado  = getEstadoPagoFactura(f);
       const pagado  = getMontoPagadoFactura(f);
       const saldo   = getSaldoFactura(f);
@@ -207,8 +206,6 @@ async function generarPDFReporte(
   // ═══ SALDO TOTAL ══════════════════════════════════════════════════════════
   const totalPend = facsPend.reduce((s, f) => s + getSaldoFactura(f), 0)
     + trabsPend.reduce((s, t) => s + getSaldo(t), 0);
-  const totalGen  = facsAll.reduce((s, f) => s + f.total, 0)
-    + trabsPend.reduce((s, t) => s + t.total, 0);
 
   y += 2;
   // Summary lines — right-aligned, clean
@@ -224,9 +221,6 @@ async function generarPDFReporte(
     doc.text(value, ml + cw, y, { align: 'right' });
     y += 5.5;
   };
-
-  sumRow('Total facturado:', '$' + fmtPeso(totalGen));
-  sumRow('Total abonado:',   '$' + fmtPeso(totalGen - totalPend));
 
   // Double rule before grand total
   doc.setDrawColor(...DARK); doc.setLineWidth(0.4);
