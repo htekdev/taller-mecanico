@@ -274,16 +274,27 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion, 
     } else {
       items.forEach((item, idx) => {
         const rowTotal = calcItem(item);
-        const bg: [number, number, number] = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
-        doc.setFillColor(...bg); doc.rect(ml, ty, cw, rh, 'F');
+        // Set font/size BEFORE splitTextToSize so metrics are correct
         doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(0, 0, 0);
+        const descLines: string[] = doc.splitTextToSize(item.descripcion || '', cols.desc - 4);
+        // Generous spacing: topPad=3mm, 4.5mm between baselines, min row height 8mm
+        const topPad = 3;
+        const lineSpacing = 4.5;
+        const rowH = Math.max(8, topPad + Math.max(0, descLines.length - 1) * lineSpacing + 3);
+        const bg: [number, number, number] = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+        doc.setFillColor(...bg); doc.rect(ml, ty, cw, rowH, 'F');
         cx = ml;
-        doc.text(String(idx + 1), cx + 2, ty + 4.2); cx += cols.no;
-        doc.text(item.cantidad || '1', cx + 2, ty + 4.2); cx += cols.qty;
-        doc.text((doc.splitTextToSize(item.descripcion || '', cols.desc - 2))[0] || '', cx + 2, ty + 4.2); cx += cols.desc;
-        doc.text('$' + fmtPeso(parseNum(item.precioUnitario)), cx + 1, ty + 4.2); cx += cols.price;
-        doc.text('$' + fmtPeso(rowTotal), cx + 1, ty + 4.2);
-        ty += rh; doc.setDrawColor(230, 235, 245); doc.line(ml, ty, ml + cw, ty);
+        const midY = ty + rowH / 2 + 1.5;
+        doc.text(String(idx + 1), cx + 2, midY); cx += cols.no;
+        doc.text(item.cantidad || '1', cx + 2, midY); cx += cols.qty;
+        // Render each line individually with explicit spacing for readability
+        descLines.forEach((line, li) => {
+          doc.text(line, cx + 2, ty + topPad + li * lineSpacing);
+        });
+        cx += cols.desc;
+        doc.text('$' + fmtPeso(parseNum(item.precioUnitario)), cx + 1, midY); cx += cols.price;
+        doc.text('$' + fmtPeso(rowTotal), cx + 1, midY);
+        ty += rowH; doc.setDrawColor(230, 235, 245); doc.line(ml, ty, ml + cw, ty);
       });
     }
     // Section subtotal row — just "Subtotal:" without the section name
