@@ -345,6 +345,7 @@ export function VistaOrdenesCompra({
   const [expandido, setExpandido] = useState<string | null>(null);
   const [filtroProveedorId, setFiltroProveedorId] = useState('');
   const [editandoOrden, setEditandoOrden] = useState<OrdenCompra | null>(null);
+  const [errorCrearRef, setErrorCrearRef] = useState<string | null>(null);
 
   // ── Modo agregar pieza ────────────────────────────────────────────────────────
   const [modoAgregar, setModoAgregar] = useState<'existente' | 'nueva'>('existente');
@@ -413,30 +414,35 @@ export function VistaOrdenesCompra({
   const agregarRefaccionNueva = async () => {
     if (!newNombre.trim() || newPrecio <= 0 || newCantidad <= 0) return;
     const categoriaFinal = newCategoria === '__custom__' ? newCategoriaCustom.trim() : newCategoria;
-    const nuevaRef = await onCrearRefaccionNueva({
-      nombre:       newNombre.trim(),
-      codigo:       newCodigo.trim(),
-      categoria:    categoriaFinal,
-      unidad:       newUnidad || 'pza',
-      precioCompra: newPrecio,
-      stock:        0,          // stock arranca en 0 — sube al recibir OC
-      stockMinimo:  1,
-    });
-    if (!nuevaRef) return;
-    setItemsOrden(prev => [
-      ...prev,
-      {
-        refaccionId:  nuevaRef.id,
-        nombre:       nuevaRef.nombre,
-        cantidad:     newCantidad,
+    setErrorCrearRef(null);
+    try {
+      const nuevaRef = await onCrearRefaccionNueva({
+        nombre:       newNombre.trim(),
+        codigo:       newCodigo.trim(),
+        categoria:    categoriaFinal,
+        unidad:       newUnidad || 'pza',
         precioCompra: newPrecio,
-        subtotal:     newCantidad * newPrecio,
-        compatibilidad: [],
-      },
-    ]);
-    // Limpiar form nueva refacción
-    setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
-    setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
+        stock:        0,          // stock arranca en 0 — sube al recibir OC
+        stockMinimo:  1,
+      });
+      if (!nuevaRef) return;
+      setItemsOrden(prev => [
+        ...prev,
+        {
+          refaccionId:  nuevaRef.id,
+          nombre:       nuevaRef.nombre,
+          cantidad:     newCantidad,
+          precioCompra: newPrecio,
+          subtotal:     newCantidad * newPrecio,
+          compatibilidad: [],
+        },
+      ]);
+      // Limpiar form nueva refacción
+      setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
+      setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
+    } catch {
+      setErrorCrearRef('No se pudo crear la refacción. Verifica tu conexión e intenta de nuevo.');
+    }
   };
 
   // True when the nueva-refacción sub-form is ready to be auto-registered on submit
@@ -448,26 +454,32 @@ export function VistaOrdenesCompra({
     let finalItems = [...itemsOrden];
     if (nuevaRefaccionLista) {
       const categoriaFinal = newCategoria === '__custom__' ? newCategoriaCustom.trim() : newCategoria;
-      const nuevaRef = await onCrearRefaccionNueva({
-        nombre:       newNombre.trim(),
-        codigo:       newCodigo.trim(),
-        categoria:    categoriaFinal,
-        unidad:       newUnidad || 'pza',
-        precioCompra: newPrecio,
-        stock:        0,
-        stockMinimo:  1,
-      });
-      if (!nuevaRef) return;
-      finalItems = [...finalItems, {
-        refaccionId:  nuevaRef.id,
-        nombre:       nuevaRef.nombre,
-        cantidad:     newCantidad,
-        precioCompra: newPrecio,
-        subtotal:     newCantidad * newPrecio,
-        compatibilidad: [],
-      }];
-      setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
-      setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
+      setErrorCrearRef(null);
+      try {
+        const nuevaRef = await onCrearRefaccionNueva({
+          nombre:       newNombre.trim(),
+          codigo:       newCodigo.trim(),
+          categoria:    categoriaFinal,
+          unidad:       newUnidad || 'pza',
+          precioCompra: newPrecio,
+          stock:        0,
+          stockMinimo:  1,
+        });
+        if (!nuevaRef) return;
+        finalItems = [...finalItems, {
+          refaccionId:  nuevaRef.id,
+          nombre:       nuevaRef.nombre,
+          cantidad:     newCantidad,
+          precioCompra: newPrecio,
+          subtotal:     newCantidad * newPrecio,
+          compatibilidad: [],
+        }];
+        setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
+        setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
+      } catch {
+        setErrorCrearRef('No se pudo registrar la pieza. Verifica tu conexión e intenta de nuevo.');
+        return;
+      }
     }
     if (!formProveedorId || finalItems.length === 0) return;
     const piezasSubtotal = finalItems.reduce((s, i) => s + i.subtotal, 0);
@@ -745,6 +757,9 @@ export function VistaOrdenesCompra({
             )}
             {formProveedorId && itemsOrden.length === 0 && !nuevaRefaccionLista && (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">⚠️ Agrega al menos una pieza a la orden.</p>
+            )}
+            {errorCrearRef && (
+              <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">⚠️ {errorCrearRef}</p>
             )}
             <Btn type="submit" variant="primary" fullWidth
               disabled={!formProveedorId || (itemsOrden.length === 0 && !nuevaRefaccionLista)}>

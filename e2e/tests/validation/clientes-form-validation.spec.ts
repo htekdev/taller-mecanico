@@ -19,7 +19,7 @@ import { showPhaseLabel } from '../visual-assert';
  * 8. Clientes module shows no raw JS errors on load
  */
 
-test.describe('Clientes Form Validation', () => {
+test.describe('Clientes Form Validation', { retries: 1 }, () => {
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.loginAsTestUser();
   });

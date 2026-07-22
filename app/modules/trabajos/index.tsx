@@ -405,6 +405,8 @@ export function VistaTrabajo({
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
   const [capturandoTftId, setCapturandoTftId] = useState<string | null>(null);
   const [tftNumeroDraft, setTftNumeroDraft] = useState('');
+  const [errorTft, setErrorTft] = useState<string | null>(null);
+  const [isSavingTft, setIsSavingTft] = useState(false);
   const [verCancelados, setVerCancelados] = useState(false);
 
   // ── Departamentos CRUD ──────────────────────────────────────────────────
@@ -680,10 +682,18 @@ export function VistaTrabajo({
 
   const guardarTft = async (trabajoId: string) => {
     const numero = tftNumeroDraft.trim();
-    if (!numero) return;
-    await onActualizarTft(trabajoId, numero);
-    setCapturandoTftId(null);
-    setTftNumeroDraft('');
+    if (!numero || isSavingTft) return;
+    setErrorTft(null);
+    setIsSavingTft(true);
+    try {
+      await onActualizarTft(trabajoId, numero);
+      setCapturandoTftId(null);
+      setTftNumeroDraft('');
+    } catch {
+      setErrorTft('No se pudo guardar el número TFT. Intenta de nuevo.');
+    } finally {
+      setIsSavingTft(false);
+    }
   };
 
   const finalizarDesdeFila = (trabajo: Trabajo) => {
@@ -1759,18 +1769,21 @@ export function VistaTrabajo({
                                     onChange={e => setTftNumeroDraft(e.target.value)}
                                   />
                                   <div className="flex gap-1">
-                                    <Btn size="sm" variant="primary" onClick={() => guardarTft(trabajo.id)} disabled={!tftNumeroDraft.trim()}>
-                                      Guardar
+                                    <Btn size="sm" variant="primary" onClick={() => guardarTft(trabajo.id)} disabled={!tftNumeroDraft.trim() || isSavingTft}>
+                                      {isSavingTft ? 'Guardando…' : 'Guardar'}
                                     </Btn>
-                                    <Btn size="sm" variant="ghost" onClick={() => { setCapturandoTftId(null); setTftNumeroDraft(''); }}>
+                                    <Btn size="sm" variant="ghost" onClick={() => { setCapturandoTftId(null); setTftNumeroDraft(''); setErrorTft(null); }}>
                                       Cancelar
                                     </Btn>
                                   </div>
+                                  {errorTft && (
+                                    <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">⚠️ {errorTft}</p>
+                                  )}
                                 </div>
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => { setCapturandoTftId(trabajo.id); setTftNumeroDraft(''); }}
+                                  onClick={() => { setCapturandoTftId(trabajo.id); setTftNumeroDraft(''); setErrorTft(null); }}
                                   className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                                 >
                                   + Registrar TFT
