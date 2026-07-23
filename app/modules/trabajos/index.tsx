@@ -5,6 +5,7 @@ import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, Tr
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt, getMontoPagado, formatearFecha, getHoy } from '@/app/lib/utils';
 import { BuscadorRefacciones } from './BuscadorRefacciones';
+import { isCompatible as isCompatibleUtil } from './utils/compatibilidad';
 
 // ─── Departamentos localStorage ───────────────────────────────────────────────
 
@@ -596,20 +597,9 @@ export function VistaTrabajo({
   // ── Compatibility filtering ──
   const vehiculoDelTrabajo = vehiculos.find(v => v.id === form.vehiculoId);
 
-  const isCompatible = (r: Refaccion): boolean => {
-    if (!vehiculoDelTrabajo) return true;
-    if (!r.compatibilidad || r.compatibilidad.length === 0) return true; // universal
-    const marca  = vehiculoDelTrabajo.marca.toLowerCase().trim();
-    const modelo = vehiculoDelTrabajo.modelo.toLowerCase().trim();
-    return r.compatibilidad.some(c =>
-      c.marca.toLowerCase().trim() === marca &&
-      c.modelos.some(m => m.toLowerCase().trim() === modelo)
-    );
-  };
-
   // Parts grouped for the picker optgroups
-  const partesParaEstaUnidad  = inventario.filter(r => r.vehiculoId === form.vehiculoId && isCompatible(r));
-  const partesCompatibles      = inventario.filter(r => r.vehiculoId !== form.vehiculoId && r.compatibilidad?.length && isCompatible(r));
+  const partesParaEstaUnidad  = inventario.filter(r => r.vehiculoId === form.vehiculoId && isCompatibleUtil(r, vehiculoDelTrabajo));
+  const partesCompatibles      = inventario.filter(r => r.vehiculoId !== form.vehiculoId && r.compatibilidad?.length && isCompatibleUtil(r, vehiculoDelTrabajo));
   const partesUniversales      = inventario.filter(r => r.vehiculoId !== form.vehiculoId && (!r.compatibilidad || r.compatibilidad.length === 0));
   // When vehicle is selected: only compatible+universal+linked-to-this-unit; otherwise all
   const totalCompatibles = form.vehiculoId
