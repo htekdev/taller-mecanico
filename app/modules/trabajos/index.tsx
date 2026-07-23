@@ -508,6 +508,7 @@ export function VistaTrabajo({
     setExtProveedorId('');
     setCapturandoTftId(null);
     setTftNumeroDraft('');
+    setBuscadorOpen(false);
   };
 
   const iniciarEdicion = (trabajo: Trabajo) => {
@@ -598,9 +599,9 @@ export function VistaTrabajo({
   const vehiculoDelTrabajo = vehiculos.find(v => v.id === form.vehiculoId);
 
   // Parts grouped for the picker optgroups
-  const partesParaEstaUnidad  = inventario.filter(r => r.vehiculoId === form.vehiculoId && isCompatibleUtil(r, vehiculoDelTrabajo));
-  const partesCompatibles      = inventario.filter(r => r.vehiculoId !== form.vehiculoId && r.compatibilidad?.length && isCompatibleUtil(r, vehiculoDelTrabajo));
-  const partesUniversales      = inventario.filter(r => r.vehiculoId !== form.vehiculoId && (!r.compatibilidad || r.compatibilidad.length === 0));
+  const partesParaEstaUnidad  = inventario.filter(r => r.stock > 0 && r.vehiculoId === form.vehiculoId && isCompatibleUtil(r, vehiculoDelTrabajo));
+  const partesCompatibles      = inventario.filter(r => r.stock > 0 && r.vehiculoId !== form.vehiculoId && r.compatibilidad?.length && isCompatibleUtil(r, vehiculoDelTrabajo));
+  const partesUniversales      = inventario.filter(r => r.stock > 0 && r.vehiculoId !== form.vehiculoId && (!r.compatibilidad || r.compatibilidad.length === 0));
   // When vehicle is selected: only compatible+universal+linked-to-this-unit; otherwise all
   const totalCompatibles = form.vehiculoId
     ? partesParaEstaUnidad.length + partesCompatibles.length + partesUniversales.length
@@ -640,6 +641,7 @@ export function VistaTrabajo({
     await onActualizarTft(trabajoId, numero);
     setCapturandoTftId(null);
     setTftNumeroDraft('');
+    setBuscadorOpen(false);
   };
 
   const finalizarDesdeFila = (trabajo: Trabajo) => {
