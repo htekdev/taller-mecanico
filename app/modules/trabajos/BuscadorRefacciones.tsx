@@ -43,6 +43,8 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
   }, []);
 
 
+  const inventarioDisponible = useMemo(() => inventario.filter(r => r.stock > 0), [inventario]);
+
   const refaccionesFiltradas = useMemo(() => {
     let items = inventarioDisponible;
     if (soloCompatibles && vehiculo) {
