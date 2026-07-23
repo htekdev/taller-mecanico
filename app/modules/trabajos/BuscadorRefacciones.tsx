@@ -181,12 +181,14 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
       )}
 
       {/* ── Success flash ────────────────────────────────────────────────────── */}
-      {ultimoAgregado && (
-        <div aria-live="polite" aria-atomic="true" className="mx-4 mt-3 flex-shrink-0 flex items-center gap-2 bg-emerald-50 border border-emerald-300 rounded-lg px-4 py-2.5 text-sm text-emerald-700 font-semibold shadow-sm">
-          <span className="text-emerald-500">✓</span>
-          <span>{ultimoAgregado} agregado</span>
-        </div>
-      )}
+      <div aria-live="polite" aria-atomic="true" className="mx-4 mt-3 flex-shrink-0">
+        {ultimoAgregado && (
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-300 rounded-lg px-4 py-2.5 text-sm text-emerald-700 font-semibold shadow-sm">
+            <span className="text-emerald-500">✓</span>
+            <span>{ultimoAgregado} agregado</span>
+          </div>
+        )}
+      </div>
 
       {/* ── Parts grid ──────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-4">
