@@ -257,7 +257,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
                               ? 'bg-amber-100 text-amber-700'
                               : 'bg-emerald-100 text-emerald-700'
                         }`}>
-                          {r.stock <= 0 ? 'Sin stock' : `{r.stock} {r.unidad}`}
+                          {r.stock <= 0 ? 'Sin stock' : lowStock ? `⚠ ${r.stock} ${r.unidad}` : `${r.stock} ${r.unidad}`}
                         </span>
                       </div>
                     </div>
