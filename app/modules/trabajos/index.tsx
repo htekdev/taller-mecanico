@@ -5,6 +5,7 @@ import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, Tr
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt, getMontoPagado, formatearFecha, getHoy } from '@/app/lib/utils';
 import { getPricingIntel } from '@/app/lib/pricing';
+import { BuscadorRefacciones } from './BuscadorRefacciones';
 
 // ─── Departamentos localStorage ───────────────────────────────────────────────
 
@@ -393,6 +394,7 @@ export function VistaTrabajo({
   const [pickerRefId, setPickerRefId]         = useState('');
   const [pickerCantidad, setPickerCantidad]   = useState(1);
   const [pickerPrecioVenta, setPickerPrecioVenta] = useState(0);
+  const [buscadorOpen, setBuscadorOpen]       = useState(false);
   const [finalizandoId, setFinalizandoId] = useState<string | null>(null);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'general' | 'ayuntamiento'>('general');
@@ -508,6 +510,33 @@ export function VistaTrabajo({
       if (prices.length > 0) { setPickerPrecioVenta(Math.max(...prices)); return; }
     }
     setPickerPrecioVenta(ref.precioCompra);
+  };
+
+  // Full-screen buscador handler — called by BuscadorRefacciones on confirm
+  const agregarParteDesdeBuscador = (refId: string, cantidad: number, precioVenta: number) => {
+    const ref = inventario.find(r => r.id === refId);
+    if (!ref || cantidad <= 0) return;
+    const pVenta = precioVenta > 0 ? precioVenta : ref.precioCompra;
+    setPartesSeleccionadas(prev => {
+      const existente = prev.find(p => p.refaccionId === ref.id);
+      if (existente) {
+        const nuevaCantidad = existente.cantidad + cantidad;
+        return prev.map(p => p.refaccionId === ref.id ? {
+          ...p,
+          cantidad: nuevaCantidad,
+          subtotal:   nuevaCantidad * p.precioVenta,
+          costoTotal: nuevaCantidad * p.precioCompra,
+        } : p);
+      }
+      return [...prev, {
+        refaccionId: ref.id, nombre: ref.nombre, codigo: ref.codigo,
+        cantidad,
+        precioCompra: ref.precioCompra,
+        precioVenta: pVenta,
+        subtotal:   cantidad * pVenta,
+        costoTotal: cantidad * ref.precioCompra,
+      }];
+    });
   };
 
   const removerParte = (refaccionId: string) =>
@@ -1198,177 +1227,21 @@ export function VistaTrabajo({
                   </div>
                 )}
 
-                {/* Picker: refacción + cantidad + precio venta */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-                  <div className="sm:col-span-2 lg:col-span-2">
-                    <Label>Refacción</Label>
-                    <Select value={pickerRefId} onChange={e => handlePickerRefChange(e.target.value)}>
-                      <option value="">Seleccionar pieza...</option>
-                      {/* 1. Parts bought specifically for this vehicle unit */}
-                      {partesParaEstaUnidad.length > 0 && (
-                        <optgroup label="🎯 Compradas para esta unidad">
-                          {partesParaEstaUnidad.map(r => (
-                            <option key={r.id} value={r.id}>
-                              {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {/* 2. Parts with matching make/model compatibility */}
-                      {partesCompatibles.length > 0 && vehiculoDelTrabajo && (
-                        <optgroup label={`✅ Compatible con ${vehiculoDelTrabajo.marca} ${vehiculoDelTrabajo.modelo}`}>
-                          {partesCompatibles.map(r => (
-                            <option key={r.id} value={r.id}>
-                              {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {/* 3. Universal parts (no compatibility restrictions) */}
-                      {partesUniversales.length > 0 && (
-                        <optgroup label="🌐 Universales (todos los vehículos)">
-                          {partesUniversales.map(r => (
-                            <option key={r.id} value={r.id}>
-                              {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {/* When no vehicle selected: show all with old grouping */}
-                      {!form.vehiculoId && inventario.map(r => (
-                        <option key={r.id} value={r.id}>
-                          {r.nombre}{r.codigo ? ` (${r.codigo})` : ''} — {r.stock} {r.unidad} en stock
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Cantidad</Label>
-                    <Input type="number" min="1" step="1" placeholder="1"
-                      value={pickerCantidad || ''}
-                      onChange={e => setPickerCantidad(Number(e.target.value))} />
-                  </div>
-                  <div>
-                    <Label>
-                      Precio venta ($)
-                      {intel?.clientLastSale && pickerPrecioVenta > 0 && pickerPrecioVenta < intel.clientLastSale.precio && (
-                        <span className="ml-2 text-amber-600 font-bold text-xs">⚠ menor que antes</span>
-                      )}
-                    </Label>
-                    <Input type="number" min="0" step="0.01" placeholder="0.00"
-                      value={pickerPrecioVenta || ''}
-                      onChange={e => setPickerPrecioVenta(Number(e.target.value))}
-                      className={
-                        intel?.clientLastSale && pickerPrecioVenta > 0 && pickerPrecioVenta < intel.clientLastSale.precio
-                          ? '!border-amber-400 !ring-amber-400'
-                          : ''
-                      }
-                    />
-                  </div>
-                </div>
-
-                {/* ── Pricing intelligence panel ── */}
-                {pickerRef && intel && (
-                  <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 text-sm">
-
-                    {/* Row 1: Cost + Markup buttons */}
-                    <div className="flex items-center flex-wrap gap-2">
-                      <span className="text-slate-500 text-xs">
-                        Costo: <strong className="text-slate-700">${fmt(pickerRef.precioCompra)}</strong>/{pickerRef.unidad}
-                      </span>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-xs text-slate-400 font-medium">Sugerencias:</span>
-                      {intel.markups.map(m => (
-                        <button key={m.pct} type="button"
-                          onClick={() => setPickerPrecioVenta(m.price)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                            pickerPrecioVenta === m.price
-                              ? 'bg-indigo-600 text-white border-indigo-600'
-                              : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50'
-                          }`}>
-                          {m.pct}% margen ${fmt(m.price)}
-                        </button>
-                      ))}
-                      {pickerRef.stock < pickerCantidad && (
-                        <span className="text-xs font-semibold text-amber-600 ml-auto">
-                          ⚠ solo {pickerRef.stock} en stock
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Row 2: Client history — most prominent */}
-                    {intel.clientLastSale && (() => {
-                      const isLower = pickerPrecioVenta > 0 && pickerPrecioVenta < intel.clientLastSale!.precio;
-                      const isSame  = pickerPrecioVenta === intel.clientLastSale!.precio;
-                      return (
-                        <div className={`flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 border ${
-                          isLower ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50 border-indigo-200'
-                        }`}>
-                          <div className="text-xs">
-                            <span className={`font-bold ${isLower ? 'text-amber-700' : 'text-indigo-700'}`}>
-                              {isLower ? '⚠️' : '📋'}
-                              {' '}
-                              {isLower
-                                ? `Estás cobrando menos que antes ($${fmt(pickerPrecioVenta)} vs $${fmt(intel.clientLastSale!.precio)})`
-                                : isSame
-                                  ? `Mismo precio que el máximo cobrado ($${fmt(intel.clientLastSale!.precio)})`
-                                  : `Mayor precio cobrado a este cliente: $${fmt(intel.clientLastSale!.precio)}`
-                              }
-                            </span>
-                            <span className="text-slate-400 ml-1">
-                              — {formatearFecha(intel.clientLastSale!.fecha)}
-                              {intel.clientAllSales.length > 1 && ` · ${intel.clientAllSales.length} veces vendida`}
-                            </span>
-                          </div>
-                          {!isSame && (
-                            <button type="button"
-                              onClick={() => setPickerPrecioVenta(intel.clientLastSale!.precio)}
-                              className={`text-xs font-bold whitespace-nowrap px-2.5 py-1 rounded-lg border transition-all ${
-                                isLower
-                                  ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
-                                  : 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
-                              }`}>
-                              Usar ${fmt(intel.clientLastSale!.precio)}
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Row 3: Cross-client range */}
-                    {intel.otherMin !== null && (
-                      <div className="text-xs text-slate-400 flex items-center gap-1">
-                        <span>💬</span>
-                        <span>
-                          Otros clientes pagaron:{' '}
-                          <strong className="text-slate-600">
-                            {intel.otherMin === intel.otherMax
-                              ? `$${fmt(intel.otherMin!)}`
-                              : `$${fmt(intel.otherMin!)} – $${fmt(intel.otherMax!)}`}
-                          </strong>
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Agregar button (always visible) */}
-                <div className="flex justify-between items-center gap-3 flex-wrap">
-                  {pickerPrecioVenta > 0 && pickerRef && (
-                    <span className="text-xs text-slate-500">
-                      Margen: <strong className={pickerPrecioVenta > pickerRef.precioCompra ? 'text-emerald-600' : 'text-slate-600'}>
-                        ${fmt((pickerPrecioVenta - pickerRef.precioCompra) * pickerCantidad)}
-                        {' '}({(((pickerPrecioVenta - pickerRef.precioCompra) / pickerRef.precioCompra) * 100).toFixed(0)}%)
-                      </strong>
-                      {pickerCantidad > 1 && ` · subtotal cobrado $${fmt(pickerPrecioVenta * pickerCantidad)}`}
+                {/* Picker: Buscar refacción — full-screen searchable buscador */}
+                <button
+                  type="button"
+                  onClick={() => setBuscadorOpen(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 border-2 border-dashed border-indigo-300 hover:border-indigo-400 rounded-xl text-indigo-700 font-semibold transition-all"
+                  aria-label="Buscar refacción del inventario"
+                >
+                  <span className="text-xl">🔍</span>
+                  <span className="flex-1 text-left text-sm">Buscar y agregar refacción al trabajo</span>
+                  {partesSeleccionadas.length > 0 && (
+                    <span className="text-xs bg-indigo-100 border border-indigo-200 text-indigo-600 px-2.5 py-1 rounded-full font-medium">
+                      {partesSeleccionadas.length} seleccionada{partesSeleccionadas.length !== 1 ? 's' : ''}
                     </span>
                   )}
-                  <div className={!pickerRef ? 'ml-auto' : ''}>
-                    <Btn variant="primary" disabled={!pickerRefId || pickerCantidad <= 0} onClick={agregarParte}>
-                      + Agregar pieza
-                    </Btn>
-                  </div>
-                </div>
+                </button>
 
                 {/* Lista de partes seleccionadas */}
                 {partesSeleccionadas.length > 0 && (
@@ -1862,6 +1735,18 @@ export function VistaTrabajo({
           </div>
         )}
       </div>
+
+      {/* ── Full-screen buscador de refacciones ── */}
+      {buscadorOpen && (
+        <BuscadorRefacciones
+          inventario={inventario}
+          vehiculo={vehiculoDelTrabajo}
+          clienteId={form.clienteId}
+          trabajos={trabajos}
+          onAgregar={agregarParteDesdeBuscador}
+          onCerrar={() => setBuscadorOpen(false)}
+        />
+      )}
     </div>
   );
 }
