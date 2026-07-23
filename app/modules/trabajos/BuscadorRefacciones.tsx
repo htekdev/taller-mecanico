@@ -31,23 +31,17 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
     return () => window.removeEventListener('keydown', onKey);
   }, [onCerrar]);
 
-  const isCompatible = (r: Refaccion): boolean => {
-    if (!vehiculo) return true;
-    if (!r.compatibilidad || r.compatibilidad.length === 0) return true;
-    const marca  = vehiculo.marca.toLowerCase().trim();
-    const modelo = vehiculo.modelo.toLowerCase().trim();
-    return r.compatibilidad.some(c =>
-      c.marca.toLowerCase().trim() === marca &&
-      (c.modelos.length === 0 || c.modelos.some(m => m.toLowerCase().trim() === modelo))
-    );
-  };
-
-  const categorias = useMemo(() => {
-    const cats = new Set(inventario.map(r => r.categoria).filter(Boolean));
-    return Array.from(cats).sort();
-  }, [inventario]);
-
   const refaccionesFiltradas = useMemo(() => {
+    const isCompatible = (r: Refaccion): boolean => {
+      if (!vehiculo) return true;
+      if (!r.compatibilidad || r.compatibilidad.length === 0) return true;
+      const marca  = vehiculo.marca.toLowerCase().trim();
+      const modelo = vehiculo.modelo.toLowerCase().trim();
+      return r.compatibilidad.some(c =>
+        c.marca.toLowerCase().trim() === marca &&
+        (c.modelos.length === 0 || c.modelos.some(m => m.toLowerCase().trim() === modelo))
+      );
+    };
     let items = inventario;
     if (soloCompatibles && vehiculo) {
       items = items.filter(r => isCompatible(r));
@@ -71,8 +65,12 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
       if (aIsCompat !== bIsCompat) return aIsCompat ? -1 : 1;
       return a.nombre.localeCompare(b.nombre);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inventario, soloCompatibles, vehiculo, catFiltro, busqueda]);
+
+  const categorias = useMemo(() => {
+    const cats = new Set(inventario.map(r => r.categoria).filter(Boolean));
+    return Array.from(cats).sort();
+  }, [inventario]);
 
   const abrirParte = (r: Refaccion) => {
     if (expandido === r.id) { setExpandido(null); return; }
@@ -184,7 +182,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
 
       {/* ── Success flash ────────────────────────────────────────────────────── */}
       {ultimoAgregado && (
-        <div className="mx-4 mt-3 flex-shrink-0 flex items-center gap-2 bg-emerald-50 border border-emerald-300 rounded-lg px-4 py-2.5 text-sm text-emerald-700 font-semibold shadow-sm">
+        <div aria-live="polite" aria-atomic="true" className="mx-4 mt-3 flex-shrink-0 flex items-center gap-2 bg-emerald-50 border border-emerald-300 rounded-lg px-4 py-2.5 text-sm text-emerald-700 font-semibold shadow-sm">
           <span className="text-emerald-500">✓</span>
           <span>{ultimoAgregado} agregado</span>
         </div>
@@ -329,7 +327,8 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
                           <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Cant.</label>
                           <input
                             type="number"
-                            min="1"
+                              inputMode="numeric"
+                              min="1"
                             step="1"
                             value={cantidad || ''}
                             onChange={e => setCantidad(Number(e.target.value))}
@@ -345,6 +344,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
                           </label>
                           <input
                             type="number"
+                            inputMode="decimal"
                             min="0"
                             step="0.01"
                             value={precioVenta || ''}
