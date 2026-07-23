@@ -23,9 +23,13 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
   const [precioVenta, setPrecioVenta] = useState(0);
   const [ultimoAgregado, setUltimoAgregado] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -95,8 +99,9 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
     setCantidad(1);
     setPrecioVenta(0);
     // Brief success flash — modal stays open for multiple additions
+    if (flashTimer.current) clearTimeout(flashTimer.current);
     setUltimoAgregado(r.nombre);
-    setTimeout(() => setUltimoAgregado(null), 2500);
+    flashTimer.current = setTimeout(() => setUltimoAgregado(null), 2500);
   };
 
   const expandedRef = expandido ? inventario.find(r => r.id === expandido) : null;
