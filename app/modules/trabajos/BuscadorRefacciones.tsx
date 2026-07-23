@@ -35,6 +35,10 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
     return () => window.removeEventListener('keydown', onKey);
   }, [onCerrar]);
 
+  useEffect(() => {
+    return () => { if (flashTimer.current) clearTimeout(flashTimer.current); };
+  }, []);
+
   const refaccionesFiltradas = useMemo(() => {
     const isCompatible = (r: Refaccion): boolean => {
       if (!vehiculo) return true;
