@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel, Proveedor } from '@/app/types';
+import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, Proveedor } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt, getMontoPagado, formatearFecha, getHoy } from '@/app/lib/utils';
-import { getPricingIntel } from '@/app/lib/pricing';
 import { BuscadorRefacciones } from './BuscadorRefacciones';
 
 // ─── Departamentos localStorage ───────────────────────────────────────────────
@@ -391,9 +390,6 @@ export function VistaTrabajo({
   const [extCostoTaller, setExtCostoTaller] = useState(0);
   const [extPrecioCliente, setExtPrecioCliente] = useState(0);
   const [partesSeleccionadas, setPartesSeleccionadas] = useState<TrabajoRefaccion[]>([]);
-  const [pickerRefId, setPickerRefId]         = useState('');
-  const [pickerCantidad, setPickerCantidad]   = useState(1);
-  const [pickerPrecioVenta, setPickerPrecioVenta] = useState(0);
   const [buscadorOpen, setBuscadorOpen]       = useState(false);
   const [finalizandoId, setFinalizandoId] = useState<string | null>(null);
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -467,51 +463,6 @@ export function VistaTrabajo({
     setShowExtForm(false);
   };
 
-  const agregarParte = () => {
-    const ref = inventario.find(r => r.id === pickerRefId);
-    if (!ref || pickerCantidad <= 0) return;
-    const pVenta = pickerPrecioVenta > 0 ? pickerPrecioVenta : ref.precioCompra;
-    setPartesSeleccionadas(prev => {
-      const existente = prev.find(p => p.refaccionId === ref.id);
-      if (existente) {
-        // Merge: update quantity keeping existing sale price
-        const nuevaCantidad = existente.cantidad + pickerCantidad;
-        return prev.map(p => p.refaccionId === ref.id ? {
-          ...p,
-          cantidad: nuevaCantidad,
-          subtotal:   nuevaCantidad * p.precioVenta,
-          costoTotal: nuevaCantidad * p.precioCompra,
-        } : p);
-      }
-      return [...prev, {
-        refaccionId: ref.id, nombre: ref.nombre, codigo: ref.codigo,
-        cantidad: pickerCantidad,
-        precioCompra: ref.precioCompra,
-        precioVenta: pVenta,
-        subtotal:   pickerCantidad * pVenta,
-        costoTotal: pickerCantidad * ref.precioCompra,
-      }];
-    });
-    setPickerRefId('');
-    setPickerCantidad(1);
-    setPickerPrecioVenta(0);
-  };
-
-  // Auto-fill precio venta when part changes — prefer client's last price
-  const handlePickerRefChange = (id: string) => {
-    setPickerRefId(id);
-    const ref = inventario.find(r => r.id === id);
-    if (!ref) { setPickerPrecioVenta(0); return; }
-    // Look up client history — use highest price ever charged (never charge less)
-    if (form.clienteId) {
-      const prices = trabajos
-        .filter(t => t.clienteId === form.clienteId)
-        .flatMap(t => t.partes.filter(p => p.refaccionId === id && p.precioVenta > 0).map(p => p.precioVenta));
-      if (prices.length > 0) { setPickerPrecioVenta(Math.max(...prices)); return; }
-    }
-    setPickerPrecioVenta(ref.precioCompra);
-  };
-
   // Full-screen buscador handler — called by BuscadorRefacciones on confirm
   const agregarParteDesdeBuscador = (refId: string, cantidad: number, precioVenta: number) => {
     const ref = inventario.find(r => r.id === refId);
@@ -548,9 +499,6 @@ export function VistaTrabajo({
     setLaborConcepto('');
     setLaborPrecio(0);
     setPartesSeleccionadas([]);
-    setPickerRefId('');
-    setPickerCantidad(1);
-    setPickerPrecioVenta(0);
     setEditandoId(null);
     setShowExtForm(false);
     setExtConcepto('');
@@ -583,9 +531,6 @@ export function VistaTrabajo({
     setPartesSeleccionadas(trabajo.partes ?? []);
     setLaborConcepto('');
     setLaborPrecio(0);
-    setPickerRefId('');
-    setPickerCantidad(1);
-    setPickerPrecioVenta(0);
     setEditandoId(trabajo.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -647,14 +592,6 @@ export function VistaTrabajo({
 
   const getCliente  = (id: string) => clientes.find(c => c.id === id);
   const getVehiculo = (id: string) => vehiculos.find(v => v.id === id);
-  const pickerRef   = inventario.find(r => r.id === pickerRefId);
-
-  const intel: PricingIntel | null = useMemo(() => {
-    if (!pickerRefId || !form.clienteId) return null;
-    const ref = inventario.find(r => r.id === pickerRefId);
-    if (!ref) return null;
-    return getPricingIntel(pickerRefId, form.clienteId, ref.precioCompra, trabajos);
-  }, [pickerRefId, form.clienteId, inventario, trabajos]);
 
   // ── Compatibility filtering ──
   const vehiculoDelTrabajo = vehiculos.find(v => v.id === form.vehiculoId);
@@ -1245,8 +1182,8 @@ export function VistaTrabajo({
 
                 {/* Lista de partes seleccionadas */}
                 {partesSeleccionadas.length > 0 && (
-                  <div className="rounded-lg border border-slate-200 overflow-hidden">
-                    <table className="w-full text-sm">
+                  <div className="rounded-lg border border-slate-200 overflow-x-auto">
+                    <table className="w-full text-sm min-w-max">
                       <thead className="bg-slate-100">
                         <tr>
                           <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Refacción</th>
