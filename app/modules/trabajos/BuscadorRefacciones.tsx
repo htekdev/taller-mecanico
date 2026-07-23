@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Refaccion, Vehiculo, Trabajo, PricingIntel } from '@/app/types';
 import { fmt, formatearFecha } from '@/app/lib/utils';
 import { getPricingIntel } from '@/app/lib/pricing';
+import { isCompatible } from './utils/compatibilidad';
 
 interface Props {
   inventario: Refaccion[];
@@ -24,35 +25,27 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
   const [ultimoAgregado, setUltimoAgregado] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCerrarRef = useRef(onCerrar);
+  useEffect(() => { onCerrarRef.current = onCerrar; });
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onCerrar]);
-
-  useEffect(() => {
     return () => { if (flashTimer.current) clearTimeout(flashTimer.current); };
   }, []);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrarRef.current(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const refaccionesFiltradas = useMemo(() => {
-    const isCompatible = (r: Refaccion): boolean => {
-      if (!vehiculo) return true;
-      if (!r.compatibilidad || r.compatibilidad.length === 0) return true;
-      const marca  = vehiculo.marca.toLowerCase().trim();
-      const modelo = vehiculo.modelo.toLowerCase().trim();
-      return r.compatibilidad.some(c =>
-        c.marca.toLowerCase().trim() === marca &&
-        (c.modelos.length === 0 || c.modelos.some(m => m.toLowerCase().trim() === modelo))
-      );
-    };
     let items = inventario;
     if (soloCompatibles && vehiculo) {
-      items = items.filter(r => isCompatible(r));
+      items = items.filter(r => isCompatible(r, vehiculo));
     }
     if (catFiltro) {
       items = items.filter(r => r.categoria === catFiltro);
@@ -127,7 +120,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
       <div className="bg-slate-800 px-4 py-3 flex items-center gap-3 shadow-md flex-shrink-0">
         <button
           onClick={onCerrar}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-all text-xl font-bold flex-shrink-0"
+          className="w-11 h-11 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-all text-xl font-bold flex-shrink-0"
           aria-label="Cerrar"
         >
           ←
@@ -137,6 +130,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
           <input
             ref={inputRef}
             type="text"
+            aria-label="Buscar refacción por nombre o código"
             placeholder="Buscar por nombre o código..."
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
@@ -209,7 +203,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
               <button
                 type="button"
                 onClick={() => setBusqueda('')}
-                className="text-xs text-indigo-600 hover:underline mt-1"
+                className="text-sm px-3 py-2 rounded-lg text-indigo-600 hover:underline mt-1"
               >
                 Limpiar búsqueda
               </button>
@@ -320,7 +314,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
                                 <button
                                   type="button"
                                   onClick={() => setPrecioVenta(intel.clientLastSale!.precio)}
-                                  className="px-2 py-0.5 rounded bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 flex-shrink-0"
+                                  className="px-3 py-2 rounded bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 flex-shrink-0"
                                 >
                                   Usar
                                 </button>
@@ -341,8 +335,9 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
                       {/* Qty + precio inputs */}
                       <div className="flex gap-2">
                         <div className="w-24 flex-shrink-0">
-                          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Cant.</label>
+                          <label htmlFor={`cantidad-${r.id}`} className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Cant.</label>
                           <input
+                            id={`cantidad-${r.id}`}
                             type="number"
                               inputMode="numeric"
                               min="1"
@@ -353,13 +348,14 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
                           />
                         </div>
                         <div className="flex-1">
-                          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                          <label htmlFor={`precio-venta-${r.id}`} className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
                             Precio venta ($)
                             {intel?.clientLastSale && precioVenta > 0 && precioVenta < intel.clientLastSale.precio && (
                               <span className="ml-1 text-amber-600 font-bold normal-case text-xs">⚠ menor que antes</span>
                             )}
                           </label>
                           <input
+                            id={`precio-venta-${r.id}`}
                             type="number"
                             inputMode="decimal"
                             min="0"
