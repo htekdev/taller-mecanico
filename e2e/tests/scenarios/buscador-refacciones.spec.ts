@@ -45,7 +45,7 @@ test.describe('BuscadorRefacciones — full-screen searchable parts picker', () 
     await buscadorBtn.click();
 
     // Full-screen modal is visible
-    const modal = page.locator('.fixed.inset-0.z-50').first();
+    const modal = page.getByRole('dialog', { name: 'Buscar refacción' });
     await expect(modal).toBeVisible({ timeout: 5_000 });
 
     // Search input is present (auto-focused)
@@ -149,7 +149,7 @@ test.describe('BuscadorRefacciones — full-screen searchable parts picker', () 
     await expect(buscadorBtn).toBeVisible({ timeout: 10_000 });
     await buscadorBtn.click();
 
-    const modal = page.locator('.fixed.inset-0.z-50').first();
+    const modal = page.getByRole('dialog', { name: 'Buscar refacción' });
     await expect(modal).toBeVisible({ timeout: 5_000 });
 
     await page.keyboard.press('Escape');
