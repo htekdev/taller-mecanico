@@ -68,10 +68,12 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
     });
   }, [inventario, soloCompatibles, vehiculo, catFiltro, busqueda]);
 
+  const inventarioDisponible = useMemo(() => inventario.filter(r => r.stock > 0), [inventario]);
+
   const categorias = useMemo(() => {
-    const cats = new Set(inventario.map(r => r.categoria).filter(Boolean));
+    const cats = new Set(inventarioDisponible.map(r => r.categoria).filter(Boolean));
     return Array.from(cats).sort();
-  }, [inventario]);
+  }, [inventarioDisponible]);
 
   const abrirParte = (r: Refaccion) => {
     if (expandido === r.id) { setExpandido(null); return; }
@@ -114,7 +116,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+    <div className="fixed inset-0 z-50 flex flex-col bg-white" role="dialog" aria-modal="true" aria-label="Buscar refacción">
 
       {/* ── Header: search + compat toggle ─────────────────────────────────── */}
       <div className="bg-slate-800 px-4 py-3 flex items-center gap-3 shadow-md flex-shrink-0">
@@ -404,7 +406,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
       <div className="border-t border-slate-200 bg-white px-4 py-3 flex items-center justify-between flex-shrink-0">
         <span className="text-xs text-slate-400">
           {refaccionesFiltradas.length} refacción{refaccionesFiltradas.length !== 1 ? 'es' : ''} mostrada{refaccionesFiltradas.length !== 1 ? 's' : ''}
-          {inventario.length !== refaccionesFiltradas.length && ` de ${inventario.length}`}
+          {inventarioDisponible.length !== refaccionesFiltradas.length && ` de ${inventarioDisponible.length}`}
         </span>
         <button
           type="button"
