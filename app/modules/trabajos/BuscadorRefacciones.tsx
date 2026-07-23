@@ -248,11 +248,17 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
                           )}
                         </div>
                       </div>
-                      <div className="text-right flex-shrink-0 ml-2">
+                      <div className="text-right flex-shrink-0 ml-2 flex flex-col items-end gap-1">
                         <p className="font-bold text-slate-900 text-sm">${fmt(r.precioCompra)}</p>
-                        <p className={`text-xs mt-0.5 ${lowStock ? 'text-amber-600 font-semibold' : 'text-slate-400'}`}>
-                          {lowStock ? `⚠ ${r.stock}` : r.stock} {r.unidad}
-                        </p>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          r.stock <= 0
+                            ? 'bg-red-100 text-red-700'
+                            : lowStock
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {r.stock <= 0 ? 'Sin stock' : `{r.stock} {r.unidad}`}
+                        </span>
                       </div>
                     </div>
                   </button>
