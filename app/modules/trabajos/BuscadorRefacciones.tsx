@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Refaccion, Vehiculo, Trabajo, PricingIntel } from '@/app/types';
-import { fmt } from '@/app/lib/utils';
+import { fmt, formatearFecha } from '@/app/lib/utils';
 import { getPricingIntel } from '@/app/lib/pricing';
 
 interface Props {
@@ -298,7 +298,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
                                   {isLower ? '⚠️' : '📋'} Último cobro a este cliente:{' '}
                                   <strong>${fmt(intel.clientLastSale!.precio)}</strong>
                                   <span className="text-slate-400 font-normal ml-1">
-                                    — {new Date(intel.clientLastSale!.fecha).toLocaleDateString('es-MX')}
+                                    — {formatearFecha(intel.clientLastSale!.fecha)}
                                     {intel.clientAllSales.length > 1 && ` · ${intel.clientAllSales.length}x`}
                                   </span>
                                 </span>
