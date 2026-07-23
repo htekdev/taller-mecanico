@@ -42,8 +42,9 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+
   const refaccionesFiltradas = useMemo(() => {
-    let items = inventario;
+    let items = inventarioDisponible;
     if (soloCompatibles && vehiculo) {
       items = items.filter(r => isCompatible(r, vehiculo));
     }
@@ -66,9 +67,8 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
       if (aIsCompat !== bIsCompat) return aIsCompat ? -1 : 1;
       return a.nombre.localeCompare(b.nombre);
     });
-  }, [inventario, soloCompatibles, vehiculo, catFiltro, busqueda]);
+  }, [inventarioDisponible, soloCompatibles, vehiculo, catFiltro, busqueda]);
 
-  const inventarioDisponible = useMemo(() => inventario.filter(r => r.stock > 0), [inventario]);
 
   const categorias = useMemo(() => {
     const cats = new Set(inventarioDisponible.map(r => r.categoria).filter(Boolean));
@@ -205,7 +205,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
               <button
                 type="button"
                 onClick={() => setBusqueda('')}
-                className="text-sm px-3 py-2 rounded-lg text-indigo-600 hover:underline mt-1"
+                className="text-sm px-3 py-2 min-h-[44px] rounded-lg text-indigo-600 hover:underline mt-1"
               >
                 Limpiar búsqueda
               </button>
@@ -316,7 +316,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
                                 <button
                                   type="button"
                                   onClick={() => setPrecioVenta(intel.clientLastSale!.precio)}
-                                  className="px-3 py-2 rounded bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 flex-shrink-0"
+                                  className="px-3 py-2 min-h-[44px] rounded bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 flex-shrink-0"
                                 >
                                   Usar
                                 </button>
@@ -411,7 +411,7 @@ export function BuscadorRefacciones({ inventario, vehiculo, clienteId, trabajos,
         <button
           type="button"
           onClick={onCerrar}
-          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-sm transition-all"
+          className="px-4 py-2 min-h-[44px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-sm transition-all"
         >
           Listo
         </button>
