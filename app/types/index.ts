@@ -59,7 +59,8 @@ export interface PagoServicioExterno {
 export interface ManoDeObraItem {
   id: string;
   concepto: string;
-  precio: number;       // precio cobrado al cliente
+  precio: number;       // precio unitario cobrado al cliente
+  cantidad?: number;    // cantidad de veces que se realiza el servicio (default 1)
   // ── Servicios externos (Opción 4) ─────────────────────────
   tipo?: 'interno' | 'externo';
   proveedorId?: string;       // FK a Proveedor
