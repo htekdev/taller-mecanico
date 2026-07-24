@@ -9,6 +9,7 @@ import { getPricingIntel } from '@/app/lib/pricing';
 // ─── Departamentos localStorage ───────────────────────────────────────────────
 
 import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
+import { generarComprobantePago } from '@/app/lib/pdf-comprobante';
 
 function loadDepartamentos(): string[] {
   try {
@@ -225,6 +226,9 @@ async function generarPDFAyuntamiento(
 
   doc.save(`reporte-ayuntamiento-${filtroSlugs[filtro]}-${fechaSlug}.pdf`);
 }
+
+
+// ── Comprobante de Pago — see app/lib/pdf-comprobante.ts ──
 
 // ── Finalization Modal ──────────────────────────────────────────────────────
 function ModalFinalizacion({
@@ -661,6 +665,8 @@ export function VistaTrabajo({
   const trabajosPendientesFacturar = trabajosDelTab.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
   const trabajosSinRefacciones = trabajosDelTab.filter(t => t.pendienteRefacciones === true);
   const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
+  const [generandoComprobanteId, setGenerandoComprobanteId] = useState<string | null>(null);
+  const [errorComprobante, setErrorComprobante] = useState<string | null>(null);
   const trabajosFiltrados = [...trabajosDelTab]
     .filter(t => {
       if (filtroClienteId && t.clienteId !== filtroClienteId) return false;
@@ -890,7 +896,7 @@ export function VistaTrabajo({
             )}
             <div>
               <Label>② Unidad / Vehículo</Label>
-              <Select value={form.vehiculoId} onChange={e => setForm(f => ({ ...f, vehiculoId: e.target.value }))}
+              <Select data-testid="vehiculo-select" value={form.vehiculoId} onChange={e => setForm(f => ({ ...f, vehiculoId: e.target.value }))}
                 required disabled={!form.clienteId || vehiculosDelCliente.length === 0}>
                 <option value="">Seleccionar unidad...</option>
                 {vehiculosDelCliente.map(v => <option key={v.id} value={v.id}>{labelVehiculo(v)}</option>)}
@@ -1792,6 +1798,7 @@ export function VistaTrabajo({
                             🏁 Finalizar
                           </button>
                         )}
+
                         <button
                           type="button"
                           onClick={() => iniciarEdicion(trabajo)}
@@ -1799,6 +1806,28 @@ export function VistaTrabajo({
                         >
                           ✏️ Editar
                         </button>
+                        {getMontoPagado(trabajo) >= trabajo.total && trabajo.total > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGenerandoComprobanteId(trabajo.id);
+                              generarComprobantePago(
+                                trabajo,
+                                clientes.find(c => c.id === trabajo.clienteId),
+                                vehiculos.find(v => v.id === trabajo.vehiculoId)
+                              ).catch((err: unknown) => {
+                                console.error('[trabajos] generarComprobantePago error:', err);
+                                setErrorComprobante('No se pudo generar el comprobante. Intenta de nuevo.');
+                                setTimeout(() => setErrorComprobante(null), 4000);
+                              }).finally(() => setGenerandoComprobanteId(null));
+                            }}
+                            disabled={generandoComprobanteId === trabajo.id}
+                            className="text-xs font-semibold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-3 py-3 min-h-[44px] rounded-lg transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Generar comprobante de pago para el cliente"
+                          >
+                            {generandoComprobanteId === trabajo.id ? "⏳..." : "🧾 Comprobante"}
+                          </button>
+                        )}
                         {confirmCancelarId === trabajo.id ? (
                           <div className="flex gap-1">
                             <button type="button" onClick={() => { onCancelarTrabajo(trabajo.id); setConfirmCancelarId(null); }}
@@ -1862,6 +1891,12 @@ export function VistaTrabajo({
           </div>
         )}
       </div>
+    {errorComprobante && (
+    <div role="alert" aria-live="assertive"
+      className="fixed bottom-4 left-4 right-4 z-50 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg px-4 py-3 shadow-lg text-sm font-medium">
+      {errorComprobante}
     </div>
+  )}
+  </div>
   );
 }
