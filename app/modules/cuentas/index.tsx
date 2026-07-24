@@ -737,6 +737,28 @@ export function VistaCuentas({
                     <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
                     <div className="flex items-center justify-between sm:justify-end gap-2">
                       <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
+                      {estado === 'pagado' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGenerandoComprobanteId(trabajo.id);
+                            generarComprobantePago(
+                              trabajo,
+                              clientes.find(c => c.id === trabajo.clienteId),
+                              vehiculos.find(v => v.id === trabajo.vehiculoId)
+                            ).catch((err: unknown) => {
+                              console.error('[cuentas] generarComprobantePago error:', err);
+                              setErrorComprobante('No se pudo generar el comprobante. Intenta de nuevo.');
+                              setTimeout(() => setErrorComprobante(null), 4000);
+                            }).finally(() => setGenerandoComprobanteId(null));
+                          }}
+                          disabled={generandoComprobanteId === trabajo.id}
+                          className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-3 min-h-[44px] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Generar comprobante de pago"
+                        >
+                          {generandoComprobanteId === trabajo.id ? '⏳' : '🧾 Comprobante'}
+                        </button>
+                      )}
                       <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'} onClick={() => { setExpandidoT(isExp ? null : trabajo.id); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); setConfirmCancelarId(null); setConfirmEliminarPagoId(null); }}>
                         {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
                       </Btn>
