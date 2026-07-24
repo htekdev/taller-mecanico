@@ -4,8 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel, Proveedor } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt, getMontoPagado, formatearFecha, getHoy } from '@/app/lib/utils';
-import { supabase, uploadFacturaPdf } from '@/app/lib/supabase';
-import { updateTrabajoFacturaPdf } from '@/app/lib/db';
+import { supabase } from '@/app/lib/supabase';
 import { getPricingIntel } from '@/app/lib/pricing';
 
 // ─── Departamentos localStorage ───────────────────────────────────────────────
@@ -469,24 +468,6 @@ export function VistaTrabajo({
     setExtPrecioCliente(0);
     setExtProveedorId('');
     setShowExtForm(false);
-  };
-
-  const subirFacturaPdf = async (trabajoId: string, file: File) => {
-    if (!tallerId) { setUploadPdfError('Error: taller no identificado'); setUploadPdfErrorId(trabajoId); return; }
-    setUploadingPdfId(trabajoId);
-    setUploadPdfError(null);
-    setUploadPdfErrorId(null);
-    try {
-      const url = await uploadFacturaPdf(tallerId, trabajoId, file);
-      await updateTrabajoFacturaPdf(tallerId, trabajoId, url);
-      onFacturaPdfUploaded?.(trabajoId, url);
-      // Optimistic UI update handled by parent reload — show success briefly
-    } catch (e) {
-      setUploadPdfError('Error al subir el archivo. Intenta de nuevo.');
-      setUploadPdfErrorId(trabajoId);
-    } finally {
-      setUploadingPdfId(null);
-    }
   };
 
   const agregarParte = () => {
