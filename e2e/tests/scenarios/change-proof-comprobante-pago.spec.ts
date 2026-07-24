@@ -102,24 +102,21 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   await page.waitForTimeout(2000);
 
 
-  // ── Assert: comprobante button visible in CxC (THE NEW FEATURE) ────────────
-  await showPhaseLabel(page, '🧾 Verificando botón Comprobante en CxC — VistaCuentas');
-  // Row collapses after payment is registered — need to re-expand with 'Ver' button
+  // ── Assert: comprobante button visible INLINE in CxC (no expansion required — new behavior) ─
+  await showPhaseLabel(page, '🧾 Verificando botón Comprobante INLINE en CxC — sin expandir');
   const cxcPaidRow = page
     .locator('[class*="border"][class*="rounded"], .border.rounded-xl')
     .filter({ hasText: /Prueba comprobante PR183/i })
     .first();
   await expect(cxcPaidRow, 'Fila pagada debe ser visible en CxC tras pago completo').toBeVisible({ timeout: 10_000 });
-  // Click 'Ver' to expand the paid row
-  const verBtn = cxcPaidRow.getByRole('button', { name: /ver/i });
-  if (await verBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await verBtn.click();
-    await page.waitForTimeout(500);
-  }
+  // The comprobante button MUST be visible WITHOUT expanding the row (inline UX)
   const cxcComprobanteBtn = cxcPaidRow.getByRole('button', { name: /comprobante/i });
-  await expect(cxcComprobanteBtn, 'Botón Comprobante debe aparecer en CxC para trabajo pagado').toBeVisible({ timeout: 10_000 });
+  await expect(cxcComprobanteBtn, 'Botón Comprobante debe ser visible INLINE sin expandir la fila').toBeVisible({ timeout: 10_000 });
   await expect(cxcComprobanteBtn, 'Botón no debe estar deshabilitado en CxC').not.toBeDisabled();
-  await showPhaseLabel(page, '✅ Comprobante disponible en CxC (VistaCuentas)');
+  // Verify the 'Ver' toggle button is also present (row details still expandable)
+  const verBtn = cxcPaidRow.getByRole('button', { name: /ver/i });
+  await expect(verBtn, 'El botón Ver debe seguir disponible para expandir detalles').toBeVisible({ timeout: 3_000 });
+  await showPhaseLabel(page, '✅ Comprobante inline visible en CxC (no requiere expansión)');
 
   // ── Navigate back to Trabajos ─────────────────────────────────────────────
   await showPhaseLabel(page, '🔧 Volviendo a Trabajos');
