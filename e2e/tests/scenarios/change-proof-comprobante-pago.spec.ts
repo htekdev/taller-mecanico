@@ -38,8 +38,21 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
 
   // ── Create a trabajo with a labor item ────────────────────────────────────
   await showPhaseLabel(page, '📝 Creando trabajo de prueba');
-  await trabajosPage.selectClient(1);
-  await trabajosPage.selectVehicle(1);
+  // Try multiple client indices until we find one with vehicles
+  let vehicleFound = false;
+  for (let ci = 1; ci <= 8; ci++) {
+    await trabajosPage.selectClient(ci);
+    // Check if vehicle dropdown has options (> 1 means there's at least one vehicle)
+    await page.waitForTimeout(800);
+    const vehicleSelect = page.locator('select').nth(1);
+    const optCount = await vehicleSelect.locator('option').count();
+    if (optCount > 1) {
+      await trabajosPage.selectVehicle(1);
+      vehicleFound = true;
+      break;
+    }
+  }
+  expect(vehicleFound, 'Se debe encontrar un cliente con vehiculo registrado').toBe(true);
   await trabajosPage.fillDescription(JOB_DESCRIPTION);
   await trabajosPage.addLaborItem('Revisión de frenos', 200);
   await trabajosPage.save();
