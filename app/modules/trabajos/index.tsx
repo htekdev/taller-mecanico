@@ -2074,6 +2074,12 @@ export function VistaTrabajo({
           </div>
         )}
       </div>
+    {errorComprobante && (
+    <div role="alert" aria-live="assertive"
+      className="fixed bottom-4 left-4 right-4 z-50 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg px-4 py-3 shadow-lg text-sm font-medium">
+      {errorComprobante}
     </div>
+  )}
+  </div>
   );
 }
