@@ -4,94 +4,81 @@ import { showPhaseLabel } from '../visual-assert';
 /**
  * change-proof-factura-pdf-upload
  *
- * Proof that PR #184 adds PDF upload capability to invoiced work orders:
- *   - "Subir factura" upload label is present on facturado jobs (no PDF yet)
- *   - "Ver factura" link is present on jobs that already have a PDF URL
- *   - Touch targets meet 44px minimum (py-3 padding applied (44px))
- *   - Upload label is absent on non-facturado jobs
+ * Proof that PR #184 adds PDF upload to the Facturas section of Cuentas x Cobrar:
+ *   - Navigate to CxC, select Facturas tab
+ *   - Expand a factura row to reveal the PDF upload area
+ *   - "Subir PDF factura" label is present (no PDF yet) OR "Ver PDF factura" link (PDF exists)
+ *   - Touch targets meet 44px minimum (py-3 padding)
+ *   - Upload UI is NOT in the Trabajos module (moved to CxC)
  *
- * Full upload flow (file picker → Supabase Storage) requires a real file
- * and authenticated session with storage access — verified via UI state only.
+ * Full upload flow requires a real file and Supabase Storage access — verified via UI state only.
  */
 
-test('change-proof-factura-pdf-upload — upload UI present on facturado jobs', async ({ page, loginPage, dashboardPage, trabajosPage }) => {
+test('change-proof-factura-pdf-upload — upload UI in CxC facturas section', async ({ page, loginPage, dashboardPage }) => {
   test.slow();
 
-  // ── Login ──────────────────────────────────────────────────────────────────
+  // ── Login ─────────────────────────────────────────────────────────────────
   await showPhaseLabel(page, '🔐 Login');
   await loginPage.loginAsTestUser();
   await dashboardPage.waitForPageLoad();
 
-  // ── Navigate to Trabajos ───────────────────────────────────────────────────
-  await showPhaseLabel(page, '🔧 Módulo Trabajos');
-  await dashboardPage.navigateToModule('trabajos');
-  await trabajosPage.waitForPageLoad();
+  // ── Navigate to CxC ───────────────────────────────────────────────────────
+  await showPhaseLabel(page, '📋 Módulo Cuentas x Cobrar');
+  await dashboardPage.navigateToModule('cxc');
   await page.waitForTimeout(2000);
 
-  // ── Check for upload UI presence ───────────────────────────────────────────
-  await showPhaseLabel(page, '✅ Verificando UI de subida de factura');
-
-  // Filter to "facturado" jobs to find the upload UI
-  const estadoFilter = page.locator('select').filter({ hasText: /todos/i }).first();
-  const hasFilter = await estadoFilter.isVisible({ timeout: 5_000 }).catch(() => false);
-
-  if (hasFilter) {
-    await estadoFilter.selectOption('facturado');
+  // ── Switch to Facturas tab ─────────────────────────────────────────────────
+  await showPhaseLabel(page, '🗂️ Pestaña Facturas');
+  const facturasTab = page.getByRole('button', { name: /facturas/i });
+  const hasTab = await facturasTab.isVisible({ timeout: 5_000 }).catch(() => false);
+  if (hasTab) {
+    await facturasTab.click();
     await page.waitForTimeout(1500);
   }
 
-  // Look for "Subir factura" labels (file upload trigger) or "Ver factura" links
-  const subirLabels = page.locator('label').filter({ hasText: /subir factura/i });
-  const verLinks = page.locator('a').filter({ hasText: /ver factura/i });
+  // ── Expand the first available row ────────────────────────────────────────
+  await showPhaseLabel(page, '🔍 Expandiendo fila de factura');
+  const expandBtn = page.getByRole('button', { name: /ver|\+ pago/i }).first();
+  const hasExpand = await expandBtn.isVisible({ timeout: 5_000 }).catch(() => false);
+  if (hasExpand) {
+    await expandBtn.click();
+    await page.waitForTimeout(1500);
+  }
+
+  // ── Look for PDF upload or view UI ────────────────────────────────────────
+  await showPhaseLabel(page, '✅ Verificando UI de PDF en facturas');
+
+  const subirLabels = page.locator('label').filter({ hasText: /subir pdf factura|reemplazar pdf/i });
+  const verLinks = page.locator('a').filter({ hasText: /ver pdf factura/i });
 
   const subirCount = await subirLabels.count();
   const verCount = await verLinks.count();
 
+  expect(subirCount + verCount, 'Debe haber al menos una opción de PDF (subir o ver) en la sección de facturas').toBeGreaterThanOrEqual(1);
+
   if (subirCount > 0) {
-    // Verify touch target size — should have py-3 (min 44px tap area with text)
     const firstLabel = subirLabels.first();
     await expect(firstLabel).toBeVisible();
-
     const className = await firstLabel.getAttribute('class') ?? '';
-    expect(className, 'Upload label debe tener py-3 para touch target >= 44px').toContain('py-3');
-    expect(className, 'Upload label debe tener text-sm').toContain('text-sm');
-
-    await showPhaseLabel(page, `✅ ${subirCount} etiqueta(s) "Subir factura" con touch target correcto`);
+    expect(className, 'Label de subida debe tener min-h-[44px] para touch target').toContain('min-h-[44px]');
+    await showPhaseLabel(page, `✅ ${subirCount} botón(es) "Subir PDF factura" con touch target correcto`);
   }
 
   if (verCount > 0) {
-    // Verify "Ver factura" links have proper touch targets
     const firstLink = verLinks.first();
     await expect(firstLink).toBeVisible();
-
     const className = await firstLink.getAttribute('class') ?? '';
-    expect(className, '"Ver factura" debe tener py-3 para touch target >= 44px').toContain('py-3');
-
-    await showPhaseLabel(page, `✅ ${verCount} enlace(s) "Ver factura" con touch target correcto`);
+    expect(className, '"Ver PDF factura" debe tener min-h-[44px]').toContain('min-h-[44px]');
+    await showPhaseLabel(page, `✅ ${verCount} enlace(s) "Ver PDF factura" con touch target correcto`);
   }
 
-  if (subirCount === 0 && verCount === 0) {
-    await showPhaseLabel(page, 'ℹ️ No hay trabajos facturados en DB de prueba — verificando sin errores');
-    const errorBanner = page.locator('[role="alert"], .bg-red-50, .bg-rose-50').first();
-    const hasError = await errorBanner.isVisible({ timeout: 2_000 }).catch(() => false);
-    expect(hasError, 'No debe haber errores en el módulo Trabajos').toBe(false);
-  }
+  // ── Verify upload UI is NOT in Trabajos module ─────────────────────────────
+  await showPhaseLabel(page, '🔧 Verificando que NO está en Trabajos');
+  await dashboardPage.navigateToModule('trabajos');
+  await page.waitForTimeout(2000);
 
-  // ── Verify upload UI absent on non-facturado jobs ─────────────────────────
-  if (hasFilter) {
-    await showPhaseLabel(page, '✅ Verificando: sin "Subir factura" en trabajos pendientes');
-    await estadoFilter.selectOption('pendiente');
-    await page.waitForTimeout(1000);
+  const subirEnTrabajosCount = await page.locator('label').filter({ hasText: /subir factura/i }).count();
+  expect(subirEnTrabajosCount, 'El upload de factura NO debe estar en el módulo de Trabajos').toBe(0);
 
-    const pendienteLabels = page.locator('label').filter({ hasText: /subir factura/i });
-    const pendienteCount = await pendienteLabels.count();
-    expect(pendienteCount, 'Trabajos pendientes no deben tener "Subir factura"').toBe(0);
-
-    // Reset filter
-    await estadoFilter.selectOption('');
-    await page.waitForTimeout(500);
-  }
-
-  await showPhaseLabel(page, '🎉 PR #184 verificado — UI de subida de factura PDF correctamente implementada');
-  await page.waitForTimeout(1000);
+  await showPhaseLabel(page, '✅ UI de PDF correctamente ubicada en CxC Facturas');
 });
