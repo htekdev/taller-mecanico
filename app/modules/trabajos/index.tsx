@@ -982,6 +982,7 @@ export function VistaTrabajo({
               {/* Labor items table */}
               {laborItems.length > 0 && (
                 <div className="rounded-lg border border-slate-200 overflow-hidden">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-slate-100">
                       <tr>
@@ -1030,6 +1031,7 @@ export function VistaTrabajo({
                       </tr>
                     </tfoot>
                   </table>
+                  </div>
                 </div>
               )}
               {laborItems.length === 0 && (
@@ -1155,11 +1157,9 @@ export function VistaTrabajo({
                           <td className="px-3 py-2 text-right text-rose-600 font-semibold">
                             ${fmt(l.costoTaller ?? 0)}
                           </td>
-                          <td className="px-3 py-2 text-right font-semibold text-slate-700">{l.cantidad ?? 1}</td>
                           <td className="px-3 py-2 text-right font-semibold text-slate-700">${fmt(l.precio)}</td>
-                          <td className="px-3 py-2 text-right font-bold text-slate-900">${fmt(l.precio * (l.cantidad ?? 1))}</td>
                           <td className="px-3 py-2 text-right font-semibold text-emerald-600">
-                            ${fmt(l.precio - (l.costoTaller ?? 0))}
+                            ${fmt((l.precio * (l.cantidad ?? 1)) - (l.costoTaller ?? 0))}
                           </td>
                           <td className="px-3 py-2 text-center">
                             <Btn size="sm" variant="danger" onClick={() => removerLabor(l.id)}>✕</Btn>
