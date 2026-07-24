@@ -127,6 +127,19 @@ describe('updateTrabajoManoDeObraItems', () => {
     expect(arg.mano_de_obra).toBe(150);
     expect(arg.mano_de_obra_items).toHaveLength(1);
   });
+
+  it('multiplies precio by cantidad when cantidad > 1 (PR #182 regression guard)', async () => {
+    const { update } = mockUpdateEqChain(null);
+    const itemsWithQuantity: ManoDeObraItem[] = [
+      { id: 'mdo-a', concepto: 'Frenos', precio: 500, cantidad: 2 },
+      { id: 'mdo-b', concepto: 'Aceite', precio: 200 },
+    ];
+    await updateTrabajoManoDeObraItems('trabajo-x', itemsWithQuantity);
+    // Frenos: 500 x 2 = 1000, Aceite: 200 x 1 = 200 -> total 1200
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ mano_de_obra: 1200 })
+    );
+  });
 });
 
 // updateTrabajoFactura
