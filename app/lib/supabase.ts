@@ -154,7 +154,7 @@ export async function uploadFacturaPdf(
   trabajoId: string,
   file: File,
 ): Promise<string> {
-  const path = `facturas/${tallerId}/${trabajoId}/factura.pdf`;
+  const path = `${tallerId}/${trabajoId}/factura.pdf`;
   const { error } = await supabase.storage
     .from('facturas')
     .upload(path, file, { contentType: 'application/pdf', upsert: true });
