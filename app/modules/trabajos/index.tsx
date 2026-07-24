@@ -1822,7 +1822,7 @@ export function VistaTrabajo({
                               }).finally(() => setGenerandoComprobanteId(null));
                             }}
                             disabled={generandoComprobanteId === trabajo.id}
-                            className="text-xs font-semibold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="text-xs font-semibold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-3 py-3 min-h-[44px] rounded-lg transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Generar comprobante de pago para el cliente"
                           >
                             {generandoComprobanteId === trabajo.id ? "⏳..." : "🧾 Comprobante"}
