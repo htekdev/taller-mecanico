@@ -1077,7 +1077,8 @@ export default function TallerMecanico() {
               onCancelarTrabajo={cancelarTrabajo}
               onReactivarTrabajo={reactivarTrabajo}
               onActualizarTft={actualizarTft}
-              onIrAFacturas={() => setVista('facturas')} />
+              onIrAFacturas={() => setVista('facturas')}
+              onFacturaPdfUploaded={(trabajoId, url) => setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaPdfUrl: url } : t))} />
           )}
           {vista === 'proveedores' && (
             <VistaProveedores proveedores={proveedores} inventario={inventario}
