@@ -15,6 +15,10 @@ import { showPhaseLabel } from '../visual-assert';
  *   Section total should be $1,200
  */
 
+// Supabase cold-start on Vercel preview can cause trabajos module navigation to fail on first
+// attempt. retries:1 ensures the create→verify flow passes when Supabase is warm.
+test.describe.configure({ retries: 1 });
+
 test('change-proof-mano-de-obra-cantidad', async ({ page, loginPage, dashboardPage, trabajosPage }) => {
   test.slow(); // Supabase cold-start on preview branch
 
