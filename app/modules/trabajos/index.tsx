@@ -481,7 +481,7 @@ export function VistaTrabajo({
     setUploadPdfErrorId(null);
     try {
       const url = await uploadFacturaPdf(tallerId, trabajoId, file);
-      await updateTrabajoFacturaPdf(trabajoId, url);
+      await updateTrabajoFacturaPdf(tallerId, trabajoId, url);
       onFacturaPdfUploaded?.(trabajoId, url);
       // Optimistic UI update handled by parent reload — show success briefly
     } catch (e) {
@@ -1743,6 +1743,7 @@ export function VistaTrabajo({
                                 📄 Ver factura
                               </a>
                             ) : (
+                              <>
                               <label className="text-sm bg-indigo-100 text-indigo-700 font-semibold px-3 py-2 rounded-full hover:bg-indigo-200 transition-colors border border-indigo-200 cursor-pointer">
                                 {uploadingPdfId === trabajo.id ? '⏳ Subiendo...' : '📎 Subir factura'}
                                 <input type="file" accept="application/pdf" className="hidden"
@@ -1752,6 +1753,7 @@ export function VistaTrabajo({
                               {uploadPdfErrorId === trabajo.id && uploadPdfError && (
                                 <span className="block text-xs text-red-600 mt-1">{uploadPdfError}</span>
                               )}
+                              </>
                             )}
                             <button type="button"
                               onClick={() => onRefacturar(trabajo.id)}
