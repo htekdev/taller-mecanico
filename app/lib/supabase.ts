@@ -162,10 +162,3 @@ export async function uploadFacturaPdf(
   const { data } = supabase.storage.from('facturas').getPublicUrl(path);
   return data.publicUrl;
 }
-// ── Supabase Storage: Invoice PDF upload ──────────────────────────────────────
-
-/**
- * Upload an invoice PDF to Supabase Storage.
- * Path: facturas/{tallerId}/{trabajoId}/factura.pdf
- * Returns the public URL on success, throws on error.
- */
