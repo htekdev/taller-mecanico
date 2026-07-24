@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect } from 'react';
 import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel, Proveedor } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt, getMontoPagado, formatearFecha, getHoy } from '@/app/lib/utils';
+import { supabase, uploadFacturaPdf } from '@/app/lib/supabase';
+import { updateTrabajoFacturaPdf } from '@/app/lib/db';
 import { getPricingIntel } from '@/app/lib/pricing';
 
 // ─── Departamentos localStorage ───────────────────────────────────────────────
@@ -326,6 +328,7 @@ function ModalFinalizacion({
 
 // ── Main Component ──────────────────────────────────────────────────────────
 export function VistaTrabajo({
+  tallerId,
   clientes,
   vehiculos,
   inventario,
@@ -343,6 +346,7 @@ export function VistaTrabajo({
   onActualizarTft,
   onIrAFacturas,
 }: {
+  tallerId: string;
   clientes: Cliente[];
   vehiculos: Vehiculo[];
   inventario: Refaccion[];
@@ -377,6 +381,8 @@ export function VistaTrabajo({
   };
   const [form, setForm] = useState(emptyForm);
   const [laborItems, setLaborItems] = useState<ManoDeObraItem[]>([]);
+  const [uploadingPdfId, setUploadingPdfId] = useState<string | null>(null);
+  const [uploadPdfError, setUploadPdfError] = useState<string | null>(null);
   const [laborConcepto, setLaborConcepto] = useState('');
   const [laborPrecio, setLaborPrecio]     = useState(0);
   // Save state — prevents double-submit and keeps form data if save fails
@@ -463,6 +469,20 @@ export function VistaTrabajo({
     setExtPrecioCliente(0);
     setExtProveedorId('');
     setShowExtForm(false);
+  };
+
+  const subirFacturaPdf = async (trabajoId: string, file: File) => {
+    setUploadingPdfId(trabajoId);
+    setUploadPdfError(null);
+    try {
+      const url = await uploadFacturaPdf(tallerId, trabajoId, file);
+      await updateTrabajoFacturaPdf(trabajoId, url);
+      // Optimistic UI update handled by parent reload — show success briefly
+    } catch (e) {
+      setUploadPdfError('Error al subir el archivo. Intenta de nuevo.');
+    } finally {
+      setUploadingPdfId(null);
+    }
   };
 
   const agregarParte = () => {
@@ -1710,6 +1730,19 @@ export function VistaTrabajo({
                         trabajo.estadoFacturacion === 'facturado' ? (
                           <span className="ml-2 inline-flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">✓ Facturado</span>
+                            {trabajo.facturaPdfUrl ? (
+                              <a href={trabajo.facturaPdfUrl} target="_blank" rel="noopener noreferrer"
+                                className="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full hover:bg-blue-200 transition-colors border border-blue-200 no-underline">
+                                📄 Ver factura
+                              </a>
+                            ) : (
+                              <label className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded-full hover:bg-indigo-200 transition-colors border border-indigo-200 cursor-pointer">
+                                {uploadingPdfId === trabajo.id ? '⏳ Subiendo...' : '📎 Subir factura'}
+                                <input type="file" accept="application/pdf" className="hidden"
+                                  onChange={e => { const f = e.target.files?.[0]; if (f) subirFacturaPdf(trabajo.id, f); e.target.value = ''; }}
+                                />
+                              </label>
+                            )}
                             <button type="button"
                               onClick={() => onRefacturar(trabajo.id)}
                               title="Cancelar la factura actual y volver a facturar este trabajo"
