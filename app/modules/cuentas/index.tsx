@@ -485,10 +485,12 @@ export function VistaCuentas({
   const hoy = getHoy();
   const [uploadingPdfId, setUploadingPdfId] = useState<string | null>(null);
   const [uploadPdfError, setUploadPdfError] = useState<string | null>(null);
+  const [uploadPdfErrorId, setUploadPdfErrorId] = useState<string | null>(null);
   const handleSubirPdf = async (trabajoId: string, file: File) => {
     if (!tallerId) return;
     setUploadingPdfId(trabajoId);
     setUploadPdfError(null);
+    setUploadPdfErrorId(null);
     try {
       const url = await uploadFacturaPdf(tallerId, trabajoId, file);
       await db.updateTrabajoFacturaPdf(tallerId, trabajoId, url);
@@ -496,7 +498,8 @@ export function VistaCuentas({
     } catch (err: unknown) {
       console.error('[cuentas] handleSubirPdf error:', err);
       setUploadPdfError('No se pudo subir el PDF. Intenta de nuevo.');
-      setTimeout(() => setUploadPdfError(null), 4000);
+      setUploadPdfErrorId(trabajoId);
+      setTimeout(() => { setUploadPdfError(null); setUploadPdfErrorId(null); }, 4000);
     } finally {
       setUploadingPdfId(null);
     }
@@ -933,8 +936,8 @@ export function VistaCuentas({
                             />
                           </label>
                         )}
-                        {uploadPdfError && uploadingPdfId === null && (
-                          <span role="alert" className="text-xs text-red-600">{uploadPdfError}</span>
+                        {uploadPdfError && uploadPdfErrorId === relTrabajo?.id && uploadingPdfId === null && (
+                          <span role="alert" className="text-sm text-red-600">{uploadPdfError}</span>
                         )}
                       </div>
                       {/* Cancelar desde cuentas */}
