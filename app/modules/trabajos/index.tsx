@@ -334,6 +334,7 @@ async function generarComprobantePago(
     y += 7;
     const rh = 6;
     trabajo.manoDeObraItems.forEach((item, i) => {
+      if (y > 255) { doc.addPage(); y = 15; }
       if (i % 2 === 0) { doc.setFillColor(...XLIGHT); doc.rect(ml, y, cw, rh, 'F'); }
       doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...DARK);
       const itemLabel = item.cantidad && item.cantidad > 1
@@ -353,6 +354,7 @@ async function generarComprobantePago(
   }
 
   // ═══ AMOUNTS SUMMARY ══════════════════════════════════════════════════════
+  if (y > 230) { doc.addPage(); y = 15; }
   const sumX = ml + cw - 75;
   doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3); doc.line(sumX, y, ml + cw, y);
   y += 5;
@@ -387,6 +389,7 @@ async function generarComprobantePago(
     y += 7;
 
     trabajo.pagos.forEach((pago, i) => {
+      if (y > 260) { doc.addPage(); y = 15; }
       if (i % 2 === 0) { doc.setFillColor(...XLIGHT); doc.rect(ml, y, cw, 6, 'F'); }
       doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...DARK);
       const pagoFecha = pago.fecha
