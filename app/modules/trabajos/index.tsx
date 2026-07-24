@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect } from 'react';
 import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel, Proveedor } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt, getMontoPagado, formatearFecha, getHoy } from '@/app/lib/utils';
-import { supabase } from '@/app/lib/supabase';
 import { getPricingIntel } from '@/app/lib/pricing';
 
 // ─── Departamentos localStorage ───────────────────────────────────────────────
