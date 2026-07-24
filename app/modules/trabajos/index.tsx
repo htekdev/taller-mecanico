@@ -1752,7 +1752,7 @@ export function VistaTrabajo({
                                 />
                               </label>
                               {uploadPdfErrorId === trabajo.id && uploadPdfError && (
-                                <span className="block text-xs text-red-600 mt-1">{uploadPdfError}</span>
+                                <span role="alert" className="block text-sm text-red-600 mt-1">{uploadPdfError}</span>
                               )}
                               </>
                             )}
