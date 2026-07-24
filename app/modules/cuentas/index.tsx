@@ -809,31 +809,7 @@ export function VistaCuentas({
                           <div className="flex items-end"><Btn variant="success" fullWidth disabled={pagoFormT.monto <= 0} onClick={() => { onRegistrarPagoTrabajo(trabajo.id, { monto: Math.min(pagoFormT.monto, saldo), fecha: pagoFormT.fecha, nota: pagoFormT.nota || undefined }); setPagoFormT({ monto: 0, fecha: hoy, nota: '' }); setExpandidoT(null); }}>✓ Registrar</Btn></div>
                         </div>
                       )}
-                      {estado === 'pagado' && (
-                      <div className="flex flex-col items-center gap-2">
-                        <p className="text-xs text-emerald-600 font-semibold text-center">✅ Completamente pagado.</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setGenerandoComprobanteId(trabajo.id);
-                            generarComprobantePago(
-                              trabajo,
-                              clientes.find(c => c.id === trabajo.clienteId),
-                              vehiculos.find(v => v.id === trabajo.vehiculoId)
-                            ).catch((err: unknown) => {
-                              console.error('[cuentas] generarComprobantePago error:', err);
-                              setErrorComprobante('No se pudo generar el comprobante. Intenta de nuevo.');
-                              setTimeout(() => setErrorComprobante(null), 4000);
-                            }).finally(() => setGenerandoComprobanteId(null));
-                          }}
-                          disabled={generandoComprobanteId === trabajo.id}
-                          className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-3 min-h-[44px] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Generar comprobante de pago para el cliente"
-                        >
-                          {generandoComprobanteId === trabajo.id ? '⏳ Generando...' : '🧾 Comprobante'}
-                        </button>
-                      </div>
-                    )}
+                      {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Completamente pagado.</p>}
                       {/* Cancelar nota */}
                       {confirmCancelarId === trabajo.id ? (
                         <div className="bg-rose-50 border border-rose-300 rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap">
