@@ -9,17 +9,17 @@ INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 VALUES ('facturas', 'facturas', true, 10485760, ARRAY['application/pdf'])
 ON CONFLICT (id) DO NOTHING;
 
--- RLS: allow authenticated users to read/write invoice PDFs
-CREATE POLICY IF NOT EXISTS "Authenticated users can upload facturas"
+-- RLS policies for invoice PDF storage
+CREATE POLICY "Authenticated users can upload facturas"
   ON storage.objects FOR INSERT
   TO authenticated
   WITH CHECK (bucket_id = 'facturas');
 
-CREATE POLICY IF NOT EXISTS "Anyone can read facturas"
+CREATE POLICY "Anyone can read facturas"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'facturas');
 
-CREATE POLICY IF NOT EXISTS "Authenticated users can update facturas"
+CREATE POLICY "Authenticated users can update facturas"
   ON storage.objects FOR UPDATE
   TO authenticated
   USING (bucket_id = 'facturas');
