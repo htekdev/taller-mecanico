@@ -846,6 +846,7 @@ export function VistaTrabajo({
   const trabajosPendientesFacturar = trabajosDelTab.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
   const trabajosSinRefacciones = trabajosDelTab.filter(t => t.pendienteRefacciones === true);
   const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
+  const [generandoComprobanteId, setGenerandoComprobanteId] = useState<string | null>(null);
   const trabajosFiltrados = [...trabajosDelTab]
     .filter(t => {
       if (filtroClienteId && t.clienteId !== filtroClienteId) return false;
@@ -1987,15 +1988,21 @@ export function VistaTrabajo({
                         {getMontoPagado(trabajo) >= trabajo.total && trabajo.total > 0 && (
                           <button
                             type="button"
-                            onClick={() => generarComprobantePago(
-                              trabajo,
-                              clientes.find(c => c.id === trabajo.clienteId),
-                              vehiculos.find(v => v.id === trabajo.vehiculoId)
-                            )}
-                            className="text-xs font-semibold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                            onClick={() => {
+                              setGenerandoComprobanteId(trabajo.id);
+                              generarComprobantePago(
+                                trabajo,
+                                clientes.find(c => c.id === trabajo.clienteId),
+                                vehiculos.find(v => v.id === trabajo.vehiculoId)
+                              ).catch(() => {
+                                alert('No se pudo generar el comprobante. Intenta de nuevo.');
+                              }).finally(() => setGenerandoComprobanteId(null));
+                            }}
+                            disabled={generandoComprobanteId === trabajo.id}
+                            className="text-xs font-semibold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Generar comprobante de pago para el cliente"
                           >
-                            🧾 Comprobante
+                            {generandoComprobanteId === trabajo.id ? "⏳..." : "🧾 Comprobante"}
                           </button>
                         )}
                         {confirmCancelarId === trabajo.id ? (
