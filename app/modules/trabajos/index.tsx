@@ -1739,14 +1739,15 @@ export function VistaTrabajo({
                             <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">✓ Facturado</span>
                             {trabajo.facturaPdfUrl ? (
                               <a href={trabajo.facturaPdfUrl} target="_blank" rel="noopener noreferrer"
-                                className="text-sm bg-blue-100 text-blue-700 font-semibold px-3 py-2 rounded-full hover:bg-blue-200 transition-colors border border-blue-200 no-underline">
+                                className="text-sm bg-blue-100 text-blue-700 font-semibold px-3 py-3 rounded-full hover:bg-blue-200 transition-colors border border-blue-200 no-underline">
                                 📄 Ver factura
                               </a>
                             ) : (
                               <>
-                              <label className="text-sm bg-indigo-100 text-indigo-700 font-semibold px-3 py-2 rounded-full hover:bg-indigo-200 transition-colors border border-indigo-200 cursor-pointer">
+                              <label className={`text-sm bg-indigo-100 text-indigo-700 font-semibold px-3 py-3 rounded-full border border-indigo-200 transition-colors ${uploadingPdfId === trabajo.id ? 'opacity-70 cursor-not-allowed' : 'hover:bg-indigo-200 cursor-pointer'}`}>
                                 {uploadingPdfId === trabajo.id ? '⏳ Subiendo...' : '📎 Subir factura'}
                                 <input type="file" accept="application/pdf" className="hidden"
+                                  disabled={uploadingPdfId === trabajo.id}
                                   onChange={e => { const f = e.target.files?.[0]; if (f) subirFacturaPdf(trabajo.id, f); e.target.value = ''; }}
                                 />
                               </label>
