@@ -850,6 +850,7 @@ export function VistaTrabajo({
   const trabajosSinRefacciones = trabajosDelTab.filter(t => t.pendienteRefacciones === true);
   const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
   const [generandoComprobanteId, setGenerandoComprobanteId] = useState<string | null>(null);
+  const [errorComprobante, setErrorComprobante] = useState<string | null>(null);
   const trabajosFiltrados = [...trabajosDelTab]
     .filter(t => {
       if (filtroClienteId && t.clienteId !== filtroClienteId) return false;
