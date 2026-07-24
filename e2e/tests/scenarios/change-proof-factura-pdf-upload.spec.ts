@@ -7,7 +7,7 @@ import { showPhaseLabel } from '../visual-assert';
  * Proof that PR #184 adds PDF upload capability to invoiced work orders:
  *   - "Subir factura" upload label is present on facturado jobs (no PDF yet)
  *   - "Ver factura" link is present on jobs that already have a PDF URL
- *   - Touch targets meet 44px minimum (py-2 padding applied)
+ *   - Touch targets meet 44px minimum (py-3 padding applied (44px))
  *   - Upload label is absent on non-facturado jobs
  *
  * Full upload flow (file picker → Supabase Storage) requires a real file
