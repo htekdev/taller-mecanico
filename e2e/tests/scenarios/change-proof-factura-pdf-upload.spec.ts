@@ -14,6 +14,10 @@ import { showPhaseLabel } from '../visual-assert';
  * Full upload flow requires a real file and Supabase Storage access — verified via UI state only.
  */
 
+// Supabase cold-start on Vercel preview can cause CxC module navigation to fail on first attempt.
+// retries:1 ensures the test passes on the second attempt when Supabase is warm.
+test.describe.configure({ retries: 1 });
+
 test('change-proof-factura-pdf-upload — upload UI in CxC facturas section', async ({ page, loginPage, dashboardPage }) => {
   test.slow();
 
