@@ -1262,7 +1262,8 @@ export async function nextCotizacionNumber(tallerId: string): Promise<string> {
 }
 
 /** Update the factura PDF URL for a trabajo */
-export async function updateTrabajoFacturaPdf(trabajoId: string, url: string | null): Promise<void> {
-  const { error } = await supabase.from('trabajos').update({ factura_pdf_url: url }).eq('id', trabajoId);
+export async function updateTrabajoFacturaPdf(tallerId: string, trabajoId: string, url: string | null): Promise<void> {
+  const { error } = await supabase.from('trabajos').update({ factura_pdf_url: url }).eq('id', trabajoId)
+    .eq('taller_id', tallerId);
   if (error) throw new Error(`updateTrabajoFacturaPdf: ${error.message}`);
 }
