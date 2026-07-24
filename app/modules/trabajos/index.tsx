@@ -1080,7 +1080,7 @@ export function VistaTrabajo({
             )}
             <div>
               <Label>② Unidad / Vehículo</Label>
-              <Select value={form.vehiculoId} onChange={e => setForm(f => ({ ...f, vehiculoId: e.target.value }))}
+              <Select data-testid="vehiculo-select" value={form.vehiculoId} onChange={e => setForm(f => ({ ...f, vehiculoId: e.target.value }))}
                 required disabled={!form.clienteId || vehiculosDelCliente.length === 0}>
                 <option value="">Seleccionar unidad...</option>
                 {vehiculosDelCliente.map(v => <option key={v.id} value={v.id}>{labelVehiculo(v)}</option>)}
