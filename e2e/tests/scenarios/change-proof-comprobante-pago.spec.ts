@@ -101,6 +101,20 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   await confirmBtn.click();
   await page.waitForTimeout(2000);
 
+
+  // ── Assert: comprobante button visible in CxC (THE NEW FEATURE) ────────────
+  await showPhaseLabel(page, '🧾 Verificando botón Comprobante en CxC — VistaCuentas');
+  // Row is already visible from payment step — still on CxC tab
+  const cxcPaidRow = page
+    .locator('[class*="border"][class*="rounded"], .border.rounded-xl')
+    .filter({ hasText: /Prueba comprobante PR183/i })
+    .first();
+  await expect(cxcPaidRow, 'Fila pagada debe ser visible en CxC tras pago completo').toBeVisible({ timeout: 10_000 });
+  const cxcComprobanteBtn = cxcPaidRow.getByRole('button', { name: /comprobante/i });
+  await expect(cxcComprobanteBtn, 'Botón Comprobante debe aparecer en CxC para trabajo pagado').toBeVisible({ timeout: 10_000 });
+  await expect(cxcComprobanteBtn, 'Botón no debe estar deshabilitado en CxC').not.toBeDisabled();
+  await showPhaseLabel(page, '✅ Comprobante disponible en CxC (VistaCuentas)');
+
   // ── Navigate back to Trabajos ─────────────────────────────────────────────
   await showPhaseLabel(page, '🔧 Volviendo a Trabajos');
   await dashboardPage.navigateToModule('trabajos');
