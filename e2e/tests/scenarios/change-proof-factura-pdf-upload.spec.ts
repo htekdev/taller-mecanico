@@ -48,7 +48,7 @@ test('change-proof-factura-pdf-upload — upload UI present on facturado jobs', 
   const verCount = await verLinks.count();
 
   if (subirCount > 0) {
-    // Verify touch target size — should have py-2 (min 44px tap area with text)
+    // Verify touch target size — should have py-3 (min 44px tap area with text)
     const firstLabel = subirLabels.first();
     await expect(firstLabel).toBeVisible();
 
