@@ -345,6 +345,7 @@ export function VistaTrabajo({
   onReactivarTrabajo,
   onActualizarTft,
   onIrAFacturas,
+  onFacturaPdfUploaded,
 }: {
   tallerId: string;
   clientes: Cliente[];
@@ -363,6 +364,7 @@ export function VistaTrabajo({
   onReactivarTrabajo: (trabajoId: string) => void;
   onActualizarTft: (trabajoId: string, tftNumero: string) => Promise<void> | void;
   onIrAFacturas: () => void;
+  onFacturaPdfUploaded?: (trabajoId: string, url: string) => void;
 }) {
   const emptyForm = {
     clienteId: '', vehiculoId: '',
@@ -383,6 +385,7 @@ export function VistaTrabajo({
   const [laborItems, setLaborItems] = useState<ManoDeObraItem[]>([]);
   const [uploadingPdfId, setUploadingPdfId] = useState<string | null>(null);
   const [uploadPdfError, setUploadPdfError] = useState<string | null>(null);
+  const [uploadPdfErrorId, setUploadPdfErrorId] = useState<string | null>(null);
   const [laborConcepto, setLaborConcepto] = useState('');
   const [laborPrecio, setLaborPrecio]     = useState(0);
   // Save state — prevents double-submit and keeps form data if save fails
@@ -472,14 +475,18 @@ export function VistaTrabajo({
   };
 
   const subirFacturaPdf = async (trabajoId: string, file: File) => {
+    if (!tallerId) { setUploadPdfError('Error: taller no identificado'); setUploadPdfErrorId(trabajoId); return; }
     setUploadingPdfId(trabajoId);
     setUploadPdfError(null);
+    setUploadPdfErrorId(null);
     try {
       const url = await uploadFacturaPdf(tallerId, trabajoId, file);
       await updateTrabajoFacturaPdf(trabajoId, url);
+      onFacturaPdfUploaded?.(trabajoId, url);
       // Optimistic UI update handled by parent reload — show success briefly
     } catch (e) {
       setUploadPdfError('Error al subir el archivo. Intenta de nuevo.');
+      setUploadPdfErrorId(trabajoId);
     } finally {
       setUploadingPdfId(null);
     }
@@ -1732,16 +1739,19 @@ export function VistaTrabajo({
                             <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">✓ Facturado</span>
                             {trabajo.facturaPdfUrl ? (
                               <a href={trabajo.facturaPdfUrl} target="_blank" rel="noopener noreferrer"
-                                className="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full hover:bg-blue-200 transition-colors border border-blue-200 no-underline">
+                                className="text-sm bg-blue-100 text-blue-700 font-semibold px-3 py-2 rounded-full hover:bg-blue-200 transition-colors border border-blue-200 no-underline">
                                 📄 Ver factura
                               </a>
                             ) : (
-                              <label className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded-full hover:bg-indigo-200 transition-colors border border-indigo-200 cursor-pointer">
+                              <label className="text-sm bg-indigo-100 text-indigo-700 font-semibold px-3 py-2 rounded-full hover:bg-indigo-200 transition-colors border border-indigo-200 cursor-pointer">
                                 {uploadingPdfId === trabajo.id ? '⏳ Subiendo...' : '📎 Subir factura'}
                                 <input type="file" accept="application/pdf" className="hidden"
                                   onChange={e => { const f = e.target.files?.[0]; if (f) subirFacturaPdf(trabajo.id, f); e.target.value = ''; }}
                                 />
                               </label>
+                              {uploadPdfErrorId === trabajo.id && uploadPdfError && (
+                                <span className="block text-xs text-red-600 mt-1">{uploadPdfError}</span>
+                              )}
                             )}
                             <button type="button"
                               onClick={() => onRefacturar(trabajo.id)}
