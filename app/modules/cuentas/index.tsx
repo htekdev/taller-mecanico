@@ -925,10 +925,10 @@ export function VistaCuentas({
                           </a>
                         ) : null}
                         {relTrabajo && (
-                          <label className={`text-xs font-semibold px-3 py-3 min-h-[44px] rounded-lg transition-colors flex items-center gap-1 ${uploadingPdfId === factura.trabajoId ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 cursor-pointer'}`}>
+                          <label className={`text-xs font-semibold px-3 py-3 min-h-[44px] rounded-lg transition-colors flex items-center gap-1 ${uploadingPdfId !== null ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 cursor-pointer'}`}>
                             {uploadingPdfId === factura.trabajoId ? '⏳ Subiendo...' : (relTrabajo.facturaPdfUrl ? '📎 Reemplazar PDF' : '📎 Subir PDF factura')}
                             <input type="file" accept="application/pdf" className="sr-only"
-                              disabled={uploadingPdfId === factura.trabajoId}
+                              disabled={uploadingPdfId !== null}
                               onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; await handleSubirPdf(relTrabajo.id, file); e.target.value = ''; }}
                             />
                           </label>
