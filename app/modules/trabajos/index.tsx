@@ -1712,7 +1712,7 @@ export function VistaTrabajo({
                             <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">✓ Facturado</span>
                             {trabajo.facturaPdfUrl ? (
                               <a href={trabajo.facturaPdfUrl} target="_blank" rel="noopener noreferrer"
-                                className="text-sm bg-blue-100 text-blue-700 font-semibold px-3 py-3 rounded-full hover:bg-blue-200 transition-colors border border-blue-200 no-underline">
+                                className="text-sm bg-blue-100 text-blue-700 font-semibold px-3 py-3 min-h-[44px] flex items-center gap-1 rounded-full hover:bg-blue-200 transition-colors border border-blue-200 no-underline">
                                 📄 Ver factura
                               </a>
                 ) : null}
