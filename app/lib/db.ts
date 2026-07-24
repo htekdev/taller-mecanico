@@ -312,6 +312,7 @@ function buildInsertTrabajoPayload(tallerId: string, data: Omit<Trabajo, 'id'>) 
     costo_refacciones: data.costoRefacciones,
     requiere_factura: data.requiereFactura,
     folio_fiscal: data.folioFiscal ?? null,
+    factura_pdf_url: data.facturaPdfUrl ?? null,
     iva: data.iva,
     total: data.total,
     partes: data.partes,
@@ -353,6 +354,7 @@ function mapTrabajoRow(row: Record<string, unknown>): Trabajo {
     partes: (row.partes as TrabajoRefaccion[]) ?? [],
     pagos: (row.pagos as Pago[]) ?? [],
     facturaId: (row.factura_id as string | null) ?? undefined,
+    facturaPdfUrl: (row.factura_pdf_url as string | null) ?? undefined,
     tipoDocumento: (row.tipo_documento as Trabajo['tipoDocumento']) ?? undefined,
     fechaFinalizacion: (row.fecha_finalizacion as string | null) ?? undefined,
     estadoFacturacion: row.estado_facturacion as Trabajo['estadoFacturacion'],
@@ -1259,4 +1261,9 @@ export async function nextCotizacionNumber(tallerId: string): Promise<string> {
   return `COT-${String(next).padStart(3, '0')}`;
 }
 
-
+/** Update the factura PDF URL for a trabajo */
+export async function updateTrabajoFacturaPdf(tallerId: string, trabajoId: string, url: string | null): Promise<void> {
+  const { error } = await supabase.from('trabajos').update({ factura_pdf_url: url }).eq('id', trabajoId)
+    .eq('taller_id', tallerId);
+  if (error) throw new Error(`updateTrabajoFacturaPdf: ${error.message}`);
+}
