@@ -1815,7 +1815,8 @@ export function VistaTrabajo({
                                 trabajo,
                                 clientes.find(c => c.id === trabajo.clienteId),
                                 vehiculos.find(v => v.id === trabajo.vehiculoId)
-                              ).catch(() => {
+                              ).catch((err) => {
+                                console.error('[trabajos] generarComprobantePago error:', err);
                                 setErrorComprobante('No se pudo generar el comprobante. Intenta de nuevo.');
                                 setTimeout(() => setErrorComprobante(null), 4000);
                               }).finally(() => setGenerandoComprobanteId(null));
