@@ -176,6 +176,7 @@ export interface Trabajo {
   pagos: Pago[];
   facturaId?: string;
   estadoFacturacion?: 'sin_facturar' | 'facturado';
+  facturaPdfUrl?: string;              // URL to uploaded invoice PDF in Supabase Storage
   estado: 'pendiente' | 'completado' | 'pagado';
   /** Set at finalization: 'factura' = with IVA (16%), 'nota' = without IVA */
   tipoDocumento?: 'factura' | 'nota';
