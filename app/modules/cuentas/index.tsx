@@ -985,13 +985,14 @@ export function VistaCuentas({
                               trabajo,
                               clientes.find(c => c.id === trabajo.clienteId),
                               vehiculos.find(v => v.id === trabajo.vehiculoId)
-                            ).catch(() => {
+                            ).catch((err) => {
+                              console.error('[cuentas] generarComprobantePago error:', err);
                               setErrorComprobante('No se pudo generar el comprobante. Intenta de nuevo.');
                               setTimeout(() => setErrorComprobante(null), 4000);
                             }).finally(() => setGenerandoComprobanteId(null));
                           }}
                           disabled={generandoComprobanteId === trabajo.id}
-                          className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-3 min-h-[44px] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Generar comprobante de pago para el cliente"
                         >
                           {generandoComprobanteId === trabajo.id ? '⏳ Generando...' : '🧾 Comprobante'}
