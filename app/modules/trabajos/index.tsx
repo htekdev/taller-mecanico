@@ -966,7 +966,7 @@ export function VistaTrabajo({
                 </div>
                 <div className="w-24">
                   <Label>Cantidad</Label>
-                  <Input type="number" placeholder="1" min="1" step="1"
+                  <Input type="number" placeholder="1" min="1" step="1" inputMode="numeric"
                     value={laborCantidad || ''}
                     onChange={e => setLaborCantidad(Math.max(1, Math.floor(Number(e.target.value) || 1)))} />
                 </div>
