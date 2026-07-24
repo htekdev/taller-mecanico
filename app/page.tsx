@@ -1105,7 +1105,9 @@ export default function TallerMecanico() {
               onEliminarPagoFactura={eliminarPagoFactura}
               onEliminarPagoTrabajo={eliminarPagoTrabajo}
               onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura}
-              onCancelarNota={cancelarNota} onReactivarNota={reactivarNota} />
+              onCancelarNota={cancelarNota} onReactivarNota={reactivarNota}
+              tallerId={taller?.id ?? ''}
+              onFacturaPdfUploaded={(trabajoId, url) => setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaPdfUrl: url } : t))} />
           )}
           {vista === 'pagos' && (
             <VistaCuentasPorPagar ordenes={ordenes} proveedores={proveedores}
