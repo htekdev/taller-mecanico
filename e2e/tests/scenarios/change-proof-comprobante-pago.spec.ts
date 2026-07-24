@@ -18,6 +18,10 @@ import { showPhaseLabel } from '../visual-assert';
  * 9. Find the row matching the unique description
  * 10. Assert: comprobante button visible + enabled (unconditional, scoped to THIS job)
  */
+// Supabase cold-start on Vercel preview can cause trabajos/cuentas module navigation to fail on
+// first attempt. retries:1 ensures the full create→pay→verify flow passes when Supabase is warm.
+test.describe.configure({ retries: 1 });
+
 test('change-proof-comprobante-pago — button appears on fully-paid job', async ({
   page, loginPage, dashboardPage, trabajosPage, cuentasCobrarPage,
 }) => {
