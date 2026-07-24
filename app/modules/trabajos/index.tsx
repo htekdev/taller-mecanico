@@ -327,7 +327,6 @@ function ModalFinalizacion({
 
 // ── Main Component ──────────────────────────────────────────────────────────
 export function VistaTrabajo({
-  tallerId,
   clientes,
   vehiculos,
   inventario,
@@ -344,9 +343,7 @@ export function VistaTrabajo({
   onReactivarTrabajo,
   onActualizarTft,
   onIrAFacturas,
-  onFacturaPdfUploaded,
 }: {
-  tallerId: string;
   clientes: Cliente[];
   vehiculos: Vehiculo[];
   inventario: Refaccion[];
@@ -363,7 +360,6 @@ export function VistaTrabajo({
   onReactivarTrabajo: (trabajoId: string) => void;
   onActualizarTft: (trabajoId: string, tftNumero: string) => Promise<void> | void;
   onIrAFacturas: () => void;
-  onFacturaPdfUploaded?: (trabajoId: string, url: string) => void;
 }) {
   const emptyForm = {
     clienteId: '', vehiculoId: '',
