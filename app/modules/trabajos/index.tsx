@@ -1135,6 +1135,7 @@ export function VistaTrabajo({
               {/* External items list */}
               {laborItems.filter(l => l.tipo === 'externo').length > 0 ? (
                 <div className="rounded-lg border border-orange-200 overflow-hidden">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-orange-50">
                       <tr>
@@ -1168,6 +1169,7 @@ export function VistaTrabajo({
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               ) : (
                 !showExtForm && (
