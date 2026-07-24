@@ -179,6 +179,7 @@ export interface Trabajo {
   facturaPdfUrl?: string;              // URL to uploaded invoice PDF in Supabase Storage
   facturaPdfUrl?: string;              // URL to uploaded invoice PDF in Supabase Storage
   facturaPdfUrl?: string;              // URL to uploaded invoice PDF in Supabase Storage
+  facturaPdfUrl?: string;              // URL to uploaded invoice PDF in Supabase Storage
   estado: 'pendiente' | 'completado' | 'pagado';
   /** Set at finalization: 'factura' = with IVA (16%), 'nota' = without IVA */
   tipoDocumento?: 'factura' | 'nota';
