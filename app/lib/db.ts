@@ -313,6 +313,7 @@ function buildInsertTrabajoPayload(tallerId: string, data: Omit<Trabajo, 'id'>) 
     requiere_factura: data.requiereFactura,
     folio_fiscal: data.folioFiscal ?? null,
     factura_pdf_url: data.facturaPdfUrl ?? null,
+    factura_pdf_url: data.facturaPdfUrl ?? null,
     iva: data.iva,
     total: data.total,
     partes: data.partes,
@@ -441,6 +442,11 @@ export async function updateTrabajoFacturaPdf(trabajoId: string, url: string | n
   if (error) throw new Error(`updateTrabajoFacturaPdf: ${error.message}`);
 }
 
+export async function updateTrabajoFacturaPdf(trabajoId: string, url: string | null): Promise<void> {
+  const { error } = await supabase.from('trabajos').update({ factura_pdf_url: url }).eq('id', trabajoId);
+  if (error) throw new Error(`updateTrabajoFacturaPdf: ${error.message}`);
+}
+
 export async function resetFacturacionTrabajo(trabajoId: string): Promise<void> {
   const { error } = await supabase.from('trabajos').update({ factura_id: null, estado_facturacion: 'sin_facturar' }).eq('id', trabajoId);
   if (error) throw new Error(`resetFacturacionTrabajo: ${error.message}`);
@@ -476,6 +482,7 @@ export async function updateTrabajo(trabajoId: string, data: Trabajo): Promise<v
     costo_refacciones: data.costoRefacciones,
     requiere_factura: data.requiereFactura,
     folio_fiscal: data.folioFiscal ?? null,
+    factura_pdf_url: data.facturaPdfUrl ?? null,
     factura_pdf_url: data.facturaPdfUrl ?? null,
     iva: data.iva,
     total: data.total,
