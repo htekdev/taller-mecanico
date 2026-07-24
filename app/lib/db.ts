@@ -313,7 +313,6 @@ function buildInsertTrabajoPayload(tallerId: string, data: Omit<Trabajo, 'id'>) 
     requiere_factura: data.requiereFactura,
     folio_fiscal: data.folioFiscal ?? null,
     factura_pdf_url: data.facturaPdfUrl ?? null,
-    factura_pdf_url: data.facturaPdfUrl ?? null,
     iva: data.iva,
     total: data.total,
     partes: data.partes,
