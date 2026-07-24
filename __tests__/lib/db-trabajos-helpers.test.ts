@@ -1,4 +1,17 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+impor
+  it('multiplies precio × cantidad when cantidad > 1 (PR #182 regression guard)', async () => {
+    const { update } = mockUpdateEqChain(null);
+    const itemsWithQuantity: ManoDeObraItem[] = [
+      { id: 'mdo-a', concepto: 'Frenos', precio: 500, cantidad: 2 },
+      { id: 'mdo-b', concepto: 'Aceite', precio: 200 },
+    ];
+    await updateTrabajoManoDeObraItems('trabajo-x', itemsWithQuantity);
+    // Frenos: 500 × 2 = 1000, Aceite: 200 × 1 = 200 → total 1200
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ mano_de_obra: 1200 })
+    );
+  });
+t { vi, describe, it, expect, beforeEach } from 'vitest';
 import { supabase } from '@/app/lib/supabase';
 
 vi.mock('@/app/lib/supabase', () => ({
