@@ -1066,7 +1066,7 @@ export default function TallerMecanico() {
               onGuardarProveedor={guardarProveedor} />
           )}
           {vista === 'trabajos' && (
-            <VistaTrabajo tallerId={taller?.id ?? ''} clientes={clientes} vehiculos={vehiculos} inventario={inventario}
+            <VistaTrabajo clientes={clientes} vehiculos={vehiculos} inventario={inventario}
               trabajos={trabajos} facturas={facturas} proveedores={proveedores}
               onGuardar={guardarTrabajo}
               onEditar={editarTrabajo}
@@ -1077,8 +1077,7 @@ export default function TallerMecanico() {
               onCancelarTrabajo={cancelarTrabajo}
               onReactivarTrabajo={reactivarTrabajo}
               onActualizarTft={actualizarTft}
-              onIrAFacturas={() => setVista('facturas')}
-              onFacturaPdfUploaded={(trabajoId, url) => setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaPdfUrl: url } : t))} />
+              onIrAFacturas={() => setVista('facturas')} />
           )}
           {vista === 'proveedores' && (
             <VistaProveedores proveedores={proveedores} inventario={inventario}
