@@ -44,7 +44,7 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
     await trabajosPage.selectClient(ci);
     // Check if vehicle dropdown has options (> 1 means there's at least one vehicle)
     await page.waitForTimeout(800);
-    const vehicleSelect = page.locator('select').nth(2);
+    const vehicleSelect = page.locator('[data-testid="vehiculo-select"]');
     const optCount = await vehicleSelect.locator('option').count();
     if (optCount > 1) {
       await trabajosPage.selectVehicle(1);
