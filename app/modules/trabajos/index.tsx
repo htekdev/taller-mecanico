@@ -383,9 +383,6 @@ export function VistaTrabajo({
   };
   const [form, setForm] = useState(emptyForm);
   const [laborItems, setLaborItems] = useState<ManoDeObraItem[]>([]);
-  const [uploadingPdfId, setUploadingPdfId] = useState<string | null>(null);
-  const [uploadPdfError, setUploadPdfError] = useState<string | null>(null);
-  const [uploadPdfErrorId, setUploadPdfErrorId] = useState<string | null>(null);
   const [laborConcepto, setLaborConcepto] = useState('');
   const [laborPrecio, setLaborPrecio]     = useState(0);
   // Save state — prevents double-submit and keeps form data if save fails
@@ -1742,20 +1739,7 @@ export function VistaTrabajo({
                                 className="text-sm bg-blue-100 text-blue-700 font-semibold px-3 py-3 rounded-full hover:bg-blue-200 transition-colors border border-blue-200 no-underline">
                                 📄 Ver factura
                               </a>
-                            ) : (
-                              <>
-                              <label className={`text-sm bg-indigo-100 text-indigo-700 font-semibold px-3 py-3 rounded-full border border-indigo-200 transition-colors ${uploadingPdfId === trabajo.id ? 'opacity-70 cursor-not-allowed' : 'hover:bg-indigo-200 cursor-pointer'}`}>
-                                {uploadingPdfId === trabajo.id ? '⏳ Subiendo...' : '📎 Subir factura'}
-                                <input type="file" accept="application/pdf" className="hidden"
-                                  disabled={uploadingPdfId === trabajo.id}
-                                  onChange={e => { const f = e.target.files?.[0]; if (f) subirFacturaPdf(trabajo.id, f); e.target.value = ''; }}
-                                />
-                              </label>
-                              {uploadPdfErrorId === trabajo.id && uploadPdfError && (
-                                <span role="alert" className="block text-sm text-red-600 mt-1">{uploadPdfError}</span>
-                              )}
-                              </>
-                            )}
+                ) : null}
                             <button type="button"
                               onClick={() => onRefacturar(trabajo.id)}
                               title="Cancelar la factura actual y volver a facturar este trabajo"
