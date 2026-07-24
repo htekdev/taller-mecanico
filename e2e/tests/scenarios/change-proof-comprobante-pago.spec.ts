@@ -82,15 +82,20 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   await cuentasCobrarPage.waitForPageLoad();
   await page.waitForTimeout(1500);
 
-  // Scope to the specific CxC row for this job (by unique description)
+  // Scope to the specific CxC row for this job (by unique description).
+  // Use `.border-slate-200.rounded-xl.overflow-hidden` (all 3 classes required) to target
+  // individual row cards only — NOT outer containers that also have border/rounded classes.
+  // Previously used `[class*="border"][class*="rounded"]` which matched outer wrappers,
+  // causing `.first()` to pick a container with ALL 15 job rows, triggering strict-mode
+  // violation on `.getByRole('button', { name: /\+ pago/i })`.
   const cuentaRow = page
-    .locator('[class*="border"][class*="rounded"], .border.rounded-xl')
+    .locator('.border-slate-200.rounded-xl.overflow-hidden')
     .filter({ hasText: /Prueba comprobante PR183/i })
     .first();
   await expect(cuentaRow, 'Debe aparecer la cuenta del trabajo recién creado').toBeVisible({ timeout: 10_000 });
 
   // Register payment from within the row
-  await cuentaRow.getByRole('button', { name: /\+ pago/i }).click(); // expands payment form
+  await cuentaRow.getByRole('button', { name: /\+ pago/i }).first().click(); // expands payment form
   await page.waitForTimeout(500);
 
   const pagoMontoInput = page.locator('input[type="number"][placeholder*="monto" i], input[type="number"]').first();
@@ -106,10 +111,10 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   await page.waitForTimeout(2000);
 
 
-  // ── Assert: comprobante button visible INLINE in CxC (no expansion required — new behavior) ─
+  // Assert: comprobante button visible INLINE in CxC (no expansion required — new behavior) ─
   await showPhaseLabel(page, '🧾 Verificando botón Comprobante INLINE en CxC — sin expandir');
   const cxcPaidRow = page
-    .locator('[class*="border"][class*="rounded"], .border.rounded-xl')
+    .locator('.border-slate-200.rounded-xl.overflow-hidden')
     .filter({ hasText: /Prueba comprobante PR183/i })
     .first();
   await expect(cxcPaidRow, 'Fila pagada debe ser visible en CxC tras pago completo').toBeVisible({ timeout: 10_000 });
@@ -131,9 +136,10 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   // ── Assert: comprobante button visible on THIS job's row ──────────────────
   await showPhaseLabel(page, '✅ Verificando botón Comprobante — scoped to PR183 job row');
 
-  // Find the specific trabajo row by its unique description
+  // Find the specific trabajo row by its unique description.
+  // Use `.border-slate-200.rounded-xl.overflow-hidden` to target only row cards (not outer containers).
   const trabajoRow = page
-    .locator('[class*="border"][class*="rounded"], .border.rounded-xl')
+    .locator('.border-slate-200.rounded-xl.overflow-hidden')
     .filter({ hasText: /Prueba comprobante PR183/i })
     .first();
   await expect(trabajoRow, 'Debe verse la fila del trabajo pagado').toBeVisible({ timeout: 10_000 });
