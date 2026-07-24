@@ -53,7 +53,7 @@ test('change-proof-factura-pdf-upload — upload UI present on facturado jobs', 
     await expect(firstLabel).toBeVisible();
 
     const className = await firstLabel.getAttribute('class') ?? '';
-    expect(className, 'Upload label debe tener py-2 para touch target adecuado').toContain('py-2');
+    expect(className, 'Upload label debe tener py-3 para touch target >= 44px').toContain('py-3');
     expect(className, 'Upload label debe tener text-sm').toContain('text-sm');
 
     await showPhaseLabel(page, `✅ ${subirCount} etiqueta(s) "Subir factura" con touch target correcto`);
@@ -65,7 +65,7 @@ test('change-proof-factura-pdf-upload — upload UI present on facturado jobs', 
     await expect(firstLink).toBeVisible();
 
     const className = await firstLink.getAttribute('class') ?? '';
-    expect(className, '"Ver factura" debe tener py-2 para touch target adecuado').toContain('py-2');
+    expect(className, '"Ver factura" debe tener py-3 para touch target >= 44px').toContain('py-3');
 
     await showPhaseLabel(page, `✅ ${verCount} enlace(s) "Ver factura" con touch target correcto`);
   }
