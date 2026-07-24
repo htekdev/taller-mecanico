@@ -6,21 +6,24 @@ import { showPhaseLabel } from '../visual-assert';
  *
  * Proof that PR #183 adds a "Comprobante" button to fully-paid work orders.
  *
- * Walk-through (creates its own test data — no conditional skips):
+ * Walk-through (creates own data, all assertions scoped to specific job):
  * 1. Login
  * 2. Navigate to Trabajos
- * 3. Create a new trabajo with a $200 labor item
- * 4. Save the trabajo
- * 5. Click Finalizar → select "Nota de Cobro" in the modal
- * 6. Navigate to "Por Cobrar" (Cuentas por Cobrar)
- * 7. Register full payment of $200 on the first pending account
+ * 3. Create a new trabajo "Prueba comprobante PR183 — frenos $200"
+ * 4. Save
+ * 5. Finalizar → "Nota de Cobro"
+ * 6. Navigate to Por Cobrar
+ * 7. Find the row matching the unique description, register $200 payment
  * 8. Navigate back to Trabajos
- * 9. Assert: comprobante button visible and enabled on the paid trabajo
+ * 9. Find the row matching the unique description
+ * 10. Assert: comprobante button visible + enabled (unconditional, scoped to THIS job)
  */
 test('change-proof-comprobante-pago — button appears on fully-paid job', async ({
   page, loginPage, dashboardPage, trabajosPage, cuentasCobrarPage,
 }) => {
   test.slow();
+
+  const JOB_DESCRIPTION = 'Prueba comprobante PR183 — frenos $200';
 
   // ── Login ──────────────────────────────────────────────────────────────────
   await showPhaseLabel(page, '🔐 Login');
@@ -37,34 +40,52 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   await showPhaseLabel(page, '📝 Creando trabajo de prueba');
   await trabajosPage.selectClient(1);
   await trabajosPage.selectVehicle(1);
-  await trabajosPage.fillDescription('Prueba comprobante PR183 — frenos $200');
+  await trabajosPage.fillDescription(JOB_DESCRIPTION);
   await trabajosPage.addLaborItem('Revisión de frenos', 200);
   await trabajosPage.save();
-  await page.waitForTimeout(3000); // Wait for Supabase insert
+  await page.waitForTimeout(3000);
 
   // Confirm no error after save
   const saveErr = await trabajosPage.getFinalizarError();
   expect(saveErr, 'No debe haber error al guardar el trabajo').toBeNull();
 
-  // ── Finalizar the trabajo ──────────────────────────────────────────────────
+  // ── Finalizar ─────────────────────────────────────────────────────────────
   await showPhaseLabel(page, '✅ Finalizando trabajo');
   await trabajosPage.finalizar();
 
-  // Dismiss the factura/nota modal — choose "Nota de Cobro"
   const notaBtn = page.getByRole('button', { name: /nota de cobro|nota/i }).first();
   if (await notaBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await notaBtn.click();
     await page.waitForTimeout(2000);
   }
 
-  // ── Navigate to Cuentas por Cobrar and register full payment ──────────────
+  // ── Navigate to CxC and register payment on THIS job's row ───────────────
   await showPhaseLabel(page, '💰 Registrando pago en Por Cobrar');
   await dashboardPage.navigateToModule('cuentas');
   await cuentasCobrarPage.waitForPageLoad();
   await page.waitForTimeout(1500);
 
-  // Register full payment ($200) on first account
-  await cuentasCobrarPage.registerPayment(200, 'Efectivo');
+  // Scope to the specific CxC row for this job (by unique description)
+  const cuentaRow = page
+    .locator('[class*="border"][class*="rounded"], .border.rounded-xl')
+    .filter({ hasText: /Prueba comprobante PR183/i })
+    .first();
+  await expect(cuentaRow, 'Debe aparecer la cuenta del trabajo recién creado').toBeVisible({ timeout: 10_000 });
+
+  // Register payment from within the row
+  await cuentaRow.getByRole('button', { name: /registrar pago|abonar/i }).click();
+  await page.waitForTimeout(500);
+
+  const pagoMontoInput = page.locator('input[type="number"][placeholder*="monto" i], input[type="number"]').first();
+  if (await pagoMontoInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await pagoMontoInput.fill('200');
+  }
+  const pagoMetodoSelect = page.locator('select:has(option:has-text("Efectivo"))').first();
+  if (await pagoMetodoSelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await pagoMetodoSelect.selectOption({ label: 'Efectivo' });
+  }
+  const confirmBtn = page.getByRole('button', { name: /confirmar|guardar pago/i }).first();
+  await confirmBtn.click();
   await page.waitForTimeout(2000);
 
   // ── Navigate back to Trabajos ─────────────────────────────────────────────
@@ -73,19 +94,24 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   await trabajosPage.waitForPageLoad();
   await page.waitForTimeout(1500);
 
-  // ── Assert: comprobante button is visible and enabled ─────────────────────
-  await showPhaseLabel(page, '✅ Verificando botón Comprobante en trabajo pagado');
+  // ── Assert: comprobante button visible on THIS job's row ──────────────────
+  await showPhaseLabel(page, '✅ Verificando botón Comprobante — scoped to PR183 job row');
 
-  const comprobanteBtn = page.getByRole('button', { name: /comprobante/i }).first();
+  // Find the specific trabajo row by its unique description
+  const trabajoRow = page
+    .locator('[class*="border"][class*="rounded"], .border.rounded-xl')
+    .filter({ hasText: /Prueba comprobante PR183/i })
+    .first();
+  await expect(trabajoRow, 'Debe verse la fila del trabajo pagado').toBeVisible({ timeout: 10_000 });
 
-  // Button must be present (unconditional — we just created a paid job above)
-  await expect(comprobanteBtn, 'Debe haber un botón Comprobante para el trabajo pagado').toBeVisible({ timeout: 10_000 });
-  await expect(comprobanteBtn, 'El botón Comprobante no debe estar deshabilitado').not.toBeDisabled();
+  // The comprobante button must be WITHIN this row (not any pre-existing paid job)
+  const comprobanteBtn = trabajoRow.getByRole('button', { name: /comprobante/i });
+  await expect(comprobanteBtn, 'Debe haber botón Comprobante en el trabajo recién pagado').toBeVisible({ timeout: 10_000 });
+  await expect(comprobanteBtn, 'El botón no debe estar deshabilitado').not.toBeDisabled();
 
-  // Verify it has the correct accessible text
   const label = await comprobanteBtn.textContent();
-  expect(label, 'Botón debe tener texto "Comprobante"').toMatch(/comprobante/i);
+  expect(label, 'Texto del botón debe incluir "comprobante"').toMatch(/comprobante/i);
 
-  await showPhaseLabel(page, '🎉 PR #183 verificado — botón Comprobante correctamente implementado en trabajos pagados');
+  await showPhaseLabel(page, '🎉 PR #183 verificado — Comprobante disponible en trabajos pagados');
   await page.waitForTimeout(1000);
 });
