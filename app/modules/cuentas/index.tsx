@@ -13,6 +13,8 @@ import {
   formatearFecha, getHoy,
   type FiltroCuenta,
 } from '@/app/lib/utils';
+import { uploadFacturaPdf } from '@/app/lib/supabase';
+import * as db from '@/app/lib/db';
 
 // ─── PDF helpers ─────────────────────────────────────────────────────────────
 
@@ -462,6 +464,8 @@ export function VistaCuentas({
   onReactivarFactura,
   onCancelarNota,
   onReactivarNota,
+  tallerId,
+  onFacturaPdfUploaded,
 }: {
   facturas: Factura[];
   trabajos: Trabajo[];
@@ -475,8 +479,28 @@ export function VistaCuentas({
   onReactivarFactura: (facturaId: string) => void;
   onCancelarNota: (trabajoId: string) => void;
   onReactivarNota: (trabajoId: string) => void;
+  tallerId: string;
+  onFacturaPdfUploaded: (trabajoId: string, url: string) => void;
 }) {
   const hoy = getHoy();
+  const [uploadingPdfId, setUploadingPdfId] = useState<string | null>(null);
+  const [uploadPdfError, setUploadPdfError] = useState<string | null>(null);
+  const handleSubirPdf = async (trabajoId: string, file: File) => {
+    if (!tallerId) return;
+    setUploadingPdfId(trabajoId);
+    setUploadPdfError(null);
+    try {
+      const url = await uploadFacturaPdf(tallerId, trabajoId, file);
+      await db.updateTrabajoFacturaPdf(tallerId, trabajoId, url);
+      onFacturaPdfUploaded(trabajoId, url);
+    } catch (err: unknown) {
+      console.error('[cuentas] handleSubirPdf error:', err);
+      setUploadPdfError('No se pudo subir el PDF. Intenta de nuevo.');
+      setTimeout(() => setUploadPdfError(null), 4000);
+    } finally {
+      setUploadingPdfId(null);
+    }
+  };
   const [filtro, setFiltro] = useState<FiltroCuenta>('todos');
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'notas' | 'facturas'>('todos');
   const [clienteFiltroId, setClienteFiltroId] = useState<string>('');
@@ -813,6 +837,7 @@ export function VistaCuentas({
           <div className="space-y-2">
             {facturasFiltradas.map(factura => {
               const cliente  = clientes.find(c => c.id === factura.clienteId);
+              const relTrabajo = trabajos.find(t => t.id === factura.trabajoId);
               const estado   = getEstadoPagoFactura(factura);
               const montoPag = getMontoPagadoFactura(factura);
               const saldo    = getSaldoFactura(factura);
@@ -891,6 +916,27 @@ export function VistaCuentas({
                         </div>
                       )}
                       {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Esta factura está completamente pagada.</p>}
+                      {/* PDF de factura */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {relTrabajo?.facturaPdfUrl ? (
+                          <a href={relTrabajo.facturaPdfUrl} target="_blank" rel="noopener noreferrer"
+                            className="text-xs font-semibold bg-blue-100 text-blue-700 px-3 py-3 min-h-[44px] rounded-lg hover:bg-blue-200 transition-colors border border-blue-200 no-underline flex items-center gap-1">
+                            📄 Ver PDF factura
+                          </a>
+                        ) : null}
+                        {relTrabajo && (
+                          <label className={`text-xs font-semibold px-3 py-3 min-h-[44px] rounded-lg transition-colors flex items-center gap-1 ${uploadingPdfId === factura.trabajoId ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 cursor-pointer'}`}>
+                            {uploadingPdfId === factura.trabajoId ? '⏳ Subiendo...' : (relTrabajo.facturaPdfUrl ? '📎 Reemplazar PDF' : '📎 Subir PDF factura')}
+                            <input type="file" accept="application/pdf" className="sr-only"
+                              disabled={uploadingPdfId === factura.trabajoId}
+                              onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; await handleSubirPdf(relTrabajo.id, file); e.target.value = ''; }}
+                            />
+                          </label>
+                        )}
+                        {uploadPdfError && uploadingPdfId === null && (
+                          <span role="alert" className="text-xs text-red-600">{uploadPdfError}</span>
+                        )}
+                      </div>
                       {/* Cancelar desde cuentas */}
                       {confirmCancelarId === factura.id ? (
                         <div className="bg-rose-50 border border-rose-300 rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap">
