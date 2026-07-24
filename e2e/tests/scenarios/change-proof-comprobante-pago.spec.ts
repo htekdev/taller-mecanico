@@ -86,7 +86,7 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   await expect(cuentaRow, 'Debe aparecer la cuenta del trabajo recién creado').toBeVisible({ timeout: 10_000 });
 
   // Register payment from within the row
-  await cuentaRow.getByRole('button', { name: /registrar pago|abonar/i }).click();
+  await cuentaRow.getByRole('button', { name: /\+ pago/i }).click(); // expands payment form
   await page.waitForTimeout(500);
 
   const pagoMontoInput = page.locator('input[type="number"][placeholder*="monto" i], input[type="number"]').first();
@@ -97,19 +97,25 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   if (await pagoMetodoSelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
     await pagoMetodoSelect.selectOption({ label: 'Efectivo' });
   }
-  const confirmBtn = page.getByRole('button', { name: /confirmar|guardar pago/i }).first();
+  const confirmBtn = cuentaRow.getByRole('button', { name: /registrar|✓/i }).last();
   await confirmBtn.click();
   await page.waitForTimeout(2000);
 
 
   // ── Assert: comprobante button visible in CxC (THE NEW FEATURE) ────────────
   await showPhaseLabel(page, '🧾 Verificando botón Comprobante en CxC — VistaCuentas');
-  // Row is already visible from payment step — still on CxC tab
+  // Row collapses after payment is registered — need to re-expand with 'Ver' button
   const cxcPaidRow = page
     .locator('[class*="border"][class*="rounded"], .border.rounded-xl')
     .filter({ hasText: /Prueba comprobante PR183/i })
     .first();
   await expect(cxcPaidRow, 'Fila pagada debe ser visible en CxC tras pago completo').toBeVisible({ timeout: 10_000 });
+  // Click 'Ver' to expand the paid row
+  const verBtn = cxcPaidRow.getByRole('button', { name: /ver/i });
+  if (await verBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await verBtn.click();
+    await page.waitForTimeout(500);
+  }
   const cxcComprobanteBtn = cxcPaidRow.getByRole('button', { name: /comprobante/i });
   await expect(cxcComprobanteBtn, 'Botón Comprobante debe aparecer en CxC para trabajo pagado').toBeVisible({ timeout: 10_000 });
   await expect(cxcComprobanteBtn, 'Botón no debe estar deshabilitado en CxC').not.toBeDisabled();
