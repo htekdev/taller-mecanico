@@ -6,7 +6,7 @@ function fmtPeso(n: number): string {
 }
 
 // ── Comprobante de Pago ──────────────────────────────────────────────────────
-async function generarComprobantePago(
+export async function generarComprobantePago(
   trabajo: Trabajo,
   cliente: Cliente | undefined,
   vehiculo: Vehiculo | undefined,
