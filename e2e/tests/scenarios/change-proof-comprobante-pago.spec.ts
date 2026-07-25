@@ -136,13 +136,15 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   // ── Assert: comprobante button visible on THIS job's row ──────────────────
   await showPhaseLabel(page, '✅ Verificando botón Comprobante — scoped to PR183 job row');
 
-  // Find the specific trabajo row by its unique description.
-  // Use `.border-slate-200.rounded-xl.overflow-hidden` to target only row cards (not outer containers).
+  // Trabajos renders job rows as <tr> in a table (NOT div cards with .border-slate-200.rounded-xl.overflow-hidden).
+  // Use locator('tr') to find the row by the unique description text.
+  await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+  await page.waitForTimeout(2000);
   const trabajoRow = page
-    .locator('.border-slate-200.rounded-xl.overflow-hidden')
+    .locator('tr')
     .filter({ hasText: /Prueba comprobante PR183/i })
     .first();
-  await expect(trabajoRow, 'Debe verse la fila del trabajo pagado').toBeVisible({ timeout: 10_000 });
+  await expect(trabajoRow, 'Debe verse la fila del trabajo pagado').toBeVisible({ timeout: 15_000 });
 
   // The comprobante button must be WITHIN this row (not any pre-existing paid job)
   const comprobanteBtn = trabajoRow.getByRole('button', { name: /comprobante/i });
