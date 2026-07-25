@@ -379,6 +379,7 @@ export function VistaTrabajo({
   const [laborItems, setLaborItems] = useState<ManoDeObraItem[]>([]);
   const [laborConcepto, setLaborConcepto] = useState('');
   const [laborPrecio, setLaborPrecio]     = useState(0);
+  const [laborCantidad, setLaborCantidad]   = useState(1);
   // Save state — prevents double-submit and keeps form data if save fails
   const [guardandoForm, setGuardandoForm] = useState(false);
   const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
@@ -417,7 +418,7 @@ export function VistaTrabajo({
   }, []);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
-  const totalManoDeObra       = laborItems.reduce((s, l) => s + l.precio, 0);
+  const totalManoDeObra       = laborItems.reduce((s, l) => s + (l.precio * (l.cantidad ?? 1)), 0);
   const totalVentaRefacciones = partesSeleccionadas.reduce((s, p) => s + (p.subtotal ?? 0), 0);
   const totalCostoRefacciones = partesSeleccionadas.reduce((s, p) => s + (p.costoTotal ?? 0), 0);
   const utilidadRefacciones   = totalVentaRefacciones - totalCostoRefacciones;
@@ -436,10 +437,12 @@ export function VistaTrabajo({
       id: `${Date.now()}-${Math.random()}`,
       concepto: laborConcepto.trim(),
       precio: laborPrecio,
+      cantidad: laborCantidad,
       tipo: 'interno' as const,
     }]);
     setLaborConcepto('');
     setLaborPrecio(0);
+    setLaborCantidad(1);
   };
 
   const removerLabor = (id: string) =>
@@ -518,6 +521,7 @@ export function VistaTrabajo({
     setLaborItems([]);
     setLaborConcepto('');
     setLaborPrecio(0);
+    setLaborCantidad(1);
     setPartesSeleccionadas([]);
     setPickerRefId('');
     setPickerCantidad(1);
@@ -554,6 +558,7 @@ export function VistaTrabajo({
     setPartesSeleccionadas(trabajo.partes ?? []);
     setLaborConcepto('');
     setLaborPrecio(0);
+    setLaborCantidad(1);
     setPickerRefId('');
     setPickerCantidad(1);
     setPickerPrecioVenta(0);
@@ -959,6 +964,12 @@ export function VistaTrabajo({
                     value={laborPrecio || ''}
                     onChange={e => setLaborPrecio(Number(e.target.value))} />
                 </div>
+                <div className="w-24">
+                  <Label>Cantidad</Label>
+                  <Input type="number" placeholder="1" min="1" step="1" inputMode="numeric"
+                    value={laborCantidad || ''}
+                    onChange={e => setLaborCantidad(Math.max(1, Math.floor(Number(e.target.value) || 1)))} />
+                </div>
                 <div className="flex items-end">
                   <Btn variant="primary"
                     disabled={!laborConcepto.trim() || laborPrecio <= 0}
@@ -971,11 +982,14 @@ export function VistaTrabajo({
               {/* Labor items table */}
               {laborItems.length > 0 && (
                 <div className="rounded-lg border border-slate-200 overflow-hidden">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-slate-100">
                       <tr>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Concepto</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Precio</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Cant.</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">P. Unit.</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Total</th>
                         <th className="px-3 py-2 w-8"></th>
                       </tr>
                     </thead>
@@ -1000,7 +1014,9 @@ export function VistaTrabajo({
                               )}
                             </div>
                           </td>
-                          <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(l.precio)}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-slate-700">{l.cantidad ?? 1}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-slate-700">${fmt(l.precio)}</td>
+                          <td className="px-3 py-2 text-right font-bold text-slate-900">${fmt(l.precio * (l.cantidad ?? 1))}</td>
                           <td className="px-3 py-2 text-center">
                             <Btn size="sm" variant="danger" onClick={() => removerLabor(l.id)}>✕</Btn>
                           </td>
@@ -1009,12 +1025,13 @@ export function VistaTrabajo({
                     </tbody>
                     <tfoot className="bg-slate-50 border-t-2 border-slate-200">
                       <tr>
-                        <td className="px-3 py-2 text-sm font-bold text-slate-700 text-right">Total Mano de Obra:</td>
+                        <td className="px-3 py-2 text-sm font-bold text-slate-700 text-right" colSpan={3}>Total Mano de Obra:</td>
                         <td className="px-3 py-2 text-right font-extrabold text-slate-900">${fmt(totalManoDeObra)}</td>
                         <td></td>
                       </tr>
                     </tfoot>
                   </table>
+                  </div>
                 </div>
               )}
               {laborItems.length === 0 && (
@@ -1118,6 +1135,7 @@ export function VistaTrabajo({
               {/* External items list */}
               {laborItems.filter(l => l.tipo === 'externo').length > 0 ? (
                 <div className="rounded-lg border border-orange-200 overflow-hidden">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-orange-50">
                       <tr>
@@ -1140,9 +1158,9 @@ export function VistaTrabajo({
                           <td className="px-3 py-2 text-right text-rose-600 font-semibold">
                             ${fmt(l.costoTaller ?? 0)}
                           </td>
-                          <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(l.precio)}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-slate-700">${fmt(l.precio)}</td>
                           <td className="px-3 py-2 text-right font-semibold text-emerald-600">
-                            ${fmt(l.precio - (l.costoTaller ?? 0))}
+                            ${fmt((l.precio * (l.cantidad ?? 1)) - (l.costoTaller ?? 0))}
                           </td>
                           <td className="px-3 py-2 text-center">
                             <Btn size="sm" variant="danger" onClick={() => removerLabor(l.id)}>✕</Btn>
@@ -1151,6 +1169,7 @@ export function VistaTrabajo({
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               ) : (
                 !showExtForm && (

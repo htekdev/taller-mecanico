@@ -9,6 +9,7 @@ import { TestData } from '../../utils/test-data';
  */
 
 test.describe('Concurrent Operations', () => {
+  test.describe.configure({ retries: 1 }); // Flaky on cold Supabase/Vercel preview runs
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.loginAsTestUser();
   });

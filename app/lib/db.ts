@@ -420,7 +420,7 @@ export async function updateTrabajoPagos(trabajoId: string, pagos: Pago[]): Prom
 
 /** Update mano_de_obra_items JSONB — used when registering payments to external service providers */
 export async function updateTrabajoManoDeObraItems(trabajoId: string, items: ManoDeObraItem[]): Promise<void> {
-  const manoDeObra = items.reduce((s, i) => s + i.precio, 0);
+  const manoDeObra = items.reduce((s, i) => s + (i.precio * (i.cantidad ?? 1)), 0);
   const { error } = await supabase.from('trabajos').update({
     mano_de_obra_items: items,
     mano_de_obra: manoDeObra,
