@@ -37,7 +37,7 @@ export class TrabajosPage extends BasePage {
     this.nuevoTrabajoButton = page.getByRole('button', { name: /nuevo trabajo/i });
 
     this.clientSelect = page.locator('select').first();
-    this.vehicleSelect = page.locator('select').nth(1);
+    this.vehicleSelect = page.locator('[data-testid="vehiculo-select"]');
     // Actual placeholder in app: "Ej. Servicio completo frenos y aceite..."
     // Note: DO NOT use "Ej." alone — numeroOrden also starts with "Ej." and appears first in DOM.
     this.descripcionInput = page.locator('input[placeholder*="Servicio completo" i], input[placeholder*="frenos y aceite" i]').first();
