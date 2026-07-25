@@ -260,6 +260,7 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
     partes: (r.partes as TrabajoRefaccion[]) ?? [],
     pagos: (r.pagos as Pago[]) ?? [],
     facturaId: r.factura_id ?? undefined,
+    facturaPdfUrl: (r.factura_pdf_url as string | null) ?? undefined,
     estadoFacturacion: r.estado_facturacion,
     estado: r.estado,
     tipoDocumento: (r.tipo_documento as Trabajo['tipoDocumento']) ?? undefined,
@@ -353,6 +354,7 @@ function mapTrabajoRow(row: Record<string, unknown>): Trabajo {
     partes: (row.partes as TrabajoRefaccion[]) ?? [],
     pagos: (row.pagos as Pago[]) ?? [],
     facturaId: (row.factura_id as string | null) ?? undefined,
+    facturaPdfUrl: (row.factura_pdf_url as string | null) ?? undefined,
     tipoDocumento: (row.tipo_documento as Trabajo['tipoDocumento']) ?? undefined,
     fechaFinalizacion: (row.fecha_finalizacion as string | null) ?? undefined,
     estadoFacturacion: row.estado_facturacion as Trabajo['estadoFacturacion'],
@@ -431,6 +433,13 @@ export async function updateTrabajoManoDeObraItems(trabajoId: string, items: Man
 export async function updateTrabajoFactura(trabajoId: string, facturaId: string): Promise<void> {
   const { error } = await supabase.from('trabajos').update({ factura_id: facturaId, estado_facturacion: 'facturado' }).eq('id', trabajoId);
   if (error) throw new Error(`updateTrabajoFactura: ${error.message}`);
+}
+
+/** Update the factura PDF URL for a trabajo */
+export async function updateTrabajoFacturaPdf(tallerId: string, trabajoId: string, url: string | null): Promise<void> {
+  const { error } = await supabase.from('trabajos').update({ factura_pdf_url: url }).eq('id', trabajoId)
+    .eq('taller_id', tallerId);
+  if (error) throw new Error(`updateTrabajoFacturaPdf: ${error.message}`);
 }
 
 /** Reset facturación — allows re-invoicing after a factura was cancelled */
@@ -1258,5 +1267,4 @@ export async function nextCotizacionNumber(tallerId: string): Promise<string> {
 
   return `COT-${String(next).padStart(3, '0')}`;
 }
-
 

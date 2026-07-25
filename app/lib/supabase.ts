@@ -104,6 +104,7 @@ export interface TrabajoRow {
   partes: unknown[];
   pagos: unknown[];
   factura_id: string | null;
+  factura_pdf_url: string | null;
   estado_facturacion: 'sin_facturar' | 'facturado';
   estado: 'pendiente' | 'completado' | 'pagado';
   created_at: string;
@@ -140,4 +141,24 @@ export interface FacturaRow {
   pagos: unknown[];
   notas: string | null;
   created_at: string;
+}
+
+// ── Supabase Storage: Invoice PDF upload ──────────────────────────────────────
+/**
+ * Upload an invoice PDF to Supabase Storage.
+ * Path: facturas/{tallerId}/{trabajoId}/factura.pdf
+ * Returns the public URL on success, throws on error.
+ */
+export async function uploadFacturaPdf(
+  tallerId: string,
+  trabajoId: string,
+  file: File,
+): Promise<string> {
+  const path = `${tallerId}/${trabajoId}/factura.pdf`;
+  const { error } = await supabase.storage
+    .from('facturas')
+    .upload(path, file, { contentType: 'application/pdf', upsert: true });
+  if (error) throw new Error(`uploadFacturaPdf: ${error.message}`);
+  const { data } = supabase.storage.from('facturas').getPublicUrl(path);
+  return data.publicUrl;
 }

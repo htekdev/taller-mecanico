@@ -321,6 +321,19 @@ export function VistaFacturas({
                       <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{factura.numeroFactura}</span>
                       <span className="font-semibold text-slate-800 text-sm">{cliente?.nombre ?? '—'}</span>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                      {(() => {
+                        const trab = trabajos.find(t => t.id === factura.trabajoId);
+                        return trab?.facturaPdfUrl ? (
+                          <a
+                            href={trab.facturaPdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-semibold bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition-colors border border-blue-200 no-underline flex items-center gap-1 whitespace-nowrap"
+                          >
+                            📄 Ver PDF
+                          </a>
+                        ) : null;
+                      })()}
                     </div>
                     <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
                       <span>{formatearFecha(factura.fecha)}</span>

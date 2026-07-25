@@ -28,6 +28,7 @@ import { VistaGastos } from '@/app/modules/gastos';
 import { VistaReportes } from '@/app/modules/reportes';
 import { useAuth }      from '@/app/context/auth';
 import * as db          from '@/app/lib/db';
+import { uploadFacturaPdf } from '@/app/lib/supabase';
 
 type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones'|'gastos'|'reportes';
 
@@ -55,7 +56,13 @@ export default function TallerMecanico() {
   });
   const [mesActual, setMesActual] = useState(getMesActual());
   const [cargando, setCargando] = useState(true);
-  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: boolean } | null>(null);
+  const [pendingFactura, setPendingFactura] = useState<{
+    trabajoId: string;
+    numero: string;
+    fecha: string;
+    incluirIva: boolean;
+    pdfFile?: File | null;
+  } | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   // ── Cargar datos desde Supabase ──
@@ -664,7 +671,7 @@ export default function TallerMecanico() {
     const trabajo = trabajos.find(t => t.id === trabajoId);
     // Default IVA checkbox: true if job was finalized as Factura or has requiereFactura=true (covers migrated data)
     const defaultIva = trabajo?.tipoDocumento === 'factura' || (trabajo?.tipoDocumento == null && trabajo?.requiereFactura === true);
-    setPendingFactura({ trabajoId, numero: sugerido, fecha: hoy, incluirIva: defaultIva ?? false });
+    setPendingFactura({ trabajoId, numero: sugerido, fecha: hoy, incluirIva: defaultIva ?? false, pdfFile: null });
   };
 
   const refacturarTrabajo = async (trabajoId: string) => {
@@ -707,6 +714,17 @@ export default function TallerMecanico() {
     if (!pendingFactura || !pendingFactura.numero.trim()) return;
     try {
       await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
+
+      if (pendingFactura.pdfFile && taller) {
+        try {
+          const pdfUrl = await uploadFacturaPdf(taller.id, pendingFactura.trabajoId, pendingFactura.pdfFile);
+          await db.updateTrabajoFacturaPdf(taller.id, pendingFactura.trabajoId, pdfUrl);
+          setTrabajos(prev => prev.map(t => t.id === pendingFactura.trabajoId ? { ...t, facturaPdfUrl: pdfUrl } : t));
+        } catch (pdfErr) {
+          console.error('[confirmarFactura] PDF upload failed (non-fatal):', pdfErr);
+        }
+      }
+
       setPendingFactura(null);
       setVista('facturas');
     } catch (err) {
@@ -1210,6 +1228,25 @@ export default function TallerMecanico() {
               onChange={e => setPendingFactura(prev => prev ? { ...prev, fecha: e.target.value } : null)}
               className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
             />
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                PDF de factura <span className="text-slate-400 font-normal normal-case">(opcional)</span>
+              </label>
+              <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-3 min-h-[44px] transition-colors ${pendingFactura?.pdfFile ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-600'}`}>
+                <span className="text-sm truncate">
+                  {pendingFactura?.pdfFile ? `📄 ${pendingFactura.pdfFile.name}` : '📎 Seleccionar PDF (opcional)'}
+                </span>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="sr-only"
+                  onChange={e => {
+                    const file = e.target.files?.[0] ?? null;
+                    setPendingFactura(prev => prev ? { ...prev, pdfFile: file } : null);
+                  }}
+                />
+              </label>
+            </div>
             <label className="flex items-center gap-3 cursor-pointer select-none mb-5 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
               <input
                 type="checkbox"
@@ -1243,5 +1280,4 @@ export default function TallerMecanico() {
     </div>
   );
 }
-
 
