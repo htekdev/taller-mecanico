@@ -1018,6 +1018,10 @@ export function VistaCuentasPorPagar({
   const [confirmAnularId, setConfirmAnularId] = useState<string | null>(null);
   const [isAnulando, setIsAnulando] = useState(false);
 
+  // ── Cancelar saldo — confirmación ─────────────────────────────────────────
+  const [confirmCancelarOrden, setConfirmCancelarOrden]     = useState<{ id: string; saldo: number; prov: string } | null>(null);
+  const [confirmCancelarServicio, setConfirmCancelarServicio] = useState<{ trabajoId: string; itemId: string; saldo: number; concepto: string } | null>(null);
+
   // ── Servicios externos — collect from trabajos ─────────────────────────────
   const [expandidoProv, setExpandidoProv]   = useState<string | null>(null);
   const [expandidoItem, setExpandidoItem]   = useState<string | null>(null);
@@ -1102,6 +1106,14 @@ export function VistaCuentasPorPagar({
   };
   const totalPendiente = ordenesPagables.filter(o => getEstadoPagoOrden(o) !== 'pagado').reduce((s, o) => s + getSaldoOrden(o), 0);
 
+  // Total por pagar al proveedor seleccionado (Feature: supplier-specific total)
+  const totalPendienteProveedor = filtroProveedorId
+    ? ordenesFiltradas.filter(o => getEstadoPagoOrden(o) !== 'pagado').reduce((s, o) => s + getSaldoOrden(o), 0)
+    : null;
+  const nombreProveedorSeleccionado = filtroProveedorId
+    ? proveedores.find(p => p.id === filtroProveedorId)?.nombre ?? 'Proveedor'
+    : null;
+
   const totalPagadoPorProveedor = (() => {
     const map: Record<string, number> = {};
     for (const o of ordenesFiltradas) {
@@ -1122,11 +1134,62 @@ export function VistaCuentasPorPagar({
     setExpandido(null);
   };
 
+  const handleCancelarSaldoOrden = (ordenId: string, saldo: number) => {
+    onRegistrarPago(ordenId, { monto: saldo, fecha: hoy, metodoPago: 'Cancelado', nota: '__CANCELADO__' });
+    setConfirmCancelarOrden(null);
+    setExpandido(null);
+  };
+
+  const handleCancelarSaldoServicio = (trabajoId: string, itemId: string, saldo: number) => {
+    onPagarServicioExterno(trabajoId, itemId, { monto: saldo, fecha: hoy, metodoPago: 'Cancelado', nota: '__CANCELADO__' });
+    setConfirmCancelarServicio(null);
+    setExpandidoItem(null);
+  };
+
   const totalServiciosBadge = provGroups.filter(g => g.saldoTotal > 0).length;
 
   return (
     <div>
       <SectionTitle title="Cuentas por Pagar" subtitle="Pagos pendientes a proveedores de refacciones y servicios externos." />
+
+      {/* ── Confirmación: cancelar saldo OC ── */}
+      {confirmCancelarOrden && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true" aria-label="Confirmar cancelación de saldo">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">🚫</div>
+              <h2 className="text-lg font-bold text-slate-800">¿Cancelar saldo pendiente?</h2>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-sm text-amber-700">
+              El saldo de <strong>${fmt(confirmCancelarOrden.saldo)}</strong> con <strong>{confirmCancelarOrden.prov}</strong> quedará en cero. El inventario <strong>no se modifica</strong>.
+            </div>
+            <p className="text-xs text-slate-500 text-center mb-5">Esto aplica si recibiste un descuento u otro ajuste del proveedor.</p>
+            <div className="flex gap-3">
+              <Btn variant="ghost" fullWidth onClick={() => setConfirmCancelarOrden(null)}>Volver</Btn>
+              <Btn variant="danger" fullWidth onClick={() => handleCancelarSaldoOrden(confirmCancelarOrden.id, confirmCancelarOrden.saldo)}>Sí, cancelar saldo</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirmación: cancelar saldo servicio ── */}
+      {confirmCancelarServicio && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true" aria-label="Confirmar cancelación de servicio">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">🚫</div>
+              <h2 className="text-lg font-bold text-slate-800">¿Cancelar saldo de servicio?</h2>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-sm text-amber-700">
+              El saldo de <strong>${fmt(confirmCancelarServicio.saldo)}</strong> por <strong>{confirmCancelarServicio.concepto}</strong> quedará en cero. El servicio queda registrado pero sin costo pendiente.
+            </div>
+            <div className="flex gap-3">
+              <Btn variant="ghost" fullWidth onClick={() => setConfirmCancelarServicio(null)}>Volver</Btn>
+              <Btn variant="danger" fullWidth onClick={() => handleCancelarSaldoServicio(confirmCancelarServicio.trabajoId, confirmCancelarServicio.itemId, confirmCancelarServicio.saldo)}>Sí, cancelar saldo</Btn>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Sub-tabs ─────────────────────────────────────────── */}
       <div className="flex gap-1 mb-6 bg-slate-100 rounded-xl p-1 w-fit">
@@ -1285,6 +1348,15 @@ export function VistaCuentasPorPagar({
                                           {isExpItem ? '✕' : '+ Pago'}
                                         </Btn>
                                       )}
+                                      {saldo > 0 && (
+                                        <Btn
+                                          size="sm"
+                                          variant="danger"
+                                          onClick={() => setConfirmCancelarServicio({ trabajoId: ei.trabajoId, itemId: ei.item.id, saldo, concepto: ei.item.concepto })}
+                                        >
+                                          🚫 Cancelar
+                                        </Btn>
+                                      )}
                                     </div>
                                   </div>
 
@@ -1294,14 +1366,25 @@ export function VistaCuentasPorPagar({
                                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Pagos registrados</p>
                                       <div className="space-y-1">
                                         {(ei.item.pagosServicio ?? []).map(p => (
-                                          <div key={p.id} className="flex items-center justify-between text-xs text-slate-600 bg-white border border-slate-200 rounded px-3 py-1.5">
-                                            <div className="flex gap-3">
-                                              <span>{new Date(p.fecha + 'T00:00:00').toLocaleDateString('es-MX')}</span>
-                                              {p.metodoPago && <span className="font-medium">{p.metodoPago}</span>}
-                                              {p.nota && <span className="italic text-slate-400">{p.nota}</span>}
+                                          p.nota === '__CANCELADO__' ? (
+                                            <div key={p.id} className="flex items-center justify-between text-xs bg-red-50 border border-red-200 rounded px-3 py-1.5">
+                                              <div className="flex gap-2 items-center">
+                                                <span>🚫</span>
+                                                <span className="text-red-600 font-semibold">Saldo cancelado</span>
+                                                <span className="text-red-400">{new Date(p.fecha + 'T00:00:00').toLocaleDateString('es-MX')}</span>
+                                              </div>
+                                              <span className="font-semibold text-red-600">−${fmt(p.monto)}</span>
                                             </div>
-                                            <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
-                                          </div>
+                                          ) : (
+                                            <div key={p.id} className="flex items-center justify-between text-xs text-slate-600 bg-white border border-slate-200 rounded px-3 py-1.5">
+                                              <div className="flex gap-3">
+                                                <span>{new Date(p.fecha + 'T00:00:00').toLocaleDateString('es-MX')}</span>
+                                                {p.metodoPago && <span className="font-medium">{p.metodoPago}</span>}
+                                                {p.nota && <span className="italic text-slate-400">{p.nota}</span>}
+                                              </div>
+                                              <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                                            </div>
+                                          )
                                         ))}
                                       </div>
                                     </div>
@@ -1400,10 +1483,18 @@ export function VistaCuentasPorPagar({
           )}
 
           {ordenesPagables.length > 0 && <>
-            {totalPendiente > 0 && (
+            {(totalPendiente > 0 || totalPendienteProveedor !== null) && (
               <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 mb-5 flex flex-wrap gap-6 items-center">
-                <div><div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Total por Pagar</div>
-                  <div className="text-2xl font-extrabold text-rose-700">${fmt(totalPendiente)}</div></div>
+                <div>
+                  <div className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Total por Pagar (Global)</div>
+                  <div className="text-2xl font-extrabold text-rose-700">${fmt(totalPendiente)}</div>
+                </div>
+                {totalPendienteProveedor !== null && (
+                  <div>
+                    <div className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1">Saldo con {nombreProveedorSeleccionado}</div>
+                    <div className="text-2xl font-extrabold text-indigo-700">${fmt(totalPendienteProveedor)}</div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1463,6 +1554,12 @@ export function VistaCuentasPorPagar({
                           onClick={() => { setExpandido(isExp ? null : orden.id); setPagoForm({ monto: 0, fecha: hoy, metodoPago: 'Efectivo', nota: '' }); }}>
                           {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
                         </Btn>
+                        {saldo > 0 && (
+                          <Btn size="sm" variant="danger"
+                            onClick={() => setConfirmCancelarOrden({ id: orden.id, saldo, prov: prov?.nombre ?? '—' })}>
+                            🚫 Cancelar
+                          </Btn>
+                        )}
                       </div>
                       {/* Desglose IVA */}
                       <div className="mt-2 pt-2 border-t border-slate-200 space-y-1">
@@ -1508,14 +1605,25 @@ export function VistaCuentasPorPagar({
                             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Historial de pagos</p>
                             <div className="space-y-1">
                               {orden.pagos.map(p => (
-                                <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                  <div className="flex gap-3">
-                                    <span className="text-slate-500">{formatearFecha(p.fecha)}</span>
-                                    {p.metodoPago && <span className="text-slate-500 font-medium">{p.metodoPago}</span>}
-                                    {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
+                                p.nota === '__CANCELADO__' ? (
+                                  <div key={p.id} className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm">
+                                    <div className="flex gap-2 items-center">
+                                      <span className="text-red-500">🚫</span>
+                                      <span className="text-red-600 font-semibold">Saldo cancelado</span>
+                                      <span className="text-red-400">{formatearFecha(p.fecha)}</span>
+                                    </div>
+                                    <span className="font-semibold text-red-600">−${fmt(p.monto)}</span>
                                   </div>
-                                  <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
-                                </div>
+                                ) : (
+                                  <div key={p.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                    <div className="flex gap-3">
+                                      <span className="text-slate-500">{formatearFecha(p.fecha)}</span>
+                                      {p.metodoPago && <span className="text-slate-500 font-medium">{p.metodoPago}</span>}
+                                      {p.nota && <span className="text-slate-500 italic">{p.nota}</span>}
+                                    </div>
+                                    <span className="font-semibold text-emerald-600">+ ${fmt(p.monto)}</span>
+                                  </div>
+                                )
                               ))}
                             </div>
                           </div>
