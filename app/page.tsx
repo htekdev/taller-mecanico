@@ -522,7 +522,21 @@ export default function TallerMecanico() {
     }
   };
   const cancelarOrden = async (ordenId: string) => {
+    const orden = ordenes.find(o => o.id === ordenId);
+    if (!orden) return;
     try {
+      // If the order was already received, reverse the stock that was added
+      if (orden.estado === 'recibida' && orden.partes.length > 0) {
+        const nuevoInv = inventario.map(r => {
+          const item = orden.partes.find(p => p.refaccionId === r.id);
+          return item ? { ...r, stock: Math.max(0, r.stock - item.cantidad) } : r;
+        });
+        const affected = nuevoInv.filter(r => orden.partes.some(p => p.refaccionId === r.id));
+        if (affected.length > 0) {
+          await db.updateRefacciones(affected);
+          setInventario(nuevoInv);
+        }
+      }
       await db.updateOrdenEstado(ordenId, 'cancelada');
       setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'cancelada' as const } : o));
     } catch (err) {

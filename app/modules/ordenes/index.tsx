@@ -345,6 +345,7 @@ export function VistaOrdenesCompra({
   const [expandido, setExpandido] = useState<string | null>(null);
   const [filtroProveedorId, setFiltroProveedorId] = useState('');
   const [editandoOrden, setEditandoOrden] = useState<OrdenCompra | null>(null);
+  const [confirmandoCancelar, setConfirmandoCancelar] = useState<OrdenCompra | null>(null);
 
   // ── Modo agregar pieza ────────────────────────────────────────────────────────
   const [modoAgregar, setModoAgregar] = useState<'existente' | 'nueva'>('existente');
@@ -509,6 +510,36 @@ export function VistaOrdenesCompra({
           onGuardar={(data) => { onEditarOrden(editandoOrden.id, data); setEditandoOrden(null); }}
           onCerrar={() => setEditandoOrden(null)}
         />
+      )}
+
+      {/* ── Confirmación de cancelación ── */}
+      {confirmandoCancelar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true" aria-label="Confirmar cancelación">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">⚠️</div>
+              <h2 className="text-lg font-bold text-slate-800">¿Cancelar esta orden?</h2>
+            </div>
+            {confirmandoCancelar.estado === 'recibida' ? (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-sm text-red-700">
+                <strong>Esta orden ya fue recibida.</strong> Al cancelarla, el inventario se reducirá en las cantidades que se agregaron cuando fue recibida.
+              </div>
+            ) : (
+              <p className="text-sm text-slate-600 text-center mb-4">
+                Esta acción no se puede deshacer.
+              </p>
+            )}
+            <div className="text-xs text-slate-500 bg-slate-50 rounded-lg p-3 mb-5">
+              <strong>{proveedores.find(p => p.id === confirmandoCancelar.proveedorId)?.nombre ?? 'Sin proveedor'}</strong>
+              {confirmandoCancelar.numeroOrden && <> · {confirmandoCancelar.numeroOrden}</>}
+              {' · '}${fmt(confirmandoCancelar.total)} · {confirmandoCancelar.partes.length} pieza{confirmandoCancelar.partes.length !== 1 ? 's' : ''}
+            </div>
+            <div className="flex gap-3">
+              <Btn variant="ghost" fullWidth onClick={() => setConfirmandoCancelar(null)}>Volver</Btn>
+              <Btn variant="danger" fullWidth onClick={() => { onCancelarOrden(confirmandoCancelar.id); setConfirmandoCancelar(null); }}>Sí, cancelar</Btn>
+            </div>
+          </div>
+        </div>
       )}
 
       {pendientesRecibir > 0 && (
@@ -791,7 +822,7 @@ export function VistaOrdenesCompra({
             const badge = BADGE_ORDEN[orden.estado];
             const isExpandida = expandido === orden.id;
             return (
-              <div key={orden.id} className={`border border-slate-200 rounded-xl p-4 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+              <div key={orden.id} className={`border rounded-xl p-4 ${orden.estado === 'cancelada' ? 'border-slate-200 bg-slate-100 opacity-60' : `border-slate-200 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}`}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -822,11 +853,14 @@ export function VistaOrdenesCompra({
                       <>
                         <Btn size="sm" variant="ghost" onClick={() => setEditandoOrden(orden)}>✏️ Editar</Btn>
                         <Btn size="sm" variant="success" onClick={() => onRecibirOrden(orden.id)}>✓ Marcar Recibida</Btn>
-                        <Btn size="sm" variant="danger" onClick={() => onCancelarOrden(orden.id)}>Cancelar</Btn>
+                        <Btn size="sm" variant="danger" onClick={() => setConfirmandoCancelar(orden)}>Cancelar</Btn>
                       </>
                     )}
                     {orden.estado === 'recibida' && (
-                      <Btn size="sm" variant="ghost" onClick={() => setEditandoOrden(orden)}>✏️ Corregir orden</Btn>
+                      <>
+                        <Btn size="sm" variant="ghost" onClick={() => setEditandoOrden(orden)}>✏️ Corregir orden</Btn>
+                        <Btn size="sm" variant="danger" onClick={() => setConfirmandoCancelar(orden)}>🚫 Cancelar</Btn>
+                      </>
                     )}
                   </div>
                 </div>
