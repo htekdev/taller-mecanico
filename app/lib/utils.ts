@@ -16,16 +16,20 @@ export function getSaldo(t: Trabajo): number {
 }
 
 export function getMontoPagadoOrden(o: OrdenCompra): number {
-  return (o.pagos ?? []).reduce((s, p) => s + p.monto, 0);
+  // Real cash paid only — excludes __CANCELADO__ entries (discounts/write-offs)
+  return (o.pagos ?? []).filter(p => p.nota !== '__CANCELADO__').reduce((s, p) => s + p.monto, 0);
 }
 export function getEstadoPagoOrden(o: OrdenCompra): 'pendiente' | 'parcial' | 'pagado' {
-  const p = getMontoPagadoOrden(o);
-  if (p <= 0) return 'pendiente';
-  if (p >= o.total) return 'pagado';
-  return 'parcial';
+  const saldo  = getSaldoOrden(o);
+  const pagado = getMontoPagadoOrden(o);
+  if (saldo <= 0)  return 'pagado';   // saldo = 0 whether paid or cancelled
+  if (pagado > 0)  return 'parcial';
+  return 'pendiente';
 }
 export function getSaldoOrden(o: OrdenCompra): number {
-  return Math.max(0, o.total - getMontoPagadoOrden(o));
+  // Saldo considers ALL pago entries (real payments + cancellations both reduce the debt)
+  const totalAplicado = (o.pagos ?? []).reduce((s, p) => s + p.monto, 0);
+  return Math.max(0, o.total - totalAplicado);
 }
 
 export function getMontoPagadoFactura(f: Factura): number {
@@ -125,17 +129,21 @@ export type FiltroCuenta = 'todos' | 'pendiente' | 'parcial' | 'pagado';
 // ─── Servicios Externos — helpers ─────────────────────────────────────────────
 
 export function getMontoPagadoServicio(item: ManoDeObraItem): number {
-  return (item.pagosServicio ?? []).reduce((s, p) => s + p.monto, 0);
+  // Real cash paid only — excludes __CANCELADO__ entries
+  return (item.pagosServicio ?? []).filter(p => p.nota !== '__CANCELADO__').reduce((s, p) => s + p.monto, 0);
 }
 
 export function getSaldoServicio(item: ManoDeObraItem): number {
-  return Math.max(0, (item.costoTaller ?? 0) - getMontoPagadoServicio(item));
+  // Saldo considers ALL entries (real payments + cancellations both reduce the debt)
+  const totalAplicado = (item.pagosServicio ?? []).reduce((s, p) => s + p.monto, 0);
+  return Math.max(0, (item.costoTaller ?? 0) - totalAplicado);
 }
 
 export function getEstadoServicio(item: ManoDeObraItem): 'pendiente' | 'parcial' | 'pagado' {
   const costo  = item.costoTaller ?? 0;
+  const saldo  = getSaldoServicio(item);
   const pagado = getMontoPagadoServicio(item);
-  if (costo <= 0 || pagado >= costo) return 'pagado';
-  if (pagado > 0)                    return 'parcial';
+  if (costo <= 0 || saldo <= 0) return 'pagado';
+  if (pagado > 0)               return 'parcial';
   return 'pendiente';
 }
