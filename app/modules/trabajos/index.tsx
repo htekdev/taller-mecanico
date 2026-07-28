@@ -10,6 +10,21 @@ import { getPricingIntel } from '@/app/lib/pricing';
 
 import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
 import { generarComprobantePago } from '@/app/lib/pdf-comprobante';
+import { readDraft, writeDraft, clearDraft } from '@/app/lib/form-draft';
+
+// Draft key for new-trabajo form state (no tallerId prop available — device-scoped is fine)
+const TRABAJO_DRAFT_KEY = 'taller_draft_trabajo_v1';
+
+interface TrabajoDraft {
+  form: {
+    clienteId: string; vehiculoId: string; fecha: string; numeroOrden: string;
+    descripcion: string; kilometraje: string | number; requiereFactura: boolean;
+    folioFiscal: string; estado: 'pendiente' | 'completado' | 'pagado'; departamento: string;
+    inventarioNum: string; ordenServicioGob: string; fechaEntrada: string; fechaSalida: string;
+  };
+  laborItems: ManoDeObraItem[];
+  subTab: 'general' | 'ayuntamiento';
+}
 
 function loadDepartamentos(): string[] {
   try {
@@ -411,6 +426,8 @@ export function VistaTrabajo({
   const [capturandoTftId, setCapturandoTftId] = useState<string | null>(null);
   const [tftNumeroDraft, setTftNumeroDraft] = useState('');
   const [verCancelados, setVerCancelados] = useState(false);
+  // Draft restore banner — briefly shown when a draft is recovered
+  const [draftRestoredTrabajo, setDraftRestoredTrabajo] = useState(false);
 
   // ── Departamentos CRUD ──────────────────────────────────────────────────
   const [departamentos, setDepartamentos] = useState<string[]>([]);
@@ -420,6 +437,55 @@ export function VistaTrabajo({
   useEffect(() => {
     setDepartamentos(loadDepartamentos());
   }, []);
+
+  // ── Draft restore: run once on mount ──────────────────────────────────────
+  // Restores in-progress new-trabajo form if user navigated away while filling it.
+  useEffect(() => {
+    const draft = readDraft<TrabajoDraft>(TRABAJO_DRAFT_KEY);
+    // Only restore if there's something meaningful (client or description set)
+    if (draft && (draft.form.clienteId || draft.form.descripcion.trim())) {
+      setForm(prev => ({ ...prev, ...draft.form }));
+      if (Array.isArray(draft.laborItems) && draft.laborItems.length > 0) {
+        setLaborItems(draft.laborItems);
+      }
+      if (draft.subTab) setSubTab(draft.subTab);
+      setDraftRestoredTrabajo(true);
+      const t = setTimeout(() => setDraftRestoredTrabajo(false), 4000);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Draft auto-save: persist new-trabajo form as the user types ───────────
+  // Skips if editing an existing job (editandoId !== null) — only saves for new jobs.
+  useEffect(() => {
+    if (editandoId) return; // Don't overwrite draft when editing existing
+    const isNewForm = form.clienteId || form.descripcion.trim() || laborItems.length > 0;
+    if (!isNewForm) return;
+    const timer = setTimeout(() => {
+      writeDraft<TrabajoDraft>(TRABAJO_DRAFT_KEY, {
+        form: {
+          clienteId: form.clienteId,
+          vehiculoId: form.vehiculoId,
+          fecha: form.fecha,
+          numeroOrden: form.numeroOrden,
+          descripcion: form.descripcion,
+          kilometraje: form.kilometraje,
+          requiereFactura: form.requiereFactura,
+          folioFiscal: form.folioFiscal,
+          estado: (form.estado as 'pendiente' | 'completado' | 'pagado'),
+          departamento: form.departamento,
+          inventarioNum: form.inventarioNum,
+          ordenServicioGob: form.ordenServicioGob,
+          fechaEntrada: form.fechaEntrada,
+          fechaSalida: form.fechaSalida,
+        },
+        laborItems,
+        subTab,
+      });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [form, laborItems, subTab, editandoId]);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === form.clienteId);
   const totalManoDeObra       = laborItems.reduce((s, l) => s + (l.precio * (l.cantidad ?? 1)), 0);
@@ -538,6 +604,8 @@ export function VistaTrabajo({
     setExtProveedorId('');
     setCapturandoTftId(null);
     setTftNumeroDraft('');
+    // Clear form draft so it doesn't restore stale data after a successful submit
+    clearDraft(TRABAJO_DRAFT_KEY);
   };
 
   const iniciarEdicion = (trabajo: Trabajo) => {
@@ -808,6 +876,16 @@ export function VistaTrabajo({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Draft restored banner — shown briefly when data was recovered after navigation */}
+      {draftRestoredTrabajo && !editandoId && (
+        <div className="flex items-center gap-3 mb-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <span className="text-emerald-500 text-lg">📋</span>
+          <p className="text-sm text-emerald-700">
+            <strong>Borrador recuperado</strong> — tus datos siguen aquí donde los dejaste.
+          </p>
         </div>
       )}
 

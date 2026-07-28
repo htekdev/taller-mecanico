@@ -7,6 +7,7 @@ import { CATEGORIAS, UNIDADES, getHoy } from '@/app/lib/utils';
 import * as db from '@/app/lib/db';
 import type { CotizacionRow } from '@/app/lib/db';
 import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
+import { readDraft, writeDraft, clearDraft } from '@/app/lib/form-draft';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,9 @@ import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
 const LS_COT_COUNTER_KEY = 'taller_cot_counter';
 const LS_COT_HISTORY_KEY = 'taller_cotizaciones';
 const LS_MIGRATED_KEY    = (tallerId: string) => `taller_cotizaciones_migrated_${tallerId}`;
+
+// Draft key: persists in-progress form data across tab switches / app backgrounding.
+const COT_DRAFT_KEY = (tallerId: string) => `taller_draft_cotizacion_${tallerId}`;
 
 const NUM_PROVEEDOR_RED = 'P004093';
 
@@ -147,6 +151,14 @@ export interface AgregarRefaccionInput {
 }
 
 type Pantalla = 'inicio' | 'formulario' | 'preview';
+
+// Draft shape persisted to localStorage while form is open
+interface CotizacionDraft {
+  pantalla: 'formulario';
+  plantilla: Plantilla;
+  form: FormCotizacion;
+  editingId: string | null;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1162,6 +1174,8 @@ export function VistaCotizaciones({
   const [reconciliandoId, setReconciliandoId] = useState<string | null>(null);
   const [guardando, setGuardando]       = useState(false);
   const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
+  // Draft restore banner — briefly shown when a draft is recovered
+  const [draftRestoredCot, setDraftRestoredCot] = useState(false);
 
   // ── Departamentos — loaded from localStorage (shared with Trabajos module) ──
   // Start with SSR-safe static defaults so server and client render the same
@@ -1266,6 +1280,38 @@ export function VistaCotizaciones({
     setVehiculosCliente(form.clienteId ? vehiculos.filter(v => v.clienteId === form.clienteId) : []);
   }, [form.clienteId, vehiculos]);
 
+  // ── Draft restore: run once when tallerId is known ─────────────────────────
+  // Restores in-progress form data if the user navigated away while filling it out.
+  const draftRestoreRan = useRef(false);
+  useEffect(() => {
+    if (!tallerId || draftRestoreRan.current) return;
+    draftRestoreRan.current = true;
+    const draft = readDraft<CotizacionDraft>(COT_DRAFT_KEY(tallerId));
+    if (draft?.pantalla === 'formulario' && draft.form) {
+      setPantalla('formulario');
+      setPlantilla(draft.plantilla ?? 'general');
+      setForm(draft.form);
+      setEditingId(draft.editingId ?? null);
+      setDraftRestoredCot(true);
+      const t = setTimeout(() => setDraftRestoredCot(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [tallerId]);
+
+  // ── Draft auto-save: persist form while user is filling it out ─────────────
+  useEffect(() => {
+    if (!tallerId || pantalla !== 'formulario') return;
+    const timer = setTimeout(() => {
+      writeDraft<CotizacionDraft>(COT_DRAFT_KEY(tallerId), {
+        pantalla: 'formulario',
+        plantilla,
+        form,
+        editingId,
+      });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [tallerId, pantalla, plantilla, form, editingId]);
+
   const set = useCallback(<K extends keyof FormCotizacion>(key: K, val: FormCotizacion[K]) => {
     setForm(f => ({ ...f, [key]: val }));
   }, []);
@@ -1337,6 +1383,7 @@ export function VistaCotizaciones({
     }
 
     setPantalla('preview');
+    if (tallerId) clearDraft(COT_DRAFT_KEY(tallerId));
     } catch {
       setErrorGuardar('No se pudo guardar la cotización. Verifica tu conexión e intenta de nuevo.');
     } finally {
@@ -1472,12 +1519,25 @@ export function VistaCotizaciones({
     return (
       <div>
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => setPantalla(viewEntry ? 'preview' : 'inicio')} className="text-slate-400 hover:text-slate-700 transition-colors text-lg">←</button>
+          <button onClick={() => {
+            if (!viewEntry && tallerId) clearDraft(COT_DRAFT_KEY(tallerId));
+            setPantalla(viewEntry ? 'preview' : 'inicio');
+          }} className="text-slate-400 hover:text-slate-700 transition-colors text-lg">←</button>
           <SectionTitle
             title={isEditing ? `Editando — ${form.numeroCotizacion}` : `Cotización — ${labelPlantilla}`}
             subtitle={isEditing ? 'Se conservará el mismo número al guardar' : 'Completa los datos y guarda para asignar número'}
           />
         </div>
+
+        {/* Draft restored banner — shown briefly when data was recovered after navigation */}
+        {draftRestoredCot && (
+          <div className="flex items-center gap-3 mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <span className="text-emerald-500 text-lg">📋</span>
+            <p className="text-sm text-emerald-700">
+              <strong>Borrador recuperado</strong> — tus datos siguen aquí donde los dejaste.
+            </p>
+          </div>
+        )}
 
         {/* Edit indicator or new quote info banner */}
         {isEditing ? (
