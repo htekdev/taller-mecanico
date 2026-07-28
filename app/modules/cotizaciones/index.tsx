@@ -1286,15 +1286,20 @@ export function VistaCotizaciones({
   useEffect(() => {
     if (!tallerId || draftRestoreRan.current) return;
     draftRestoreRan.current = true;
-    const draft = readDraft<CotizacionDraft>(COT_DRAFT_KEY(tallerId));
-    if (draft?.pantalla === 'formulario' && draft.form) {
-      setPantalla('formulario');
-      setPlantilla(draft.plantilla ?? 'general');
-      setForm(draft.form);
-      setEditingId(draft.editingId ?? null);
-      setDraftRestoredCot(true);
-      const t = setTimeout(() => setDraftRestoredCot(false), 4000);
-      return () => clearTimeout(t);
+    try {
+      const draft = readDraft<CotizacionDraft>(COT_DRAFT_KEY(tallerId));
+      if (draft?.pantalla === 'formulario' && draft.form) {
+        setPantalla('formulario');
+        setPlantilla(draft.plantilla ?? 'general');
+        setForm(draft.form);
+        setEditingId(draft.editingId ?? null);
+        setDraftRestoredCot(true);
+        const t = setTimeout(() => setDraftRestoredCot(false), 4000);
+        return () => clearTimeout(t);
+      }
+    } catch {
+      // Corrupted localStorage data — clear it so it doesn't persist
+      clearDraft(COT_DRAFT_KEY(tallerId));
     }
   }, [tallerId]);
 
@@ -1531,8 +1536,8 @@ export function VistaCotizaciones({
 
         {/* Draft restored banner — shown briefly when data was recovered after navigation */}
         {draftRestoredCot && (
-          <div className="flex items-center gap-3 mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-            <span className="text-emerald-500 text-lg">📋</span>
+          <div role="status" aria-live="polite" className="flex items-center gap-3 mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <span className="text-emerald-500 text-lg" aria-hidden="true">📋</span>
             <p className="text-sm text-emerald-700">
               <strong>Borrador recuperado</strong> — tus datos siguen aquí donde los dejaste.
             </p>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, PricingIntel, Proveedor } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt, getMontoPagado, formatearFecha, getHoy } from '@/app/lib/utils';
@@ -12,16 +12,33 @@ import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
 import { generarComprobantePago } from '@/app/lib/pdf-comprobante';
 import { readDraft, writeDraft, clearDraft } from '@/app/lib/form-draft';
 
-// Draft key for new-trabajo form state (no tallerId prop available — device-scoped is fine)
+// Draft key for new-trabajo form state (no tallerId prop available — device-scoped is fine for single-tenant)
 const TRABAJO_DRAFT_KEY = 'taller_draft_trabajo_v1';
 
+/**
+ * Form fields for a new/in-progress trabajo entry.
+ * Defined outside the component so TrabajoDraft can reference it without
+ * duplicating the field list — prevents silent drift if emptyForm changes.
+ */
+type TrabajoNewForm = {
+  clienteId: string;
+  vehiculoId: string;
+  fecha: string;
+  numeroOrden: string;
+  descripcion: string;
+  kilometraje: string | number;
+  requiereFactura: boolean;
+  folioFiscal: string;
+  estado: Trabajo['estado'];
+  departamento: string;
+  inventarioNum: string;
+  ordenServicioGob: string;
+  fechaEntrada: string;
+  fechaSalida: string;
+};
+
 interface TrabajoDraft {
-  form: {
-    clienteId: string; vehiculoId: string; fecha: string; numeroOrden: string;
-    descripcion: string; kilometraje: string | number; requiereFactura: boolean;
-    folioFiscal: string; estado: 'pendiente' | 'completado' | 'pagado'; departamento: string;
-    inventarioNum: string; ordenServicioGob: string; fechaEntrada: string; fechaSalida: string;
-  };
+  form: TrabajoNewForm;
   laborItems: ManoDeObraItem[];
   subTab: 'general' | 'ayuntamiento';
 }
@@ -379,7 +396,7 @@ export function VistaTrabajo({
   onActualizarTft: (trabajoId: string, tftNumero: string) => Promise<void> | void;
   onIrAFacturas: () => void;
 }) {
-  const emptyForm = {
+  const emptyForm: TrabajoNewForm = {
     clienteId: '', vehiculoId: '',
     fecha: getHoy(),
     numeroOrden: '',
@@ -394,7 +411,7 @@ export function VistaTrabajo({
     fechaEntrada: '',
     fechaSalida: '',
   };
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<TrabajoNewForm>(emptyForm);
   const [laborItems, setLaborItems] = useState<ManoDeObraItem[]>([]);
   const [laborConcepto, setLaborConcepto] = useState('');
   const [laborPrecio, setLaborPrecio]     = useState(0);
@@ -440,18 +457,30 @@ export function VistaTrabajo({
 
   // ── Draft restore: run once on mount ──────────────────────────────────────
   // Restores in-progress new-trabajo form if user navigated away while filling it.
+  // useRef guard prevents double-execution in React 18 Strict Mode (dev).
+  const draftRestoreRanTrabajo = useRef(false);
   useEffect(() => {
-    const draft = readDraft<TrabajoDraft>(TRABAJO_DRAFT_KEY);
-    // Only restore if there's something meaningful (client or description set)
-    if (draft && (draft.form.clienteId || draft.form.descripcion.trim())) {
-      setForm(prev => ({ ...prev, ...draft.form }));
-      if (Array.isArray(draft.laborItems) && draft.laborItems.length > 0) {
-        setLaborItems(draft.laborItems);
+    if (draftRestoreRanTrabajo.current) return;
+    draftRestoreRanTrabajo.current = true;
+    try {
+      const draft = readDraft<TrabajoDraft>(TRABAJO_DRAFT_KEY);
+      // Guard: draft.form must be a valid object before accessing properties
+      if (draft && draft.form && typeof draft.form === 'object' &&
+          (draft.form.clienteId || (typeof draft.form.descripcion === 'string' && draft.form.descripcion.trim()))) {
+        setForm(prev => ({ ...prev, ...draft.form }));
+        if (Array.isArray(draft.laborItems) && draft.laborItems.length > 0) {
+          setLaborItems(draft.laborItems);
+        }
+        if (draft.subTab === 'general' || draft.subTab === 'ayuntamiento') {
+          setSubTab(draft.subTab);
+        }
+        setDraftRestoredTrabajo(true);
+        const t = setTimeout(() => setDraftRestoredTrabajo(false), 4000);
+        return () => clearTimeout(t);
       }
-      if (draft.subTab) setSubTab(draft.subTab);
-      setDraftRestoredTrabajo(true);
-      const t = setTimeout(() => setDraftRestoredTrabajo(false), 4000);
-      return () => clearTimeout(t);
+    } catch {
+      // Corrupted localStorage data — clear it so it doesn't persist
+      clearDraft(TRABAJO_DRAFT_KEY);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -473,7 +502,7 @@ export function VistaTrabajo({
           kilometraje: form.kilometraje,
           requiereFactura: form.requiereFactura,
           folioFiscal: form.folioFiscal,
-          estado: (form.estado as 'pendiente' | 'completado' | 'pagado'),
+          estado: (form.estado as TrabajoNewForm['estado']),
           departamento: form.departamento,
           inventarioNum: form.inventarioNum,
           ordenServicioGob: form.ordenServicioGob,
@@ -881,8 +910,8 @@ export function VistaTrabajo({
 
       {/* Draft restored banner — shown briefly when data was recovered after navigation */}
       {draftRestoredTrabajo && !editandoId && (
-        <div className="flex items-center gap-3 mb-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-          <span className="text-emerald-500 text-lg">📋</span>
+        <div role="status" aria-live="polite" className="flex items-center gap-3 mb-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <span className="text-emerald-500 text-lg" aria-hidden="true">📋</span>
           <p className="text-sm text-emerald-700">
             <strong>Borrador recuperado</strong> — tus datos siguen aquí donde los dejaste.
           </p>
