@@ -19,6 +19,10 @@ const LS_MIGRATED_KEY    = (tallerId: string) => `taller_cotizaciones_migrated_$
 // Draft key: persists in-progress form data across tab switches / app backgrounding.
 const COT_DRAFT_KEY = (tallerId: string) => `taller_draft_cotizacion_${tallerId}`;
 
+// Nav persistence key: remembers which cotización was last viewed so the user
+// returns directly to it when navigating back to the Cotizaciones section.
+const COT_LAST_VIEW_KEY = (tallerId: string) => `taller_cot_last_view_${tallerId}`;
+
 const NUM_PROVEEDOR_RED = 'P004093';
 
 // ─── Departamentos localStorage — same key as Trabajos module ─────────────────
@@ -1251,7 +1255,28 @@ export function VistaCotizaciones({
           }
         }
 
-        await recargarHistory();
+        // Load history and restore last viewed cotización in one pass
+        const rows = await db.getCotizaciones(tallerId);
+        const entries = rows.map(rowToEntry);
+        setHistory(entries);
+
+        // ── Nav persistence: restore last viewed cotización ───────────────────
+        try {
+          const savedId = localStorage.getItem(COT_LAST_VIEW_KEY(tallerId));
+          if (savedId) {
+            const entry = entries.find(e => e.id === savedId && !e.cancelada);
+            if (entry) {
+              setPlantilla(entry.plantilla);
+              setForm(entry.form);
+              setViewEntry(entry);
+              setEditingId(null);
+              setPantalla('preview');
+            } else {
+              // Cotización was deleted or cancelled — clear stale key
+              localStorage.removeItem(COT_LAST_VIEW_KEY(tallerId));
+            }
+          }
+        } catch { /* ignore localStorage errors */ }
       } catch (err) {
         console.error('[cotizaciones] init error:', err);
         setInitError('No se pudieron cargar las cotizaciones. Verifica tu conexión e intenta de nuevo.');
@@ -1259,7 +1284,22 @@ export function VistaCotizaciones({
         setLoading(false);
       }
     })();
-  }, [tallerId, recargarHistory]);
+  }, [tallerId]);
+
+  // ── Nav persistence: save/clear the last-viewed cotización ──────────────────
+  // When pantalla='preview' with an active viewEntry → save its id so we can
+  // restore it if the component unmounts (user switches sections) or the page refreshes.
+  // When pantalla='inicio' → user returned to the list intentionally → clear saved id.
+  useEffect(() => {
+    if (!tallerId) return;
+    try {
+      if (pantalla === 'preview' && viewEntry?.id) {
+        localStorage.setItem(COT_LAST_VIEW_KEY(tallerId), viewEntry.id);
+      } else if (pantalla === 'inicio') {
+        localStorage.removeItem(COT_LAST_VIEW_KEY(tallerId));
+      }
+    } catch { /* ignore */ }
+  }, [pantalla, viewEntry, tallerId]);
 
   const blankForm = useCallback((p: Plantilla): FormCotizacion => ({
     numeroCotizacion: '',

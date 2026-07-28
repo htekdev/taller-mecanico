@@ -75,6 +75,21 @@ export default function TallerMecanico() {
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
 
+  // ── Nav persistence: remember last active section across refreshes & tab switches ──
+  useEffect(() => {
+    // Restore saved section once on mount (after hydration)
+    try {
+      const saved = localStorage.getItem('taller_last_vista') as Vista | null;
+      const valid: Vista[] = ['clientes','inventario','trabajos','proveedores','ordenes','facturas','cuentas','pagos','resumen','historial','configuracion','cotizaciones','gastos','reportes'];
+      if (saved && valid.includes(saved)) setVista(saved);
+    } catch { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    // Save whenever the section changes
+    try { localStorage.setItem('taller_last_vista', vista); } catch { /* ignore */ }
+  }, [vista]);
+
   // ── Handlers ──
 
   const guardarCliente = async (data: Omit<Cliente, 'id'>) => {
