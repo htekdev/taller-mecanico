@@ -23,6 +23,10 @@ const COT_DRAFT_KEY = (tallerId: string) => `taller_draft_cotizacion_${tallerId}
 // returns directly to it when navigating back to the Cotizaciones section.
 const COT_LAST_VIEW_KEY = (tallerId: string) => `taller_cot_last_view_${tallerId}`;
 
+// Module-level localStorage helpers — avoid nested try/catch inside async effects.
+const lsGet = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
+const lsRemove = (key: string): void => { try { localStorage.removeItem(key); } catch { /* ignore */ } };
+
 const NUM_PROVEEDOR_RED = 'P004093';
 
 // ─── Departamentos localStorage — same key as Trabajos module ─────────────────
@@ -1208,6 +1212,21 @@ export function VistaCotizaciones({
     }
   }, [tallerId]);
 
+  // ── blankForm + form state declared here so the init useEffect below can call
+  // setForm without violating React Compiler ordering rules (hooks must be declared
+  // before any effect that references their setters).
+  const blankForm = useCallback((p: Plantilla): FormCotizacion => ({
+    numeroCotizacion: '',
+    clienteId: '', cliente: p === 'ayuntamiento' ? 'Ayuntamiento de Mérida' : p === 'red_ambiental' ? 'Red Ambiental' : '',
+    vehiculoId: '', marca: '', modelo: '', anio: '', placas: '', kms: '',
+    fecha: hoy(), trabajo: '', observaciones: '',
+    incluirIVA: false, autorizadoPor: '',
+    inventario: '', ordenServicio: '', departamento: '',
+    refacciones: [newItem()], manoDeObra: [newItem()],
+  }), []);
+
+  const [form, setForm] = useState<FormCotizacion>(() => blankForm('general'));
+
   useEffect(() => {
     if (!tallerId) { setLoading(false); return; }
 
@@ -1260,23 +1279,22 @@ export function VistaCotizaciones({
         const entries = rows.map(rowToEntry);
         setHistory(entries);
 
-        // ── Nav persistence: restore last viewed cotización ───────────────────
-        try {
-          const savedId = localStorage.getItem(COT_LAST_VIEW_KEY(tallerId));
-          if (savedId) {
-            const entry = entries.find(e => e.id === savedId && !e.cancelada);
-            if (entry) {
-              setPlantilla(entry.plantilla);
-              setForm(entry.form);
-              setViewEntry(entry);
-              setEditingId(null);
-              setPantalla('preview');
-            } else {
-              // Cotización was deleted or cancelled — clear stale key
-              localStorage.removeItem(COT_LAST_VIEW_KEY(tallerId));
-            }
+        // ── Nav persistence: restore last viewed cotización (no nested try —
+        // lsGet/lsRemove handle their own errors at the module level) ─────────
+        const savedId = lsGet(COT_LAST_VIEW_KEY(tallerId));
+        if (savedId) {
+          const entry = entries.find(e => e.id === savedId && !e.cancelada);
+          if (entry) {
+            setPlantilla(entry.plantilla);
+            setForm(entry.form);
+            setViewEntry(entry);
+            setEditingId(null);
+            setPantalla('preview');
+          } else {
+            // Cotización was deleted or cancelled — clear stale key
+            lsRemove(COT_LAST_VIEW_KEY(tallerId));
           }
-        } catch { /* ignore localStorage errors */ }
+        }
       } catch (err) {
         console.error('[cotizaciones] init error:', err);
         setInitError('No se pudieron cargar las cotizaciones. Verifica tu conexión e intenta de nuevo.');
@@ -1292,26 +1310,12 @@ export function VistaCotizaciones({
   // When pantalla='inicio' → user returned to the list intentionally → clear saved id.
   useEffect(() => {
     if (!tallerId) return;
-    try {
-      if (pantalla === 'preview' && viewEntry?.id) {
-        localStorage.setItem(COT_LAST_VIEW_KEY(tallerId), viewEntry.id);
-      } else if (pantalla === 'inicio') {
-        localStorage.removeItem(COT_LAST_VIEW_KEY(tallerId));
-      }
-    } catch { /* ignore */ }
+    if (pantalla === 'preview' && viewEntry?.id) {
+      try { localStorage.setItem(COT_LAST_VIEW_KEY(tallerId), viewEntry.id); } catch { /* ignore */ }
+    } else if (pantalla === 'inicio') {
+      lsRemove(COT_LAST_VIEW_KEY(tallerId));
+    }
   }, [pantalla, viewEntry, tallerId]);
-
-  const blankForm = useCallback((p: Plantilla): FormCotizacion => ({
-    numeroCotizacion: '',
-    clienteId: '', cliente: p === 'ayuntamiento' ? 'Ayuntamiento de Mérida' : p === 'red_ambiental' ? 'Red Ambiental' : '',
-    vehiculoId: '', marca: '', modelo: '', anio: '', placas: '', kms: '',
-    fecha: hoy(), trabajo: '', observaciones: '',
-    incluirIVA: false, autorizadoPor: '',
-    inventario: '', ordenServicio: '', departamento: '',
-    refacciones: [newItem()], manoDeObra: [newItem()],
-  }), []);
-
-  const [form, setForm] = useState<FormCotizacion>(() => blankForm('general'));
 
   const [vehiculosCliente, setVehiculosCliente] = useState<Vehiculo[]>([]);
   useEffect(() => {
