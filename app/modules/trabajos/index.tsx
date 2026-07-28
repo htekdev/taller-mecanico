@@ -443,8 +443,6 @@ export function VistaTrabajo({
   const [capturandoTftId, setCapturandoTftId] = useState<string | null>(null);
   const [tftNumeroDraft, setTftNumeroDraft] = useState('');
   const [verCancelados, setVerCancelados] = useState(false);
-  // Draft restore banner — briefly shown when a draft is recovered
-  const [draftRestoredTrabajo, setDraftRestoredTrabajo] = useState(false);
 
   // ── Departamentos CRUD ──────────────────────────────────────────────────
   const [departamentos, setDepartamentos] = useState<string[]>([]);
@@ -474,9 +472,6 @@ export function VistaTrabajo({
         if (draft.subTab === 'general' || draft.subTab === 'ayuntamiento') {
           setSubTab(draft.subTab);
         }
-        setDraftRestoredTrabajo(true);
-        const t = setTimeout(() => setDraftRestoredTrabajo(false), 4000);
-        return () => clearTimeout(t);
       }
     } catch {
       // Corrupted localStorage data — clear it so it doesn't persist
@@ -905,16 +900,6 @@ export function VistaTrabajo({
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Draft restored banner — shown briefly when data was recovered after navigation */}
-      {draftRestoredTrabajo && !editandoId && (
-        <div role="status" aria-live="polite" className="flex items-center gap-3 mb-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-          <span className="text-emerald-500 text-lg" aria-hidden="true">📋</span>
-          <p className="text-sm text-emerald-700">
-            <strong>Borrador recuperado</strong> — tus datos siguen aquí donde los dejaste.
-          </p>
         </div>
       )}
 
