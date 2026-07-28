@@ -1174,8 +1174,6 @@ export function VistaCotizaciones({
   const [reconciliandoId, setReconciliandoId] = useState<string | null>(null);
   const [guardando, setGuardando]       = useState(false);
   const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
-  // Draft restore banner — briefly shown when a draft is recovered
-  const [draftRestoredCot, setDraftRestoredCot] = useState(false);
 
   // ── Departamentos — loaded from localStorage (shared with Trabajos module) ──
   // Start with SSR-safe static defaults so server and client render the same
@@ -1293,9 +1291,6 @@ export function VistaCotizaciones({
         setPlantilla(draft.plantilla ?? 'general');
         setForm(draft.form);
         setEditingId(draft.editingId ?? null);
-        setDraftRestoredCot(true);
-        const t = setTimeout(() => setDraftRestoredCot(false), 4000);
-        return () => clearTimeout(t);
       }
     } catch {
       // Corrupted localStorage data — clear it so it doesn't persist
@@ -1533,16 +1528,6 @@ export function VistaCotizaciones({
             subtitle={isEditing ? 'Se conservará el mismo número al guardar' : 'Completa los datos y guarda para asignar número'}
           />
         </div>
-
-        {/* Draft restored banner — shown briefly when data was recovered after navigation */}
-        {draftRestoredCot && (
-          <div role="status" aria-live="polite" className="flex items-center gap-3 mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-            <span className="text-emerald-500 text-lg" aria-hidden="true">📋</span>
-            <p className="text-sm text-emerald-700">
-              <strong>Borrador recuperado</strong> — tus datos siguen aquí donde los dejaste.
-            </p>
-          </div>
-        )}
 
         {/* Edit indicator or new quote info banner */}
         {isEditing ? (
