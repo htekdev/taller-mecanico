@@ -149,12 +149,37 @@ export interface FacturaRow {
  * Path: {tallerId}/{trabajoId}/factura.pdf
  * Returns the storage PATH (not a public URL) — callers must use
  * createFacturaPdfSignedUrl() to generate a 1-hour signed URL for display.
+ * 
+ * Validates:
+ * - File MIME type must be 'application/pdf'
+ * - File size must not exceed 10 MB
+ * - File content must start with PDF magic number (%PDF)
  */
 export async function uploadFacturaPdf(
   tallerId: string,
   trabajoId: string,
   file: File,
 ): Promise<string> {
+  // ── Validation 1: MIME type check ──
+  if (file.type !== 'application/pdf') {
+    throw new Error('uploadFacturaPdf: Solo se aceptan archivos PDF (tipo MIME: application/pdf).');
+  }
+
+  // ── Validation 2: File size check (10 MB limit) ──
+  const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+  if (file.size > MAX_SIZE) {
+    throw new Error('uploadFacturaPdf: El PDF no puede exceder 10 MB.');
+  }
+
+  // ── Validation 3: PDF magic number check ──
+  // Read first 4 bytes to verify file starts with %PDF
+  const buffer = await file.slice(0, 4).arrayBuffer();
+  const uint8 = new Uint8Array(buffer);
+  const isPDF = uint8[0] === 0x25 && uint8[1] === 0x50 && uint8[2] === 0x44 && uint8[3] === 0x46; // %PDF
+  if (!isPDF) {
+    throw new Error('uploadFacturaPdf: El archivo no es un PDF válido (no contiene encabezado PDF válido).');
+  }
+
   const path = `${tallerId}/${trabajoId}/factura.pdf`;
   const { error } = await supabase.storage
     .from('facturas')
