@@ -642,10 +642,10 @@ export default function TallerMecanico() {
   };
 
   // ── Invoice (Factura) handlers ──
-  const generarFactura = async (trabajoId: string, numeroFactura: string, fechaFactura: string, incluirIva: boolean) => {
-    if (!taller) return;
+  const generarFactura = async (trabajoId: string, numeroFactura: string, fechaFactura: string, incluirIva: boolean): Promise<string> => {
+    if (!taller) throw new Error('[generarFactura] taller not found');
     const trabajo = trabajos.find(t => t.id === trabajoId);
-    if (!trabajo || trabajo.facturaId) return;
+    if (!trabajo || trabajo.facturaId) throw new Error('[generarFactura] trabajo not found or already invoiced');
     const conceptos: FacturaConcepto[] = [
       ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
       ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
@@ -664,6 +664,7 @@ export default function TallerMecanico() {
     setFacturas(prev => [...prev, nuevaFactura]);
     await db.updateTrabajoFactura(trabajoId, nuevaFactura.id);
     setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 'facturado' as const } : t));
+    return nuevaFactura.id;
   };
 
   const abrirModalFactura = (trabajoId: string) => {
@@ -714,17 +715,40 @@ export default function TallerMecanico() {
   const confirmarFactura = async () => {
     if (!pendingFactura || !pendingFactura.numero.trim() || creandoFactura) return;
     setCreandoFactura(true);
+    let facturaId: string | null = null;
     try {
-      await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
+      facturaId = await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
 
-      if (pendingFactura.pdfFile && taller) {
+      if (pendingFactura.pdfFile && taller && facturaId) {
         try {
           const pdfPath = await uploadFacturaPdf(taller.id, pendingFactura.trabajoId, pendingFactura.pdfFile);
           await db.updateTrabajoFacturaPdf(taller.id, pendingFactura.trabajoId, pdfPath);
           setTrabajos(prev => prev.map(t => t.id === pendingFactura.trabajoId ? { ...t, facturaPdfUrl: pdfPath } : t));
-        } catch (pdfErr) {
-          console.error('[confirmarFactura] PDF upload failed (non-fatal):', pdfErr);
-          setErrorBanner('La factura fue creada. El PDF no se pudo subir — verifica tu conexión e intenta de nuevo marcando el trabajo como Facturado otra vez.');
+        } catch (pdfErr: any) {
+          // PDF upload failed — rollback the factura record
+          console.error('[confirmarFactura] PDF upload failed — rolling back factura:', pdfErr);
+          try {
+            await db.deleteFactura(facturaId);
+            // Remove the factura from UI and revert trabajo state
+            setFacturas(prev => prev.filter(f => f.id !== facturaId));
+            setTrabajos(prev => prev.map(t => t.id === pendingFactura.trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: undefined } : t));
+          } catch (rollbackErr) {
+            console.error('[confirmarFactura] Rollback failed:', rollbackErr);
+          }
+          
+          // Specific error messages based on failure type
+          const errorMsg = (pdfErr instanceof Error ? pdfErr.message : String(pdfErr)).toLowerCase();
+          if (errorMsg.includes('mime')) {
+            setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
+          } else if (errorMsg.includes('size') || errorMsg.includes('10mb')) {
+            setErrorBanner('El PDF no puede exceder 10 MB.');
+          } else if (errorMsg.includes('corrupted') || errorMsg.includes('magic') || errorMsg.includes('header')) {
+            setErrorBanner('El archivo parece estar corrupto. Intenta con otro PDF.');
+          } else {
+            setErrorBanner('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.');
+          }
+          setCreandoFactura(false);
+          return;
         }
       }
 
@@ -732,7 +756,7 @@ export default function TallerMecanico() {
       setVista('facturas');
     } catch (err) {
       console.error('[confirmarFactura] FAILED:', err);
-      setErrorBanner('No se pudo generar la factura. Verifica tu conexion e intenta de nuevo.');
+      setErrorBanner('No se pudo generar la factura. Verifica tu conexión e intenta de nuevo.');
     } finally {
       setCreandoFactura(false);
     }

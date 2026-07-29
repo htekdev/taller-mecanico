@@ -7,6 +7,7 @@ import { showPhaseLabel } from '../visual-assert';
  * Verifies: PDF upload field exists in the factura number modal,
  * Facturas section shows factura correctly,
  * CxC has no PDF file input.
+ * Also verifies error handling & rollback for invalid PDFs.
  */
 test.describe.configure({ retries: 1 });
 
@@ -131,3 +132,156 @@ test('change-proof: PDF upload in facturado modal, visible only in Facturas', as
   await showPhaseLabel(page, '✅ PR #185 verificado');
   await page.waitForTimeout(500);
 });
+
+test('error-handling: Non-PDF file rejection with rollback', async ({
+  page, loginPage, dashboardPage, trabajosPage,
+}) => {
+  test.slow();
+  const JOB_DESC = 'Prueba rechazo archivo no-PDF';
+
+  await showPhaseLabel(page, '→ Setup & create trabajo');
+  await loginPage.loginAsTestUser();
+  await dashboardPage.waitForPageLoad();
+  await dashboardPage.navigateToModule('trabajos');
+  await trabajosPage.waitForPageLoad();
+  await page.waitForTimeout(800);
+
+  // Find or create a trabajo
+  const pendienteBtn = page.getByRole('button', { name: /pendiente de facturar/i }).first();
+  if (await pendienteBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await pendienteBtn.click();
+  } else {
+    await trabajosPage.selectClient(1);
+    await page.waitForTimeout(500);
+    await trabajosPage.selectVehicle(1);
+    await trabajosPage.fillDescription(JOB_DESC);
+    await trabajosPage.addLaborItem('Chequeo', 200);
+    await trabajosPage.save();
+    await page.waitForTimeout(2000);
+    const trabajoRow = page.locator('tr').filter({ hasText: JOB_DESC }).first();
+    await trabajoRow.getByRole('button', { name: /finalizar/i }).click();
+    await page.waitForTimeout(1500);
+    const finalizarModal = page.locator('.fixed.inset-0').filter({ hasText: /Finalizar Trabajo/i }).first();
+    const facturaBtn = finalizarModal.getByRole('button', { name: /factura/i }).first();
+    if (await facturaBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await facturaBtn.click();
+      await page.waitForTimeout(1000);
+    }
+  }
+
+  await showPhaseLabel(page, '→ Attempt upload .txt file (non-PDF)');
+  const modal = page.locator('.fixed.inset-0').filter({ hasText: /Número de Factura/i }).first();
+  await expect(modal, 'Modal debe ser visible').toBeVisible({ timeout: 8_000 });
+
+  const numeroInput = modal.locator('input[type="text"]').first();
+  await numeroInput.fill(`ERR-${TestData.uniqueId().slice(-3)}`);
+  await page.waitForTimeout(300);
+
+  // Create a temporary .txt file to simulate non-PDF
+  const pdfInput = modal.locator('input[accept="application/pdf"]');
+  await pdfInput.setInputFiles({
+    name: 'not-a-pdf.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('This is not a PDF file'),
+  });
+  await page.waitForTimeout(500);
+
+  const crearBtn = modal.getByRole('button', { name: /crear factura/i });
+  await crearBtn.click();
+  await page.waitForTimeout(2500);
+
+  await showPhaseLabel(page, '→ Verify error message');
+  const errorBanner = page.locator('[role="alert"]');
+  await expect(errorBanner, 'Error banner debe aparecer').toBeVisible({ timeout: 8_000 });
+  const errorText = await errorBanner.textContent();
+  expect(errorText, 'Error debe mencionar tipo MIME incorrecto').toMatch(/tipo MIME|MIME incorrecto/i);
+
+  await showPhaseLabel(page, '→ Verify rollback (factura NOT in DB)');
+  await dashboardPage.navigateToModule('facturas');
+  await page.waitForTimeout(1500);
+  const numeroVal = numeroInput.inputValue();
+  const facturaNotFound = page.locator('.border-slate-200').filter({ hasText: new RegExp(await numeroVal, 'i') });
+  const facturaCount = await facturaNotFound.count();
+  expect(facturaCount, 'Factura debe ser eliminada (rollback)').toBe(0);
+
+  await showPhaseLabel(page, '✅ Non-PDF rejection & rollback verified');
+});
+
+test('error-handling: Corrupted PDF rejection with rollback', async ({
+  page, loginPage, dashboardPage, trabajosPage,
+}) => {
+  test.slow();
+  const JOB_DESC = 'Prueba rechazo PDF corrupto';
+
+  await showPhaseLabel(page, '→ Setup & create trabajo');
+  await loginPage.loginAsTestUser();
+  await dashboardPage.waitForPageLoad();
+  await dashboardPage.navigateToModule('trabajos');
+  await trabajosPage.waitForPageLoad();
+  await page.waitForTimeout(800);
+
+  // Find or create a trabajo
+  const pendienteBtn = page.getByRole('button', { name: /pendiente de facturar/i }).first();
+  if (await pendienteBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await pendienteBtn.click();
+  } else {
+    await trabajosPage.selectClient(1);
+    await page.waitForTimeout(500);
+    await trabajosPage.selectVehicle(1);
+    await trabajosPage.fillDescription(JOB_DESC);
+    await trabajosPage.addLaborItem('Chequeo', 250);
+    await trabajosPage.save();
+    await page.waitForTimeout(2000);
+    const trabajoRow = page.locator('tr').filter({ hasText: JOB_DESC }).first();
+    await trabajoRow.getByRole('button', { name: /finalizar/i }).click();
+    await page.waitForTimeout(1500);
+    const finalizarModal = page.locator('.fixed.inset-0').filter({ hasText: /Finalizar Trabajo/i }).first();
+    const facturaBtn = finalizarModal.getByRole('button', { name: /factura/i }).first();
+    if (await facturaBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await facturaBtn.click();
+      await page.waitForTimeout(1000);
+    }
+  }
+
+  await showPhaseLabel(page, '→ Attempt upload corrupted PDF (invalid magic number)');
+  const modal = page.locator('.fixed.inset-0').filter({ hasText: /Número de Factura/i }).first();
+  await expect(modal, 'Modal debe ser visible').toBeVisible({ timeout: 8_000 });
+
+  const numeroInput = modal.locator('input[type="text"]').first();
+  await numeroInput.fill(`CORRUPT-${TestData.uniqueId().slice(-2)}`);
+  await page.waitForTimeout(300);
+
+  // Create a fake PDF with wrong magic number
+  const pdfInput = modal.locator('input[accept="application/pdf"]');
+  const fakeBuffer = Buffer.concat([
+    Buffer.from('FAKE'), // Wrong magic number (should be %PDF)
+    Buffer.from('\n\n1 0 obj\n<< /Type /Catalog >>\nendobj'),
+  ]);
+  await pdfInput.setInputFiles({
+    name: 'corrupted.pdf',
+    mimeType: 'application/pdf',
+    buffer: fakeBuffer,
+  });
+  await page.waitForTimeout(500);
+
+  const crearBtn = modal.getByRole('button', { name: /crear factura/i });
+  await crearBtn.click();
+  await page.waitForTimeout(2500);
+
+  await showPhaseLabel(page, '→ Verify error message');
+  const errorBanner = page.locator('[role="alert"]');
+  await expect(errorBanner, 'Error banner debe aparecer').toBeVisible({ timeout: 8_000 });
+  const errorText = await errorBanner.textContent();
+  expect(errorText, 'Error debe mencionar archivo corrupto').toMatch(/corrupto|parece estar/i);
+
+  await showPhaseLabel(page, '→ Verify rollback (factura NOT in DB)');
+  await dashboardPage.navigateToModule('facturas');
+  await page.waitForTimeout(1500);
+  const numeroVal = await numeroInput.inputValue();
+  const facturaNotFound = page.locator('.border-slate-200').filter({ hasText: new RegExp(numeroVal, 'i') });
+  const facturaCount = await facturaNotFound.count();
+  expect(facturaCount, 'Factura debe ser eliminada (rollback)').toBe(0);
+
+  await showPhaseLabel(page, '✅ Corrupted PDF rejection & rollback verified');
+});
+

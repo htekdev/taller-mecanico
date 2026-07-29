@@ -850,6 +850,11 @@ export async function reactivarFactura(facturaId: string): Promise<void> {
   if (error) throw new Error(`reactivarFactura: ${error.message}`);
 }
 
+export async function deleteFactura(facturaId: string): Promise<void> {
+  const { error } = await supabase.from('facturas').delete().eq('id', facturaId);
+  if (error) throw new Error(`deleteFactura: ${error.message}`);
+}
+
 export async function cancelarNota(trabajoId: string): Promise<void> {
   const { error } = await supabase.from('trabajos').update({ folio_fiscal: '__CANCELADA__' }).eq('id', trabajoId);
   if (error) throw new Error(`cancelarNota: ${error.message}`);
