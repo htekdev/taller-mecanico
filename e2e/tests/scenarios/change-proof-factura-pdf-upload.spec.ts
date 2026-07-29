@@ -14,7 +14,7 @@ test('change-proof: PDF upload in facturado modal, visible only in Facturas', as
   page, loginPage, dashboardPage, trabajosPage,
 }) => {
   test.slow();
-  const JOB_DESC = 'Prueba PDF factura PR184v2 modal check';
+  const JOB_DESC = 'Prueba PDF factura PR185 modal check';
 
   await showPhaseLabel(page, '→ Login');
   await loginPage.loginAsTestUser();
@@ -128,6 +128,6 @@ test('change-proof: PDF upload in facturado modal, visible only in Facturas', as
   const cxcPdfInput = page.locator('input[accept="application/pdf"]');
   await expect(cxcPdfInput, 'CxC NO debe tener input PDF').not.toBeAttached();
 
-  await showPhaseLabel(page, '✅ PR #184v2 verificado');
+  await showPhaseLabel(page, '✅ PR #185 verificado');
   await page.waitForTimeout(500);
 });

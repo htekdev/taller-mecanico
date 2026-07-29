@@ -64,6 +64,7 @@ export default function TallerMecanico() {
     pdfFile?: File | null;
   } | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [creandoFactura, setCreandoFactura] = useState(false);
 
   // ── Cargar datos desde Supabase ──
   const cargarDatos = useCallback(async () => {
@@ -711,17 +712,19 @@ export default function TallerMecanico() {
   };
 
   const confirmarFactura = async () => {
-    if (!pendingFactura || !pendingFactura.numero.trim()) return;
+    if (!pendingFactura || !pendingFactura.numero.trim() || creandoFactura) return;
+    setCreandoFactura(true);
     try {
       await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
 
       if (pendingFactura.pdfFile && taller) {
         try {
-          const pdfUrl = await uploadFacturaPdf(taller.id, pendingFactura.trabajoId, pendingFactura.pdfFile);
-          await db.updateTrabajoFacturaPdf(taller.id, pendingFactura.trabajoId, pdfUrl);
-          setTrabajos(prev => prev.map(t => t.id === pendingFactura.trabajoId ? { ...t, facturaPdfUrl: pdfUrl } : t));
+          const pdfPath = await uploadFacturaPdf(taller.id, pendingFactura.trabajoId, pendingFactura.pdfFile);
+          await db.updateTrabajoFacturaPdf(taller.id, pendingFactura.trabajoId, pdfPath);
+          setTrabajos(prev => prev.map(t => t.id === pendingFactura.trabajoId ? { ...t, facturaPdfUrl: pdfPath } : t));
         } catch (pdfErr) {
           console.error('[confirmarFactura] PDF upload failed (non-fatal):', pdfErr);
+          setErrorBanner('La factura fue creada. El PDF no se pudo subir — verifica tu conexión e intenta de nuevo marcando el trabajo como Facturado otra vez.');
         }
       }
 
@@ -730,6 +733,8 @@ export default function TallerMecanico() {
     } catch (err) {
       console.error('[confirmarFactura] FAILED:', err);
       setErrorBanner('No se pudo generar la factura. Verifica tu conexion e intenta de nuevo.');
+    } finally {
+      setCreandoFactura(false);
     }
   };
   const registrarPagoFactura = async (facturaId: string, pago: Omit<PagoFactura, 'id'>) => {
@@ -1129,7 +1134,8 @@ export default function TallerMecanico() {
               onRegistrarPago={registrarPagoFactura} onEditarFechaFactura={editarFechaFactura}
               onEditarNumeroFactura={editarNumeroFactura}
               onEditarSubtotalFactura={editarSubtotalFactura}
-              onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura} />
+              onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura}
+              onError={setErrorBanner} />
           )}
           {vista === 'cuentas' && (
             <VistaCuentas facturas={facturas} trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
@@ -1242,6 +1248,10 @@ export default function TallerMecanico() {
                   className="sr-only"
                   onChange={e => {
                     const file = e.target.files?.[0] ?? null;
+                    if (file && file.size > 10 * 1024 * 1024) {
+                      setErrorBanner('El PDF no puede exceder 10 MB.');
+                      return;
+                    }
                     setPendingFactura(prev => prev ? { ...prev, pdfFile: file } : null);
                   }}
                 />
@@ -1269,9 +1279,9 @@ export default function TallerMecanico() {
               </button>
               <button
                 onClick={confirmarFactura}
-                disabled={!pendingFactura.numero.trim() || !pendingFactura.fecha}
+                disabled={!pendingFactura.numero.trim() || !pendingFactura.fecha || creandoFactura}
                 className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                ✓ Crear Factura
+                {creandoFactura ? 'Creando...' : '✓ Crear Factura'}
               </button>
             </div>
           </div>

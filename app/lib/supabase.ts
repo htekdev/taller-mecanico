@@ -145,9 +145,10 @@ export interface FacturaRow {
 
 // ── Supabase Storage: Invoice PDF upload ──────────────────────────────────────
 /**
- * Upload an invoice PDF to Supabase Storage.
- * Path: facturas/{tallerId}/{trabajoId}/factura.pdf
- * Returns the public URL on success, throws on error.
+ * Upload an invoice PDF to Supabase Storage (private bucket).
+ * Path: {tallerId}/{trabajoId}/factura.pdf
+ * Returns the storage PATH (not a public URL) — callers must use
+ * createFacturaPdfSignedUrl() to generate a 1-hour signed URL for display.
  */
 export async function uploadFacturaPdf(
   tallerId: string,
@@ -159,6 +160,19 @@ export async function uploadFacturaPdf(
     .from('facturas')
     .upload(path, file, { contentType: 'application/pdf', upsert: true });
   if (error) throw new Error(`uploadFacturaPdf: ${error.message}`);
-  const { data } = supabase.storage.from('facturas').getPublicUrl(path);
-  return data.publicUrl;
+  // Return the storage path — the bucket is private; use createFacturaPdfSignedUrl() to view
+  return path;
+}
+
+/**
+ * Generate a 1-hour signed URL for viewing a factura PDF.
+ * @param storagePath  The path returned by uploadFacturaPdf (e.g. tallerId/trabajoId/factura.pdf)
+ * @returns Signed URL string, or throws on error.
+ */
+export async function createFacturaPdfSignedUrl(storagePath: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('facturas')
+    .createSignedUrl(storagePath, 3600); // 1-hour expiry
+  if (error || !data?.signedUrl) throw new Error(`createFacturaPdfSignedUrl: ${error?.message ?? 'no signed URL returned'}`);
+  return data.signedUrl;
 }

@@ -1,9 +1,10 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import type { Factura, Cliente, Vehiculo, Trabajo, PagoFactura } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { fmt, getEstadoPagoFactura, getMontoPagadoFactura, getSaldoFactura, BADGE_ESTADO, formatearFecha, getHoy } from '@/app/lib/utils';
+import { createFacturaPdfSignedUrl } from '@/app/lib/supabase';
 
 // ─── Meses en español ──────────────────────────────────────────────────────
 const MESES_ES = [
@@ -22,6 +23,7 @@ export function VistaFacturas({
   onEditarSubtotalFactura,
   onCancelarFactura,
   onReactivarFactura,
+  onError,
 }: {
   facturas: Factura[];
   clientes: Cliente[];
@@ -33,6 +35,7 @@ export function VistaFacturas({
   onEditarSubtotalFactura: (facturaId: string, subtotal: number, incluirIva: boolean, nuevoNumero: string) => void;
   onCancelarFactura: (facturaId: string) => void;
   onReactivarFactura: (facturaId: string) => void;
+  onError?: (msg: string) => void;
 }) {
   const hoy = getHoy();
 
@@ -56,6 +59,7 @@ export function VistaFacturas({
   const [nuevoNumeroAjuste, setNuevoNumeroAjuste] = useState('');
   const [verCanceladas, setVerCanceladas] = useState(false);
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
+  const [loadingPdfId, setLoadingPdfId] = useState<string | null>(null);
   const [mostrarDesglose, setMostrarDesglose] = useState(false);
 
   const facturasCanceladas = facturas.filter(f => f.notas === 'CANCELADA');
@@ -323,16 +327,34 @@ export function VistaFacturas({
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
                       {(() => {
                         const trab = trabajos.find(t => t.id === factura.trabajoId);
-                        return trab?.facturaPdfUrl ? (
-                          <a
-                            href={trab.facturaPdfUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs font-semibold bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition-colors border border-blue-200 no-underline flex items-center gap-1 whitespace-nowrap"
+                        if (!trab?.facturaPdfUrl) return null;
+                        const pdfPath = trab.facturaPdfUrl;
+                        const isLoading = loadingPdfId === factura.id;
+                        return (
+                          <button
+                            type="button"
+                            aria-label="Ver PDF de la factura"
+                            disabled={isLoading}
+                            onClick={async () => {
+                              try {
+                                setLoadingPdfId(factura.id);
+                                const signedUrl = await createFacturaPdfSignedUrl(pdfPath);
+                                window.open(signedUrl, '_blank', 'noopener,noreferrer');
+                              } catch {
+                                onError?.('No se pudo abrir el PDF. Verifica tu conexión e intenta de nuevo.');
+                              } finally {
+                                setLoadingPdfId(null);
+                              }
+                            }}
+                            className={`text-xs font-semibold px-3 py-2.5 min-h-[44px] rounded-lg transition-colors border flex items-center gap-1 whitespace-nowrap cursor-pointer ${
+                              isLoading
+                                ? 'bg-slate-200 text-slate-600 border-slate-300 cursor-wait'
+                                : 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200'
+                            }`}
                           >
-                            📄 Ver PDF
-                          </a>
-                        ) : null;
+                            {isLoading ? '⏳ Abriendo...' : '📄 Ver PDF'}
+                          </button>
+                        );
                       })()}
                     </div>
                     <div className="text-xs text-slate-500 mt-0.5 flex gap-2 flex-wrap">
