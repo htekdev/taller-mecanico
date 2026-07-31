@@ -678,7 +678,7 @@ export default function TallerMecanico() {
 
   const refacturarTrabajo = async (trabajoId: string) => {
     try {
-      await db.resetFacturacionTrabajo(trabajoId);
+      await db.resetFacturacionTrabajo(trabajoId, taller.id);
       setTrabajos(prev => prev.map(t =>
         t.id === trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
       ));
@@ -728,12 +728,14 @@ export default function TallerMecanico() {
           // PDF upload failed — rollback the factura record
           console.error('[confirmarFactura] PDF upload failed — rolling back factura:', pdfErr);
           try {
-            await db.deleteFactura(facturaId);
-            // Remove the factura from UI and revert trabajo state
+            await db.deleteFactura(facturaId, taller.id);
+            // Remove the factura from UI and revert trabajo state ONLY after DB succeeds
             setFacturas(prev => prev.filter(f => f.id !== facturaId));
             setTrabajos(prev => prev.map(t => t.id === pendingFactura.trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: undefined } : t));
           } catch (rollbackErr) {
             console.error('[confirmarFactura] Rollback failed:', rollbackErr);
+            // Re-throw to outer catch for proper user notification
+            throw rollbackErr;
           }
           
           // Specific error messages based on failure type

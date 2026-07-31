@@ -202,6 +202,7 @@ describe('resetFacturacionTrabajo', () => {
     expect(update).toHaveBeenCalledWith({
       factura_id: null,
       estado_facturacion: 'sin_facturar',
+      factura_pdf_url: null,
     });
   });
 

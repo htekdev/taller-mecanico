@@ -443,8 +443,9 @@ export async function updateTrabajoFacturaPdf(tallerId: string, trabajoId: strin
 }
 
 /** Reset facturación — allows re-invoicing after a factura was cancelled */
-export async function resetFacturacionTrabajo(trabajoId: string): Promise<void> {
-  const { error } = await supabase.from('trabajos').update({ factura_id: null, estado_facturacion: 'sin_facturar', factura_pdf_url: null }).eq('id', trabajoId);
+export async function resetFacturacionTrabajo(trabajoId: string, tallerId: string): Promise<void> {
+  const { error } = await supabase.from('trabajos').update({ factura_id: null, estado_facturacion: 'sin_facturar', factura_pdf_url: null }).eq('id', trabajoId)
+    .eq('taller_id', tallerId);
   if (error) throw new Error(`resetFacturacionTrabajo: ${error.message}`);
 }
 
@@ -850,15 +851,24 @@ export async function reactivarFactura(facturaId: string): Promise<void> {
   if (error) throw new Error(`reactivarFactura: ${error.message}`);
 }
 
-export async function deleteFactura(facturaId: string): Promise<void> {
-  // First, revert all trabajos linked to this factura to 'sin_facturar' state
+export async function deleteFactura(facturaId: string, tallerId: string): Promise<void> {
+  // First, verify factura exists and belongs to this taller (security check)
+  const { data: factura, error: fetchError } = await supabase.from('facturas')
+    .select('*')
+    .eq('id', facturaId)
+    .eq('taller_id', tallerId)
+    .single();
+  if (fetchError || !factura) throw new Error(`deleteFactura: Factura not found or unauthorized`);
+
+  // Then, revert all trabajos linked to this factura to 'sin_facturar' state
   const { error: updateError } = await supabase.from('trabajos')
     .update({ factura_id: null, estado_facturacion: 'sin_facturar', factura_pdf_url: null })
-    .eq('factura_id', facturaId);
+    .eq('factura_id', facturaId)
+    .eq('taller_id', tallerId);
   if (updateError) throw new Error(`deleteFactura (update trabajos): ${updateError.message}`);
 
   // Then delete the factura itself
-  const { error } = await supabase.from('facturas').delete().eq('id', facturaId);
+  const { error } = await supabase.from('facturas').delete().eq('id', facturaId).eq('taller_id', tallerId);
   if (error) throw new Error(`deleteFactura: ${error.message}`);
 }
 
