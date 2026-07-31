@@ -745,7 +745,7 @@ export default function TallerMecanico() {
             setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
           } else if (errorMsg.includes('size') || errorMsg.includes('10mb')) {
             setErrorBanner('El PDF no puede exceder 10 MB.');
-          } else if (errorMsg.includes('corrupted') || errorMsg.includes('magic') || errorMsg.includes('header')) {
+          } else if (errorMsg.includes('corrupted') || errorMsg.includes('magic') || errorMsg.includes('header') || errorMsg.includes('encabezado')) {
             setErrorBanner('El archivo parece estar corrupto. Intenta con otro PDF.');
           } else {
             setErrorBanner('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.');

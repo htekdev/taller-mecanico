@@ -204,11 +204,13 @@ test('error-handling: Non-PDF file rejection with rollback', async ({
   const errorText = await errorBanner.textContent();
   expect(errorText, 'Error debe mencionar tipo MIME incorrecto').toMatch(/tipo MIME|MIME incorrecto/i);
 
+  // Capture numero BEFORE navigating — modal closes on navigation and locator becomes stale
+  const numeroVal = await numeroInput.inputValue();
+
   await showPhaseLabel(page, '→ Verify rollback (factura NOT in DB)');
   await dashboardPage.navigateToModule('facturas');
   await page.waitForTimeout(1500);
-  const numeroVal = numeroInput.inputValue();
-  const facturaNotFound = page.locator('.border-slate-200').filter({ hasText: new RegExp(await numeroVal, 'i') });
+  const facturaNotFound = page.locator('.border-slate-200').filter({ hasText: new RegExp(numeroVal, 'i') });
   const facturaCount = await facturaNotFound.count();
   expect(facturaCount, 'Factura debe ser eliminada (rollback)').toBe(0);
 
