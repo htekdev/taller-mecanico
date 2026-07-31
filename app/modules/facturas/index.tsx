@@ -56,6 +56,7 @@ export function VistaFacturas({
   const [nuevoNumeroAjuste, setNuevoNumeroAjuste] = useState('');
   const [verCanceladas, setVerCanceladas] = useState(false);
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
+  const [mostrarDesglose, setMostrarDesglose] = useState(false);
 
   const facturasCanceladas = facturas.filter(f => f.notas === 'CANCELADA');
   const facturasActivas = facturas.filter(f => f.notas !== 'CANCELADA');
@@ -181,36 +182,48 @@ export function VistaFacturas({
           </div>
         </div>
 
-        {/* Desglose de facturas del mes */}
+        {/* Desglose de facturas del mes — colapsable */}
         {countFacturasMes > 0 && (
           <div className="mt-4">
-            <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">
-              Facturas del mes
-            </p>
-            <div className="space-y-1.5">
-              {facturasFormalesDelMes
-                .sort((a, b) => b.fecha.localeCompare(a.fecha))
-                .map(f => {
-                  const cli = clientes.find(c => c.id === f.clienteId);
-                  return (
-                    <div
-                      key={f.id}
-                      className="flex items-center justify-between bg-white border border-emerald-100 rounded-lg px-4 py-2 text-sm"
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                          {f.numeroFactura}
+            <button
+              onClick={() => setMostrarDesglose(v => !v)}
+              className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 uppercase tracking-wider hover:text-emerald-900 transition-colors"
+              aria-expanded={mostrarDesglose}
+              aria-controls="desglose-facturas"
+            >
+              <span
+                className={`inline-block transition-transform duration-200 ${mostrarDesglose ? 'rotate-90' : ''}`}
+              >
+                ▶
+              </span>
+              {mostrarDesglose ? 'Ocultar desglose' : 'Ver desglose'}
+            </button>
+            {mostrarDesglose && (
+              <div id="desglose-facturas" className="space-y-1.5 mt-2" data-testid="desglose-facturas">
+                {facturasFormalesDelMes
+                  .sort((a, b) => b.fecha.localeCompare(a.fecha))
+                  .map(f => {
+                    const cli = clientes.find(c => c.id === f.clienteId);
+                    return (
+                      <div
+                        key={f.id}
+                        className="flex items-center justify-between bg-white border border-emerald-100 rounded-lg px-4 py-2 text-sm"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                            {f.numeroFactura}
+                          </span>
+                          <span className="font-medium text-slate-700">{cli?.nombre ?? '—'}</span>
+                          <span className="text-xs text-slate-400">{formatearFecha(f.fecha)}</span>
+                        </div>
+                        <span className="font-bold text-emerald-700 whitespace-nowrap">
+                          ${fmt(f.total)}
                         </span>
-                        <span className="font-medium text-slate-700">{cli?.nombre ?? '—'}</span>
-                        <span className="text-xs text-slate-400">{formatearFecha(f.fecha)}</span>
                       </div>
-                      <span className="font-bold text-emerald-700 whitespace-nowrap">
-                        ${fmt(f.total)}
-                      </span>
-                    </div>
-                  );
-                })}
-            </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         )}
 
