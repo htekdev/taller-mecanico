@@ -5,6 +5,12 @@ import type { Factura, Cliente, Vehiculo, Trabajo, PagoFactura } from '@/app/typ
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { fmt, getEstadoPagoFactura, getMontoPagadoFactura, getSaldoFactura, BADGE_ESTADO, formatearFecha, getHoy } from '@/app/lib/utils';
 
+// ─── Meses en español ──────────────────────────────────────────────────────
+const MESES_ES = [
+  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
+];
+
 export function VistaFacturas({
   facturas,
   clientes,
@@ -29,6 +35,12 @@ export function VistaFacturas({
   onReactivarFactura: (facturaId: string) => void;
 }) {
   const hoy = getHoy();
+
+  // ── Resumen Mensual ────────────────────────────────────────────────────────
+  const hoyDate = new Date();
+  const [mesResumen, setMesResumen] = useState<number>(hoyDate.getMonth() + 1); // 1–12
+  const [anioResumen, setAnioResumen] = useState<number>(hoyDate.getFullYear());
+
   const [expandido, setExpandido] = useState<string | null>(null);
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
@@ -47,6 +59,18 @@ export function VistaFacturas({
 
   const facturasCanceladas = facturas.filter(f => f.notas === 'CANCELADA');
   const facturasActivas = facturas.filter(f => f.notas !== 'CANCELADA');
+
+  // ── Resumen Mensual: solo facturas formales (con IVA), no notas ────────────
+  const mesPrefijo = `${anioResumen}-${String(mesResumen).padStart(2, '0')}`;
+  const facturasFormalesDelMes = facturasActivas.filter(f =>
+    (f.iva ?? 0) > 0 && f.fecha.startsWith(mesPrefijo)
+  );
+  const totalFacturadoMes = facturasFormalesDelMes.reduce((s, f) => s + f.total, 0);
+  const countFacturasMes = facturasFormalesDelMes.length;
+
+  // Year range for selector: from 2024 up to next year
+  const anioMin = 2024;
+  const anioMax = hoyDate.getFullYear() + 1;
 
   const facturasFiltradas = [...facturasActivas]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
@@ -71,6 +95,131 @@ export function VistaFacturas({
   return (
     <div>
       <SectionTitle title="Facturas" subtitle="Facturas generadas desde trabajos. Aquí se registran los pagos de clientes." />
+
+      {/* ── Resumen Mensual de Facturación ───────────────────────────────────── */}
+      <section
+        aria-label="Resumen mensual de facturación"
+        data-testid="resumen-mensual"
+        className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl px-5 py-5 mb-6"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-2xl">📊</span>
+          <h2 className="text-base font-bold text-emerald-800 uppercase tracking-wide">
+            Resumen Mensual de Facturación
+          </h2>
+          <span className="text-xs text-emerald-600 font-medium bg-emerald-100 px-2 py-0.5 rounded-full">
+            Solo facturas con IVA
+          </span>
+        </div>
+
+        {/* Selectores de mes y año */}
+        <div className="flex flex-wrap gap-3 mb-5 items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
+              Mes
+            </label>
+            <select
+              aria-label="Seleccionar mes"
+              value={mesResumen}
+              onChange={e => setMesResumen(Number(e.target.value))}
+              className="border border-emerald-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-w-[130px]"
+            >
+              {MESES_ES.map((nombre, i) => (
+                <option key={i + 1} value={i + 1}>{nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
+              Año
+            </label>
+            <select
+              aria-label="Seleccionar año"
+              value={anioResumen}
+              onChange={e => setAnioResumen(Number(e.target.value))}
+              className="border border-emerald-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-w-[90px]"
+            >
+              {Array.from({ length: anioMax - anioMin + 1 }, (_, i) => anioMin + i).map(a => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Tarjetas de resumen */}
+        <div className="flex flex-wrap gap-4">
+          {/* Total Facturado */}
+          <div className="flex-1 min-w-[200px] bg-white border border-emerald-200 rounded-xl px-5 py-4 shadow-sm">
+            <div className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">
+              Total Facturado
+            </div>
+            <div
+              data-testid="total-facturado-mes"
+              className="text-3xl font-extrabold text-emerald-700"
+            >
+              ${fmt(totalFacturadoMes)}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              {MESES_ES[mesResumen - 1]} {anioResumen}
+            </div>
+          </div>
+
+          {/* Número de facturas */}
+          <div className="bg-white border border-emerald-200 rounded-xl px-5 py-4 shadow-sm min-w-[140px]">
+            <div className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">
+              Facturas Emitidas
+            </div>
+            <div
+              data-testid="count-facturas-mes"
+              className="text-3xl font-extrabold text-slate-700"
+            >
+              {countFacturasMes}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              {countFacturasMes === 1 ? 'factura formal' : 'facturas formales'}
+            </div>
+          </div>
+        </div>
+
+        {/* Desglose de facturas del mes */}
+        {countFacturasMes > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">
+              Facturas del mes
+            </p>
+            <div className="space-y-1.5">
+              {facturasFormalesDelMes
+                .sort((a, b) => b.fecha.localeCompare(a.fecha))
+                .map(f => {
+                  const cli = clientes.find(c => c.id === f.clienteId);
+                  return (
+                    <div
+                      key={f.id}
+                      className="flex items-center justify-between bg-white border border-emerald-100 rounded-lg px-4 py-2 text-sm"
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                          {f.numeroFactura}
+                        </span>
+                        <span className="font-medium text-slate-700">{cli?.nombre ?? '—'}</span>
+                        <span className="text-xs text-slate-400">{formatearFecha(f.fecha)}</span>
+                      </div>
+                      <span className="font-bold text-emerald-700 whitespace-nowrap">
+                        ${fmt(f.total)}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {countFacturasMes === 0 && (
+          <p className="text-sm text-emerald-600 mt-3 italic">
+            No hay facturas formales (con IVA) en {MESES_ES[mesResumen - 1]} {anioResumen}.
+          </p>
+        )}
+      </section>
 
       {/* Banner: trabajos pendientes de facturar */}
       {trabajosPendientesFacturar > 0 && (
