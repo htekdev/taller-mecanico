@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import type { OrdenCompra, Proveedor, Refaccion, CompraItem, ItemCompatibilidad } from '@/app/types';
+import type { OrdenCompra, Proveedor, Refaccion, CompraItem } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { fmt, BADGE_ORDEN, formatearFecha, getHoy } from '@/app/lib/utils';
+import { BuscadorInventarioOC } from './BuscadorInventarioOC';
 
 // ── Modal de edición de OC ────────────────────────────────────────────────────
 function ModalEditarOrden({
@@ -21,14 +22,13 @@ function ModalEditarOrden({
   const [numOrden, setNumOrden] = useState(orden.numeroOrden ?? '');
   const [conIVA, setConIVA] = useState(orden.conIVA);
   const [items, setItems] = useState<CompraItem[]>(orden.partes ?? []);
-  const [pickerRefId, setPickerRefId] = useState('');
-  const [pickerCantidad, setPickerCantidad] = useState(1);
-  const [pickerPrecio, setPickerPrecio] = useState(0);
   const [guardando, setGuardando] = useState(false);
   // Modo agregar: collapsed by default, expanded when user taps "+ Agregar refacción"
   const [mostrarAgregar, setMostrarAgregar] = useState(false);
   // Modo de agregar: del inventario o libre (nombre libre)
   const [modoAgregarModal, setModoAgregarModal] = useState<'existente' | 'libre'>('existente');
+  // Buscador de inventario (modal OC edit)
+  const [buscadorAbiertoModal, setBuscadorAbiertoModal] = useState(false);
   // Campos para pieza libre
   const [newLibreNombre, setNewLibreNombre] = useState('');
   const [newLibreCantidad, setNewLibreCantidad] = useState(1);
@@ -52,15 +52,18 @@ function ModalEditarOrden({
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, nombre } : it));
   };
 
-  const agregarItem = () => {
-    const ref = inventario.find(r => r.id === pickerRefId);
-    if (!ref || pickerCantidad <= 0 || pickerPrecio <= 0) return;
-    const subtotal = pickerCantidad * pickerPrecio;
-    setItems(prev => [...prev, {
-      refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad,
-      precioCompra: pickerPrecio, subtotal, compatibilidad: [],
-    }]);
-    setPickerRefId(''); setPickerCantidad(1); setPickerPrecio(0);
+  // Callback from BuscadorInventarioOC — add item directly from buscador
+  const agregarDesdeInventarioModal = (refId: string, cant: number, precio: number) => {
+    const ref = inventario.find(r => r.id === refId);
+    if (!ref || cant <= 0 || precio <= 0) return;
+    setItems(prev => {
+      const ex = prev.find(i => i.refaccionId === refId);
+      if (ex) {
+        const nc = ex.cantidad + cant;
+        return prev.map(i => i.refaccionId === refId ? { ...i, cantidad: nc, subtotal: nc * i.precioCompra } : i);
+      }
+      return [...prev, { refaccionId: refId, nombre: ref.nombre, cantidad: cant, precioCompra: precio, subtotal: cant * precio, compatibilidad: [] }];
+    });
   };
 
   const agregarLibre = () => {
@@ -243,24 +246,25 @@ function ModalEditarOrden({
 
             {modoAgregarModal === 'existente' && (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                  <div className="sm:col-span-2">
-                    <Label>Pieza</Label>
-                    <Select value={pickerRefId} onChange={e => {
-                      setPickerRefId(e.target.value);
-                      const r = inventario.find(x => x.id === e.target.value);
-                      if (r) setPickerPrecio(r.precioCompra);
-                    }}>
-                      <option value="">Seleccionar pieza...</option>
-                      {inventario.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.codigo})</option>)}
-                    </Select>
-                  </div>
-                  <div><Label>Cantidad</Label><Input type="number" min="1" step="1" value={pickerCantidad} onChange={e => setPickerCantidad(Number(e.target.value))} /></div>
-                  <div><Label>Precio ($)</Label><Input type="number" min="0" step="0.01" value={pickerPrecio || ''} onChange={e => setPickerPrecio(Number(e.target.value))} /></div>
-                </div>
-                <div className="mt-3 flex justify-end">
-                  <Btn type="button" size="sm" variant="ghost" onClick={() => { agregarItem(); setMostrarAgregar(false); }} disabled={!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0}>+ Agregar pieza</Btn>
-                </div>
+                {/* Buscador full-screen — replaces the old Select dropdown */}
+                {buscadorAbiertoModal && (
+                  <BuscadorInventarioOC
+                    inventario={inventario}
+                    onAgregar={(refId, cant, precio) => {
+                      agregarDesdeInventarioModal(refId, cant, precio);
+                    }}
+                    onCerrar={() => setBuscadorAbiertoModal(false)}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => setBuscadorAbiertoModal(true)}
+                  className="w-full flex items-center justify-center gap-2 border border-slate-300 bg-white hover:border-indigo-400 hover:bg-indigo-50 rounded-xl py-3 text-sm text-slate-600 hover:text-indigo-700 font-medium transition-colors"
+                >
+                  <span>🔍</span>
+                  <span>Buscar en inventario</span>
+                  <span className="text-xs text-slate-400">({inventario.length} piezas)</span>
+                </button>
               </>
             )}
 
@@ -349,10 +353,8 @@ export function VistaOrdenesCompra({
   // ── Modo agregar pieza ────────────────────────────────────────────────────────
   const [modoAgregar, setModoAgregar] = useState<'existente' | 'nueva'>('existente');
 
-  // Pieza existente
-  const [pickerRefId, setPickerRefId] = useState('');
-  const [pickerCantidad, setPickerCantidad] = useState(1);
-  const [pickerPrecio, setPickerPrecio] = useState(0);
+  // Buscador de inventario para nueva OC
+  const [buscadorAbierto, setBuscadorAbierto] = useState(false);
 
   // Nueva refacción
   const [newNombre, setNewNombre]         = useState('');
@@ -374,7 +376,6 @@ export function VistaOrdenesCompra({
   const subtotalPiezas = itemsOrden.reduce((s, i) => s + i.subtotal, 0);
   const ivaCalculado   = formConIVA ? Math.round(subtotalPiezas * 0.16 * 100) / 100 : 0;
   const totalOrden     = subtotalPiezas + ivaCalculado;
-  const pickerRef      = inventario.find(r => r.id === pickerRefId);
 
   // ── Compatibilidad helpers ────────────────────────────────────────────────────
   const agregarVehiculo = (refaccionId: string) => {
@@ -396,17 +397,18 @@ export function VistaOrdenesCompra({
     ));
   };
 
-  // ── Agregar pieza existente ───────────────────────────────────────────────
-  const agregarItem = () => {
-    if (!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0) return;
-    const ref = inventario.find(r => r.id === pickerRefId);
-    if (!ref) return;
+  // Callback from BuscadorInventarioOC — add item directly
+  const agregarDesdeInventario = (refId: string, cant: number, precio: number) => {
+    const ref = inventario.find(r => r.id === refId);
+    if (!ref || cant <= 0 || precio <= 0) return;
     setItemsOrden(prev => {
-      const ex = prev.find(i => i.refaccionId === ref.id);
-      if (ex) { const nc = ex.cantidad + pickerCantidad; return prev.map(i => i.refaccionId === ref.id ? { ...i, cantidad: nc, subtotal: nc * i.precioCompra } : i); }
-      return [...prev, { refaccionId: ref.id, nombre: ref.nombre, cantidad: pickerCantidad, precioCompra: pickerPrecio, subtotal: pickerCantidad * pickerPrecio, compatibilidad: [] }];
+      const ex = prev.find(i => i.refaccionId === refId);
+      if (ex) {
+        const nc = ex.cantidad + cant;
+        return prev.map(i => i.refaccionId === refId ? { ...i, cantidad: nc, subtotal: nc * i.precioCompra } : i);
+      }
+      return [...prev, { refaccionId: refId, nombre: ref.nombre, cantidad: cant, precioCompra: precio, subtotal: cant * precio, compatibilidad: [] }];
     });
-    setPickerRefId(''); setPickerCantidad(1); setPickerPrecio(0);
   };
 
   // ── Agregar nueva refacción al catálogo + orden ───────────────────────────
@@ -569,21 +571,23 @@ export function VistaOrdenesCompra({
                 {/* ── Modo: Pieza existente ── */}
                 {modoAgregar === 'existente' && (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                      <div className="sm:col-span-2"><Label>Refacción</Label>
-                        <Select value={pickerRefId} onChange={e => { setPickerRefId(e.target.value); const r = inventario.find(x => x.id === e.target.value); setPickerPrecio(r?.precioCompra ?? 0); }}>
-                          <option value="">Seleccionar pieza...</option>
-                          {inventario.map(r => <option key={r.id} value={r.id}>{r.nombre}{r.codigo ? ` (${r.codigo})` : ''}</option>)}
-                        </Select></div>
-                      <div><Label>Cantidad</Label>
-                        <Input type="number" min="1" step="1" placeholder="1" value={pickerCantidad || ''} onChange={e => setPickerCantidad(Number(e.target.value))} /></div>
-                      <div><Label>Precio compra ($)</Label>
-                        <Input type="number" min="0.01" step="0.01" placeholder="0.00" value={pickerPrecio || ''} onChange={e => setPickerPrecio(Number(e.target.value))} /></div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      {pickerRef && pickerPrecio > 0 && <span className="text-xs text-slate-500">Subtotal: <strong>${fmt(pickerPrecio * pickerCantidad)}</strong></span>}
-                      <Btn variant="primary" size="sm" disabled={!pickerRefId || pickerCantidad <= 0 || pickerPrecio <= 0} onClick={agregarItem}>+ Agregar</Btn>
-                    </div>
+                    {/* BuscadorInventarioOC — full-screen modal overlay */}
+                    {buscadorAbierto && (
+                      <BuscadorInventarioOC
+                        inventario={inventario}
+                        onAgregar={agregarDesdeInventario}
+                        onCerrar={() => setBuscadorAbierto(false)}
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setBuscadorAbierto(true)}
+                      className="w-full flex items-center justify-center gap-2 border border-slate-300 bg-white hover:border-indigo-400 hover:bg-indigo-50 rounded-xl py-3 text-sm text-slate-600 hover:text-indigo-700 font-medium transition-colors"
+                    >
+                      <span>🔍</span>
+                      <span>Buscar en inventario</span>
+                      <span className="text-xs text-slate-400">({inventario.length} piezas)</span>
+                    </button>
                   </>
                 )}
 
