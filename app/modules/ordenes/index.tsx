@@ -60,7 +60,7 @@ function ModalEditarOrden({
       const ex = prev.find(i => i.refaccionId === refId);
       if (ex) {
         const nc = ex.cantidad + cant;
-        return prev.map(i => i.refaccionId === refId ? { ...i, cantidad: nc, subtotal: nc * i.precioCompra } : i);
+        return prev.map(i => i.refaccionId === refId ? { ...i, cantidad: nc, precioCompra: precio, subtotal: nc * precio } : i);
       }
       return [...prev, { refaccionId: refId, nombre: ref.nombre, cantidad: cant, precioCompra: precio, subtotal: cant * precio, compatibilidad: [] }];
     });
@@ -405,7 +405,7 @@ export function VistaOrdenesCompra({
       const ex = prev.find(i => i.refaccionId === refId);
       if (ex) {
         const nc = ex.cantidad + cant;
-        return prev.map(i => i.refaccionId === refId ? { ...i, cantidad: nc, subtotal: nc * i.precioCompra } : i);
+        return prev.map(i => i.refaccionId === refId ? { ...i, cantidad: nc, precioCompra: precio, subtotal: nc * precio } : i);
       }
       return [...prev, { refaccionId: refId, nombre: ref.nombre, cantidad: cant, precioCompra: precio, subtotal: cant * precio, compatibilidad: [] }];
     });
