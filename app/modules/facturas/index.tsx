@@ -1,4 +1,4 @@
-﻿'use client';
+﻿﻿'use client';
 
 import { useState } from 'react';
 import type { Factura, Cliente, Vehiculo, Trabajo, PagoFactura } from '@/app/types';

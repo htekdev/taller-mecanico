@@ -48,3 +48,5 @@ e2e/results/
 playwright-report/
 playwright-report/data/
 test-results/
+test-results-*.json
+test-results.txt

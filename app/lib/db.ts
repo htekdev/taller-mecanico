@@ -444,7 +444,7 @@ export async function updateTrabajoFacturaPdf(tallerId: string, trabajoId: strin
 
 /** Reset facturación — allows re-invoicing after a factura was cancelled */
 export async function resetFacturacionTrabajo(trabajoId: string): Promise<void> {
-  const { error } = await supabase.from('trabajos').update({ factura_id: null, estado_facturacion: 'sin_facturar' }).eq('id', trabajoId);
+  const { error } = await supabase.from('trabajos').update({ factura_id: null, estado_facturacion: 'sin_facturar', factura_pdf_url: null }).eq('id', trabajoId);
   if (error) throw new Error(`resetFacturacionTrabajo: ${error.message}`);
 }
 
@@ -851,6 +851,13 @@ export async function reactivarFactura(facturaId: string): Promise<void> {
 }
 
 export async function deleteFactura(facturaId: string): Promise<void> {
+  // First, revert all trabajos linked to this factura to 'sin_facturar' state
+  const { error: updateError } = await supabase.from('trabajos')
+    .update({ factura_id: null, estado_facturacion: 'sin_facturar', factura_pdf_url: null })
+    .eq('factura_id', facturaId);
+  if (updateError) throw new Error(`deleteFactura (update trabajos): ${updateError.message}`);
+
+  // Then delete the factura itself
   const { error } = await supabase.from('facturas').delete().eq('id', facturaId);
   if (error) throw new Error(`deleteFactura: ${error.message}`);
 }
