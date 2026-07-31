@@ -725,7 +725,7 @@ export default function TallerMecanico() {
           const pdfPath = await uploadFacturaPdf(taller.id, pendingFactura.trabajoId, pendingFactura.pdfFile);
           await db.updateTrabajoFacturaPdf(taller.id, pendingFactura.trabajoId, pdfPath);
           setTrabajos(prev => prev.map(t => t.id === pendingFactura.trabajoId ? { ...t, facturaPdfUrl: pdfPath } : t));
-        } catch (pdfErr: any) {
+        } catch (pdfErr: unknown) {
           // PDF upload failed — rollback the factura record
           console.error('[confirmarFactura] PDF upload failed — rolling back factura:', pdfErr);
           try {

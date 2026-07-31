@@ -191,7 +191,7 @@ test('error-handling: Non-PDF file rejection with rollback', async ({
   await page.waitForTimeout(2500);
 
   await showPhaseLabel(page, '→ Verify error message');
-  const errorBanner = page.locator('[role="alert"]');
+  const errorBanner = page.locator('[role="alert"]:not(#__next-route-announcer__)');
   await expect(errorBanner, 'Error banner debe aparecer').toBeVisible({ timeout: 8_000 });
   const errorText = await errorBanner.textContent();
   expect(errorText, 'Error debe mencionar tipo MIME incorrecto').toMatch(/tipo MIME|MIME incorrecto/i);
@@ -269,7 +269,7 @@ test('error-handling: Corrupted PDF rejection with rollback', async ({
   await page.waitForTimeout(2500);
 
   await showPhaseLabel(page, '→ Verify error message');
-  const errorBanner = page.locator('[role="alert"]');
+  const errorBanner = page.locator('[role="alert"]:not(#__next-route-announcer__)');
   await expect(errorBanner, 'Error banner debe aparecer').toBeVisible({ timeout: 8_000 });
   const errorText = await errorBanner.textContent();
   expect(errorText, 'Error debe mencionar archivo corrupto').toMatch(/corrupto|parece estar/i);
