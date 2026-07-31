@@ -63,19 +63,18 @@ export function BuscadorInventarioOC({ inventario, onAgregar, onCerrar }: Props)
     setCantidad(1);
     setPrecio(0);
     setUltimoAgregado(r.nombre);
-    const timer = setTimeout(() => setUltimoAgregado(null), 2500);
-    return () => clearTimeout(timer);
+    setTimeout(() => setUltimoAgregado(null), 2500);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+    <div className="fixed inset-0 z-50 flex flex-col bg-white" role="dialog" aria-modal="true" aria-label="Buscar inventario">
 
       {/* ── Header: back + search ─────────────────────────────────────────── */}
       <div className="bg-slate-800 px-4 py-3 flex items-center gap-3 shadow-md flex-shrink-0">
         <button
           type="button"
           onClick={onCerrar}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-all text-xl font-bold flex-shrink-0"
+          className="w-11 h-11 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-all text-xl font-bold flex-shrink-0"
           aria-label="Cerrar buscador"
         >
           ←
@@ -102,7 +101,7 @@ export function BuscadorInventarioOC({ inventario, onAgregar, onCerrar }: Props)
           <button
             type="button"
             onClick={() => setCatFiltro('')}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-4 py-2.5 text-sm min-h-[44px] rounded-full font-semibold whitespace-nowrap transition-all ${
               catFiltro === ''
                 ? 'bg-slate-800 text-white shadow-sm'
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
@@ -115,7 +114,7 @@ export function BuscadorInventarioOC({ inventario, onAgregar, onCerrar }: Props)
               key={cat}
               type="button"
               onClick={() => setCatFiltro(catFiltro === cat ? '' : cat)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+              className={`px-4 py-2.5 text-sm min-h-[44px] rounded-full font-semibold whitespace-nowrap transition-all ${
                 catFiltro === cat
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200'
@@ -149,7 +148,7 @@ export function BuscadorInventarioOC({ inventario, onAgregar, onCerrar }: Props)
               <button
                 type="button"
                 onClick={() => setBusqueda('')}
-                className="text-xs text-indigo-600 hover:underline mt-1"
+                className="px-4 py-2 min-h-[44px] text-xs text-indigo-600 hover:underline mt-1"
               >
                 Limpiar búsqueda
               </button>
@@ -158,7 +157,7 @@ export function BuscadorInventarioOC({ inventario, onAgregar, onCerrar }: Props)
               <button
                 type="button"
                 onClick={() => setCatFiltro('')}
-                className="text-xs text-indigo-600 hover:underline"
+                className="px-4 py-2 min-h-[44px] text-xs text-indigo-600 hover:underline"
               >
                 Ver todas las categorías
               </button>
@@ -215,32 +214,34 @@ export function BuscadorInventarioOC({ inventario, onAgregar, onCerrar }: Props)
                     <div className="border-t border-indigo-200 bg-indigo-50 p-3 space-y-3">
                       <div className="flex gap-2">
                         <div className="w-24 flex-shrink-0">
-                          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                            <label htmlFor={`cant-${r.id}`} className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
                             Cant.
                           </label>
                           <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            inputMode="numeric"
-                            value={cantidad || ''}
-                            onChange={e => setCantidad(Number(e.target.value))}
-                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                            Precio compra ($)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            inputMode="decimal"
-                            value={precio || ''}
-                            onChange={e => setPrecio(Number(e.target.value))}
-                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
+                              id={`cant-${r.id}`}
+                              type="number"
+                              min="1"
+                              step="1"
+                              inputMode="numeric"
+                              value={cantidad || ''}
+                              onChange={e => setCantidad(Number(e.target.value))}
+                              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label htmlFor={`precio-${r.id}`} className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                              Precio compra ($)
+                            </label>
+                            <input
+                              id={`precio-${r.id}`}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              value={precio || ''}
+                              onChange={e => setPrecio(Number(e.target.value))}
+                              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
                         </div>
                       </div>
                       {precio > 0 && cantidad > 0 && (
