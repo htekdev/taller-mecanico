@@ -677,6 +677,7 @@ export default function TallerMecanico() {
   };
 
   const refacturarTrabajo = async (trabajoId: string) => {
+    if (!taller) return;
     try {
       await db.resetFacturacionTrabajo(trabajoId, taller.id);
       setTrabajos(prev => prev.map(t =>

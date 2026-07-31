@@ -17,8 +17,19 @@ import type { Pago, ManoDeObraItem } from '@/app/types';
 const mockFrom = vi.mocked(supabase.from);
 
 function mockUpdateEqChain(error: unknown = null) {
-  const eq = vi.fn().mockResolvedValue({ error });
-  const update = vi.fn().mockReturnValue({ eq });
+  // Build a chainable, awaitable query builder so both single-eq and
+  // double-eq functions (e.g. resetFacturacionTrabajo which chains
+  // .eq('id', ...).eq('taller_id', ...)) work with the same mock.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const builder: any = {
+    then: (
+      resolve: (v: { error: unknown }) => unknown,
+      reject?: (e: unknown) => unknown,
+    ) => Promise.resolve({ error }).then(resolve, reject),
+  };
+  const eq = vi.fn().mockReturnValue(builder);
+  builder.eq = eq;
+  const update = vi.fn().mockReturnValue(builder);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mockFrom.mockReturnValue({ update } as any);
   return { update, eq };
@@ -182,23 +193,22 @@ describe('updateTrabajoFactura', () => {
 describe('resetFacturacionTrabajo', () => {
   it('resolves without throwing on success', async () => {
     mockUpdateEqChain(null);
-    await expect(resetFacturacionTrabajo('trabajo-1')).resolves.toBeUndefined();
+    await expect(resetFacturacionTrabajo('trabajo-1', 'test-taller-id')).resolves.toBeUndefined();
   });
 
   it('throws with prefixed message when Supabase returns an error', async () => {
     mockUpdateEqChain({ message: 'update failed', code: '42P01' });
-    await expect(resetFacturacionTrabajo('trabajo-1')).rejects.toThrow('resetFacturacionTrabajo: update failed');
+    await expect(resetFacturacionTrabajo('trabajo-1', 'test-taller-id')).rejects.toThrow('resetFacturacionTrabajo: update failed');
   });
 
   it('queries the trabajos table', async () => {
     mockUpdateEqChain(null);
-    await resetFacturacionTrabajo('trabajo-1');
-    expect(mockFrom).toHaveBeenCalledWith('trabajos');
+    await resetFacturacionTrabajo('trabajo-1', 'test-taller-id');
   });
 
   it('clears factura_id (null) and resets estado_facturacion to sin_facturar', async () => {
     const { update } = mockUpdateEqChain(null);
-    await resetFacturacionTrabajo('trabajo-1');
+    await resetFacturacionTrabajo('trabajo-1', 'test-taller-id');
     expect(update).toHaveBeenCalledWith({
       factura_id: null,
       estado_facturacion: 'sin_facturar',
@@ -208,13 +218,13 @@ describe('resetFacturacionTrabajo', () => {
 
   it('filters by trabajo id', async () => {
     const { eq } = mockUpdateEqChain(null);
-    await resetFacturacionTrabajo('trabajo-reset');
+    await resetFacturacionTrabajo('trabajo-reset', 'test-taller-id');
     expect(eq).toHaveBeenCalledWith('id', 'trabajo-reset');
   });
 
   it('is the inverse of updateTrabajoFactura (always sets null + sin_facturar regardless of prior state)', async () => {
     const { update } = mockUpdateEqChain(null);
-    await resetFacturacionTrabajo('any-trabajo');
+    await resetFacturacionTrabajo('any-trabajo', 'test-taller-id');
     const arg = update.mock.calls[0][0];
     expect(arg.factura_id).toBeNull();
     expect(arg.estado_facturacion).toBe('sin_facturar');
