@@ -35,8 +35,8 @@ test.describe('Anular órdenes recibidas + resumen sin cancelados', { retries: 1
     await receivedBtn.click();
     await page.waitForTimeout(1000);
 
-    // If there are received orders, check for the anular button
-    const recibidaBadge = page.locator('.text-emerald-700, .text-emerald-600').filter({ hasText: /Recibida/ }).first();
+    // Check for a 'Recibida' badge using text content (not CSS classes)
+    const recibidaBadge = page.getByText(/Recibida/i).first();
     const hasRecibida = await recibidaBadge.isVisible().catch(() => false);
 
     if (hasRecibida) {
