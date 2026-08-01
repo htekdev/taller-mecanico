@@ -88,9 +88,12 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   // Previously used `[class*="border"][class*="rounded"]` which matched outer wrappers,
   // causing `.first()` to pick a container with ALL 15 job rows, triggering strict-mode
   // violation on `.getByRole('button', { name: /\+ pago/i })`.
+  // Also filter to rows that still have the `+ Pago` button — in case a prior test run
+  // already paid the same job and left a paid row in the shared Supabase instance.
   const cuentaRow = page
     .locator('.border-slate-200.rounded-xl.overflow-hidden')
     .filter({ hasText: /Prueba comprobante PR183/i })
+    .filter({ has: page.getByRole('button', { name: /\+ pago/i }) })
     .first();
   await expect(cuentaRow, 'Debe aparecer la cuenta del trabajo recién creado').toBeVisible({ timeout: 10_000 });
 
