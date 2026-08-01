@@ -118,19 +118,24 @@ test.describe('Anular órdenes recibidas + resumen sin cancelados', { retries: 1
     test.slow();
     await showPhaseLabel(page, '💵 Phase 1: Ir a Resumen');
     await dashboardPage.navigateToModule('resumen');
-    await page.waitForTimeout(2500);
 
-    await showPhaseLabel(page, '🔍 Phase 2: Verificar tarjetas de Flujo de Efectivo');
-    const cobradoCard = page.getByText('Cobrado Real');
+    await showPhaseLabel(page, '⏳ Phase 2: Esperar sección Flujo de Efectivo');
+    // Wait for the section heading to confirm the full resumen has rendered
+    const flujoHeading = page.getByText('Flujo de Efectivo Real');
+    await expect(flujoHeading).toBeVisible({ timeout: 10000 });
+
+    await showPhaseLabel(page, '🔍 Phase 3: Verificar tarjetas de Flujo de Efectivo');
+    // Use .first() to avoid strict-mode failures when regex matches multiple elements
+    const cobradoCard = page.getByText('Cobrado Real').first();
     await expect(cobradoCard).toBeVisible({ timeout: 5000 });
 
-    const pagadoCard = page.getByText('Pagado Proveedores');
+    const pagadoCard = page.getByText('Pagado Proveedores').first();
     await expect(pagadoCard).toBeVisible({ timeout: 3000 });
 
-    const porCobrarCard = page.getByText(/Por Cobrar/);
+    const porCobrarCard = page.getByText(/Por Cobrar/).first();
     await expect(porCobrarCard).toBeVisible({ timeout: 3000 });
 
-    const porPagarCard = page.getByText(/Por Pagar/);
+    const porPagarCard = page.getByText(/Por Pagar/).first();
     await expect(porPagarCard).toBeVisible({ timeout: 3000 });
 
     // All financial cards must show valid $ values (no NaN, no undefined)
