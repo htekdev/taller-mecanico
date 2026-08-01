@@ -56,6 +56,9 @@ export class CotizacionesPage extends BasePage {
   }
 
   async waitForPageLoad() {
+    // Wait for network to settle before checking UI elements (prevents Supabase cold-start timeouts)
+    await this.page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+
     const startSurface = this.page.locator('h2:has-text("Cotizaciones")').first();
     const templateButton = this.page.getByRole('button', { name: /general/i }).first();
     const historyTitle = this.page.getByText('Historial de Cotizaciones').first();
