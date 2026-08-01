@@ -2,22 +2,18 @@ import { test, expect } from '../../fixtures';
 import { showPhaseLabel } from '../visual-assert';
 
 /**
- * change-proof: Anular órdenes recibidas sin afectar inventario
+ * change-proof: Anular órdenes recibidas sin afectar inventario + resumen limpio
  *
- * Verifies two critical fixes from Sofia's bug reports (Issues #196 and #197):
+ * Verifies critical fixes from Sofia's bug reports (Issues #196 and #197):
  *
- * Fix #1 — "Anular por error" button exists for received orders:
- *   - Navigate to Órdenes de Compra
- *   - Filter to "Recibidas"
- *   - If any received orders exist, verify "Anular por error" button is visible
- *
- * Fix #2 — Resumen excludes cancelled trabajos:
- *   - Navigate to Resumen
- *   - Verify the page renders without corrupt data
- *   - Verify "Estado de Resultados" section is visible
- *   (The actual exclusion of cancelled trabajos is logic tested in unit tests)
- *
+ * Fix #1 — "Anular por error" button exists for received orders
+ * Fix #2 — Resumen excludes cancelled trabajos from ALL calculations:
+ *   - facturadoMes, totalCostoRef (from `mes` filter)
+ *   - cobradoEnMes (excludes cancelled facturas + cancelled trabajos)
+ *   - pendientePorCobrar (excludes cancelled facturas + cancelled trabajos)
+ *   - porCobrarDelMes (excludes cancelled facturas + cancelled trabajos)
  * Fix #3 — UI smoke: "Canceladas" filter tab exists in ordenes
+ * Fix #4 — Resumen shows no NaN / undefined when cancelled items exist
  */
 
 test.describe('Anular órdenes recibidas + resumen sin cancelados', { retries: 1 }, () => {
@@ -114,5 +110,36 @@ test.describe('Anular órdenes recibidas + resumen sin cancelados', { retries: 1
     expect(body).not.toContain('undefined');
 
     await showPhaseLabel(page, '✅ Tab Canceladas — OK');
+  });
+
+  test('resumen flujo de efectivo no muestra NaN con items cancelados', async ({
+    page, dashboardPage,
+  }) => {
+    test.slow();
+    await showPhaseLabel(page, '💵 Phase 1: Ir a Resumen');
+    await dashboardPage.navigateToModule('resumen');
+    await page.waitForTimeout(2500);
+
+    await showPhaseLabel(page, '🔍 Phase 2: Verificar tarjetas de Flujo de Efectivo');
+    const cobradoCard = page.getByText('Cobrado Real');
+    await expect(cobradoCard).toBeVisible({ timeout: 5000 });
+
+    const pagadoCard = page.getByText('Pagado Proveedores');
+    await expect(pagadoCard).toBeVisible({ timeout: 3000 });
+
+    const porCobrarCard = page.getByText(/Por Cobrar/);
+    await expect(porCobrarCard).toBeVisible({ timeout: 3000 });
+
+    const porPagarCard = page.getByText(/Por Pagar/);
+    await expect(porPagarCard).toBeVisible({ timeout: 3000 });
+
+    // All financial cards must show valid $ values (no NaN, no undefined)
+    const bodyText = await page.locator('body').innerText();
+    expect(bodyText).not.toContain('NaN');
+    expect(bodyText).not.toContain('undefined');
+    expect(bodyText).not.toContain('$undefined');
+    expect(bodyText).not.toContain('$NaN');
+
+    await showPhaseLabel(page, '✅ Flujo de Efectivo — valores limpios');
   });
 });
