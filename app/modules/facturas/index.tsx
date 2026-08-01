@@ -168,7 +168,7 @@ export function VistaFacturas({
           </div>
 
           {/* Número de facturas */}
-          <div className="bg-white border border-emerald-200 rounded-xl px-5 py-4 shadow-sm min-w-[140px]">
+          <div className="flex-1 bg-white border border-emerald-200 rounded-xl px-5 py-4 shadow-sm min-w-[140px]">
             <div className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">
               Facturas Emitidas
             </div>
@@ -189,7 +189,7 @@ export function VistaFacturas({
           <div className="mt-4">
             <button
               onClick={() => setMostrarDesglose(v => !v)}
-              className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 uppercase tracking-wider hover:text-emerald-900 transition-colors py-2.5 px-3 rounded-lg hover:bg-emerald-50 active:bg-emerald-100"
+              className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 uppercase tracking-wider hover:text-emerald-900 transition-colors py-3 px-3 rounded-lg hover:bg-emerald-50 active:bg-emerald-100 min-h-[44px]"
               aria-expanded={mostrarDesglose}
               aria-controls="desglose-facturas"
             >
