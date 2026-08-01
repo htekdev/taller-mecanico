@@ -157,4 +157,45 @@ test.describe('Resumen Mensual de Facturación', () => {
 
     await showPhaseLabel(page, '✅ Year Change Works');
   });
+
+  test('desglose toggle expands and collapses invoice breakdown', async ({
+    page, dashboardPage,
+  }) => {
+    await showPhaseLabel(page, '🔽 Phase 1: Check Desglose Toggle');
+    await dashboardPage.navigateToModule('facturas');
+    await dashboardPage.waitForPageLoad();
+    await page.waitForTimeout(1000);
+
+    // Use current month/year (default state) to maximize chances of having IVA facturas
+    const desgloseBtn = page.getByRole('button', { name: /ver desglose/i });
+    const btnVisible = await desgloseBtn.isVisible().catch(() => false);
+
+    if (!btnVisible) {
+      // No IVA facturas in current month — test gracefully skips toggle
+      await showPhaseLabel(page, '⏭️ No IVA facturas in current month — skip toggle test');
+      return;
+    }
+
+    // Button should start collapsed
+    expect(await desgloseBtn.getAttribute('aria-expanded')).toBe('false');
+
+    await showPhaseLabel(page, '🔽 Phase 2: Expand Desglose');
+    await desgloseBtn.click();
+    await page.waitForTimeout(300);
+
+    // Breakdown list should now be visible
+    const breakdown = page.locator('[data-testid="desglose-facturas"]');
+    await expectVisible(breakdown, 'Desglose section expanded after click');
+    expect(await desgloseBtn.getAttribute('aria-expanded')).toBe('true');
+
+    await showPhaseLabel(page, '🔼 Phase 3: Collapse Desglose');
+    const ocultarBtn = page.getByRole('button', { name: /ocultar desglose/i });
+    await ocultarBtn.click();
+    await page.waitForTimeout(300);
+
+    // Breakdown list should now be hidden
+    await expect(breakdown).not.toBeVisible();
+
+    await showPhaseLabel(page, '✅ Desglose Toggle Works');
+  });
 });

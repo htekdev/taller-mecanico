@@ -116,14 +116,15 @@ export function VistaFacturas({
         {/* Selectores de mes y año */}
         <div className="flex flex-wrap gap-3 mb-5 items-end">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
+            <label htmlFor="mes-resumen" className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
               Mes
             </label>
             <select
+              id="mes-resumen"
               aria-label="Seleccionar mes"
               value={mesResumen}
               onChange={e => setMesResumen(Number(e.target.value))}
-              className="border border-emerald-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-w-[130px]"
+              className="border border-emerald-300 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-w-[130px]"
             >
               {MESES_ES.map((nombre, i) => (
                 <option key={i + 1} value={i + 1}>{nombre}</option>
@@ -131,14 +132,15 @@ export function VistaFacturas({
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
+            <label htmlFor="anio-resumen" className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
               Año
             </label>
             <select
+              id="anio-resumen"
               aria-label="Seleccionar año"
               value={anioResumen}
               onChange={e => setAnioResumen(Number(e.target.value))}
-              className="border border-emerald-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-w-[90px]"
+              className="border border-emerald-300 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-w-[90px]"
             >
               {Array.from({ length: anioMax - anioMin + 1 }, (_, i) => anioMin + i).map(a => (
                 <option key={a} value={a}>{a}</option>
@@ -187,7 +189,7 @@ export function VistaFacturas({
           <div className="mt-4">
             <button
               onClick={() => setMostrarDesglose(v => !v)}
-              className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 uppercase tracking-wider hover:text-emerald-900 transition-colors"
+              className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 uppercase tracking-wider hover:text-emerald-900 transition-colors py-2.5 px-3 rounded-lg hover:bg-emerald-50 active:bg-emerald-100"
               aria-expanded={mostrarDesglose}
               aria-controls="desglose-facturas"
             >
