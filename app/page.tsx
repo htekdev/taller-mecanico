@@ -855,7 +855,8 @@ export default function TallerMecanico() {
   };
 
   const calcularResumen = () => {
-    const mes = trabajos.filter(t => t.fecha.startsWith(mesActual));
+    // Excluir trabajos cancelados (folioFiscal === '__CANCELADA__') de todos los cálculos del resumen
+    const mes = trabajos.filter(t => t.fecha.startsWith(mesActual) && t.folioFiscal !== '__CANCELADA__');
     const facturadoMes       = mes.reduce((s, t) => s + t.total, 0);
     const totalVentaRef      = mes.reduce((s, t) => s + t.refacciones, 0);
     const totalCostoRef      = mes.reduce((s, t) => s + (t.costoRefacciones ?? t.refacciones), 0);
@@ -1133,7 +1134,7 @@ export default function TallerMecanico() {
           {vista === 'resumen' && (
             <VistaResumen mesActual={mesActual} setMesActual={setMesActual}
               resumen={calcularResumen()}
-              trabajos={trabajos.filter(t => t.fecha.startsWith(mesActual))}
+              trabajos={trabajos.filter(t => t.fecha.startsWith(mesActual) && t.folioFiscal !== '__CANCELADA__')}
               clientes={clientes} vehiculos={vehiculos} />
           )}
           {vista === 'gastos' && (
