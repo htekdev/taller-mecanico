@@ -997,6 +997,7 @@ export function VistaCuentasPorPagar({
   onRegistrarPago,
   onIrAOrdenes,
   onPagarServicioExterno,
+  onAnularOrden,
 }: {
   ordenes: OrdenCompra[];
   proveedores: Proveedor[];
@@ -1006,6 +1007,7 @@ export function VistaCuentasPorPagar({
   onRegistrarPago: (ordenId: string, pago: Omit<PagoCompra, 'id'>) => void;
   onIrAOrdenes: () => void;
   onPagarServicioExterno: (trabajoId: string, itemId: string, pago: Omit<PagoServicioExterno, 'id'>) => void;
+  onAnularOrden?: (ordenId: string) => void;
 }) {
   const hoy = getHoy();
   const [tabPago, setTabPago] = useState<'refacciones' | 'servicios'>('refacciones');
@@ -1013,6 +1015,7 @@ export function VistaCuentasPorPagar({
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo', nota: '' });
   const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
   const [filtroProveedorId, setFiltroProveedorId] = useState('');
+  const [confirmAnularId, setConfirmAnularId] = useState<string | null>(null);
 
   // ── Servicios externos — collect from trabajos ─────────────────────────────
   const [expandidoProv, setExpandidoProv]   = useState<string | null>(null);
@@ -1529,6 +1532,25 @@ export function VistaCuentasPorPagar({
                           </div>
                         )}
                         {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Esta orden está completamente pagada.</p>}
+
+                        {/* ── Anular desde Cuentas por Pagar ──────────────────────────────── */}
+                        {onAnularOrden && (
+                          <div className="pt-3 border-t border-slate-200">
+                            {confirmAnularId === orden.id ? (
+                              <div className="flex flex-wrap items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2.5">
+                                <span className="w-full text-sm font-semibold text-rose-700">⚠️ ¿Anular esta orden? El gasto de <strong>${fmt(orden.total)}</strong> será removido del estado financiero.</span>
+                                <div className="flex gap-2 flex-wrap">
+                                  <Btn size="sm" variant="danger" onClick={() => { onAnularOrden(orden.id); setConfirmAnularId(null); setExpandido(null); }}>Sí, anular orden</Btn>
+                                  <Btn size="sm" variant="ghost" onClick={() => setConfirmAnularId(null)}>No, cancelar</Btn>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex justify-end">
+                                <Btn size="sm" variant="danger" onClick={() => setConfirmAnularId(orden.id)}>🚫 Anular orden</Btn>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

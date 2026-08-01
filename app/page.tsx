@@ -1111,7 +1111,8 @@ export default function TallerMecanico() {
               trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
               onRegistrarPago={registrarPagoOrden}
               onIrAOrdenes={() => setVista('ordenes')}
-              onPagarServicioExterno={registrarPagoServicioExterno} />
+              onPagarServicioExterno={registrarPagoServicioExterno}
+              onAnularOrden={cancelarOrden} />
           )}
           {vista === 'resumen' && (
             <VistaResumen mesActual={mesActual} setMesActual={setMesActual}
