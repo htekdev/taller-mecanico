@@ -80,7 +80,11 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   await showPhaseLabel(page, '💰 Registrando pago en Por Cobrar');
   await dashboardPage.navigateToModule('cuentas');
   await cuentasCobrarPage.waitForPageLoad();
-  await page.waitForTimeout(1500);
+  // Give Supabase/React time to fully deliver and render all CxC rows.
+  // waitForPageLoad confirms the section title is visible, but row data may still
+  // be in-flight. networkidle + extra wait ensures the row card is stable before interaction.
+  await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+  await page.waitForTimeout(2000);
 
   // Scope to the specific CxC row for this job (by unique description).
   // Use `.border-slate-200.rounded-xl.overflow-hidden` (all 3 classes required) to target
@@ -95,10 +99,14 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
     .filter({ hasText: /Prueba comprobante PR183/i })
     .filter({ has: page.getByRole('button', { name: /\+ pago/i }) })
     .first();
-  await expect(cuentaRow, 'Debe aparecer la cuenta del trabajo recién creado').toBeVisible({ timeout: 10_000 });
+  await expect(cuentaRow, 'Debe aparecer la cuenta del trabajo recién creado').toBeVisible({ timeout: 15_000 });
 
   // Register payment from within the row
-  await cuentaRow.getByRole('button', { name: /\+ pago/i }).first().click(); // expands payment form
+  // Explicitly wait for the "+ Pago" button to be visible before clicking — the row card
+  // may be visible (outer div) while inner content is still rendering after Supabase load.
+  const pagoBtn = cuentaRow.getByRole('button', { name: /\+ pago/i }).first();
+  await expect(pagoBtn, 'Debe aparecer botón + Pago en la fila del trabajo').toBeVisible({ timeout: 20_000 });
+  await pagoBtn.click(); // expands payment form
   await page.waitForTimeout(500);
 
   const pagoMontoInput = page.locator('input[type="number"][placeholder*="monto" i], input[type="number"]').first();

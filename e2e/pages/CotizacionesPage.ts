@@ -63,12 +63,18 @@ export class CotizacionesPage extends BasePage {
     const templateButton = this.page.getByRole('button', { name: /general/i }).first();
     const historyTitle = this.page.getByText('Historial de Cotizaciones').first();
     const previewTitle = this.page.locator('text=/Cotización COT-/').first();
+    // Handles 'formulario' state: when a draft is restored on navigation, the module
+    // renders the form screen (SectionTitle shows "Cotización — {plantilla}"), not the
+    // 'inicio' screen. None of the above signals match in that state.
+    // h2 filter /Cotizaci/i matches both "Cotizaciones" (inicio) and "Cotización — ..." (formulario).
+    const formularioTitle = this.page.locator('h2').filter({ hasText: /Cotizaci/i }).first();
 
     await Promise.race([
       startSurface.waitFor({ state: 'visible', timeout: 45_000 }),
       templateButton.waitFor({ state: 'visible', timeout: 45_000 }),
       historyTitle.waitFor({ state: 'visible', timeout: 45_000 }),
       previewTitle.waitFor({ state: 'visible', timeout: 45_000 }),
+      formularioTitle.waitFor({ state: 'visible', timeout: 45_000 }),
     ]);
   }
 

@@ -516,6 +516,11 @@ export function VistaTrabajo({
   const totalCostoRefacciones = partesSeleccionadas.reduce((s, p) => s + (p.costoTotal ?? 0), 0);
   const utilidadRefacciones   = totalVentaRefacciones - totalCostoRefacciones;
   const subtotalSinIVA        = totalManoDeObra + totalVentaRefacciones;
+  // Costo que el taller paga a proveedores de servicios externos (mano de obra subcontratada)
+  const costoServiciosExternos = laborItems
+    .filter(l => l.tipo === 'externo')
+    .reduce((s, l) => s + (l.costoTaller ?? 0), 0);
+  const utilidadTotal = totalManoDeObra + utilidadRefacciones - costoServiciosExternos;
   const esAyuntamientoTab = subTab === 'ayuntamiento';
 
   // Auto-detect Ayuntamiento client (case-insensitive match on name containing "ayuntamiento")
@@ -1363,11 +1368,20 @@ export function VistaTrabajo({
                 <div><span className="text-indigo-500 font-semibold">Venta refacciones:</span> <span className="font-bold text-slate-800">${fmt(totalVentaRefacciones)}</span></div>
                 <div><span className="text-indigo-700 font-bold">Subtotal: </span><span className="font-extrabold text-indigo-800 text-base">${fmt(subtotalSinIVA)}</span></div>
               </div>
-              {utilidadRefacciones !== 0 && (
+              {(utilidadRefacciones !== 0 || costoServiciosExternos > 0) && (
                 <div className="text-xs text-slate-500 border-t border-indigo-100 pt-2 flex flex-wrap gap-4">
-                  <span>Costo refacciones: <strong className="text-slate-700">${fmt(totalCostoRefacciones)}</strong></span>
-                  <span>Margen en partes: <strong className={utilidadRefacciones >= 0 ? 'text-emerald-600' : 'text-rose-600'}>${fmt(utilidadRefacciones)}</strong></span>
-                  <span>Utilidad total: <strong className="text-emerald-700">${fmt(totalManoDeObra + utilidadRefacciones)}</strong></span>
+                  {totalCostoRefacciones > 0 && (
+                    <span>Costo refacciones: <strong className="text-slate-700">${fmt(totalCostoRefacciones)}</strong></span>
+                  )}
+                  {utilidadRefacciones !== 0 && (
+                    <span>Margen en partes: <strong className={utilidadRefacciones >= 0 ? 'text-emerald-600' : 'text-rose-600'}>${fmt(utilidadRefacciones)}</strong></span>
+                  )}
+                  {costoServiciosExternos > 0 && (
+                    <span>
+                      Costo externos: <strong className="text-rose-600">−${fmt(costoServiciosExternos)}</strong>
+                    </span>
+                  )}
+                  <span>Utilidad total: <strong className={utilidadTotal >= 0 ? 'text-emerald-700' : 'text-rose-700'}>${fmt(utilidadTotal)}</strong></span>
                 </div>
               )}
             </div>
