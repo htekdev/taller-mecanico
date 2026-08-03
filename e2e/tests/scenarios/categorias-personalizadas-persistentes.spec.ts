@@ -28,14 +28,21 @@ test.describe('Categorías personalizadas — persist across reloads', () => {
     await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
     await expect(page.getByRole('heading', { name: /órdenes de compra/i })).toBeVisible({ timeout: 15_000 });
 
-    // ── Phase 2: Open new order form ──────────────────────────────────────────
-    await showPhaseLabel(page, '➕ Phase 2: Abrir formulario nueva OC');
-    const nuevaOrdenBtn = page.getByRole('button', { name: /nueva orden|nueva oc|crear orden/i });
-    if (await nuevaOrdenBtn.count() === 0) {
-      test.skip(true, 'No se encontró botón "Nueva Orden" — skippeando prueba de categorías');
+    // ── Phase 2: Select a proveedor to enable the order form ─────────────────
+    // The ordenes module shows the form permanently; the submit button is disabled
+    // until a proveedor is selected. We must pick one before interacting with the form.
+    await showPhaseLabel(page, '🏪 Phase 2: Seleccionar proveedor');
+    const proveedorSelect = page.locator('select').filter({ hasText: /-- seleccionar|proveedor/i }).first();
+    const proveedorOptions = await proveedorSelect.locator('option[value]:not([value=""])').count();
+    if (proveedorOptions === 0) {
+      test.skip(true, 'No hay proveedores registrados — skip prueba de categorías');
     }
-    await nuevaOrdenBtn.first().click();
-    await page.waitForTimeout(500);
+    const firstProvider = await proveedorSelect.locator('option[value]:not([value=""])').first().getAttribute('value');
+    if (!firstProvider) {
+      test.skip(true, 'No se pudo obtener el valor del primer proveedor — skip');
+    }
+    await proveedorSelect.selectOption(firstProvider!);
+    await page.waitForTimeout(400);
 
     // ── Phase 3: Add a refacción row ──────────────────────────────────────────
     await showPhaseLabel(page, '🔩 Phase 3: Agregar refacción');
@@ -99,30 +106,32 @@ test.describe('Categorías personalizadas — persist across reloads', () => {
 
     // ── Phase 8: Open new order and verify custom category appears ────────────
     await showPhaseLabel(page, '✅ Phase 8: Verificar categoría persiste');
-    const nuevaOrdenBtn2 = page.getByRole('button', { name: /nueva orden|nueva oc|crear orden/i });
-    if (await nuevaOrdenBtn2.count() > 0) {
-      await nuevaOrdenBtn2.first().click();
-      await page.waitForTimeout(500);
+    // Re-select a proveedor to enable the form for a second order (same logic as Phase 2)
+    const proveedorSelectAfter = page.locator('select').filter({ hasText: /-- seleccionar|proveedor/i }).first();
+    const proveedorOptAfter = await proveedorSelectAfter.locator('option[value]:not([value=""])').first().getAttribute('value').catch(() => null);
+    if (proveedorOptAfter) {
+      await proveedorSelectAfter.selectOption(proveedorOptAfter);
+      await page.waitForTimeout(400);
+    }
 
-      const agregarRefBtn2 = page.getByRole('button', { name: /agregar.*refacción|nueva refacción/i });
-      if (await agregarRefBtn2.count() > 0) {
-        await agregarRefBtn2.first().click();
-        await page.waitForTimeout(300);
+    const agregarRefBtn2 = page.getByRole('button', { name: /agregar.*refacción|nueva refacción/i });
+    if (await agregarRefBtn2.count() > 0) {
+      await agregarRefBtn2.first().click();
+      await page.waitForTimeout(300);
 
-        // Check that the custom category appears in any select's options
-        const allSelectsAfter = page.locator('select');
-        const selectCountAfter = await allSelectsAfter.count();
-        let found = false;
-        for (let i = 0; i < selectCountAfter; i++) {
-          const sel = allSelectsAfter.nth(i);
-          const options = await sel.locator('option').allTextContents();
-          if (options.some(o => o.includes(CUSTOM_CATEGORY))) {
-            found = true;
-            break;
-          }
+      // Check that the custom category appears in any select's options
+      const allSelectsAfter = page.locator('select');
+      const selectCountAfter = await allSelectsAfter.count();
+      let found = false;
+      for (let i = 0; i < selectCountAfter; i++) {
+        const sel = allSelectsAfter.nth(i);
+        const options = await sel.locator('option').allTextContents();
+        if (options.some(o => o.includes(CUSTOM_CATEGORY))) {
+          found = true;
+          break;
         }
-        expect(found, `Categoría personalizada "${CUSTOM_CATEGORY}" debe aparecer en el dropdown después de recargar`).toBe(true);
       }
+      expect(found, `Categoría personalizada "${CUSTOM_CATEGORY}" debe aparecer en el dropdown después de recargar`).toBe(true);
     }
   });
 });
