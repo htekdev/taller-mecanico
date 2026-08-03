@@ -1857,7 +1857,7 @@ export function VistaCuentasPorPagar({
                               </div>
                             ) : (
                               <div className="flex justify-end">
-                                <Btn size="sm" variant="danger" className="min-h-[44px]" onClick={() => setConfirmAnularId(orden.id)}>🚫 Anular orden</Btn>
+                                <Btn size="sm" variant="danger" className="min-h-[44px]" onClick={() => { setConfirmAnularId(orden.id); setErrorAnular(null); }}>🚫 Anular orden</Btn>
                               </div>
                             )}
                           </div>
