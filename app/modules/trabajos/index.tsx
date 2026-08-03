@@ -520,6 +520,7 @@ export function VistaTrabajo({
   const costoServiciosExternos = laborItems
     .filter(l => l.tipo === 'externo')
     .reduce((s, l) => s + (l.costoTaller ?? 0), 0);
+  const utilidadTotal = totalManoDeObra + utilidadRefacciones - costoServiciosExternos;
   const esAyuntamientoTab = subTab === 'ayuntamiento';
 
   // Auto-detect Ayuntamiento client (case-insensitive match on name containing "ayuntamiento")
@@ -1380,7 +1381,7 @@ export function VistaTrabajo({
                       Costo externos: <strong className="text-rose-600">−${fmt(costoServiciosExternos)}</strong>
                     </span>
                   )}
-                  <span>Utilidad total: <strong className={totalManoDeObra + utilidadRefacciones - costoServiciosExternos >= 0 ? 'text-emerald-700' : 'text-rose-700'}>${fmt(totalManoDeObra + utilidadRefacciones - costoServiciosExternos)}</strong></span>
+                  <span>Utilidad total: <strong className={utilidadTotal >= 0 ? 'text-emerald-700' : 'text-rose-700'}>${fmt(utilidadTotal)}</strong></span>
                 </div>
               )}
             </div>
