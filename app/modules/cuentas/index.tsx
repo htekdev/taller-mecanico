@@ -757,6 +757,7 @@ export function VistaCuentas({
           <button
             type="button"
             aria-haspopup="listbox"
+            data-testid="mes-dropdown-cobrar"
             aria-expanded={showMesDropdown}
             onClick={() => setShowMesDropdown(v => !v)}
             onKeyDown={e => e.key === 'Escape' && setShowMesDropdown(false)}
@@ -1061,7 +1062,7 @@ export function VistaCuentas({
             }
           </p>
           {filtroMes !== 'todos' && (
-            <button type="button" onClick={() => setFiltroMes('todos')} className="mt-2 text-indigo-600 font-semibold hover:underline text-sm">Ver todos los meses →</button>
+            <button type="button" onClick={() => setFiltroMes('todos')} className="mt-3 px-4 py-3 text-indigo-600 font-semibold hover:underline text-sm">Ver todos los meses →</button>
           )}
           {clienteSeleccionado && filtroMes === 'todos' && <button type="button" onClick={limpiarFiltroCliente} className="mt-2 text-indigo-600 font-semibold hover:underline text-sm">Ver todos los clientes →</button>}
         </div>
@@ -1218,11 +1219,15 @@ export function VistaCuentasPorPagar({
       return true;
     });
 
+  // Counts scoped to month filter only (not status/proveedor) so badges match list
+  const ordenesPorMes = filtroMesPagar === 'todos' ? ordenesPagables
+    : ordenesPagables.filter(o => o.fecha.slice(0, 7) === filtroMesPagar);
+
   const counts = {
-    todos:     ordenesFiltradas.length,
-    pendiente: ordenesFiltradas.filter(o => getEstadoPagoOrden(o) === 'pendiente').length,
-    parcial:   ordenesFiltradas.filter(o => getEstadoPagoOrden(o) === 'parcial').length,
-    pagado:    ordenesFiltradas.filter(o => getEstadoPagoOrden(o) === 'pagado').length,
+    todos:     ordenesPorMes.length,
+    pendiente: ordenesPorMes.filter(o => getEstadoPagoOrden(o) === 'pendiente').length,
+    parcial:   ordenesPorMes.filter(o => getEstadoPagoOrden(o) === 'parcial').length,
+    pagado:    ordenesPorMes.filter(o => getEstadoPagoOrden(o) === 'pagado').length,
   };
   const totalPendiente = ordenesPagables.filter(o => getEstadoPagoOrden(o) !== 'pagado').reduce((s, o) => s + getSaldoOrden(o), 0);
 
@@ -1643,6 +1648,7 @@ export function VistaCuentasPorPagar({
                 <button
                   type="button"
                   aria-haspopup="listbox"
+                  data-testid="mes-dropdown-pagar"
                   aria-expanded={showMesPagarDropdown}
                   onClick={() => setShowMesPagarDropdown(v => !v)}
                   onKeyDown={e => e.key === 'Escape' && setShowMesPagarDropdown(false)}
@@ -1687,7 +1693,7 @@ export function VistaCuentasPorPagar({
                   }
                 </p>
                 {filtroMesPagar !== 'todos' && (
-                  <button type="button" onClick={() => setFiltroMesPagar('todos')} className="mt-2 text-indigo-600 font-semibold hover:underline text-sm">Ver todos los meses →</button>
+                  <button type="button" onClick={() => setFiltroMesPagar('todos')} className="mt-3 px-4 py-3 text-indigo-600 font-semibold hover:underline text-sm">Ver todos los meses →</button>
                 )}
               </div>
             ) : (

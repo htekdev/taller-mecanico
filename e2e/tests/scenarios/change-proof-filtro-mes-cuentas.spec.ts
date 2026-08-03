@@ -38,10 +38,8 @@ test.describe('Filtro de Mes — Cuentas por Cobrar', () => {
 
     await showPhaseLabel(page, '✅ Phase 4: Close with Escape key');
     await page.keyboard.press('Escape');
-    // After Escape, dropdown should close (the listbox role div disappears)
-    await expect(page.locator('[role="listbox"]').first()).not.toBeVisible({ timeout: 3000 }).catch(() => {
-      // If no listbox role, just verify no duplicate "Todos los meses" buttons visible
-    });
+    // After Escape the listbox must not be visible — no catch, assertion must pass
+    await expect(page.locator('[role="listbox"]').first()).not.toBeVisible({ timeout: 3000 });
 
     await showPhaseLabel(page, '✅ Month filter functional in Por Cobrar');
   });
