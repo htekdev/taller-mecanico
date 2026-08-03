@@ -1109,6 +1109,7 @@ export function VistaCuentasPorPagar({
   const [filtroProveedorId, setFiltroProveedorId] = useState('');
   const [confirmAnularId, setConfirmAnularId] = useState<string | null>(null);
   const [isAnulando, setIsAnulando] = useState(false);
+  const [errorAnular, setErrorAnular] = useState<string | null>(null);
   const [filtroMesPagar, setFiltroMesPagar] = useState<string>('todos');
   const [showMesPagarDropdown, setShowMesPagarDropdown] = useState(false);
   const mesPagarDropdownRef = useRef<HTMLDivElement>(null);
@@ -1831,10 +1832,14 @@ export function VistaCuentasPorPagar({
                                     disabled={isAnulando}
                                     onClick={async () => {
                                       setIsAnulando(true);
+                                      setErrorAnular(null);
                                       try {
                                         await onAnularOrden(orden.id);
                                         setConfirmAnularId(null);
                                         setExpandido(null);
+                                      } catch (err) {
+                                        console.error('[cuentas] onAnularOrden error:', err);
+                                        setErrorAnular('No se pudo anular la orden. Intenta de nuevo.');
                                       } finally {
                                         setIsAnulando(false);
                                       }
@@ -1843,6 +1848,11 @@ export function VistaCuentasPorPagar({
                                     {isAnulando ? 'Anulando...' : 'Sí, anular orden'}
                                   </Btn>
                                   <Btn size="sm" variant="ghost" className="min-h-[44px] px-4" disabled={isAnulando} onClick={() => setConfirmAnularId(null)}>No, cancelar</Btn>
+                                  {errorAnular && (
+                                    <div role="alert" className="w-full mt-2 px-3 py-2 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
+                                      {errorAnular}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             ) : (
