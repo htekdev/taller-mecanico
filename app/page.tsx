@@ -9,7 +9,7 @@ import type {
 import {
   generarNumeroFactura, generarNumeroOrden,
   getEstadoPagoFactura, getSaldoFactura, getSaldo,
-  getEstadoPagoOrden, getHoy, getMesActual,
+  getEstadoPagoOrden, getSaldoOrden, getMontoPagadoOrden, getHoy, getMesActual,
 } from '@/app/lib/utils';
 import { Card } from '@/app/components/ui';
 import { VistaClientes } from '@/app/modules/clientes';
@@ -910,9 +910,9 @@ export default function TallerMecanico() {
       + trabajos.filter(t => t.fecha.startsWith(mesActual) && !t.facturaId).reduce((s, t) => s + getSaldo(t), 0);
     const ordenesMes    = ordenes.filter(o => o.fecha.startsWith(mesActual) && o.estado !== 'cancelada');
     const totalOrdenes  = ordenesMes.reduce((s, o) => s + o.total, 0);
-    const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0);
-    const pagadoAProveedoresMes = ordenesMes.reduce((s, o) => s + (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0), 0);
-    const porPagarTotal = ordenes.filter(o => o.estado === 'recibida').reduce((s, o) => s + (o.total - (o.pagos ?? []).reduce((s2, p) => s2 + p.monto, 0)), 0);
+    const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + getSaldoOrden(o), 0);
+    const pagadoAProveedoresMes = ordenesMes.reduce((s, o) => s + getMontoPagadoOrden(o), 0);
+    const porPagarTotal = ordenes.filter(o => o.estado === 'recibida').reduce((s, o) => s + getSaldoOrden(o), 0);
     const mesConIVA    = mes.filter(t => t.requiereFactura);
     const mesSinIVA    = mes.filter(t => !t.requiereFactura);
     const ingresoConIVA = mesConIVA.reduce((s, t) => s + t.total, 0);
