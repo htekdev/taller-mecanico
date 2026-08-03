@@ -1271,7 +1271,7 @@ export default function TallerMecanico() {
                 </span>
                 <input
                   type="file"
-                  accept="application/pdf"
+                  accept="application/pdf,.pdf"
                   className="sr-only"
                   onChange={e => {
                     const file = e.target.files?.[0] ?? null;

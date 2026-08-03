@@ -161,7 +161,10 @@ export async function uploadFacturaPdf(
   file: File,
 ): Promise<string> {
   // ── Validation 1: MIME type check ──
-  if (file.type !== 'application/pdf') {
+  // Note: iOS Safari (and some Android browsers) return file.type === '' for PDFs selected
+  // from the Files app. We allow empty type here and rely on the magic-number check below
+  // to confirm the file is actually a valid PDF.
+  if (file.type !== '' && file.type !== 'application/pdf') {
     throw new Error('uploadFacturaPdf: Solo se aceptan archivos PDF (tipo MIME: application/pdf).');
   }
 
