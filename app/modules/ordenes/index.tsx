@@ -309,11 +309,25 @@ function ModalEditarOrden({
   );
 }
 
-// Categorías comunes de refacciones para el selector rápido
-const CATEGORIAS_COMUNES = [
-  'Filtros', 'Frenos', 'Suspensión', 'Motor', 'Transmisión',
-  'Eléctrico', 'Escape', 'Enfriamiento', 'Lubricantes', 'Otro',
+// Categorías predefinidas de refacciones — siempre presentes en el selector
+const CATEGORIAS_PREDEFINIDAS = [
+  'Eléctrico', 'Enfriamiento', 'Escape', 'Filtros', 'Frenos',
+  'Lubricantes', 'Motor', 'Otro', 'Suspensión', 'Transmisión',
 ];
+
+/**
+ * Builds the merged + deduplicated category list for the dropdown.
+ * Predefined categories always appear. Custom categories are added only if they
+ * don't already exist (case-insensitive) in the predefined list.
+ * Result is sorted alphabetically in Spanish.
+ */
+function buildCategorias(custom: string[]): string[] {
+  const predLower = new Set(CATEGORIAS_PREDEFINIDAS.map(c => c.toLowerCase()));
+  const extra = custom.filter(c => !predLower.has(c.toLowerCase()));
+  return [...CATEGORIAS_PREDEFINIDAS, ...extra].sort((a, b) =>
+    a.localeCompare(b, 'es', { sensitivity: 'base' })
+  );
+}
 
 export function VistaOrdenesCompra({
   ordenes,
@@ -325,18 +339,25 @@ export function VistaOrdenesCompra({
   onEditarOrden,
   onIrAProveedores,
   onCrearRefaccionNueva,
+  categoriasCustom = [],
+  onAgregarCategoria,
 }: {
   ordenes: OrdenCompra[];
   proveedores: Proveedor[];
   inventario: Refaccion[];
   onCrearOrden: (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => void;
   onRecibirOrden: (id: string) => void;
-  onCancelarOrden: (id: string) => void;
+  onCancelarOrden: (id: string) => void | Promise<void>;
   onEditarOrden: (ordenId: string, data: Pick<OrdenCompra, 'descripcion' | 'numeroOrden' | 'partes' | 'subtotalSinIVA' | 'ivaAmount' | 'total' | 'conIVA'>) => void;
   onIrAProveedores: () => void;
   onCrearRefaccionNueva: (data: Omit<Refaccion, 'id'>) => Promise<Refaccion | null>;
+  /** Custom categories loaded from DB — will be merged with predefined defaults */
+  categoriasCustom?: string[];
+  /** Called after a new custom category is entered so it persists for future orders */
+  onAgregarCategoria?: (nombre: string) => Promise<void>;
 }) {
   const hoy = getHoy();
+  const categoriasList = buildCategorias(categoriasCustom);
 
   // ── Form principal OC ─────────────────────────────────────────────────────────
   const [formProveedorId, setFormProveedorId] = useState('');
@@ -364,6 +385,8 @@ export function VistaOrdenesCompra({
   const [newUnidad, setNewUnidad]         = useState('pza');
   const [newPrecio, setNewPrecio]         = useState(0);
   const [newCantidad, setNewCantidad]     = useState(1);
+  // Loading guard — prevents double-click on "Registrar y agregar a OC"
+  const [guardandoNuevaRef, setGuardandoNuevaRef] = useState(false);
 
   // Compatibilidad por pieza: { marca, modelo } en curso por refaccionId
   const [compatInputs, setCompatInputs] = useState<Record<string, { marca: string; modelo: string }>>({});
@@ -414,31 +437,46 @@ export function VistaOrdenesCompra({
   // ── Agregar nueva refacción al catálogo + orden ───────────────────────────
   const agregarRefaccionNueva = async () => {
     if (!newNombre.trim() || newPrecio <= 0 || newCantidad <= 0) return;
-    const categoriaFinal = newCategoria === '__custom__' ? newCategoriaCustom.trim() : newCategoria;
-    const nuevaRef = await onCrearRefaccionNueva({
-      nombre:       newNombre.trim(),
-      codigo:       newCodigo.trim(),
-      categoria:    categoriaFinal,
-      unidad:       newUnidad || 'pza',
-      precioCompra: newPrecio,
-      stock:        0,          // stock arranca en 0 — sube al recibir OC
-      stockMinimo:  1,
-    });
-    if (!nuevaRef) return;
-    setItemsOrden(prev => [
-      ...prev,
-      {
-        refaccionId:  nuevaRef.id,
-        nombre:       nuevaRef.nombre,
-        cantidad:     newCantidad,
+    if (guardandoNuevaRef) return; // prevent double-click
+    setGuardandoNuevaRef(true);
+    try {
+      const categoriaFinal = newCategoria === '__custom__' ? newCategoriaCustom.trim() : newCategoria;
+      const nuevaRef = await onCrearRefaccionNueva({
+        nombre:       newNombre.trim(),
+        codigo:       newCodigo.trim(),
+        categoria:    categoriaFinal,
+        unidad:       newUnidad || 'pza',
         precioCompra: newPrecio,
-        subtotal:     newCantidad * newPrecio,
-        compatibilidad: [],
-      },
-    ]);
-    // Limpiar form nueva refacción
-    setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
-    setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
+        stock:        0,          // stock arranca en 0 — sube al recibir OC
+        stockMinimo:  1,
+      });
+      if (!nuevaRef) return;
+      // Persist custom category so it appears in future dropdowns
+      if (newCategoria === '__custom__' && newCategoriaCustom.trim() && onAgregarCategoria) {
+        try {
+          await onAgregarCategoria(newCategoriaCustom.trim());
+        } catch (err) {
+          // Refacción saved successfully, but category persistence failed — non-fatal
+          console.warn('[ordenes] Category persistence failed, but refacción was saved:', err);
+        }
+      }
+      setItemsOrden(prev => [
+        ...prev,
+        {
+          refaccionId:  nuevaRef.id,
+          nombre:       nuevaRef.nombre,
+          cantidad:     newCantidad,
+          precioCompra: newPrecio,
+          subtotal:     newCantidad * newPrecio,
+          compatibilidad: [],
+        },
+      ]);
+      // Limpiar form nueva refacción
+      setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
+      setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
+    } finally {
+      setGuardandoNuevaRef(false);
+    }
   };
 
   // True when the nueva-refacción sub-form is ready to be auto-registered on submit
@@ -468,6 +506,14 @@ export function VistaOrdenesCompra({
         subtotal:     newCantidad * newPrecio,
         compatibilidad: [],
       }];
+      // Persist custom category so it appears in future dropdowns
+      if (newCategoria === '__custom__' && newCategoriaCustom.trim() && onAgregarCategoria) {
+        try {
+          await onAgregarCategoria(newCategoriaCustom.trim());
+        } catch (err) {
+          console.warn('[ordenes] Category persistence failed, but refacción was saved:', err);
+        }
+      }
       setNewNombre(''); setNewCodigo(''); setNewCategoria(''); setNewCategoriaCustom('');
       setNewUnidad('pza'); setNewPrecio(0); setNewCantidad(1);
     }
@@ -612,7 +658,7 @@ export function VistaOrdenesCompra({
                         <Label>Categoría</Label>
                         <Select value={newCategoria} onChange={e => setNewCategoria(e.target.value)}>
                           <option value="">Sin categoría</option>
-                          {CATEGORIAS_COMUNES.map(c => <option key={c} value={c}>{c}</option>)}
+                          {categoriasList.map(c => <option key={c} value={c}>{c}</option>)}
                           <option value="__custom__">Otra (escribir)...</option>
                         </Select>
                         {newCategoria === '__custom__' && (

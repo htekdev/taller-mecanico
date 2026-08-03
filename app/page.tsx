@@ -42,6 +42,7 @@ export default function TallerMecanico() {
   const [ordenes,     setOrdenes]     = useState<OrdenCompra[]>([]);
   const [facturas,    setFacturas]    = useState<Factura[]>([]);
   const [gastos,      setGastos]      = useState<Gasto[]>([]);
+  const [categoriasRefacciones, setCategoriasRefacciones] = useState<string[]>([]);
   const [vista, setVista] = useState<Vista>(() => {
     // Lazy initializer runs client-side only ('use client') — no SSR risk.
     // Restores the last-visited section so the user lands on the same module
@@ -63,7 +64,7 @@ export default function TallerMecanico() {
     if (!taller) return;
     setCargando(true);
     try {
-      const [c, v, r, t, p, o, f, g] = await Promise.all([
+      const [c, v, r, t, p, o, f, g, cats] = await Promise.all([
         db.getClientes(taller.id),
         db.getVehiculos(taller.id),
         db.getRefacciones(taller.id),
@@ -72,9 +73,11 @@ export default function TallerMecanico() {
         db.getOrdenes(taller.id),
         db.getFacturas(taller.id),
         db.getGastos(taller.id),
+        db.getCategorias(taller.id),
       ]);
       setClientes(c); setVehiculos(v); setInventario(r); setTrabajos(t);
       setProveedores(p); setOrdenes(o); setFacturas(f); setGastos(g);
+      setCategoriasRefacciones(cats);
     } catch (err) {
       console.error('[cargarDatos] FAILED:', err);
       setErrorBanner('Error al cargar datos. Verifica tu conexión e intenta de nuevo.');
@@ -185,6 +188,27 @@ export default function TallerMecanico() {
       return nuevo;
     } catch {
       return null;
+    }
+  };
+
+  /** Saves a new custom category to DB + updates local state — used by VistaOrdenesCompra */
+  const agregarCategoriaRefaccion = async (nombre: string): Promise<void> => {
+    if (!taller) return;
+    const trimmed = nombre.trim();
+    if (!trimmed) return;
+    // Normalize: capitalize first letter
+    const normalizado = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    // Only persist if not already present (case-insensitive)
+    const yaExiste = categoriasRefacciones.some(c => c.toLowerCase() === normalizado.toLowerCase());
+    if (yaExiste) return;
+    try {
+      await db.insertCategoria(taller.id, normalizado);
+      // Only update state AFTER successful DB write — no optimistic update
+      setCategoriasRefacciones(prev => [...prev, normalizado].sort((a, b) => a.localeCompare(b, 'es')));
+    } catch (err) {
+      // Non-fatal: refaccion was saved successfully; category persistence failed
+      console.warn('[agregarCategoriaRefaccion]', err);
+      setErrorBanner('La refacción se guardó, pero no se pudo persistir la categoría. Intenta de nuevo.');
     }
   };
 
@@ -1104,7 +1128,9 @@ export default function TallerMecanico() {
               onCrearOrden={crearOrden} onRecibirOrden={recibirOrden} onCancelarOrden={cancelarOrden}
               onEditarOrden={editarOrden}
               onIrAProveedores={() => setVista('proveedores')}
-              onCrearRefaccionNueva={crearRefaccionDesdeOrden} />
+              onCrearRefaccionNueva={crearRefaccionDesdeOrden}
+              categoriasCustom={categoriasRefacciones}
+              onAgregarCategoria={agregarCategoriaRefaccion} />
           )}
           {vista === 'facturas' && (
             <VistaFacturas facturas={facturas} clientes={clientes} vehiculos={vehiculos} trabajos={trabajos}
