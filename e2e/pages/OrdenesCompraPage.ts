@@ -15,7 +15,6 @@ export class OrdenesCompraPage extends BasePage {
   readonly numeroOrdenInput: Locator;
   readonly conIVACheckbox: Locator;
   readonly addItemButton: Locator;
-  readonly refaccionSelect: Locator;
   readonly cantidadInput: Locator;
   readonly precioInput: Locator;
   readonly saveButton: Locator;
@@ -37,7 +36,6 @@ export class OrdenesCompraPage extends BasePage {
     this.numeroOrdenInput = createForm.locator('input[placeholder*="OC-2026" i]').first();
     this.conIVACheckbox = page.locator('button[role="switch"], button').filter({ hasText: /IVA/i }).first();
     this.addItemButton = createForm.getByRole('button', { name: /^\+ Agregar$/i }).first();
-    this.refaccionSelect = createForm.locator('select').nth(1);
     this.cantidadInput = createForm.locator('input[placeholder="1"]').first();
     this.precioInput = createForm.locator('input[placeholder="0.00"]').first();
     this.saveButton = createForm.getByRole('button', { name: /crear orden|registrar pieza y crear orden/i }).first();
@@ -73,28 +71,59 @@ export class OrdenesCompraPage extends BasePage {
   }
 
   async addItemFromInventory(refIndex = 1, cantidad = 1, precio = 100) {
-    if (await this.refaccionSelect.isVisible().catch(() => false)) {
-      const count = await this.getOptionCount(this.refaccionSelect);
-      if (count > 1) {
-        await this.selectByIndex(this.refaccionSelect, Math.min(refIndex, count - 1));
-        await this.page.waitForTimeout(200);
-      }
+    // PR #193 replaced the <select> with a BuscadorInventarioOC full-screen modal.
+    // Find and click the "Buscar en inventario" trigger button.
+    const buscadorBtn = this.page.getByRole('button', { name: /buscar en inventario/i }).first();
+    if (!await buscadorBtn.isVisible().catch(() => false)) return;
+    await buscadorBtn.click();
+
+    // Wait for the full-screen buscador modal
+    const modal = this.page.getByRole('dialog', { name: 'Buscar inventario' });
+    await modal.waitFor({ state: 'visible', timeout: 8_000 }).catch(() => {});
+    if (!await modal.isVisible().catch(() => false)) return;
+
+    // Pick the Nth card (refIndex-based, 1 = first)
+    const cards = modal.locator('.border.rounded-xl').filter({ hasText: /\$/ });
+    await this.page.waitForTimeout(500); // let results settle
+    const cardCount = await cards.count();
+    if (cardCount === 0) {
+      // No inventory data — close modal and bail
+      const cerrarBtn = modal.getByRole('button', { name: /cerrar|←/i }).first();
+      if (await cerrarBtn.isVisible().catch(() => false)) await cerrarBtn.click();
+      return;
     }
 
-    if (await this.cantidadInput.isVisible().catch(() => false)) {
-      await this.fillInput(this.cantidadInput, String(cantidad));
-    }
-    if (await this.precioInput.isVisible().catch(() => false)) {
-      await this.fillInput(this.precioInput, String(precio));
+    const targetCard = cards.nth(Math.min(refIndex - 1, cardCount - 1));
+    const cardHeader = targetCard.locator('button').first();
+    await cardHeader.click();
+    await this.page.waitForTimeout(300);
+
+    // Fill cantidad
+    const cantidadInput = targetCard.locator('input[type="number"]').first();
+    if (await cantidadInput.isVisible().catch(() => false)) {
+      await cantidadInput.fill(String(cantidad));
     }
 
-    if (await this.addItemButton.isVisible().catch(() => false)) {
-      const isDisabled = await this.addItemButton.isDisabled().catch(() => false);
+    // Fill precio (second number input in the expanded panel)
+    const precioInput = targetCard.locator('input[type="number"]').nth(1);
+    if (await precioInput.isVisible().catch(() => false)) {
+      await precioInput.fill(String(precio));
+    }
+
+    // Confirm add
+    const agregarBtn = targetCard.getByRole('button', { name: /agregar a la orden/i });
+    if (await agregarBtn.isVisible().catch(() => false)) {
+      const isDisabled = await agregarBtn.isDisabled().catch(() => false);
       if (!isDisabled) {
-        await this.addItemButton.click();
+        await agregarBtn.click();
         await this.page.waitForTimeout(500);
       }
     }
+
+    // Close buscador
+    const cerrarBtn = modal.getByRole('button', { name: /cerrar|←/i }).first();
+    if (await cerrarBtn.isVisible().catch(() => false)) await cerrarBtn.click();
+    await this.page.waitForTimeout(300);
   }
 
   async toggleIVA() {
