@@ -9,8 +9,8 @@ import { test, expect } from '../../fixtures';
  * - No visual banner is shown — persistence is completely invisible to the user
  */
 test.describe('change-proof: form draft persistence', () => {
-  // Supabase cold-start can slow module navigation — allow retry on first failure.
-  test.describe.configure({ retries: 1 });
+  // Supabase cold-start can slow module navigation — allow 2 retries on first failure.
+  test.describe.configure({ retries: 2 });
 
   // ── Test 1: Trabajos form silently restores data on navigation ───────────────
   test('trabajos form silently preserves description after navigating away and back', async ({
