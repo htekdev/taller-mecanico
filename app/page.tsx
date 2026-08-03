@@ -42,7 +42,17 @@ export default function TallerMecanico() {
   const [ordenes,     setOrdenes]     = useState<OrdenCompra[]>([]);
   const [facturas,    setFacturas]    = useState<Factura[]>([]);
   const [gastos,      setGastos]      = useState<Gasto[]>([]);
-  const [vista, setVista] = useState<Vista>('clientes');
+  const [vista, setVista] = useState<Vista>(() => {
+    // Lazy initializer runs client-side only ('use client') — no SSR risk.
+    // Restores the last-visited section so the user lands on the same module
+    // they were on before closing or refreshing the app (no FOUC).
+    try {
+      const saved = localStorage.getItem('taller_last_vista');
+      const valid = ['clientes','inventario','trabajos','proveedores','ordenes','facturas','cuentas','pagos','resumen','historial','configuracion','cotizaciones','gastos','reportes'] satisfies readonly Vista[];
+      if (saved && (valid as readonly string[]).includes(saved)) return saved as Vista;
+    } catch { /* localStorage unavailable */ }
+    return 'clientes';
+  });
   const [mesActual, setMesActual] = useState(getMesActual());
   const [cargando, setCargando] = useState(true);
   const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: boolean } | null>(null);
@@ -74,6 +84,12 @@ export default function TallerMecanico() {
   }, [taller]);
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
+
+  // ── Nav persistence: save the active section on every change ────────────────
+  // Restoration is handled by the lazy useState initializer above (no FOUC).
+  useEffect(() => {
+    try { localStorage.setItem('taller_last_vista', vista); } catch { /* ignore */ }
+  }, [vista]);
 
   // ── Handlers ──
 
