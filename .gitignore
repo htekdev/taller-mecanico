@@ -45,6 +45,10 @@ full-log.txt
 
 # E2E artifacts
 e2e/results/
+e2e-output.log
+e2e/tmp-*.png
 playwright-report/
 playwright-report/data/
 test-results/
+test-results-*.json
+test-results.txt

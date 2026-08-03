@@ -104,6 +104,7 @@ export interface TrabajoRow {
   partes: unknown[];
   pagos: unknown[];
   factura_id: string | null;
+  factura_pdf_url: string | null;
   estado_facturacion: 'sin_facturar' | 'facturado';
   estado: 'pendiente' | 'completado' | 'pagado';
   created_at: string;
@@ -140,4 +141,66 @@ export interface FacturaRow {
   pagos: unknown[];
   notas: string | null;
   created_at: string;
+}
+
+// ── Supabase Storage: Invoice PDF upload ──────────────────────────────────────
+/**
+ * Upload an invoice PDF to Supabase Storage (private bucket).
+ * Path: {tallerId}/{trabajoId}/factura.pdf
+ * Returns the storage PATH (not a public URL) — callers must use
+ * createFacturaPdfSignedUrl() to generate a 1-hour signed URL for display.
+ * 
+ * Validates:
+ * - File MIME type must be 'application/pdf'
+ * - File size must not exceed 10 MB
+ * - File content must start with PDF magic number (%PDF)
+ */
+export async function uploadFacturaPdf(
+  tallerId: string,
+  trabajoId: string,
+  file: File,
+): Promise<string> {
+  // ── Validation 1: MIME type check ──
+  // Note: iOS Safari (and some Android browsers) return file.type === '' for PDFs selected
+  // from the Files app. We allow empty type here and rely on the magic-number check below
+  // to confirm the file is actually a valid PDF.
+  if (file.type !== '' && file.type !== 'application/pdf') {
+    throw new Error('uploadFacturaPdf: Solo se aceptan archivos PDF (tipo MIME: application/pdf).');
+  }
+
+  // ── Validation 2: File size check (10 MB limit) ──
+  const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+  if (file.size > MAX_SIZE) {
+    throw new Error('uploadFacturaPdf: El PDF no puede exceder 10 MB.');
+  }
+
+  // ── Validation 3: PDF magic number check ──
+  // Read first 4 bytes to verify file starts with %PDF
+  const buffer = await file.slice(0, 4).arrayBuffer();
+  const uint8 = new Uint8Array(buffer);
+  const isPDF = uint8[0] === 0x25 && uint8[1] === 0x50 && uint8[2] === 0x44 && uint8[3] === 0x46; // %PDF
+  if (!isPDF) {
+    throw new Error('uploadFacturaPdf: El archivo no es un PDF válido (no contiene encabezado PDF válido).');
+  }
+
+  const path = `${tallerId}/${trabajoId}/factura.pdf`;
+  const { error } = await supabase.storage
+    .from('facturas')
+    .upload(path, file, { contentType: 'application/pdf', upsert: true });
+  if (error) throw new Error(`uploadFacturaPdf: ${error.message}`);
+  // Return the storage path — the bucket is private; use createFacturaPdfSignedUrl() to view
+  return path;
+}
+
+/**
+ * Generate a 1-hour signed URL for viewing a factura PDF.
+ * @param storagePath  The path returned by uploadFacturaPdf (e.g. tallerId/trabajoId/factura.pdf)
+ * @returns Signed URL string, or throws on error.
+ */
+export async function createFacturaPdfSignedUrl(storagePath: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('facturas')
+    .createSignedUrl(storagePath, 3600); // 1-hour expiry
+  if (error || !data?.signedUrl) throw new Error(`createFacturaPdfSignedUrl: ${error?.message ?? 'no signed URL returned'}`);
+  return data.signedUrl;
 }

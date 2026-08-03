@@ -176,6 +176,7 @@ export interface Trabajo {
   partes: TrabajoRefaccion[];
   pagos: Pago[];
   facturaId?: string;
+  facturaPdfUrl?: string | null;
   estadoFacturacion?: 'sin_facturar' | 'facturado';
   estado: 'pendiente' | 'completado' | 'pagado';
   /** Set at finalization: 'factura' = with IVA (16%), 'nota' = without IVA */
