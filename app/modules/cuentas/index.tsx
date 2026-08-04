@@ -1599,6 +1599,48 @@ export function VistaCuentasPorPagar({
             </button>
           )}
 
+          {/* ── Filtro por mes — Por Pagar — always rendered ── */}
+            <div className="flex gap-2 mb-4 flex-wrap">
+              <div className="relative" ref={mesPagarDropdownRef}>
+                <button
+                  type="button"
+                  aria-haspopup="listbox"
+                  data-testid="mes-dropdown-pagar"
+                  aria-expanded={showMesPagarDropdown}
+                  onClick={() => setShowMesPagarDropdown(v => !v)}
+                  onKeyDown={e => e.key === 'Escape' && setShowMesPagarDropdown(false)}
+                  className={`flex items-center gap-1.5 px-4 py-3 rounded-full text-sm font-semibold transition-all ${filtroMesPagar !== 'todos' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'}`}
+                >
+                  📅 {filtroMesPagar === 'todos' ? 'Todos los meses' : mesLabel(filtroMesPagar)} ▾
+                </button>
+                {showMesPagarDropdown && (
+                  <div role="listbox" aria-label="Seleccionar mes" className="absolute z-30 top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[190px] max-h-[60vh] overflow-y-auto">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={filtroMesPagar === 'todos'}
+                      onClick={() => { setFiltroMesPagar('todos'); setShowMesPagarDropdown(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-indigo-50 ${filtroMesPagar === 'todos' ? 'font-bold text-indigo-700 bg-indigo-50' : 'text-slate-700'}`}
+                    >
+                      Todos los meses
+                    </button>
+                    {mesesDisponiblesPagar.map(mes => (
+                      <button
+                        key={mes}
+                        type="button"
+                        role="option"
+                        aria-selected={filtroMesPagar === mes}
+                        onClick={() => { setFiltroMesPagar(mes); setShowMesPagarDropdown(false); }}
+                        className={`w-full text-left px-4 py-3 text-sm border-t border-slate-100 transition-colors hover:bg-indigo-50 capitalize ${filtroMesPagar === mes ? 'font-bold text-indigo-700 bg-indigo-50' : 'text-slate-700'}`}
+                      >
+                        {mesLabel(mes)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
           {ordenesPagables.length === 0 && (
             <div className="text-center py-14 text-slate-400">
               <div className="text-5xl mb-3">🔴</div>
@@ -1641,48 +1683,6 @@ export function VistaCuentasPorPagar({
                   {f === 'todos' ? 'Todas' : BADGE_ESTADO[f].label} ({counts[f]})
                 </button>
               ))}
-            </div>
-
-            {/* ── Filtro por mes — Por Pagar ── */}
-            <div className="flex gap-2 mb-4 flex-wrap">
-              <div className="relative" ref={mesPagarDropdownRef}>
-                <button
-                  type="button"
-                  aria-haspopup="listbox"
-                  data-testid="mes-dropdown-pagar"
-                  aria-expanded={showMesPagarDropdown}
-                  onClick={() => setShowMesPagarDropdown(v => !v)}
-                  onKeyDown={e => e.key === 'Escape' && setShowMesPagarDropdown(false)}
-                  className={`flex items-center gap-1.5 px-4 py-3 rounded-full text-sm font-semibold transition-all ${filtroMesPagar !== 'todos' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'}`}
-                >
-                  📅 {filtroMesPagar === 'todos' ? 'Todos los meses' : mesLabel(filtroMesPagar)} ▾
-                </button>
-                {showMesPagarDropdown && (
-                  <div role="listbox" aria-label="Seleccionar mes" className="absolute z-30 top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[190px] max-h-[60vh] overflow-y-auto">
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={filtroMesPagar === 'todos'}
-                      onClick={() => { setFiltroMesPagar('todos'); setShowMesPagarDropdown(false); }}
-                      className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-indigo-50 ${filtroMesPagar === 'todos' ? 'font-bold text-indigo-700 bg-indigo-50' : 'text-slate-700'}`}
-                    >
-                      Todos los meses
-                    </button>
-                    {mesesDisponiblesPagar.map(mes => (
-                      <button
-                        key={mes}
-                        type="button"
-                        role="option"
-                        aria-selected={filtroMesPagar === mes}
-                        onClick={() => { setFiltroMesPagar(mes); setShowMesPagarDropdown(false); }}
-                        className={`w-full text-left px-4 py-3 text-sm border-t border-slate-100 transition-colors hover:bg-indigo-50 capitalize ${filtroMesPagar === mes ? 'font-bold text-indigo-700 bg-indigo-50' : 'text-slate-700'}`}
-                      >
-                        {mesLabel(mes)}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
 
             {ordenesFiltradas.length === 0 ? (
