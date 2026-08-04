@@ -62,13 +62,8 @@ test.describe('Filtro de Mes — Cuentas por Cobrar', () => {
     }
 
     await showPhaseLabel(page, '📅 Phase 2: Verify month filter button in Por Pagar');
-    // The month filter button renders inside the Refacciones tab content
-    const mesBtnPagar = page.locator('[data-testid="mes-dropdown-pagar"], button:has-text("Todos los meses")').nth(1);
-    // Allow for both single and double button scenarios
-    const allMesBtns = page.locator('button:has-text("Todos los meses")');
-    const count = await allMesBtns.count();
-    // At least 1 month filter button should be present
-    expect(count).toBeGreaterThanOrEqual(1);
+    const mesBtnPagar = page.locator('[data-testid="mes-dropdown-pagar"]');
+    await expect(mesBtnPagar).toBeVisible({ timeout: 8000 });
 
     await showPhaseLabel(page, '✅ Month filter present in Por Pagar');
   });
