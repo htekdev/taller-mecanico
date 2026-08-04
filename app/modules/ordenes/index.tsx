@@ -1,4 +1,4 @@
-'use client';
+﻿﻿﻿'use client';
 
 import { useState } from 'react';
 import type { OrdenCompra, Proveedor, Refaccion, CompraItem } from '@/app/types';
@@ -331,7 +331,7 @@ export function VistaOrdenesCompra({
   inventario: Refaccion[];
   onCrearOrden: (data: Omit<OrdenCompra, 'id' | 'estado' | 'fechaRecibida' | 'pagos'>) => void;
   onRecibirOrden: (id: string) => void;
-  onCancelarOrden: (id: string) => void;
+  onCancelarOrden: (id: string) => void | Promise<void>;
   onEditarOrden: (ordenId: string, data: Pick<OrdenCompra, 'descripcion' | 'numeroOrden' | 'partes' | 'subtotalSinIVA' | 'ivaAmount' | 'total' | 'conIVA'>) => void;
   onIrAProveedores: () => void;
   onCrearRefaccionNueva: (data: Omit<Refaccion, 'id'>) => Promise<Refaccion | null>;
@@ -349,6 +349,8 @@ export function VistaOrdenesCompra({
   const [expandido, setExpandido] = useState<string | null>(null);
   const [filtroProveedorId, setFiltroProveedorId] = useState('');
   const [editandoOrden, setEditandoOrden] = useState<OrdenCompra | null>(null);
+  const [confirmAnularId, setConfirmAnularId] = useState<string | null>(null);
+  const [anulando, setAnulando] = useState(false);
 
   // ── Modo agregar pieza ────────────────────────────────────────────────────────
   const [modoAgregar, setModoAgregar] = useState<'existente' | 'nueva'>('existente');
@@ -830,7 +832,29 @@ export function VistaOrdenesCompra({
                       </>
                     )}
                     {orden.estado === 'recibida' && (
-                      <Btn size="sm" variant="ghost" onClick={() => setEditandoOrden(orden)}>✏️ Corregir orden</Btn>
+                      <>
+                        <Btn size="sm" variant="ghost" onClick={() => setEditandoOrden(orden)}>✏️ Corregir orden</Btn>
+                        {confirmAnularId === orden.id ? (
+                          <div role="alert" className="flex flex-wrap items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-sm text-rose-700">
+                            <span className="w-full font-semibold">⚠️ ¿Anular sin revertir inventario?</span>
+                            <Btn size="md" variant="danger" disabled={anulando}
+                              onClick={async () => {
+                                setAnulando(true);
+                                try {
+                                  await onCancelarOrden(orden.id);
+                                  setConfirmAnularId(null);
+                                } finally {
+                                  setAnulando(false);
+                                }
+                              }}>
+                              {anulando ? 'Anulando…' : 'Sí, anular'}
+                            </Btn>
+                            <Btn size="md" variant="ghost" onClick={() => setConfirmAnularId(null)}>No</Btn>
+                          </div>
+                        ) : (
+                          <Btn size="sm" variant="danger" onClick={() => setConfirmAnularId(orden.id)}>🚫 Anular por error</Btn>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

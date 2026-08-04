@@ -855,7 +855,8 @@ export default function TallerMecanico() {
   };
 
   const calcularResumen = () => {
-    const mes = trabajos.filter(t => t.fecha.startsWith(mesActual));
+    // Excluir trabajos cancelados (folioFiscal === '__CANCELADA__') de todos los cálculos del resumen
+    const mes = trabajos.filter(t => t.fecha.startsWith(mesActual) && t.folioFiscal !== '__CANCELADA__');
     const facturadoMes       = mes.reduce((s, t) => s + t.total, 0);
     const totalVentaRef      = mes.reduce((s, t) => s + t.refacciones, 0);
     const totalCostoRef      = mes.reduce((s, t) => s + (t.costoRefacciones ?? t.refacciones), 0);
@@ -892,22 +893,37 @@ export default function TallerMecanico() {
     const utilidadNeta   = utilidadBruta - gastosOperativos;
     const pctUtilidadNeta = ingresoNeto > 0 ? Math.round((utilidadNeta / ingresoNeto) * 100) : 0;
 
-    const cobradoEnMes = facturas.reduce((s, f) =>
-      s + (f.pagos ?? []).filter(p => p.fecha.startsWith(mesActual)).reduce((s2, p) => s2 + p.monto, 0), 0)
-      // also count direct payments on legacy trabajos
-      + trabajos.filter(t => !t.facturaId).reduce((s, t) =>
+    // Helper: a trabajo is cancelled when its folioFiscal is the sentinel string.
+    // Accepts undefined so it can be called on the result of Array.find() directly.
+    const isCancelledTrabajo = (t: Trabajo | undefined): boolean => t?.folioFiscal === '__CANCELADA__';
+    // Helper: a factura is cancelled when notas === 'CANCELADA'
+    const isCancelledFactura = (f: Factura): boolean => f.notas === 'CANCELADA';
+
+    // cobradoEnMes — exclude cancelled trabajos AND cancelled facturas
+    const cobradoEnMes = facturas
+      .filter(f => !isCancelledFactura(f) && !isCancelledTrabajo(trabajos.find(t => t.id === f.trabajoId)))
+      .reduce((s, f) =>
+        s + (f.pagos ?? []).filter(p => p.fecha.startsWith(mesActual)).reduce((s2, p) => s2 + p.monto, 0), 0)
+      // also count direct payments on legacy trabajos (no factura), excluding cancelled
+      + trabajos.filter(t => !t.facturaId && !isCancelledTrabajo(t)).reduce((s, t) =>
           s + (t.pagos ?? []).filter(p => p.fecha.startsWith(mesActual)).reduce((s2, p) => s2 + p.monto, 0), 0);
 
     const pctCobrado = facturadoMes > 0 ? Math.min(cobradoEnMes / facturadoMes, 1) : 0;
     const gananciaCobrada = Math.round(ganancia * pctCobrado * 100) / 100;
+    // porCobrarDelMes — exclude cancelled facturas and facturas linked to cancelled trabajos
     const porCobrarDelMes = facturas.filter(f => {
+      if (isCancelledFactura(f)) return false;
       const t = trabajos.find(t => t.id === f.trabajoId);
-      return t?.fecha.startsWith(mesActual);
+      return !!t && t.fecha.startsWith(mesActual) && !isCancelledTrabajo(t);
     }).reduce((s, f) => s + getSaldoFactura(f), 0);
+    // pendientePorCobrar — exclude cancelled facturas, cancelled trabajos
     const pendientePorCobrar =
-      facturas.filter(f => { const t = trabajos.find(t => t.id === f.trabajoId); return t?.fecha.startsWith(mesActual); })
-        .reduce((s, f) => s + getSaldoFactura(f), 0)
-      + trabajos.filter(t => t.fecha.startsWith(mesActual) && !t.facturaId).reduce((s, t) => s + getSaldo(t), 0);
+      facturas.filter(f => {
+        if (isCancelledFactura(f)) return false;
+        const t = trabajos.find(t => t.id === f.trabajoId);
+        return !!t && t.fecha.startsWith(mesActual) && !isCancelledTrabajo(t);
+      }).reduce((s, f) => s + getSaldoFactura(f), 0)
+      + trabajos.filter(t => t.fecha.startsWith(mesActual) && !t.facturaId && !isCancelledTrabajo(t)).reduce((s, t) => s + getSaldo(t), 0);
     const ordenesMes    = ordenes.filter(o => o.fecha.startsWith(mesActual) && o.estado !== 'cancelada');
     const totalOrdenes  = ordenesMes.reduce((s, o) => s + o.total, 0);
     const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + getSaldoOrden(o), 0);
@@ -1133,7 +1149,7 @@ export default function TallerMecanico() {
           {vista === 'resumen' && (
             <VistaResumen mesActual={mesActual} setMesActual={setMesActual}
               resumen={calcularResumen()}
-              trabajos={trabajos.filter(t => t.fecha.startsWith(mesActual))}
+              trabajos={trabajos.filter(t => t.fecha.startsWith(mesActual) && t.folioFiscal !== '__CANCELADA__')}
               clientes={clientes} vehiculos={vehiculos} />
           )}
           {vista === 'gastos' && (
