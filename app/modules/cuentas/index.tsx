@@ -448,6 +448,14 @@ function ReporteCliente({
   );
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function mesLabel(yyyyMM: string): string {
+  const [year, month] = yyyyMM.split('-').map(Number);
+  const d = new Date(year, month - 1, 15);
+  return d.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+}
+
 // ─── VistaCuentas (Por Cobrar) ────────────────────────────────────────────────
 
 export function VistaCuentas({
@@ -492,6 +500,23 @@ export function VistaCuentas({
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
   // Tracks which pago id (within the currently expanded item) is pending delete confirmation
   const [confirmEliminarPagoId, setConfirmEliminarPagoId] = useState<string | null>(null);
+  const [filtroMes, setFiltroMes] = useState<string>('todos');
+  const [showMesDropdown, setShowMesDropdown] = useState(false);
+  const mesDropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showMesDropdown) return;
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (mesDropdownRef.current && !mesDropdownRef.current.contains(e.target as Node)) {
+        setShowMesDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, [showMesDropdown]);
 
   // Por cobrar: solo trabajos COMPLETADOS (no en progreso) sin factura formal.
   // Regla de negocio: (1) terminado, (2) facturado o nota completa → aparece en por cobrar.
@@ -530,11 +555,25 @@ export function VistaCuentas({
   // Active (non-cancelled) facturas
   const facturasActivasPorCliente = facturasPorCliente.filter(f => f.notas !== 'CANCELADA');
 
+  // Months available from current pool (for the month picker dropdown)
+  const mesesDisponibles = [...new Set([
+    ...facturasActivasPorCliente.map(f => f.fecha.slice(0, 7)),
+    ...legacyPorCliente.map(t => t.fecha.slice(0, 7)),
+  ])].filter(Boolean).sort((a, b) => b.localeCompare(a));
+
   const facturasFiltradas = filtroTipo === 'notas' ? [] : [...facturasActivasPorCliente]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
-    .filter(f => filtro === 'todos' || getEstadoPagoFactura(f) === filtro);
+    .filter(f => {
+      if (filtro !== 'todos' && getEstadoPagoFactura(f) !== filtro) return false;
+      if (filtroMes !== 'todos' && f.fecha.slice(0, 7) !== filtroMes) return false;
+      return true;
+    });
 
-  const legacyFiltrados = filtroTipo === 'facturas' ? [] : legacyPorCliente.filter(t => filtro === 'todos' || getEstadoPago(t) === filtro);
+  const legacyFiltrados = filtroTipo === 'facturas' ? [] : legacyPorCliente.filter(t => {
+    if (filtro !== 'todos' && getEstadoPago(t) !== filtro) return false;
+    if (filtroMes !== 'todos' && t.fecha.slice(0, 7) !== filtroMes) return false;
+    return true;
+  });
 
   // Global total pending (all clients) — cancelled facturas excluded
   const totalPendienteGlobal = facturas.filter(f => f.notas !== 'CANCELADA' && getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0)
@@ -548,11 +587,17 @@ export function VistaCuentas({
 
   const totalPendiente = clienteFiltroId ? totalPendienteCliente : totalPendienteGlobal;
 
+  // Counts scoped to the active month filter (so badges match the visible list)
+  const facturasPorMes = filtroMes === 'todos' ? facturasActivasPorCliente
+    : facturasActivasPorCliente.filter(f => f.fecha.slice(0, 7) === filtroMes);
+  const legacyPorMes = filtroMes === 'todos' ? legacyPorCliente
+    : legacyPorCliente.filter(t => t.fecha.slice(0, 7) === filtroMes);
+
   const counts = {
-    todos: facturasActivasPorCliente.length + legacyPorCliente.length,
-    pendiente: facturasActivasPorCliente.filter(f => getEstadoPagoFactura(f) === 'pendiente').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'pendiente').length,
-    parcial: facturasActivasPorCliente.filter(f => getEstadoPagoFactura(f) === 'parcial').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'parcial').length,
-    pagado: facturasActivasPorCliente.filter(f => getEstadoPagoFactura(f) === 'pagado').length + legacyPorCliente.filter(t => getEstadoPago(t) === 'pagado').length,
+    todos:     facturasPorMes.length + legacyPorMes.length,
+    pendiente: facturasPorMes.filter(f => getEstadoPagoFactura(f) === 'pendiente').length + legacyPorMes.filter(t => getEstadoPago(t) === 'pendiente').length,
+    parcial:   facturasPorMes.filter(f => getEstadoPagoFactura(f) === 'parcial').length  + legacyPorMes.filter(t => getEstadoPago(t) === 'parcial').length,
+    pagado:    facturasPorMes.filter(f => getEstadoPagoFactura(f) === 'pagado').length   + legacyPorMes.filter(t => getEstadoPago(t) === 'pagado').length,
   };
 
   const limpiarFiltroCliente = () => {
@@ -704,6 +749,48 @@ export function VistaCuentas({
             {label}
           </button>
         ))}
+      </div>
+
+      {/* ── Filtro por mes ── */}
+      <div className="flex gap-2 mb-5 flex-wrap">
+        <div className="relative" ref={mesDropdownRef}>
+          <button
+            type="button"
+            aria-haspopup="listbox"
+            data-testid="mes-dropdown-cobrar"
+            aria-expanded={showMesDropdown}
+            onClick={() => setShowMesDropdown(v => !v)}
+            onKeyDown={e => e.key === 'Escape' && setShowMesDropdown(false)}
+            className={`flex items-center gap-1.5 px-4 py-3 rounded-full text-sm font-semibold transition-all ${filtroMes !== 'todos' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'}`}
+          >
+            📅 {filtroMes === 'todos' ? 'Todos los meses' : mesLabel(filtroMes)} ▾
+          </button>
+          {showMesDropdown && (
+            <div role="listbox" aria-label="Seleccionar mes" className="absolute z-30 top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[190px] max-h-[60vh] overflow-y-auto">
+              <button
+                type="button"
+                role="option"
+                aria-selected={filtroMes === 'todos'}
+                onClick={() => { setFiltroMes('todos'); setShowMesDropdown(false); }}
+                className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-indigo-50 ${filtroMes === 'todos' ? 'font-bold text-indigo-700 bg-indigo-50' : 'text-slate-700'}`}
+              >
+                Todos los meses
+              </button>
+              {mesesDisponibles.map(mes => (
+                <button
+                  key={mes}
+                  type="button"
+                  role="option"
+                  aria-selected={filtroMes === mes}
+                  onClick={() => { setFiltroMes(mes); setShowMesDropdown(false); }}
+                  className={`w-full text-left px-4 py-3 text-sm border-t border-slate-100 transition-colors hover:bg-indigo-50 capitalize ${filtroMes === mes ? 'font-bold text-indigo-700 bg-indigo-50' : 'text-slate-700'}`}
+                >
+                  {mesLabel(mes)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── NOTAS first (por solicitud de Sofia) ── */}
@@ -967,12 +1054,17 @@ export function VistaCuentas({
         <div className="text-center py-14 text-slate-400">
           <div className="text-5xl mb-3">💰</div>
           <p className="font-medium text-slate-500">
-            {clienteSeleccionado
-              ? `${clienteSeleccionado.nombre} no tiene registros${filtro !== 'todos' ? ` con estado "${BADGE_ESTADO[filtro as 'pendiente'|'parcial'|'pagado'].label}"` : ''}`
-              : filtro === 'todos' ? 'Sin registros' : `Sin registros con estado "${BADGE_ESTADO[filtro as 'pendiente'|'parcial'|'pagado'].label}"`
+            {filtroMes !== 'todos'
+              ? `Sin registros para ${mesLabel(filtroMes)}`
+              : clienteSeleccionado
+                ? `${clienteSeleccionado.nombre} no tiene registros${filtro !== 'todos' ? ` con estado "${BADGE_ESTADO[filtro as 'pendiente'|'parcial'|'pagado'].label}"` : ''}`
+                : filtro === 'todos' ? 'Sin registros' : `Sin registros con estado "${BADGE_ESTADO[filtro as 'pendiente'|'parcial'|'pagado'].label}"`
             }
           </p>
-          {clienteSeleccionado && <button type="button" onClick={limpiarFiltroCliente} className="mt-2 text-indigo-600 font-semibold hover:underline text-sm">Ver todos los clientes →</button>}
+          {filtroMes !== 'todos' && (
+            <button type="button" onClick={() => setFiltroMes('todos')} className="mt-3 px-4 py-3 text-indigo-600 font-semibold hover:underline text-sm">Ver todos los meses →</button>
+          )}
+          {clienteSeleccionado && filtroMes === 'todos' && <button type="button" onClick={limpiarFiltroCliente} className="mt-2 text-indigo-600 font-semibold hover:underline text-sm">Ver todos los clientes →</button>}
         </div>
       )}
     
@@ -1017,6 +1109,24 @@ export function VistaCuentasPorPagar({
   const [filtroProveedorId, setFiltroProveedorId] = useState('');
   const [confirmAnularId, setConfirmAnularId] = useState<string | null>(null);
   const [isAnulando, setIsAnulando] = useState(false);
+  const [errorAnular, setErrorAnular] = useState<string | null>(null);
+  const [filtroMesPagar, setFiltroMesPagar] = useState<string>('todos');
+  const [showMesPagarDropdown, setShowMesPagarDropdown] = useState(false);
+  const mesPagarDropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showMesPagarDropdown) return;
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (mesPagarDropdownRef.current && !mesPagarDropdownRef.current.contains(e.target as Node)) {
+        setShowMesPagarDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, [showMesPagarDropdown]);
 
   // ── Cancelar saldo — confirmación ─────────────────────────────────────────
   const [confirmCancelarOrden, setConfirmCancelarOrden]     = useState<{ id: string; saldo: number; prov: string } | null>(null);
@@ -1058,11 +1168,15 @@ export function VistaCuentasPorPagar({
     if (extItems.length > 0) setTabPago('servicios');
   }, [extItems.length]);
 
-  // Group by proveedorId (or fall back to proveedorNombre)
+  // Group by proveedorId (or fall back to proveedorNombre) — filtered by month if set
+  const extItemsFiltradosMes = filtroMesPagar === 'todos'
+    ? extItems
+    : extItems.filter(ei => ei.trabajoFecha.slice(0, 7) === filtroMesPagar);
+
   type ProvGroup = { key: string; nombre: string; items: ExtItem[]; saldoTotal: number; costoTotal: number };
   const provGroups = (() => {
     const map = new Map<string, ProvGroup>();
-    for (const ei of extItems) {
+    for (const ei of extItemsFiltradosMes) {
       const key = ei.item.proveedorId ?? `sin-prov:${ei.item.proveedorNombre ?? 'Externo'}`;
       const nombre = ei.item.proveedorNombre ?? (proveedores.find(p => p.id === ei.item.proveedorId)?.nombre ?? 'Sin proveedor');
       if (!map.has(key)) map.set(key, { key, nombre, items: [], saldoTotal: 0, costoTotal: 0 });
@@ -1090,19 +1204,31 @@ export function VistaCuentasPorPagar({
 
   // ── Refacciones (PO-based) ─────────────────────────────────────────────────
   const ordenesPagables = ordenes.filter(o => o.estado === 'recibida');
+
+  // Months available across ordenes + servicios externos (for the month picker)
+  const mesesDisponiblesPagar = [...new Set([
+    ...ordenesPagables.map(o => o.fecha.slice(0, 7)),
+    ...extItems.map(ei => ei.trabajoFecha.slice(0, 7)),
+  ])].filter(Boolean).sort((a, b) => b.localeCompare(a));
+
   const ordenesFiltradas = [...ordenesPagables]
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
     .filter(o => {
       if (filtro !== 'todos' && getEstadoPagoOrden(o) !== filtro) return false;
       if (filtroProveedorId && o.proveedorId !== filtroProveedorId) return false;
+      if (filtroMesPagar !== 'todos' && o.fecha.slice(0, 7) !== filtroMesPagar) return false;
       return true;
     });
 
+  // Counts scoped to month filter only (not status/proveedor) so badges match list
+  const ordenesPorMes = filtroMesPagar === 'todos' ? ordenesPagables
+    : ordenesPagables.filter(o => o.fecha.slice(0, 7) === filtroMesPagar);
+
   const counts = {
-    todos: ordenesPagables.length,
-    pendiente: ordenesPagables.filter(o => getEstadoPagoOrden(o) === 'pendiente').length,
-    parcial:   ordenesPagables.filter(o => getEstadoPagoOrden(o) === 'parcial').length,
-    pagado:    ordenesPagables.filter(o => getEstadoPagoOrden(o) === 'pagado').length,
+    todos:     ordenesPorMes.length,
+    pendiente: ordenesPorMes.filter(o => getEstadoPagoOrden(o) === 'pendiente').length,
+    parcial:   ordenesPorMes.filter(o => getEstadoPagoOrden(o) === 'parcial').length,
+    pagado:    ordenesPorMes.filter(o => getEstadoPagoOrden(o) === 'pagado').length,
   };
   const totalPendiente = ordenesPagables.filter(o => getEstadoPagoOrden(o) !== 'pagado').reduce((s, o) => s + getSaldoOrden(o), 0);
 
@@ -1473,6 +1599,48 @@ export function VistaCuentasPorPagar({
             </button>
           )}
 
+          {/* ── Filtro por mes — Por Pagar — always rendered ── */}
+            <div className="flex gap-2 mb-4 flex-wrap">
+              <div className="relative" ref={mesPagarDropdownRef}>
+                <button
+                  type="button"
+                  aria-haspopup="listbox"
+                  data-testid="mes-dropdown-pagar"
+                  aria-expanded={showMesPagarDropdown}
+                  onClick={() => setShowMesPagarDropdown(v => !v)}
+                  onKeyDown={e => e.key === 'Escape' && setShowMesPagarDropdown(false)}
+                  className={`flex items-center gap-1.5 px-4 py-3 rounded-full text-sm font-semibold transition-all ${filtroMesPagar !== 'todos' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'}`}
+                >
+                  📅 {filtroMesPagar === 'todos' ? 'Todos los meses' : mesLabel(filtroMesPagar)} ▾
+                </button>
+                {showMesPagarDropdown && (
+                  <div role="listbox" aria-label="Seleccionar mes" className="absolute z-30 top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[190px] max-h-[60vh] overflow-y-auto">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={filtroMesPagar === 'todos'}
+                      onClick={() => { setFiltroMesPagar('todos'); setShowMesPagarDropdown(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-indigo-50 ${filtroMesPagar === 'todos' ? 'font-bold text-indigo-700 bg-indigo-50' : 'text-slate-700'}`}
+                    >
+                      Todos los meses
+                    </button>
+                    {mesesDisponiblesPagar.map(mes => (
+                      <button
+                        key={mes}
+                        type="button"
+                        role="option"
+                        aria-selected={filtroMesPagar === mes}
+                        onClick={() => { setFiltroMesPagar(mes); setShowMesPagarDropdown(false); }}
+                        className={`w-full text-left px-4 py-3 text-sm border-t border-slate-100 transition-colors hover:bg-indigo-50 capitalize ${filtroMesPagar === mes ? 'font-bold text-indigo-700 bg-indigo-50' : 'text-slate-700'}`}
+                      >
+                        {mesLabel(mes)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
           {ordenesPagables.length === 0 && (
             <div className="text-center py-14 text-slate-400">
               <div className="text-5xl mb-3">🔴</div>
@@ -1519,7 +1687,15 @@ export function VistaCuentasPorPagar({
 
             {ordenesFiltradas.length === 0 ? (
               <div className="text-center py-10 text-slate-400">
-                <p className="font-medium">No se encontraron resultados.</p>
+                <p className="font-medium">
+                  {filtroMesPagar !== 'todos'
+                    ? `Sin órdenes para ${mesLabel(filtroMesPagar)}`
+                    : 'No se encontraron resultados.'
+                  }
+                </p>
+                {filtroMesPagar !== 'todos' && (
+                  <button type="button" onClick={() => setFiltroMesPagar('todos')} className="mt-3 px-4 py-3 text-indigo-600 font-semibold hover:underline text-sm">Ver todos los meses →</button>
+                )}
               </div>
             ) : (
             <div className="space-y-2">
@@ -1656,10 +1832,14 @@ export function VistaCuentasPorPagar({
                                     disabled={isAnulando}
                                     onClick={async () => {
                                       setIsAnulando(true);
+                                      setErrorAnular(null);
                                       try {
                                         await onAnularOrden(orden.id);
                                         setConfirmAnularId(null);
                                         setExpandido(null);
+                                      } catch (err) {
+                                        console.error('[cuentas] onAnularOrden error:', err);
+                                        setErrorAnular('No se pudo anular la orden. Intenta de nuevo.');
                                       } finally {
                                         setIsAnulando(false);
                                       }
@@ -1668,11 +1848,16 @@ export function VistaCuentasPorPagar({
                                     {isAnulando ? 'Anulando...' : 'Sí, anular orden'}
                                   </Btn>
                                   <Btn size="sm" variant="ghost" className="min-h-[44px] px-4" disabled={isAnulando} onClick={() => setConfirmAnularId(null)}>No, cancelar</Btn>
+                                  {errorAnular && (
+                                    <div role="alert" className="w-full mt-2 px-3 py-2 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
+                                      {errorAnular}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             ) : (
                               <div className="flex justify-end">
-                                <Btn size="sm" variant="danger" className="min-h-[44px]" onClick={() => setConfirmAnularId(orden.id)}>🚫 Anular orden</Btn>
+                                <Btn size="sm" variant="danger" className="min-h-[44px]" onClick={() => { setConfirmAnularId(orden.id); setErrorAnular(null); }}>🚫 Anular orden</Btn>
                               </div>
                             )}
                           </div>
