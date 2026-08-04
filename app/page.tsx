@@ -941,28 +941,21 @@ export default function TallerMecanico() {
     };
   };
 
-  const stockBajo              = inventario.filter(r => r.stock <= r.stockMinimo).length;
-  const facturasPendientes     = facturas.filter(f => getEstadoPagoFactura(f) !== 'pagado').length;
-  const ordenesPendientesPago  = ordenes.filter(o => o.estado === 'recibida' && getEstadoPagoOrden(o) !== 'pagado').length;
-  const ordenesPendientesRecibir = ordenes.filter(o => o.estado === 'pendiente').length;
-  const trabajosPendientesCt   = trabajos.filter(t => t.estado === 'pendiente').length;
-  const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
-
   const tabs = [
-    { key: 'clientes',    icon: '👥', label: 'Clientes',         count: clientes.length },
-    { key: 'inventario',  icon: '📦', label: 'Inventario',        count: stockBajo > 0 ? `⚠ ${stockBajo}` : inventario.length > 0 ? inventario.length : null },
-    { key: 'trabajos',    icon: '🔧', label: 'Trabajos',          count: trabajosPendientesCt > 0 ? `🕐 ${trabajosPendientesCt}` : trabajos.length > 0 ? trabajos.length : null },
-    { key: 'proveedores', icon: '🏪', label: 'Proveedores',       count: proveedores.length > 0 ? proveedores.length : null },
-    { key: 'ordenes',     icon: '📋', label: 'Órdenes de Compra', count: ordenesPendientesRecibir > 0 ? ordenesPendientesRecibir : ordenes.length > 0 ? ordenes.length : null },
-    { key: 'facturas',    icon: '🧾', label: 'Facturas',          count: facturas.length > 0 ? facturas.length : null },
-    { key: 'cuentas',     icon: '💰', label: 'Por Cobrar',        count: facturasPendientes > 0 ? facturasPendientes : null },
-    { key: 'pagos',       icon: '🔴', label: 'Por Pagar',         count: ordenesPendientesPago > 0 ? ordenesPendientesPago : null },
-    { key: 'resumen',       icon: '📊', label: 'Resumen',           count: null },
-    { key: 'gastos',        icon: '💸', label: 'Gastos',            count: gastos.filter(g => g.fecha.startsWith(mesActual)).length > 0 ? gastos.filter(g => g.fecha.startsWith(mesActual)).length : null },
-    { key: 'reportes',      icon: '📣', label: 'Reportes',           count: null },
-    { key: 'historial',     icon: '📋', label: 'Historial',          count: null },
-    { key: 'cotizaciones',  icon: '📄', label: 'Cotizaciones',       count: null },
-    { key: 'configuracion', icon: '⚙️', label: 'Configuración',     count: null },
+    { key: 'clientes',      icon: '👥', label: 'Clientes' },
+    { key: 'inventario',    icon: '📦', label: 'Inventario' },
+    { key: 'trabajos',      icon: '🔧', label: 'Trabajos' },
+    { key: 'proveedores',   icon: '🏪', label: 'Proveedores' },
+    { key: 'ordenes',       icon: '📋', label: 'Órdenes de Compra' },
+    { key: 'facturas',      icon: '🧾', label: 'Facturas' },
+    { key: 'cuentas',       icon: '💰', label: 'Por Cobrar' },
+    { key: 'pagos',         icon: '🔴', label: 'Por Pagar' },
+    { key: 'resumen',       icon: '📊', label: 'Resumen' },
+    { key: 'gastos',        icon: '💸', label: 'Gastos' },
+    { key: 'reportes',      icon: '📣', label: 'Reportes' },
+    { key: 'historial',     icon: '📋', label: 'Historial' },
+    { key: 'cotizaciones',  icon: '📄', label: 'Cotizaciones' },
+    { key: 'configuracion', icon: '⚙️', label: 'Configuración' },
   ] as const;
 
   return (
@@ -1041,22 +1034,13 @@ export default function TallerMecanico() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <nav className="flex gap-1 mb-6 bg-white rounded-xl p-1.5 shadow-sm border border-slate-200 overflow-x-auto">
-          {tabs.map(({ key, icon, label, count }) => (
+          {tabs.map(({ key, icon, label }) => (
             <button key={key} onClick={() => setVista(key)}
-              className={`relative flex items-center gap-2 px-3 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 whitespace-nowrap ${
                 vista === key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}>
               <span>{icon}</span>
               <span>{label}</span>
-              {count !== null && (
-                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                  vista === key ? 'bg-indigo-400 text-white'
-                    : (typeof count === 'string' && count.startsWith('⚠')) ? 'bg-rose-100 text-rose-600'
-                    : (typeof count === 'string' && count.startsWith('🕐')) ? 'bg-amber-100 text-amber-700'
-                    : (key === 'cuentas' && facturasPendientes > 0) || (key === 'pagos' && ordenesPendientesPago > 0) || (key === 'ordenes' && ordenesPendientesRecibir > 0) ? 'bg-rose-100 text-rose-600'
-                    : 'bg-slate-200 text-slate-600'
-                }`}>{count}</span>
-              )}
             </button>
           ))}
         </nav>
