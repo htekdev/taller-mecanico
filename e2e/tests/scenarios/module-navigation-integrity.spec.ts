@@ -1,13 +1,15 @@
 import { test, expect } from '../../fixtures';
-import { expectVisible, showPhaseLabel } from '../visual-assert';
-import { TestData } from '../../utils/test-data';
+import { showPhaseLabel } from '../visual-assert';
 
 /**
  * Module Navigation Integrity — Verifies context preservation and
  * correct behavior when switching between modules rapidly.
  *
- * Tests sidebar badge updates, date display correctness, and
+ * Tests navigation integrity, date display correctness, and
  * mathematical accuracy of displayed totals.
+ *
+ * Note: sidebar badge counts were removed per product request (PR #205).
+ * Badge-related assertions have been replaced with navigation integrity checks.
  */
 
 test.describe('Module Navigation Integrity', () => {
@@ -16,36 +18,30 @@ test.describe('Module Navigation Integrity', () => {
     await loginPage.loginAsTestUser();
   });
 
-  test('sidebar badges update after creating items', async ({
+  test('nav tabs render without badge counts after navigating to Inventario', async ({
     page, dashboardPage, inventarioPage, sidebar
   }) => {
-    await showPhaseLabel(page, '🔢 Badge Update After Create');
+    await showPhaseLabel(page, '🗂️ Nav Tab Integrity Check');
     await dashboardPage.waitForPageLoad();
 
-    // Record initial Inventario badge
-    const badgeBefore = await sidebar.getBadgeCount('Inventario');
-
-    // Add a part
+    // Navigate to Inventario — verify module loads and nav has no badge spans
     await sidebar.clickTab('Inventario');
     await inventarioPage.waitForPageLoad();
 
-    const partName = `Badge Test ${TestData.uniqueId()}`;
-    await inventarioPage.addPart({
-      nombre: partName,
-      precioCompra: 100,
-      stock: 5,
-    });
+    // Nav should be visible and stable
+    const navVisible = await dashboardPage.nav.isVisible();
+    expect(navVisible).toBe(true);
 
-    // Wait for state to update
-    await page.waitForTimeout(1000);
+    // Badges were removed (PR #205) — no span.text-xs.font-bold should exist in nav
+    const badgeCount = await page.locator('nav span.text-xs.font-bold').count();
+    expect(badgeCount).toBe(0);
 
-    // Check badge updated
-    const badgeAfter = await sidebar.getBadgeCount('Inventario');
-    if (badgeBefore !== null && badgeAfter !== null) {
-      expect(badgeAfter).toBeGreaterThanOrEqual(badgeBefore);
-    }
+    // Inventario module should render without errors
+    const mainText = await page.locator('main').innerText().catch(() => '');
+    expect(mainText).not.toContain('undefined');
+    expect(mainText).not.toContain('NaN');
 
-    await showPhaseLabel(page, '✅ Badge Updated');
+    await showPhaseLabel(page, '✅ Nav Clean — No Badges');
   });
 
   test('dates display in correct format (dd/mm/yyyy or ISO)', async ({
@@ -138,10 +134,10 @@ test.describe('Module Navigation Integrity', () => {
     }
   });
 
-  test('Trabajos sidebar badge is a valid number when shown', async ({
+  test('Trabajos nav tab renders correctly with no badge counts', async ({
     page, dashboardPage, trabajosPage, sidebar
   }) => {
-    await showPhaseLabel(page, '🕐 Badge Presence Check');
+    await showPhaseLabel(page, '🔧 Trabajos Nav Check');
     await dashboardPage.waitForPageLoad();
 
     // Navigate to Trabajos
@@ -149,17 +145,15 @@ test.describe('Module Navigation Integrity', () => {
     await trabajosPage.waitForPageLoad();
     await page.waitForTimeout(1000);
 
-    // Verify badge value is sane (non-negative, not an astronomical number)
-    const badge = await sidebar.getBadgeCount('Trabajos');
-    if (badge !== null) {
-      // A negative badge count would indicate a data corruption bug
-      expect(badge).toBeGreaterThanOrEqual(0);
-      // Shared test DB accumulates trabajos across CI runs — only check for absurd values
-      expect(badge).toBeLessThan(100_000);
-    }
-    // badge === null means no pending trabajos in test DB — valid state
+    // Nav should still be stable
+    const navVisible = await dashboardPage.nav.isVisible();
+    expect(navVisible).toBe(true);
 
-    await showPhaseLabel(page, '✅ Badge Value Valid');
+    // Badges were removed (PR #205) — getBadgeCount returns null for all tabs
+    const badge = await sidebar.getBadgeCount('Trabajos');
+    expect(badge).toBeNull();
+
+    await showPhaseLabel(page, '✅ Trabajos Nav Clean');
   });
 });
 
