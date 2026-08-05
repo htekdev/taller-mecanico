@@ -638,9 +638,17 @@ export default function TallerMecanico() {
     if (!taller) return;
     const trabajo = trabajos.find(t => t.id === trabajoId);
     if (!trabajo || trabajo.facturaId) return;
-    const conceptos: FacturaConcepto[] = [
+    // Build conceptos from itemized lines (manoDeObraItems + partes).
+    // Fallback: some trabajos (e.g. older/migrated records) have no itemized lines but a non-zero
+    // aggregate total — in that case synthesize a single concepto per type so the factura total
+    // is never $0 when the trabajo has a real amount.
+    const itemizedConceptos: FacturaConcepto[] = [
       ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
       ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
+    ];
+    const conceptos: FacturaConcepto[] = itemizedConceptos.length > 0 ? itemizedConceptos : [
+      ...(trabajo.manoDeObra > 0 ? [{ tipo: 'mano_de_obra' as const, descripcion: 'Mano de obra', cantidad: 1, precioUnitario: trabajo.manoDeObra, subtotal: trabajo.manoDeObra }] : []),
+      ...(trabajo.refacciones > 0 ? [{ tipo: 'parte' as const, descripcion: 'Refacciones', cantidad: 1, precioUnitario: trabajo.refacciones, subtotal: trabajo.refacciones }] : []),
     ];
     const subtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
     // IVA is now explicit: controlled by the checkbox in the modal (incluirIva param).
