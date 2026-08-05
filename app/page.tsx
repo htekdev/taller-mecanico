@@ -856,7 +856,11 @@ export default function TallerMecanico() {
 
   const calcularResumen = () => {
     const mes = trabajos.filter(t => t.fecha.startsWith(mesActual));
-    const facturadoMes       = mes.reduce((s, t) => s + t.total, 0);
+    // facturadoMes: facturas EMITIDAS este mes (por fecha de la factura) + trabajos sin factura de este mes.
+    // This ensures a factura generated this month for a prior-month job is counted correctly.
+    const facturasMesActivas = facturas.filter(f => f.fecha.startsWith(mesActual) && f.notas !== 'CANCELADA');
+    const legacyMes          = mes.filter(t => !t.facturaId && t.folioFiscal !== '__CANCELADA__');
+    const facturadoMes       = facturasMesActivas.reduce((s, f) => s + f.total, 0) + legacyMes.reduce((s, t) => s + t.total, 0);
     const totalVentaRef      = mes.reduce((s, t) => s + t.refacciones, 0);
     const totalCostoRef      = mes.reduce((s, t) => s + (t.costoRefacciones ?? t.refacciones), 0);
     const totalManoObra      = mes.reduce((s, t) => s + t.manoDeObra, 0);
@@ -900,14 +904,12 @@ export default function TallerMecanico() {
 
     const pctCobrado = facturadoMes > 0 ? Math.min(cobradoEnMes / facturadoMes, 1) : 0;
     const gananciaCobrada = Math.round(ganancia * pctCobrado * 100) / 100;
-    const porCobrarDelMes = facturas.filter(f => {
-      const t = trabajos.find(t => t.id === f.trabajoId);
-      return t?.fecha.startsWith(mesActual);
-    }).reduce((s, f) => s + getSaldoFactura(f), 0);
+    const porCobrarDelMes = facturas.filter(f => f.fecha.startsWith(mesActual) && f.notas !== 'CANCELADA')
+      .reduce((s, f) => s + getSaldoFactura(f), 0);
     const pendientePorCobrar =
-      facturas.filter(f => { const t = trabajos.find(t => t.id === f.trabajoId); return t?.fecha.startsWith(mesActual); })
+      facturas.filter(f => f.fecha.startsWith(mesActual) && f.notas !== 'CANCELADA')
         .reduce((s, f) => s + getSaldoFactura(f), 0)
-      + trabajos.filter(t => t.fecha.startsWith(mesActual) && !t.facturaId).reduce((s, t) => s + getSaldo(t), 0);
+      + trabajos.filter(t => t.fecha.startsWith(mesActual) && !t.facturaId && t.folioFiscal !== '__CANCELADA__').reduce((s, t) => s + getSaldo(t), 0);
     const ordenesMes    = ordenes.filter(o => o.fecha.startsWith(mesActual) && o.estado !== 'cancelada');
     const totalOrdenes  = ordenesMes.reduce((s, o) => s + o.total, 0);
     const porPagarOrdenes = ordenesMes.filter(o => o.estado === 'recibida').reduce((s, o) => s + getSaldoOrden(o), 0);
