@@ -96,9 +96,16 @@ test.describe('change-proof: form draft persistence', () => {
     await expect(banner, 'El banner NO debe aparecer — el guardado es silencioso').not.toBeVisible();
 
     // Assert: formulario was restored (pantalla 'formulario' shown, not 'inicio')
-    // and the typed description is present
-    const formScreen = page.locator('[class*="rounded-xl"], form').filter({ hasText: DRAFT_DESCRIPTION.slice(0, 15) });
-    await expect(formScreen, 'El formulario debe contener el texto del borrador silenciosamente').toBeVisible({ timeout: 3_000 });
+    // and the typed description is present — check textarea .value directly since
+    // Playwright's hasText/filter checks DOM textContent, not input element values.
+    const descTextarea = page.locator('textarea').first();
+    const isVisible = await descTextarea.isVisible({ timeout: 5_000 }).catch(() => false);
+    if (isVisible) {
+      const value = await descTextarea.inputValue().catch(() => '');
+      expect(value, 'El formulario debe contener el texto del borrador silenciosamente').toContain(DRAFT_DESCRIPTION.slice(0, 15));
+    } else {
+      await expect(descTextarea, 'El formulario (textarea) debe estar visible — draft restaurado').toBeVisible({ timeout: 5_000 });
+    }
   });
 
   // ── Test 3: Draft is cleared after save — form resets cleanly on re-visit ────

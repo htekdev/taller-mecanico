@@ -66,9 +66,13 @@ test('change-proof-comprobante-pago — button appears on fully-paid job', async
   const saveErr = await trabajosPage.getFinalizarError();
   expect(saveErr, 'No debe haber error al guardar el trabajo').toBeNull();
 
-  // ── Finalizar ─────────────────────────────────────────────────────────────
+  // ── Finalizar — scope to specific row by description to avoid strict-mode
+  // violation when other jobs are present in the table
   await showPhaseLabel(page, '✅ Finalizando trabajo');
-  await trabajosPage.finalizar();
+  const finalizarRow = page.locator('tr').filter({ hasText: JOB_DESCRIPTION }).first();
+  await expect(finalizarRow, 'Fila del trabajo debe estar visible antes de finalizar').toBeVisible({ timeout: 10_000 });
+  await finalizarRow.getByRole('button', { name: /finalizar/i }).click();
+  await page.waitForTimeout(2000);
 
   const notaBtn = page.getByRole('button', { name: /nota de cobro|nota/i }).first();
   if (await notaBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {

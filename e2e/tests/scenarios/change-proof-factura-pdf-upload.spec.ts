@@ -84,8 +84,18 @@ async function openFacturaModal(
   const facturaBtn = finModal.getByRole('button', { name: /factura/i }).first();
   if (await facturaBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await facturaBtn.click();
-    await page.waitForTimeout(1500);
+    // Wait for "Finalizar Trabajo" modal to close before proceeding
+    await expect(finModal).not.toBeVisible({ timeout: 8_000 });
   }
+
+  // After finalizing with tipoDocumento='factura', the row shows "🧾 Pendiente de facturar".
+  // That button opens the "Número de Factura" modal via abrirModalFactura().
+  const updatedRow = page.locator('tr').filter({ hasText: jobDesc }).first();
+  await expect(updatedRow, 'Fila del trabajo debe seguir visible tras finalizar').toBeVisible({ timeout: 8_000 });
+  const pendienteBtn = updatedRow.getByRole('button', { name: /pendiente de facturar/i }).first();
+  await expect(pendienteBtn, 'Botón Pendiente de facturar debe aparecer en la fila').toBeVisible({ timeout: 8_000 });
+  await pendienteBtn.click();
+  await page.waitForTimeout(1000);
 
   const modal = page.locator('.fixed.inset-0').filter({ hasText: /Número de Factura/i }).first();
   await expect(modal, 'Modal Número de Factura debe abrirse').toBeVisible({ timeout: 10_000 });

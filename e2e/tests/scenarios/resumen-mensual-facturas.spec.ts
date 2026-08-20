@@ -45,12 +45,12 @@ test.describe('Resumen Mensual de Facturación', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1000);
 
-    // Month selector
-    const mesSelect = page.getByRole('combobox', { name: /seleccionar mes/i });
+    // Month selector — use getByLabel since <select> has aria-label (not 'combobox' role)
+    const mesSelect = page.getByLabel(/seleccionar mes/i);
     await expectVisible(mesSelect, 'Mes selector visible');
 
     // Year selector
-    const anioSelect = page.getByRole('combobox', { name: /seleccionar año/i });
+    const anioSelect = page.getByLabel(/seleccionar año/i);
     await expectVisible(anioSelect, 'Año selector visible');
 
     // Change month to Enero (value=1)
@@ -133,7 +133,7 @@ test.describe('Resumen Mensual de Facturación', () => {
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1000);
 
-    const anioSelect = page.getByRole('combobox', { name: /seleccionar año/i });
+    const anioSelect = page.getByLabel(/seleccionar año/i);
     await expectVisible(anioSelect, 'Año selector visible');
 
     // Change to 2024
@@ -168,6 +168,8 @@ test.describe('Resumen Mensual de Facturación', () => {
 
     // Use current month/year (default state) to maximize chances of having IVA facturas
     const desgloseBtn = page.getByRole('button', { name: /ver desglose/i });
+    // Stable locator independent of button text — survives text change after click
+    const toggleBtn = page.locator('button[aria-controls="desglose-facturas"]');
     const btnVisible = await desgloseBtn.isVisible().catch(() => false);
 
     if (!btnVisible) {
@@ -177,7 +179,7 @@ test.describe('Resumen Mensual de Facturación', () => {
     }
 
     // Button should start collapsed
-    expect(await desgloseBtn.getAttribute('aria-expanded')).toBe('false');
+    expect(await toggleBtn.getAttribute('aria-expanded')).toBe('false');
 
     await showPhaseLabel(page, '🔽 Phase 2: Expand Desglose');
     await desgloseBtn.click();
@@ -186,7 +188,8 @@ test.describe('Resumen Mensual de Facturación', () => {
     // Breakdown list should now be visible
     const breakdown = page.locator('[data-testid="desglose-facturas"]');
     await expectVisible(breakdown, 'Desglose section expanded after click');
-    expect(await desgloseBtn.getAttribute('aria-expanded')).toBe('true');
+    // Use stable toggleBtn locator — desgloseBtn's text changed to "Ocultar desglose" after click
+    expect(await toggleBtn.getAttribute('aria-expanded')).toBe('true');
 
     await showPhaseLabel(page, '🔼 Phase 3: Collapse Desglose');
     const ocultarBtn = page.getByRole('button', { name: /ocultar desglose/i });
