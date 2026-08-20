@@ -185,7 +185,6 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
    */
   test(
     'C: decimal quantities accepted and stored correctly (NUMERIC migration)',
-    { retries: 1 },
     async ({ page, dashboardPage, inventarioPage }) => {
       test.setTimeout(90_000); // explicit cap — avoids test.slow() tripling global 180s timeout
       const runId = TestData.uniqueId();

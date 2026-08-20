@@ -226,7 +226,8 @@ export class InventarioPage extends BasePage {
       const confirmarBtn = row.getByRole('button', { name: /Confirmar/i });
       await confirmarBtn.waitFor({ state: 'visible', timeout: 10_000 });
       await confirmarBtn.click();
-      await this.page.waitForTimeout(2000);
+      // Wait for the row to disappear — confirms deletion completed
+      await row.waitFor({ state: 'hidden', timeout: 10_000 });
     } else {
       // Click "Cancelar" to abort (part remains in list)
       const cancelarBtn = row.getByRole('button', { name: /^Cancelar$/i });
@@ -257,10 +258,10 @@ export class InventarioPage extends BasePage {
 
     // Fill in the phone number — exact aria-label to avoid ambiguity
     const telInput = this.page.locator('[aria-label="Tel\u00e9fono del proveedor"]');
-    if (await telInput.isVisible().catch(() => false)) {
-      await telInput.fill(telefono);
-      await this.page.waitForTimeout(200);
-    }
+    // Hard fail if phone field not visible — prevents silent skip of required field
+    await telInput.waitFor({ state: 'visible', timeout: 8_000 });
+    await telInput.fill(telefono);
+    await this.page.waitForTimeout(200);
 
     // Click "✓ Guardar" — unique on page since main form uses "Agregar al inventario".
     // Button is now type="button" + onClick (no form submit side effects).
@@ -282,8 +283,6 @@ export class InventarioPage extends BasePage {
       },
       nombre,
       { timeout: 15_000 }
-    ).catch(() => {
-      // If not found after 15s, continue — test assertion will catch it
-    });
+    );
   }
 }
