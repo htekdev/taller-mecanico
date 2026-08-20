@@ -361,10 +361,11 @@ export default function TallerMecanico() {
               return d !== undefined && d !== 0;
             }),
           );
+          // Only update UI after DB confirmed — prevents UI/DB desync on failure
+          setInventario(updatedInv);
         } catch (err) {
           console.error('[editarTrabajo] stock adjustment failed (non-fatal):', err);
         }
-        setInventario(updatedInv);
       }
 
       // If this job has a linked invoice, sync it with the updated costs
