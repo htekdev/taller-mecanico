@@ -109,8 +109,8 @@ export function VistaFacturas({
         ref={fileInputRef}
         type="file"
         accept="application/pdf,.pdf"
-      data-testid="pdf-upload-existing-input"
-      className="hidden"
+        data-testid="pdf-upload-existing-input"
+        className="hidden"
         onChange={async (e) => {
           const file = e.target.files?.[0];
           const pending = pendingUploadRef.current;
