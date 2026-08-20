@@ -339,6 +339,39 @@ export function VistaFacturas({
                   <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
                   <div className="flex items-center justify-between sm:justify-end gap-2">
                     <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
+                    {/* Ver PDF directo — siempre visible, activo solo cuando hay PDF */}
+                    {(() => {
+                      const trab = trabajos.find(t => t.id === factura.trabajoId);
+                      const pdfPath = trab?.facturaPdfUrl ?? null;
+                      const hasPdf = !!pdfPath;
+                      const isLoadingPdf = loadingPdfId === factura.id;
+                      return (
+                        <button
+                          type="button"
+                          data-testid="ver-pdf-header-btn"
+                          disabled={!hasPdf || isLoadingPdf}
+                          className={`text-xs px-2 py-1 rounded border transition-colors font-medium whitespace-nowrap ${
+                            hasPdf
+                              ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 cursor-pointer'
+                              : 'bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed'
+                          }`}
+                          onClick={hasPdf ? async (e) => {
+                            e.stopPropagation();
+                            setLoadingPdfId(factura.id);
+                            try {
+                              const url = await createFacturaPdfSignedUrl(pdfPath!);
+                              window.open(url, '_blank');
+                            } catch {
+                              // silent
+                            } finally {
+                              setLoadingPdfId(null);
+                            }
+                          } : undefined}
+                        >
+                          {isLoadingPdf ? '⏳' : '📄 Ver PDF'}
+                        </button>
+                      );
+                    })()}
                     <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'}
                       onClick={() => { setExpandido(isExp ? null : factura.id); setPagoForm({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' }); }}>
                       {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
