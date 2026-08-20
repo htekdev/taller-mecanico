@@ -58,7 +58,7 @@ INSERT INTO auth.users (
     NOW() - interval '2 days', NOW(),
     '', '', '', ''
   )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;  -- handles both id AND email unique constraints
 
 -- ── Taller ───────────────────────────────────────────────────
 INSERT INTO talleres (id, nombre, created_by, created_at) VALUES (
