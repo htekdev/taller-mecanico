@@ -275,10 +275,11 @@ export default function TallerMecanico() {
       });
       try {
         await db.updateRefacciones(updatedInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
+        // Only update UI after DB confirmed — prevents UI/DB desync on failure
+        setInventario(updatedInv);
       } catch (err) {
         console.error('[convertirCotizacionATrabajo] stock update failed (best-effort, non-fatal):', err);
       }
-      setInventario(updatedInv);
     }
 
     // Full authoritative reload — guarantees UI matches DB regardless of
