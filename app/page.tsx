@@ -271,7 +271,7 @@ export default function TallerMecanico() {
     if (data.partes.length > 0) {
       const updatedInv = inventario.map(r => {
         const usada = data.partes.find(p => p.refaccionId === r.id);
-        return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
+        return usada ? { ...r, stock: Math.max(0, r.stock - usada.cantidad) } : r;
       });
       try {
         await db.updateRefacciones(updatedInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
@@ -313,7 +313,7 @@ export default function TallerMecanico() {
     if (data.partes.length > 0) {
       const nuevoInv = inventario.map(r => {
         const usada = data.partes.find(p => p.refaccionId === r.id);
-        return usada ? { ...r, stock: r.stock - usada.cantidad } : r;
+        return usada ? { ...r, stock: Math.max(0, r.stock - usada.cantidad) } : r;
       });
       try {
         await db.updateRefacciones(nuevoInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
@@ -353,7 +353,7 @@ export default function TallerMecanico() {
       if (refaccionesConCambio.length > 0) {
         const updatedInv = inventario.map(r => {
           const delta = deltaMap.get(r.id);
-          return delta ? { ...r, stock: r.stock - delta } : r;
+          return delta ? { ...r, stock: Math.max(0, r.stock - delta) } : r;
         });
         try {
           await db.updateRefacciones(
