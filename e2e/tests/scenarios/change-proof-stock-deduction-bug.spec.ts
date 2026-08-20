@@ -21,6 +21,11 @@ import { TestData } from '../../utils/test-data';
  *     double-deduction — the stock must remain unchanged after a no-op edit.
  *  C. Decimal quantities (e.g. 2.5L) are accepted and stored correctly
  *     (proves the INTEGER→NUMERIC(12,4) migration works).
+ *
+ * Coverage gap (tracked in issue #211):
+ *  The positive deduction path — adding a part via BuscadorRefacciones so that
+ *  editarTrabajo actually subtracts stock — requires selector work deferred from
+ *  this PR. See https://github.com/htekdev/taller-mecanico/issues/211
  */
 
 test.describe('Stock Deduction — Inventory Bug Fix', () => {
