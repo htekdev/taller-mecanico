@@ -24,6 +24,7 @@ export function VistaFacturas({
   onCancelarFactura,
   onReactivarFactura,
   onSubirPdf,
+  onError,
 }: {
   facturas: Factura[];
   clientes: Cliente[];
