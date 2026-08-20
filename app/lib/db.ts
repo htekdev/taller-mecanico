@@ -260,6 +260,7 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
     partes: (r.partes as TrabajoRefaccion[]) ?? [],
     pagos: (r.pagos as Pago[]) ?? [],
     facturaId: r.factura_id ?? undefined,
+    facturaPdfUrl: (r.factura_pdf_url as string | null) ?? undefined,
     estadoFacturacion: r.estado_facturacion,
     estado: r.estado,
     tipoDocumento: (r.tipo_documento as Trabajo['tipoDocumento']) ?? undefined,
@@ -353,6 +354,7 @@ function mapTrabajoRow(row: Record<string, unknown>): Trabajo {
     partes: (row.partes as TrabajoRefaccion[]) ?? [],
     pagos: (row.pagos as Pago[]) ?? [],
     facturaId: (row.factura_id as string | null) ?? undefined,
+    facturaPdfUrl: (row.factura_pdf_url as string | null) ?? undefined,
     tipoDocumento: (row.tipo_documento as Trabajo['tipoDocumento']) ?? undefined,
     fechaFinalizacion: (row.fecha_finalizacion as string | null) ?? undefined,
     estadoFacturacion: row.estado_facturacion as Trabajo['estadoFacturacion'],
@@ -437,6 +439,26 @@ export async function updateTrabajoFactura(trabajoId: string, facturaId: string)
 export async function resetFacturacionTrabajo(trabajoId: string): Promise<void> {
   const { error } = await supabase.from('trabajos').update({ factura_id: null, estado_facturacion: 'sin_facturar' }).eq('id', trabajoId);
   if (error) throw new Error(`resetFacturacionTrabajo: ${error.message}`);
+}
+
+/** Update the factura PDF storage path on a trabajo */
+export async function updateTrabajoFacturaPdf(tallerId: string, trabajoId: string, pdfUrl: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('trabajos')
+    .update({ factura_pdf_url: pdfUrl })
+    .eq('id', trabajoId)
+    .eq('taller_id', tallerId);
+  if (error) throw new Error(`updateTrabajoFacturaPdf: ${error.message}`);
+}
+
+/** Hard-delete a factura by ID (used for rollback on PDF upload failure) */
+export async function deleteFactura(tallerId: string, facturaId: string): Promise<void> {
+  const { error } = await supabase
+    .from('facturas')
+    .delete()
+    .eq('id', facturaId)
+    .eq('taller_id', tallerId);
+  if (error) throw new Error(`deleteFactura: ${error.message}`);
 }
 
 /** Editar trabajo pendiente — actualiza todos los campos en la DB */

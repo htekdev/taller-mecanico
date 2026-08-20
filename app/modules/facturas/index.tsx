@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { Factura, Cliente, Vehiculo, Trabajo, PagoFactura } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { fmt, getEstadoPagoFactura, getMontoPagadoFactura, getSaldoFactura, BADGE_ESTADO, formatearFecha, getHoy } from '@/app/lib/utils';
+import { createFacturaPdfSignedUrl } from '@/app/lib/supabase';
 
 // ─── Meses en español ──────────────────────────────────────────────────────
 const MESES_ES = [
@@ -55,6 +56,7 @@ export function VistaFacturas({
   const [subtotalIncluyeIva, setSubtotalIncluyeIva] = useState(false);
   const [nuevoNumeroAjuste, setNuevoNumeroAjuste] = useState('');
   const [verCanceladas, setVerCanceladas] = useState(false);
+  const [loadingPdfId, setLoadingPdfId] = useState<string | null>(null);
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
   const [mostrarDesglose, setMostrarDesglose] = useState(false);
 
@@ -623,6 +625,36 @@ export function VistaFacturas({
                       </div>
                     )}
                     {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Esta factura está completamente pagada.</p>}
+
+                    {/* Ver PDF de factura */}
+                    {(() => {
+                      const trab = trabajos.find(t => t.id === factura.trabajoId);
+                      if (!trab?.facturaPdfUrl) return null;
+                      const pdfPath = trab.facturaPdfUrl;
+                      const isLoading = loadingPdfId === factura.id;
+                      return (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            data-testid="ver-pdf-btn"
+                            className="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                            onClick={async () => {
+                              setLoadingPdfId(factura.id);
+                              try {
+                                const url = await createFacturaPdfSignedUrl(pdfPath);
+                                window.open(url, '_blank');
+                              } catch {
+                                // silent — no onError prop in this component
+                              } finally {
+                                setLoadingPdfId(null);
+                              }
+                            }}
+                          >
+                            {isLoading ? '⏳ Abriendo...' : '📄 Ver PDF'}
+                          </button>
+                        </div>
+                      );
+                    })()}
 
                     {/* Cancelar factura */}
                     {confirmCancelarId === factura.id ? (

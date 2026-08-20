@@ -28,6 +28,7 @@ import { VistaGastos } from '@/app/modules/gastos';
 import { VistaReportes } from '@/app/modules/reportes';
 import { useAuth }      from '@/app/context/auth';
 import * as db          from '@/app/lib/db';
+import { uploadFacturaPdf } from '@/app/lib/supabase';
 
 type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones'|'gastos'|'reportes';
 
@@ -55,7 +56,7 @@ export default function TallerMecanico() {
   });
   const [mesActual, setMesActual] = useState(getMesActual());
   const [cargando, setCargando] = useState(true);
-  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: boolean } | null>(null);
+  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: boolean; pdfFile?: File | null } | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   // ── Cargar datos desde Supabase ──
@@ -664,7 +665,7 @@ export default function TallerMecanico() {
     const trabajo = trabajos.find(t => t.id === trabajoId);
     // Default IVA checkbox: true if job was finalized as Factura or has requiereFactura=true (covers migrated data)
     const defaultIva = trabajo?.tipoDocumento === 'factura' || (trabajo?.tipoDocumento == null && trabajo?.requiereFactura === true);
-    setPendingFactura({ trabajoId, numero: sugerido, fecha: hoy, incluirIva: defaultIva ?? false });
+    setPendingFactura({ trabajoId, numero: sugerido, fecha: hoy, incluirIva: defaultIva ?? false, pdfFile: null });
   };
 
   const refacturarTrabajo = async (trabajoId: string) => {
@@ -705,8 +706,44 @@ export default function TallerMecanico() {
 
   const confirmarFactura = async () => {
     if (!pendingFactura || !pendingFactura.numero.trim()) return;
+    let facturaId: string | null = null;
     try {
       await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
+      // Retrieve the newly-created factura ID from state
+      facturaId = facturas.find(f => f.trabajoId === pendingFactura.trabajoId)?.id ?? null;
+      // Upload PDF if one was selected
+      if (pendingFactura.pdfFile && taller) {
+        try {
+          const pdfPath = await uploadFacturaPdf(taller.id, pendingFactura.trabajoId, pendingFactura.pdfFile);
+          await db.updateTrabajoFacturaPdf(taller.id, pendingFactura.trabajoId, pdfPath);
+          setTrabajos(prev => prev.map(t =>
+            t.id === pendingFactura.trabajoId ? { ...t, facturaPdfUrl: pdfPath } : t,
+          ));
+        } catch (pdfErr: unknown) {
+          // PDF upload failed — roll back the factura for data integrity
+          console.error('[confirmarFactura] PDF upload failed — rolling back:', pdfErr);
+          try {
+            if (facturaId) await db.deleteFactura(taller.id, facturaId);
+            await db.resetFacturacionTrabajo(pendingFactura.trabajoId);
+            setFacturas(prev => prev.filter(f => f.id !== facturaId));
+            setTrabajos(prev => prev.map(t =>
+              t.id === pendingFactura.trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
+            ));
+          } catch (_rollbackErr) { /* best-effort rollback */ }
+          const msg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
+          if (msg.includes('MIME_ERROR')) {
+            setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
+          } else if (msg.includes('SIZE_ERROR')) {
+            setErrorBanner('El PDF no puede exceder 10 MB.');
+          } else if (msg.includes('MAGIC_ERROR')) {
+            setErrorBanner('El archivo parece estar corrupto. Intenta con otro PDF.');
+          } else {
+            setErrorBanner('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.');
+          }
+          setPendingFactura(null);
+          return;
+        }
+      }
       setPendingFactura(null);
       setVista('facturas');
     } catch (err) {
@@ -1224,6 +1261,44 @@ export default function TallerMecanico() {
                 </p>
               </div>
             </label>
+            {/* PDF de factura (opcional) */}
+            <div className="mb-5">
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                PDF de factura <span className="text-slate-400 font-normal normal-case">(opcional)</span>
+              </label>
+              <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-3 min-h-[44px] transition-colors ${
+                pendingFactura?.pdfFile
+                  ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                  : 'border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-600'
+              }`}>
+                <span className="flex-1 text-sm truncate">
+                  {pendingFactura?.pdfFile ? `📄 ${pendingFactura.pdfFile.name}` : '📎 Seleccionar PDF (opcional)'}
+                </span>
+                <input
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  data-testid="pdf-upload-input"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    if (file && file.size > 10 * 1024 * 1024) {
+                      setErrorBanner('El PDF no puede exceder 10 MB.');
+                      return;
+                    }
+                    setPendingFactura(prev => prev ? { ...prev, pdfFile: file } : null);
+                  }}
+                />
+              </label>
+              {pendingFactura?.pdfFile && (
+                <button
+                  type="button"
+                  className="mt-1 text-xs text-slate-500 hover:text-red-500"
+                  onClick={() => setPendingFactura(prev => prev ? { ...prev, pdfFile: null } : null)}
+                >
+                  ✕ Quitar PDF
+                </button>
+              )}
+            </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setPendingFactura(null)}

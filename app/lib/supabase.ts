@@ -104,6 +104,7 @@ export interface TrabajoRow {
   partes: unknown[];
   pagos: unknown[];
   factura_id: string | null;
+  factura_pdf_url: string | null;
   estado_facturacion: 'sin_facturar' | 'facturado';
   estado: 'pendiente' | 'completado' | 'pagado';
   created_at: string;
@@ -140,4 +141,55 @@ export interface FacturaRow {
   pagos: unknown[];
   notas: string | null;
   created_at: string;
+}
+
+// ── Supabase Storage: Invoice PDF upload ──────────────────────────────────────
+/**
+ * Upload invoice PDF to Supabase Storage (private bucket 'facturas').
+ * Path: {tallerId}/{trabajoId}/factura.pdf — returns path (not URL).
+ * Use createFacturaPdfSignedUrl() to get a viewable URL.
+ *
+ * Validates:
+ * - MIME type must be 'application/pdf' (allows empty for iOS Safari quirk)
+ * - File size must not exceed 10 MB
+ * - File must start with PDF magic number (%PDF = 0x25 0x50 0x44 0x46)
+ */
+export async function uploadFacturaPdf(
+  tallerId: string,
+  trabajoId: string,
+  file: File,
+): Promise<string> {
+  // iOS Safari returns '' for PDFs from Files app — allow empty MIME and rely on magic bytes
+  if (file.type !== '' && file.type !== 'application/pdf') {
+    throw new Error('MIME_ERROR: Solo se aceptan archivos PDF.');
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    throw new Error('SIZE_ERROR: El PDF no puede exceder 10 MB.');
+  }
+  // PDF magic number: %PDF = 0x25 0x50 0x44 0x46
+  const buf = await file.slice(0, 4).arrayBuffer();
+  const u8 = new Uint8Array(buf);
+  if (!(u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46)) {
+    throw new Error('MAGIC_ERROR: El archivo no es un PDF válido (encabezado inválido).');
+  }
+
+  const path = `${tallerId}/${trabajoId}/factura.pdf`;
+  const { error } = await supabase.storage
+    .from('facturas')
+    .upload(path, file, { contentType: 'application/pdf', upsert: true });
+  if (error) throw new Error(`UPLOAD_ERROR: ${error.message}`);
+  return path;
+}
+
+/**
+ * Generate a 1-hour signed URL for viewing a factura PDF.
+ */
+export async function createFacturaPdfSignedUrl(storagePath: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('facturas')
+    .createSignedUrl(storagePath, 3600);
+  if (error || !data?.signedUrl) {
+    throw new Error(`createFacturaPdfSignedUrl: ${error?.message ?? 'no signed URL'}`);
+  }
+  return data.signedUrl;
 }
