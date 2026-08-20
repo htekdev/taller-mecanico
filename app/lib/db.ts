@@ -260,6 +260,7 @@ export async function getTrabajos(tallerId: string): Promise<Trabajo[]> {
     partes: (r.partes as TrabajoRefaccion[]) ?? [],
     pagos: (r.pagos as Pago[]) ?? [],
     facturaId: r.factura_id ?? undefined,
+    facturaPdfUrl: (r.factura_pdf_url as string | null) ?? undefined,
     estadoFacturacion: r.estado_facturacion,
     estado: r.estado,
     tipoDocumento: (r.tipo_documento as Trabajo['tipoDocumento']) ?? undefined,
@@ -353,6 +354,7 @@ function mapTrabajoRow(row: Record<string, unknown>): Trabajo {
     partes: (row.partes as TrabajoRefaccion[]) ?? [],
     pagos: (row.pagos as Pago[]) ?? [],
     facturaId: (row.factura_id as string | null) ?? undefined,
+    facturaPdfUrl: (row.factura_pdf_url as string | null) ?? undefined,
     tipoDocumento: (row.tipo_documento as Trabajo['tipoDocumento']) ?? undefined,
     fechaFinalizacion: (row.fecha_finalizacion as string | null) ?? undefined,
     estadoFacturacion: row.estado_facturacion as Trabajo['estadoFacturacion'],
@@ -433,9 +435,17 @@ export async function updateTrabajoFactura(trabajoId: string, facturaId: string)
   if (error) throw new Error(`updateTrabajoFactura: ${error.message}`);
 }
 
+/** Update the factura PDF URL for a trabajo */
+export async function updateTrabajoFacturaPdf(tallerId: string, trabajoId: string, url: string | null): Promise<void> {
+  const { error } = await supabase.from('trabajos').update({ factura_pdf_url: url }).eq('id', trabajoId)
+    .eq('taller_id', tallerId);
+  if (error) throw new Error(`updateTrabajoFacturaPdf: ${error.message}`);
+}
+
 /** Reset facturación — allows re-invoicing after a factura was cancelled */
-export async function resetFacturacionTrabajo(trabajoId: string): Promise<void> {
-  const { error } = await supabase.from('trabajos').update({ factura_id: null, estado_facturacion: 'sin_facturar' }).eq('id', trabajoId);
+export async function resetFacturacionTrabajo(trabajoId: string, tallerId: string): Promise<void> {
+  const { error } = await supabase.from('trabajos').update({ factura_id: null, estado_facturacion: 'sin_facturar', factura_pdf_url: null }).eq('id', trabajoId)
+    .eq('taller_id', tallerId);
   if (error) throw new Error(`resetFacturacionTrabajo: ${error.message}`);
 }
 
@@ -839,6 +849,27 @@ export async function cancelarFactura(facturaId: string): Promise<void> {
 export async function reactivarFactura(facturaId: string): Promise<void> {
   const { error } = await supabase.from('facturas').update({ notas: null }).eq('id', facturaId);
   if (error) throw new Error(`reactivarFactura: ${error.message}`);
+}
+
+export async function deleteFactura(facturaId: string, tallerId: string): Promise<void> {
+  // First, verify factura exists and belongs to this taller (security check)
+  const { data: factura, error: fetchError } = await supabase.from('facturas')
+    .select('*')
+    .eq('id', facturaId)
+    .eq('taller_id', tallerId)
+    .single();
+  if (fetchError || !factura) throw new Error(`deleteFactura: Factura not found or unauthorized`);
+
+  // Then, revert all trabajos linked to this factura to 'sin_facturar' state
+  const { error: updateError } = await supabase.from('trabajos')
+    .update({ factura_id: null, estado_facturacion: 'sin_facturar', factura_pdf_url: null })
+    .eq('factura_id', facturaId)
+    .eq('taller_id', tallerId);
+  if (updateError) throw new Error(`deleteFactura (update trabajos): ${updateError.message}`);
+
+  // Then delete the factura itself
+  const { error } = await supabase.from('facturas').delete().eq('id', facturaId).eq('taller_id', tallerId);
+  if (error) throw new Error(`deleteFactura: ${error.message}`);
 }
 
 export async function cancelarNota(trabajoId: string): Promise<void> {
@@ -1258,5 +1289,4 @@ export async function nextCotizacionNumber(tallerId: string): Promise<string> {
 
   return `COT-${String(next).padStart(3, '0')}`;
 }
-
 
