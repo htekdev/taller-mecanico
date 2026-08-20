@@ -115,6 +115,17 @@ export function VistaFacturas({
           const pending = pendingUploadRef.current;
           e.target.value = '';
           if (!file || !pending) return;
+          // Preflight: same size + MIME checks as the modal PDF picker
+          if (file.size > 10 * 1024 * 1024) {
+            onError?.('El PDF no puede exceder 10 MB.');
+            pendingUploadRef.current = null;
+            return;
+          }
+          if (file.type && file.type !== 'application/pdf') {
+            onError?.('El archivo no es un PDF válido (tipo MIME incorrecto).');
+            pendingUploadRef.current = null;
+            return;
+          }
           setUploadingPdfId(pending.facturaId);
           try {
             await onSubirPdf(pending.trabajoId, file);

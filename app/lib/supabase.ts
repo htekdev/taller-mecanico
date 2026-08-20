@@ -193,3 +193,13 @@ export async function createFacturaPdfSignedUrl(storagePath: string): Promise<st
   }
   return data.signedUrl;
 }
+
+/**
+ * Delete a factura PDF from Supabase Storage (best-effort rollback helper).
+ * Called when a PDF upload succeeded but the subsequent DB update failed,
+ * leaving an orphaned file in the 'facturas' bucket.
+ */
+export async function deleteFacturaPdf(storagePath: string): Promise<void> {
+  const { error } = await supabase.storage.from('facturas').remove([storagePath]);
+  if (error) throw new Error(`deleteFacturaPdf: ${error.message}`);
+}

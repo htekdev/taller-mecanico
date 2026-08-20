@@ -28,7 +28,7 @@ import { VistaGastos } from '@/app/modules/gastos';
 import { VistaReportes } from '@/app/modules/reportes';
 import { useAuth }      from '@/app/context/auth';
 import * as db          from '@/app/lib/db';
-import { uploadFacturaPdf } from '@/app/lib/supabase';
+import { uploadFacturaPdf, deleteFacturaPdf } from '@/app/lib/supabase';
 
 type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones'|'gastos'|'reportes';
 
@@ -57,6 +57,7 @@ export default function TallerMecanico() {
   const [mesActual, setMesActual] = useState(getMesActual());
   const [cargando, setCargando] = useState(true);
   const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: boolean; pdfFile?: File | null } | null>(null);
+  const [isCreatingFactura, setIsCreatingFactura] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   // ── Cargar datos desde Supabase ──
@@ -706,7 +707,8 @@ export default function TallerMecanico() {
   };
 
   const confirmarFactura = async () => {
-    if (!pendingFactura || !pendingFactura.numero.trim()) return;
+    if (!pendingFactura || !pendingFactura.numero.trim() || isCreatingFactura) return;
+    setIsCreatingFactura(true);
     let facturaId: string | null = null;
     try {
       // generarFactura returns the new factura ID directly — avoids stale closure on React state
@@ -722,31 +724,40 @@ export default function TallerMecanico() {
         } catch (pdfErr: unknown) {
           // PDF upload failed — roll back the factura for data integrity
           console.error('[confirmarFactura] PDF upload failed — rolling back:', pdfErr);
-          try {
-            if (facturaId) await db.deleteFactura(taller.id, facturaId);
-            await db.resetFacturacionTrabajo(pendingFactura.trabajoId);
-            setFacturas(prev => prev.filter(f => f.id !== facturaId));
-            setTrabajos(prev => prev.map(t =>
-              t.id === pendingFactura.trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
-            ));
-          } catch (_rollbackErr) {
-            console.error('[confirmarFactura] Rollback failed after PDF upload error:', _rollbackErr);
-            setErrorBanner('No se pudo subir el PDF ni revertir los cambios automáticamente. Recarga la página para ver el estado actual.');
-            setPendingFactura(null);
-            return;
-          }
-          const msg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
-          if (msg.includes('MIME_ERROR')) {
-            setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
-          } else if (msg.includes('SIZE_ERROR')) {
-            setErrorBanner('El PDF no puede exceder 10 MB.');
-          } else if (msg.includes('MAGIC_ERROR')) {
-            setErrorBanner('El archivo parece estar corrupto. Intenta con otro PDF.');
-          } else {
-            setErrorBanner('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.');
-          }
+        const pdfMsg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
+        // Clean up orphaned storage file for non-preflight errors (MIME/SIZE/MAGIC were already
+        // caught client-side; reaching here means upload succeeded but DB update failed, or
+        // an unexpected storage error occurred AFTER upload — best-effort delete)
+        if (!pdfMsg.includes('MIME_ERROR') && !pdfMsg.includes('SIZE_ERROR') && !pdfMsg.includes('MAGIC_ERROR') && taller) {
+          const orphanPath = `${taller.id}/${pendingFactura.trabajoId}/factura.pdf`;
+          deleteFacturaPdf(orphanPath).catch(e =>
+            console.error('[confirmarFactura] Storage cleanup failed (orphaned file):', e),
+          );
+        }
+        try {
+          if (facturaId) await db.deleteFactura(taller.id, facturaId);
+          await db.resetFacturacionTrabajo(pendingFactura.trabajoId);
+          setFacturas(prev => prev.filter(f => f.id !== facturaId));
+          setTrabajos(prev => prev.map(t =>
+            t.id === pendingFactura.trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
+          ));
+        } catch (_rollbackErr) {
+          console.error('[confirmarFactura] Rollback failed after PDF upload error:', _rollbackErr);
+          setErrorBanner('No se pudo subir el PDF ni revertir los cambios automáticamente. Recarga la página para ver el estado actual.');
           setPendingFactura(null);
           return;
+          }
+        if (pdfMsg.includes('MIME_ERROR')) {
+          setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
+        } else if (pdfMsg.includes('SIZE_ERROR')) {
+          setErrorBanner('El PDF no puede exceder 10 MB.');
+        } else if (pdfMsg.includes('MAGIC_ERROR')) {
+          setErrorBanner('El archivo parece estar corrupto. Intenta con otro PDF.');
+        } else {
+          setErrorBanner('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.');
+        }
+        setPendingFactura(null);
+        return;
         }
       }
       setPendingFactura(null);
@@ -754,6 +765,8 @@ export default function TallerMecanico() {
     } catch (err) {
       console.error('[confirmarFactura] FAILED:', err);
       setErrorBanner('No se pudo generar la factura. Verifica tu conexion e intenta de nuevo.');
+    } finally {
+      setIsCreatingFactura(false);
     }
   };
   const registrarPagoFactura = async (facturaId: string, pago: Omit<PagoFactura, 'id'>) => {
@@ -1322,7 +1335,7 @@ export default function TallerMecanico() {
               {pendingFactura?.pdfFile && (
                 <button
                   type="button"
-                  className="mt-1 text-xs text-slate-500 hover:text-red-500"
+                  className="mt-1 text-xs text-slate-500 hover:text-red-500 py-2.5 px-2 min-h-[44px] flex items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
                   onClick={() => setPendingFactura(prev => prev ? { ...prev, pdfFile: null } : null)}
                 >
                   ✕ Quitar PDF
@@ -1337,9 +1350,9 @@ export default function TallerMecanico() {
               </button>
               <button
                 onClick={confirmarFactura}
-                disabled={!pendingFactura.numero.trim() || !pendingFactura.fecha}
+                disabled={!pendingFactura.numero.trim() || !pendingFactura.fecha || isCreatingFactura}
                 className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                ✓ Crear Factura
+                {isCreatingFactura ? (pendingFactura?.pdfFile ? '⏳ Subiendo PDF...' : '⏳ Creando...') : '✓ Crear Factura'}
               </button>
             </div>
           </div>
