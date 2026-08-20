@@ -46,7 +46,7 @@ export class TrabajosPage extends BasePage {
     this.manoDeObraPrecioInput = page.locator('input[type="number"]').first();
     this.addManoDeObraButton = page.getByRole('button', { name: /^\+?\s*agregar$/i }).first();
     this.saveButton = page.getByRole('button', { name: /registrar trabajo|guardar|crear trabajo/i });
-    this.finalizarButton = page.getByRole('button', { name: /finalizar/i });
+    this.finalizarButton = page.getByRole('button', { name: /finalizar/i }).first();
 
     this.addPartButton = page.getByRole('button', { name: /agregar refacción|buscar refacción|añadir pieza/i });
     this.partSelect = page.locator('select:has(option:has-text("Seleccionar"))').last();

@@ -55,7 +55,7 @@ test.describe('Change-proof: Anular orden desde Cuentas por Pagar (#201)', () =>
     await page.waitForTimeout(1200);
 
     // Check if there are any ordenes in the pagos module
-    const verBtn = page.getByRole('button', { name: /ver|pago/i }).first();
+    const verBtn = page.getByRole('button', { name: /^\+ Pago$|^Ver$/ }).first();
     const hasPendientes = await verBtn.isVisible().catch(() => false);
 
     if (!hasPendientes) {
@@ -86,7 +86,7 @@ test.describe('Change-proof: Anular orden desde Cuentas por Pagar (#201)', () =>
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1200);
 
-    const verBtn = page.getByRole('button', { name: /ver|pago/i }).first();
+    const verBtn = page.getByRole('button', { name: /^\+ Pago$|^Ver$/ }).first();
     const hasPendientes = await verBtn.isVisible().catch(() => false);
 
     if (!hasPendientes) {
@@ -126,7 +126,7 @@ test.describe('Change-proof: Anular orden desde Cuentas por Pagar (#201)', () =>
     await dashboardPage.waitForPageLoad();
     await page.waitForTimeout(1200);
 
-    const verBtn = page.getByRole('button', { name: /ver|pago/i }).first();
+    const verBtn = page.getByRole('button', { name: /^\+ Pago$|^Ver$/ }).first();
     const hasPendientes = await verBtn.isVisible().catch(() => false);
     if (!hasPendientes) return;
 

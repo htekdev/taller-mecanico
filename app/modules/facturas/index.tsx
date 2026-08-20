@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { Factura, Cliente, Vehiculo, Trabajo, PagoFactura } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { fmt, getEstadoPagoFactura, getMontoPagadoFactura, getSaldoFactura, BADGE_ESTADO, formatearFecha, getHoy } from '@/app/lib/utils';
+import { createFacturaPdfSignedUrl } from '@/app/lib/supabase';
 
 // ─── Meses en español ──────────────────────────────────────────────────────
 const MESES_ES = [
@@ -22,6 +23,8 @@ export function VistaFacturas({
   onEditarSubtotalFactura,
   onCancelarFactura,
   onReactivarFactura,
+  onSubirPdf,
+  onError,
 }: {
   facturas: Factura[];
   clientes: Cliente[];
@@ -33,6 +36,8 @@ export function VistaFacturas({
   onEditarSubtotalFactura: (facturaId: string, subtotal: number, incluirIva: boolean, nuevoNumero: string) => void;
   onCancelarFactura: (facturaId: string) => void;
   onReactivarFactura: (facturaId: string) => void;
+  onSubirPdf: (trabajoId: string, file: File) => Promise<void>;
+  onError: (msg: string) => void;
 }) {
   const hoy = getHoy();
 
@@ -55,6 +60,10 @@ export function VistaFacturas({
   const [subtotalIncluyeIva, setSubtotalIncluyeIva] = useState(false);
   const [nuevoNumeroAjuste, setNuevoNumeroAjuste] = useState('');
   const [verCanceladas, setVerCanceladas] = useState(false);
+  const [loadingPdfId, setLoadingPdfId] = useState<string | null>(null);
+  const [uploadingPdfId, setUploadingPdfId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingUploadRef = useRef<{ trabajoId: string; facturaId: string } | null>(null);
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
   const [mostrarDesglose, setMostrarDesglose] = useState(false);
 
@@ -95,6 +104,41 @@ export function VistaFacturas({
 
   return (
     <div>
+      {/* Hidden file input for PDF upload on existing facturas */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        data-testid="pdf-upload-existing-input"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          const pending = pendingUploadRef.current;
+          e.target.value = '';
+          if (!file || !pending) return;
+          // Preflight: same size + MIME checks as the modal PDF picker
+          if (file.size > 10 * 1024 * 1024) {
+            onError('El PDF no puede exceder 10 MB.');
+            pendingUploadRef.current = null;
+            return;
+          }
+          if (file.type && file.type !== 'application/pdf') {
+            onError('El archivo no es un PDF válido (tipo MIME incorrecto).');
+            pendingUploadRef.current = null;
+            return;
+          }
+          setUploadingPdfId(pending.facturaId);
+          try {
+            await onSubirPdf(pending.trabajoId, file);
+          } catch {
+            // Errors are handled in subirPdfExistente (page.tsx) via setErrorBanner
+          } finally {
+            setUploadingPdfId(null);
+            pendingUploadRef.current = null;
+          }
+        }}
+      />
+
       <SectionTitle title="Facturas" subtitle="Facturas generadas desde trabajos. Aquí se registran los pagos de clientes." />
 
       {/* ── Resumen Mensual de Facturación ───────────────────────────────────── */}
@@ -337,6 +381,62 @@ export function VistaFacturas({
                   <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Pagado</div><div className="font-semibold text-emerald-600">${fmt(montoPag)}</div></div>
                   <div className="flex items-center justify-between sm:justify-end gap-2">
                     <div className="text-right"><div className="text-xs text-slate-400 uppercase tracking-wide">Saldo</div><div className={`font-bold ${saldo > 0 ? 'text-rose-600' : 'text-slate-400'}`}>${fmt(saldo)}</div></div>
+                    {/* Ver PDF (activo) o Subir PDF (si aún no hay) — siempre visible */}
+                    {(() => {
+                      const trab = trabajos.find(t => t.id === factura.trabajoId);
+                      const pdfPath = trab?.facturaPdfUrl ?? null;
+                      const hasPdf = !!pdfPath;
+                      const isLoadingPdf = loadingPdfId === factura.id;
+                      const isUploading = uploadingPdfId === factura.id;
+
+                      if (hasPdf) {
+                        return (
+                          <button
+                            type="button"
+                            data-testid="ver-pdf-header-btn"
+                            disabled={isLoadingPdf}
+                            className="text-xs px-3 py-2.5 min-h-[44px] rounded border transition-colors font-medium whitespace-nowrap bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              setLoadingPdfId(factura.id);
+                              // Open blank window synchronously (in user-gesture context) to avoid
+                              // iOS/Android popup blocker blocking window.open after an await
+                              const win = window.open('', '_blank', 'noopener,noreferrer');
+                              try {
+                                const url = await createFacturaPdfSignedUrl(pdfPath);
+                                if (win) win.location.href = url;
+                                else window.open(url, '_blank', 'noopener,noreferrer');
+                              } catch {
+                                if (win) win.close();
+                                onError('No se pudo abrir el PDF. Verifica tu conexión e intenta de nuevo.');
+                              } finally {
+                                setLoadingPdfId(null);
+                              }
+                            }}
+                          >
+                            {isLoadingPdf ? '⏳ Abriendo...' : '📄 Ver PDF'}
+                          </button>
+                        );
+                      }
+
+                      if (!trab?.id) return null;
+
+                      return (
+                        <button
+                          type="button"
+                          data-testid="subir-pdf-header-btn"
+                          disabled={isUploading}
+                          className="text-xs px-3 py-2.5 min-h-[44px] rounded border transition-colors font-medium whitespace-nowrap bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            pendingUploadRef.current = { trabajoId: trab.id, facturaId: factura.id };
+                            fileInputRef.current?.click();
+                          }}
+                        >
+                          {isUploading ? '⏳ Subiendo...' : '📎 Subir PDF'}
+                        </button>
+                      );
+                    })()}
                     <Btn size="sm" variant={isExp ? 'ghost' : estado !== 'pagado' ? 'success' : 'ghost'}
                       onClick={() => { setExpandido(isExp ? null : factura.id); setPagoForm({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' }); }}>
                       {isExp ? '✕' : estado !== 'pagado' ? '+ Pago' : 'Ver'}
@@ -623,6 +723,43 @@ export function VistaFacturas({
                       </div>
                     )}
                     {estado === 'pagado' && <p className="text-xs text-emerald-600 font-semibold text-center">✅ Esta factura está completamente pagada.</p>}
+
+                    {/* Ver PDF de factura */}
+                    {(() => {
+                      const trab = trabajos.find(t => t.id === factura.trabajoId);
+                      if (!trab?.facturaPdfUrl) return null;
+                      const pdfPath = trab.facturaPdfUrl;
+                      const isLoading = loadingPdfId === factura.id;
+                      return (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            data-testid="ver-pdf-btn"
+                            disabled={isLoading}
+                            className="text-xs px-3 py-2.5 min-h-[44px] rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={async () => {
+                              setLoadingPdfId(factura.id);
+                              // Open blank window synchronously (in user-gesture context) to avoid
+                              // iOS/Android popup blocker blocking window.open after an await
+                              const win = window.open('', '_blank', 'noopener,noreferrer');
+                              try {
+                                const url = await createFacturaPdfSignedUrl(pdfPath);
+                                if (win) win.location.href = url;
+                                else window.open(url, '_blank', 'noopener,noreferrer');
+                              } catch {
+                                if (win) win.close();
+                                // Surface PDF signed URL errors via onError prop
+                                onError('No se pudo abrir el PDF. Verifica tu conexión e intenta de nuevo.');
+                              } finally {
+                                setLoadingPdfId(null);
+                              }
+                            }}
+                          >
+                            {isLoading ? '⏳ Abriendo...' : '📄 Ver PDF'}
+                          </button>
+                        </div>
+                      );
+                    })()}
 
                     {/* Cancelar factura */}
                     {confirmCancelarId === factura.id ? (

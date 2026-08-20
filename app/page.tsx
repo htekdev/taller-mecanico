@@ -28,6 +28,7 @@ import { VistaGastos } from '@/app/modules/gastos';
 import { VistaReportes } from '@/app/modules/reportes';
 import { useAuth }      from '@/app/context/auth';
 import * as db          from '@/app/lib/db';
+import { uploadFacturaPdf, deleteFacturaPdf } from '@/app/lib/supabase';
 
 type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones'|'gastos'|'reportes';
 
@@ -55,7 +56,8 @@ export default function TallerMecanico() {
   });
   const [mesActual, setMesActual] = useState(getMesActual());
   const [cargando, setCargando] = useState(true);
-  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: boolean } | null>(null);
+  const [pendingFactura, setPendingFactura] = useState<{ trabajoId: string; numero: string; fecha: string; incluirIva: boolean; pdfFile?: File | null } | null>(null);
+  const [isCreatingFactura, setIsCreatingFactura] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   // ── Cargar datos desde Supabase ──
@@ -240,7 +242,7 @@ export default function TallerMecanico() {
    *  Navigation to Trabajos tab is driven by the success screen button (onNavToTrabajos). */
   const convertirCotizacionATrabajo = async (data: ConversionTrabajo): Promise<void> => {
     if (!taller) throw new Error('Sin sesión activa');
-    const totalManoDeObra = data.manoDeObraItems.reduce((s, l) => s + l.precio, 0);
+    const totalManoDeObra = data.manoDeObraItems.reduce((s, l) => s + (l.precio * (l.cantidad ?? 1)), 0);
     const totalVentaRef   = data.partes.reduce((s, p) => s + p.subtotal, 0);
     const totalCostoRef   = data.partes.reduce((s, p) => s + p.costoTotal, 0);
     const subtotal        = totalManoDeObra + totalVentaRef;
@@ -339,7 +341,7 @@ export default function TallerMecanico() {
       // If this job has a linked invoice, sync it with the updated costs
       if (existing.facturaId) {
         const conceptos: FacturaConcepto[] = [
-          ...data.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
+          ...data.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: m.cantidad ?? 1, precioUnitario: m.precio, subtotal: m.precio * (m.cantidad ?? 1) })),
           ...data.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
         ];
         const facturaSubtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
@@ -634,12 +636,12 @@ export default function TallerMecanico() {
   };
 
   // ── Invoice (Factura) handlers ──
-  const generarFactura = async (trabajoId: string, numeroFactura: string, fechaFactura: string, incluirIva: boolean) => {
-    if (!taller) return;
+  const generarFactura = async (trabajoId: string, numeroFactura: string, fechaFactura: string, incluirIva: boolean): Promise<string> => {
+    if (!taller) throw new Error('[generarFactura] taller is null');
     const trabajo = trabajos.find(t => t.id === trabajoId);
-    if (!trabajo || trabajo.facturaId) return;
+    if (!trabajo || trabajo.facturaId) throw new Error('[generarFactura] invalid trabajo state');
     const conceptos: FacturaConcepto[] = [
-      ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
+      ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: m.cantidad ?? 1, precioUnitario: m.precio, subtotal: m.precio * (m.cantidad ?? 1) })),
       ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
     ];
     const subtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
@@ -656,6 +658,7 @@ export default function TallerMecanico() {
     setFacturas(prev => [...prev, nuevaFactura]);
     await db.updateTrabajoFactura(trabajoId, nuevaFactura.id);
     setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 'facturado' as const } : t));
+    return nuevaFactura.id;
   };
 
   const abrirModalFactura = (trabajoId: string) => {
@@ -664,7 +667,7 @@ export default function TallerMecanico() {
     const trabajo = trabajos.find(t => t.id === trabajoId);
     // Default IVA checkbox: true if job was finalized as Factura or has requiereFactura=true (covers migrated data)
     const defaultIva = trabajo?.tipoDocumento === 'factura' || (trabajo?.tipoDocumento == null && trabajo?.requiereFactura === true);
-    setPendingFactura({ trabajoId, numero: sugerido, fecha: hoy, incluirIva: defaultIva ?? false });
+    setPendingFactura({ trabajoId, numero: sugerido, fecha: hoy, incluirIva: defaultIva ?? false, pdfFile: null });
   };
 
   const refacturarTrabajo = async (trabajoId: string) => {
@@ -704,14 +707,65 @@ export default function TallerMecanico() {
   };
 
   const confirmarFactura = async () => {
-    if (!pendingFactura || !pendingFactura.numero.trim()) return;
+    if (!pendingFactura || !pendingFactura.numero.trim() || isCreatingFactura) return;
+    setIsCreatingFactura(true);
+    let facturaId: string | null = null;
     try {
-      await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
+      // generarFactura returns the new factura ID directly — avoids stale closure on React state
+      facturaId = await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
+      // Upload PDF if one was selected
+      if (pendingFactura.pdfFile && taller) {
+        try {
+          const pdfPath = await uploadFacturaPdf(taller.id, pendingFactura.trabajoId, pendingFactura.pdfFile);
+          await db.updateTrabajoFacturaPdf(taller.id, pendingFactura.trabajoId, pdfPath);
+          setTrabajos(prev => prev.map(t =>
+            t.id === pendingFactura.trabajoId ? { ...t, facturaPdfUrl: pdfPath } : t,
+          ));
+        } catch (pdfErr: unknown) {
+          // PDF upload failed — roll back the factura for data integrity
+          console.error('[confirmarFactura] PDF upload failed — rolling back:', pdfErr);
+          const pdfMsg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
+          // Clean up orphaned storage file for non-preflight errors (MIME/SIZE/MAGIC are
+          // caught client-side; reaching here means upload succeeded but DB update failed)
+          if (!pdfMsg.includes('MIME_ERROR') && !pdfMsg.includes('SIZE_ERROR') && !pdfMsg.includes('MAGIC_ERROR') && taller) {
+            const orphanPath = `${taller.id}/${pendingFactura.trabajoId}/factura.pdf`;
+            deleteFacturaPdf(orphanPath).catch(e =>
+              console.error('[confirmarFactura] Storage cleanup failed (orphaned file):', e),
+            );
+          }
+          try {
+            if (facturaId) await db.deleteFactura(taller.id, facturaId);
+            await db.resetFacturacionTrabajo(pendingFactura.trabajoId);
+            setFacturas(prev => prev.filter(f => f.id !== facturaId));
+            setTrabajos(prev => prev.map(t =>
+              t.id === pendingFactura.trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
+            ));
+          } catch (_rollbackErr) {
+            console.error('[confirmarFactura] Rollback failed after PDF upload error:', _rollbackErr);
+            setErrorBanner('No se pudo subir el PDF ni revertir los cambios automáticamente. Recarga la página para ver el estado actual.');
+            setPendingFactura(null);
+            return;
+          }
+          if (pdfMsg.includes('MIME_ERROR')) {
+            setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
+          } else if (pdfMsg.includes('SIZE_ERROR')) {
+            setErrorBanner('El PDF no puede exceder 10 MB.');
+          } else if (pdfMsg.includes('MAGIC_ERROR')) {
+            setErrorBanner('El archivo parece estar corrupto. Intenta con otro PDF.');
+          } else {
+            setErrorBanner('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.');
+          }
+          setPendingFactura(null);
+          return;
+        }
+      }
       setPendingFactura(null);
       setVista('facturas');
     } catch (err) {
       console.error('[confirmarFactura] FAILED:', err);
       setErrorBanner('No se pudo generar la factura. Verifica tu conexion e intenta de nuevo.');
+    } finally {
+      setIsCreatingFactura(false);
     }
   };
   const registrarPagoFactura = async (facturaId: string, pago: Omit<PagoFactura, 'id'>) => {
@@ -821,6 +875,30 @@ export default function TallerMecanico() {
     } catch (err) {
       console.error('[reactivarNota] FAILED:', err);
       setErrorBanner('No se pudo reactivar la nota. Verifica tu conexion e intenta de nuevo.');
+    }
+  };
+
+  const subirPdfExistente = async (trabajoId: string, file: File) => {
+    if (!taller) return;
+    let uploadedPath: string | null = null;
+    try {
+      const pdfPath = await uploadFacturaPdf(taller.id, trabajoId, file);
+      uploadedPath = pdfPath; // track path so we can clean up if DB update fails
+      await db.updateTrabajoFacturaPdf(taller.id, trabajoId, pdfPath);
+      setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaPdfUrl: pdfPath } : t));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Best-effort cleanup: if upload succeeded but DB update failed, remove orphaned file.
+      // MIME/SIZE/MAGIC errors are thrown before any actual upload — skip cleanup for those.
+      if (uploadedPath && !msg.includes('MIME_ERROR') && !msg.includes('SIZE_ERROR') && !msg.includes('MAGIC_ERROR')) {
+        deleteFacturaPdf(uploadedPath).catch(e =>
+          console.error('[subirPdfExistente] Storage cleanup failed (orphaned file):', e),
+        );
+      }
+      if (msg.includes('MIME_ERROR')) setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
+      else if (msg.includes('SIZE_ERROR')) setErrorBanner('El PDF no puede exceder 10 MB.');
+      else if (msg.includes('MAGIC_ERROR')) setErrorBanner('El archivo parece estar corrupto. Intenta con otro PDF.');
+      else setErrorBanner('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.');
     }
   };
 
@@ -1111,7 +1189,9 @@ export default function TallerMecanico() {
               onRegistrarPago={registrarPagoFactura} onEditarFechaFactura={editarFechaFactura}
               onEditarNumeroFactura={editarNumeroFactura}
               onEditarSubtotalFactura={editarSubtotalFactura}
-              onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura} />
+              onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura}
+              onSubirPdf={subirPdfExistente}
+              onError={setErrorBanner} />
           )}
           {vista === 'cuentas' && (
             <VistaCuentas facturas={facturas} trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
@@ -1173,7 +1253,7 @@ export default function TallerMecanico() {
       {/* ── Modal: Número de Factura ── */}
       {pendingFactura && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 max-h-[85vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-slate-800 mb-1">🧾 Número de Factura</h2>
             <p className="text-sm text-slate-500 mb-4">
               Escribe el número de factura que manejan en el taller. Puedes usar la sugerencia o escribir el tuyo propio.
@@ -1224,17 +1304,64 @@ export default function TallerMecanico() {
                 </p>
               </div>
             </label>
+            {/* PDF de factura (opcional) */}
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                PDF de factura <span className="text-slate-400 font-normal normal-case">(opcional)</span>
+              </p>
+              <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-3 min-h-[44px] transition-colors ${
+                pendingFactura?.pdfFile
+                  ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                  : 'border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-600'
+              }`}>
+                <span className="flex-1 text-sm truncate">
+                  {pendingFactura?.pdfFile ? `📄 ${pendingFactura.pdfFile.name}` : '📎 Seleccionar PDF (opcional)'}
+                </span>
+                <input
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  data-testid="pdf-upload-input"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    if (file && file.size > 10 * 1024 * 1024) {
+                      setErrorBanner('El PDF no puede exceder 10 MB.');
+                      e.target.value = '';
+                      return;
+                    }
+                    // Preflight MIME check — catches wrong file types before server round-trip
+                    // Note: iOS Safari may send empty file.type for PDFs; skip check in that case
+                    if (file && file.type && file.type !== 'application/pdf') {
+                      setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
+                      e.target.value = '';
+                      return;
+                    }
+                    setPendingFactura(prev => prev ? { ...prev, pdfFile: file } : null);
+                  }}
+                />
+              </label>
+              {pendingFactura?.pdfFile && (
+                <button
+                  type="button"
+                  className="mt-1 text-xs text-slate-500 hover:text-red-500 py-2.5 px-2 min-h-[44px] flex items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                  onClick={() => setPendingFactura(prev => prev ? { ...prev, pdfFile: null } : null)}
+                >
+                  ✕ Quitar PDF
+                </button>
+              )}
+            </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setPendingFactura(null)}
-                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
+                disabled={isCreatingFactura}
+                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 Cancelar
               </button>
               <button
                 onClick={confirmarFactura}
-                disabled={!pendingFactura.numero.trim() || !pendingFactura.fecha}
+                disabled={!pendingFactura.numero.trim() || !pendingFactura.fecha || isCreatingFactura}
                 className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                ✓ Crear Factura
+                {isCreatingFactura ? (pendingFactura?.pdfFile ? '⏳ Subiendo PDF...' : '⏳ Creando...') : '✓ Crear Factura'}
               </button>
             </div>
           </div>

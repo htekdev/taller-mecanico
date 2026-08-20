@@ -11,89 +11,125 @@
 -- FIXED UUIDs so cross-table references work on every fresh branch.
 -- ============================================================
 
--- ── Auth Users ───────────────────────────────────────────────
--- Inserting directly into auth.users (seed runs as superuser).
--- pgcrypto is always available on Supabase preview branches.
+-- ── Auth Users + Taller + Miembros (idempotent DO block) ────────────────────
+-- Uses a DO block so we can look up existing user UUIDs before inserting
+-- downstream FK references (talleres.created_by, taller_members.user_id).
+-- This handles preview branches that already have test users with different UUIDs.
+DO $$
+DECLARE
+  sofia_id    uuid := 'a0000000-0000-0000-0000-000000000001';
+  mecanico_id uuid := 'a0000000-0000-0000-0000-000000000002';
+  invitado_id uuid := 'a0000000-0000-0000-0000-000000000003';
+  existing_id uuid;
+BEGIN
+  -- ── sofia@test.com ────────────────────────────────────────────
+  SELECT id INTO existing_id FROM auth.users WHERE email = 'sofia@test.com';
+  IF existing_id IS NOT NULL THEN
+    sofia_id := existing_id;  -- use the UUID already in this preview branch
+  ELSE
+    INSERT INTO auth.users (
+      instance_id, id, aud, role, email,
+      encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data,
+      created_at, updated_at,
+      confirmation_token, email_change, email_change_token_new, recovery_token
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      sofia_id,
+      'authenticated', 'authenticated', 'sofia@test.com',
+      crypt('Test1234!', gen_salt('bf', 10)),
+      NOW(),
+      '{"provider":"email","providers":["email"]}',
+      '{"nombre":"Sofía"}',
+      NOW() - interval '30 days', NOW(),
+      '', '', '', ''
+    ) ON CONFLICT DO NOTHING;
+  END IF;
 
-INSERT INTO auth.users (
-  instance_id, id, aud, role, email,
-  encrypted_password, email_confirmed_at,
-  raw_app_meta_data, raw_user_meta_data,
-  created_at, updated_at,
-  confirmation_token, email_change, email_change_token_new, recovery_token
-) VALUES
-  -- sofia@test.com — owner
-  (
-    '00000000-0000-0000-0000-000000000000',
-    'a0000000-0000-0000-0000-000000000001',
-    'authenticated', 'authenticated', 'sofia@test.com',
-    crypt('Test1234!', gen_salt('bf', 10)),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{"nombre":"Sofía"}',
-    NOW() - interval '30 days', NOW(),
-    '', '', '', ''
-  ),
-  -- mecanico@test.com — mechanic
-  (
-    '00000000-0000-0000-0000-000000000000',
-    'a0000000-0000-0000-0000-000000000002',
-    'authenticated', 'authenticated', 'mecanico@test.com',
-    crypt('Test1234!', gen_salt('bf', 10)),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{"nombre":"Miguel"}',
-    NOW() - interval '25 days', NOW(),
-    '', '', '', ''
-  ),
-  -- invitado@test.com — has pending invite, not yet a member
-  (
-    '00000000-0000-0000-0000-000000000000',
-    'a0000000-0000-0000-0000-000000000003',
-    'authenticated', 'authenticated', 'invitado@test.com',
-    crypt('Test1234!', gen_salt('bf', 10)),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{"nombre":"Invitado"}',
-    NOW() - interval '2 days', NOW(),
-    '', '', '', ''
-  )
-ON CONFLICT (id) DO NOTHING;
+  -- ── mecanico@test.com ─────────────────────────────────────────
+  SELECT id INTO existing_id FROM auth.users WHERE email = 'mecanico@test.com';
+  IF existing_id IS NOT NULL THEN
+    mecanico_id := existing_id;
+  ELSE
+    INSERT INTO auth.users (
+      instance_id, id, aud, role, email,
+      encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data,
+      created_at, updated_at,
+      confirmation_token, email_change, email_change_token_new, recovery_token
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      mecanico_id,
+      'authenticated', 'authenticated', 'mecanico@test.com',
+      crypt('Test1234!', gen_salt('bf', 10)),
+      NOW(),
+      '{"provider":"email","providers":["email"]}',
+      '{"nombre":"Miguel"}',
+      NOW() - interval '25 days', NOW(),
+      '', '', '', ''
+    ) ON CONFLICT DO NOTHING;
+  END IF;
 
--- ── Taller ───────────────────────────────────────────────────
-INSERT INTO talleres (id, nombre, created_by, created_at) VALUES (
-  'b0000000-0000-0000-0000-000000000001',
-  'Taller Diesel Mérida',
-  'a0000000-0000-0000-0000-000000000001',
-  NOW() - interval '30 days'
-) ON CONFLICT (id) DO NOTHING;
+  -- ── invitado@test.com ─────────────────────────────────────────
+  SELECT id INTO existing_id FROM auth.users WHERE email = 'invitado@test.com';
+  IF existing_id IS NOT NULL THEN
+    invitado_id := existing_id;
+  ELSE
+    INSERT INTO auth.users (
+      instance_id, id, aud, role, email,
+      encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data,
+      created_at, updated_at,
+      confirmation_token, email_change, email_change_token_new, recovery_token
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      invitado_id,
+      'authenticated', 'authenticated', 'invitado@test.com',
+      crypt('Test1234!', gen_salt('bf', 10)),
+      NOW(),
+      '{"provider":"email","providers":["email"]}',
+      '{"nombre":"Invitado"}',
+      NOW() - interval '2 days', NOW(),
+      '', '', '', ''
+    ) ON CONFLICT DO NOTHING;
+  END IF;
 
--- ── Miembros ──────────────────────────────────────────────────
-INSERT INTO taller_members (id, taller_id, user_id, role, email, created_at) VALUES
-  (
-    'c0000000-0000-0000-0000-000000000001',
+  -- ── Taller ────────────────────────────────────────────────────
+  INSERT INTO talleres (id, nombre, created_by, created_at) VALUES (
     'b0000000-0000-0000-0000-000000000001',
-    'a0000000-0000-0000-0000-000000000001',
-    'owner', 'sofia@test.com', NOW() - interval '30 days'
-  ),
-  (
-    'c0000000-0000-0000-0000-000000000002',
-    'b0000000-0000-0000-0000-000000000001',
-    'a0000000-0000-0000-0000-000000000002',
-    'mechanic', 'mecanico@test.com', NOW() - interval '25 days'
-  )
-ON CONFLICT (id) DO NOTHING;
+    'Taller Diesel Mérida',
+    sofia_id,
+    NOW() - interval '30 days'
+  ) ON CONFLICT (id) DO UPDATE SET created_by = EXCLUDED.created_by;
 
--- ── Invitación pendiente (invitado@test.com) ──────────────────
-INSERT INTO taller_invites (id, taller_id, email, token, invited_by, used_at, created_at) VALUES (
-  'c1000000-0000-0000-0000-000000000001',
-  'b0000000-0000-0000-0000-000000000001',
-  'invitado@test.com',
-  'preview-seed-token-invitado-2026',
-  'a0000000-0000-0000-0000-000000000001',
-  NULL,
-  NOW() - interval '2 days'
-) ON CONFLICT (id) DO NOTHING;
+  -- ── Miembros ──────────────────────────────────────────────────
+  INSERT INTO taller_members (id, taller_id, user_id, role, email, created_at) VALUES
+    (
+      'c0000000-0000-0000-0000-000000000001',
+      'b0000000-0000-0000-0000-000000000001',
+      sofia_id,
+      'owner', 'sofia@test.com', NOW() - interval '30 days'
+    ),
+    (
+      'c0000000-0000-0000-0000-000000000002',
+      'b0000000-0000-0000-0000-000000000001',
+      mecanico_id,
+      'mechanic', 'mecanico@test.com', NOW() - interval '25 days'
+    )
+  ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id;
+
+  -- ── Invitación pendiente ──────────────────────────────────────
+  INSERT INTO taller_invites (id, taller_id, email, token, invited_by, used_at, created_at) VALUES (
+    'c1000000-0000-0000-0000-000000000001',
+    'b0000000-0000-0000-0000-000000000001',
+    'invitado@test.com',
+    'preview-seed-token-invitado-2026',
+    sofia_id,
+    NULL,
+    NOW() - interval '2 days'
+  ) ON CONFLICT (id) DO NOTHING;
+
+END $$;
 
 -- ── Proveedores ───────────────────────────────────────────────
 INSERT INTO proveedores (id, taller_id, nombre, telefono, contacto, notas, created_at) VALUES

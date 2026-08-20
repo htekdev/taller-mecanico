@@ -14,6 +14,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Blocked in production' }, { status: 403 });
   }
 
+  // Require a secret token on all non-development environments to prevent
+  // unauthorized data deletion on preview deployments.
+  // E2E_CLEANUP_SECRET must be set in Vercel preview + CI env vars.
+  const expectedSecret = process.env.E2E_CLEANUP_SECRET;
+  const isDev = process.env.NODE_ENV === 'development';
+  if (!isDev) {
+    if (!expectedSecret) {
+      return NextResponse.json(
+        { error: 'E2E_CLEANUP_SECRET not configured' },
+        { status: 503 },
+      );
+    }
+    const authHeader = request.headers.get('authorization') ?? '';
+    const providedSecret = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (providedSecret !== expectedSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

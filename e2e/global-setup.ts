@@ -41,9 +41,13 @@ export default async function globalSetup(config: FullConfig) {
   // old so concurrent CI runs do not interfere with each other.
   console.log('[E2E Setup] Cleaning old test data...');
   try {
+    const cleanupSecret = process.env.E2E_CLEANUP_SECRET;
     const cleanupResponse = await fetch(`${baseURL}/api/e2e-cleanup`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(cleanupSecret ? { 'Authorization': `Bearer ${cleanupSecret}` } : {}),
+      },
       body: JSON.stringify({ email: TEST_EMAIL }),
     });
     const cleanupBody = await cleanupResponse.json().catch(() => ({}));
