@@ -1353,7 +1353,8 @@ export default function TallerMecanico() {
             <div className="flex gap-3">
               <button
                 onClick={() => setPendingFactura(null)}
-                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
+                disabled={isCreatingFactura}
+                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 Cancelar
               </button>
               <button

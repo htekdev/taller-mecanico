@@ -399,10 +399,15 @@ export function VistaFacturas({
                             onClick={async (e) => {
                               e.stopPropagation();
                               setLoadingPdfId(factura.id);
+                              // Open blank window synchronously (in user-gesture context) to avoid
+                              // iOS/Android popup blocker blocking window.open after an await
+                              const win = window.open('', '_blank', 'noopener,noreferrer');
                               try {
                                 const url = await createFacturaPdfSignedUrl(pdfPath);
-                                window.open(url, '_blank', 'noopener,noreferrer');
+                                if (win) win.location.href = url;
+                                else window.open(url, '_blank', 'noopener,noreferrer');
                               } catch {
+                                if (win) win.close();
                                 onError('No se pudo abrir el PDF. Verifica tu conexión e intenta de nuevo.');
                               } finally {
                                 setLoadingPdfId(null);
@@ -734,10 +739,15 @@ export function VistaFacturas({
                             className="text-xs px-3 py-2.5 min-h-[44px] rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={async () => {
                               setLoadingPdfId(factura.id);
+                              // Open blank window synchronously (in user-gesture context) to avoid
+                              // iOS/Android popup blocker blocking window.open after an await
+                              const win = window.open('', '_blank', 'noopener,noreferrer');
                               try {
                                 const url = await createFacturaPdfSignedUrl(pdfPath);
-                                window.open(url, '_blank', 'noopener,noreferrer');
+                                if (win) win.location.href = url;
+                                else window.open(url, '_blank', 'noopener,noreferrer');
                               } catch {
+                                if (win) win.close();
                                 // Surface PDF signed URL errors via onError prop
                                 onError('No se pudo abrir el PDF. Verifica tu conexión e intenta de nuevo.');
                               } finally {
