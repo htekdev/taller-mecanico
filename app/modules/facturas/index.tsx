@@ -36,6 +36,7 @@ export function VistaFacturas({
   onCancelarFactura: (facturaId: string) => void;
   onReactivarFactura: (facturaId: string) => void;
   onSubirPdf: (trabajoId: string, file: File) => Promise<void>;
+  onError?: (msg: string) => void;
 }) {
   const hoy = getHoy();
 
@@ -387,7 +388,8 @@ export function VistaFacturas({
                                 const url = await createFacturaPdfSignedUrl(pdfPath);
                                 window.open(url, '_blank');
                               } catch {
-                                // silent — signed URL errors don't require user action
+                                // Silent URL errors are surfaced via onError prop
+                                onError?.('No se pudo abrir el PDF. Verifica tu conexión e intenta de nuevo.');
                               }
                               finally { setLoadingPdfId(null); }
                             }}
@@ -720,7 +722,8 @@ export function VistaFacturas({
                                 const url = await createFacturaPdfSignedUrl(pdfPath);
                                 window.open(url, '_blank');
                               } catch {
-                                // silent — no onError prop in this component
+                                // Surface PDF signed URL errors via onError prop
+                                onError?.('No se pudo abrir el PDF. Verifica tu conexión e intenta de nuevo.');
                               } finally {
                                 setLoadingPdfId(null);
                               }

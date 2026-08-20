@@ -104,7 +104,10 @@ test.describe('change-proof: form draft persistence', () => {
       const value = await descTextarea.inputValue().catch(() => '');
       expect(value, 'El formulario debe contener el texto del borrador silenciosamente').toContain(DRAFT_DESCRIPTION.slice(0, 15));
     } else {
+      // Wait for form to render — draft restore sets pantalla='formulario' asynchronously
       await expect(descTextarea, 'El formulario (textarea) debe estar visible — draft restaurado').toBeVisible({ timeout: 5_000 });
+      const value = await descTextarea.inputValue().catch(() => '');
+      expect(value, 'El formulario debe contener el texto del borrador silenciosamente').toContain(DRAFT_DESCRIPTION.slice(0, 15));
     }
   });
 

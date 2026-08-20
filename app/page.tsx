@@ -729,7 +729,12 @@ export default function TallerMecanico() {
             setTrabajos(prev => prev.map(t =>
               t.id === pendingFactura.trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
             ));
-          } catch (_rollbackErr) { /* best-effort rollback */ }
+          } catch (_rollbackErr) {
+            console.error('[confirmarFactura] Rollback failed after PDF upload error:', _rollbackErr);
+            setErrorBanner('No se pudo subir el PDF ni revertir los cambios automáticamente. Recarga la página para ver el estado actual.');
+            setPendingFactura(null);
+            return;
+          }
           const msg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
           if (msg.includes('MIME_ERROR')) {
             setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
@@ -1164,7 +1169,8 @@ export default function TallerMecanico() {
               onEditarNumeroFactura={editarNumeroFactura}
               onEditarSubtotalFactura={editarSubtotalFactura}
               onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura}
-              onSubirPdf={subirPdfExistente} />
+              onSubirPdf={subirPdfExistente}
+              onError={setErrorBanner} />
           )}
           {vista === 'cuentas' && (
             <VistaCuentas facturas={facturas} trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
@@ -1299,6 +1305,14 @@ export default function TallerMecanico() {
                     const file = e.target.files?.[0] ?? null;
                     if (file && file.size > 10 * 1024 * 1024) {
                       setErrorBanner('El PDF no puede exceder 10 MB.');
+                      e.target.value = '';
+                      return;
+                    }
+                    // Preflight MIME check — catches wrong file types before server round-trip
+                    // Note: iOS Safari may send empty file.type for PDFs; skip check in that case
+                    if (file && file.type && file.type !== 'application/pdf') {
+                      setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
+                      e.target.value = '';
                       return;
                     }
                     setPendingFactura(prev => prev ? { ...prev, pdfFile: file } : null);
