@@ -35,9 +35,8 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
    */
   test(
     'A: inventory remains intact after creating a job (guardarTrabajo smoke)',
-    { retries: 1 },
     async ({ page, dashboardPage, inventarioPage, trabajosPage }) => {
-      test.slow();
+      test.setTimeout(90_000); // explicit cap — avoids test.slow() tripling global 180s timeout
       const runId = TestData.uniqueId();
       const partName = `Aceite 15W-40 A ${runId}`;
       const INITIAL_STOCK = 10;
@@ -52,7 +51,6 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
         stock: INITIAL_STOCK,
         stockMinimo: 2,
       });
-      await page.waitForTimeout(500);
       expect(await inventarioPage.isPartVisible(partName)).toBe(true);
 
       // ─── Phase 2: Confirm initial stock via page object ─────────────────────
@@ -96,9 +94,8 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
    */
   test(
     'B: no double-deduction when re-saving existing job with same parts (editarTrabajo delta=0)',
-    { retries: 1 },
     async ({ page, dashboardPage, inventarioPage, trabajosPage }) => {
-      test.slow();
+      test.setTimeout(90_000); // explicit cap — avoids test.slow() tripling global 180s timeout
       const runId = TestData.uniqueId();
       const partName = `Aceite Edit B ${runId}`;
       const INITIAL_STOCK = 20;
@@ -114,7 +111,6 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
         stock: INITIAL_STOCK,
         stockMinimo: 2,
       });
-      await page.waitForTimeout(1000);
       expect(await inventarioPage.isPartVisible(partName)).toBe(true);
 
       // ─── Phase 2: Create job (no parts — typical workflow) ──────────────────
@@ -186,7 +182,7 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
     'C: decimal quantities accepted and stored correctly (NUMERIC migration)',
     { retries: 1 },
     async ({ page, dashboardPage, inventarioPage }) => {
-      test.slow();
+      test.setTimeout(90_000); // explicit cap — avoids test.slow() tripling global 180s timeout
       const runId = TestData.uniqueId();
       const partName = `Aceite Decimal C ${runId}`;
       const INITIAL_STOCK = 10;
@@ -202,7 +198,6 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
         stock: INITIAL_STOCK,
         stockMinimo: 1,
       });
-      await page.waitForTimeout(500);
       expect(await inventarioPage.isPartVisible(partName)).toBe(true);
 
       // ─── Phase 2: Receive stock with decimal quantity ────────────────────────

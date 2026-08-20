@@ -118,7 +118,8 @@ export class InventarioPage extends BasePage {
     }
 
     await this.agregarButton.click();
-    await this.page.waitForTimeout(2000);
+    // Wait for the part to appear in the list instead of sleeping unconditionally
+    await this.page.locator(`:has-text("${data.nombre}")`).first().waitFor({ state: 'visible', timeout: 15_000 });
   }
 
   async selectProveedor(index = 1) {
