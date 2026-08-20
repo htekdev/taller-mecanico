@@ -1259,4 +1259,46 @@ export async function nextCotizacionNumber(tallerId: string): Promise<string> {
   return `COT-${String(next).padStart(3, '0')}`;
 }
 
+// ── Categorías de refacciones ─────────────────────────────────────────────────
+
+/**
+ * Returns all custom categories saved for this taller, sorted alphabetically.
+ * Default categories (CATEGORIAS_PREDEFINIDAS in ordenes/index.tsx) are NOT stored
+ * here — this table only holds user-added custom categories.
+ * Throws on error so cargarDatos catch handler surfaces it as an error banner.
+ */
+export async function getCategorias(tallerId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('categorias_refacciones')
+    .select('nombre')
+    .eq('taller_id', tallerId)
+    .order('nombre', { ascending: true });
+
+  if (error) throw new Error('[getCategorias] ' + error.message);
+  return (data ?? []).map((r: { nombre: string }) => r.nombre);
+}
+
+/**
+ * Persists a new custom category for this taller.
+ * Normalizes input: trims whitespace and capitalizes the first letter.
+ * Silently ignores duplicates (ignored at DB level via ignoreDuplicates: true).
+ * Throws on any other error so the caller can surface it to the user.
+ */
+export async function insertCategoria(tallerId: string, nombre: string): Promise<void> {
+  const trimmed = nombre.trim();
+  if (!trimmed) return;
+  // Capitalize first letter only (e.g. "frenos" → "Frenos")
+  const normalizado = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+
+  const { error } = await supabase
+    .from('categorias_refacciones')
+    .upsert(
+      { taller_id: tallerId, nombre: normalizado },
+      { onConflict: 'taller_id,nombre', ignoreDuplicates: true }
+    );
+
+  // ignoreDuplicates: true means duplicate conflicts are silently dropped — error is null on dup.
+  // Any non-null error is unexpected (RLS block, network, etc.) — throw so caller can handle it.
+  if (error) throw new Error('[insertCategoria] ' + error.message);
+}
 

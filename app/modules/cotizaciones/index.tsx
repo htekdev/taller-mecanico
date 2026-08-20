@@ -1181,6 +1181,8 @@ export function VistaCotizaciones({
   // Conversion modal: tracks which cotización is being reconciled
   const [reconciliandoId, setReconciliandoId] = useState<string | null>(null);
   const [guardando, setGuardando]       = useState(false);
+  // Guard: ensures draft restore fires at most once per mount, not on every pantalla change
+  const draftRestoredRef = useRef(false);
   const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
 
   // ── Departamentos — loaded from localStorage (shared with Trabajos module) ──
@@ -1341,6 +1343,25 @@ export function VistaCotizaciones({
       clearDraft(COT_DRAFT_KEY(tallerId));
     }
   }, [tallerId]);
+
+  // ── Re-restore draft when returning to inicio (after navigation away/back) ──
+  useEffect(() => {
+    if (!tallerId || pantalla !== 'inicio') return;
+    if (draftRestoredRef.current) return; // already restored once this mount
+    draftRestoredRef.current = true;
+    try {
+      const draft = readDraft<CotizacionDraft>(COT_DRAFT_KEY(tallerId));
+      if (draft?.pantalla === 'formulario' && draft.form) {
+        setPantalla('formulario');
+        setPlantilla(draft.plantilla ?? 'general');
+        setForm(draft.form);
+        setEditingId(draft.editingId ?? null);
+      }
+    } catch {
+      // Corrupted localStorage data — clear it
+      clearDraft(COT_DRAFT_KEY(tallerId));
+    }
+  }, [tallerId, pantalla]);
 
   // ── Draft auto-save: persist form while user is filling it out ─────────────
   useEffect(() => {
