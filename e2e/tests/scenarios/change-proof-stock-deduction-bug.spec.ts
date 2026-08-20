@@ -52,15 +52,16 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
         stock: INITIAL_STOCK,
         stockMinimo: 2,
       });
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(500);
       expect(await inventarioPage.isPartVisible(partName)).toBe(true);
 
       // ─── Phase 2: Confirm initial stock via page object ─────────────────────
       await showPhaseLabel(page, `📊 Phase 2: Confirm initial stock = ${INITIAL_STOCK}`);
-      const stockBefore = await inventarioPage.getStockForPart(partName).catch(() => null);
-      if (stockBefore !== null) {
-        expect(parseFloat(stockBefore)).toBe(INITIAL_STOCK);
-      }
+      const rawStockBefore = await inventarioPage.getStockForPart(partName).catch(() => null);
+      const stockBefore = rawStockBefore !== null ? parseFloat(rawStockBefore) : null;
+      // Hard assertion — baseline must be verified; null = stock UI not rendering (test infra issue)
+      expect(stockBefore).not.toBeNull();
+      expect(stockBefore).toBe(INITIAL_STOCK);
 
       // ─── Phase 3: Create a new job (no parts) ───────────────────────────────
       await showPhaseLabel(page, '🔧 Phase 3: Create job (no parts)');
@@ -68,17 +69,14 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
       await trabajosPage.waitForPageLoad();
       await trabajosPage.nuevoTrabajoButton.click();
       await trabajosPage.selectClient(1);
-      await page.waitForTimeout(500);
       await trabajosPage.descripcionInput.fill(`Aceite job ${runId}`);
       await trabajosPage.saveButton.click();
-      await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
 
       // ─── Phase 4: Verify stock is unchanged (no phantom deduction) ──────────
       await showPhaseLabel(page, `✅ Phase 4: Stock must still be ${INITIAL_STOCK}`);
       await dashboardPage.navigateToModule('inventario');
       await inventarioPage.waitForPageLoad();
-      await page.waitForTimeout(1000);
 
       const rawStockAfter = await inventarioPage.getStockForPart(partName).catch(() => null);
       const stockAfter = rawStockAfter !== null ? parseFloat(rawStockAfter) : null;
@@ -116,7 +114,7 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
         stock: INITIAL_STOCK,
         stockMinimo: 2,
       });
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(1000);
       expect(await inventarioPage.isPartVisible(partName)).toBe(true);
 
       // ─── Phase 2: Create job (no parts — typical workflow) ──────────────────
@@ -125,12 +123,10 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
       await trabajosPage.waitForPageLoad();
       await trabajosPage.nuevoTrabajoButton.click();
       await trabajosPage.selectClient(1);
-      await page.waitForTimeout(500);
       await trabajosPage.selectVehicle(0);
       await trabajosPage.descripcionInput.fill(DESCRIPTION);
       await trabajosPage.saveButton.click();
-      await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
 
       // ─── Phase 3: Read stock (should still be INITIAL — no parts added yet) ──
       await showPhaseLabel(page, `📊 Phase 3: Stock should still be ${INITIAL_STOCK}`);
@@ -139,9 +135,9 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
       const rawStockCreate = await inventarioPage.getStockForPart(partName).catch(() => null);
       const stockAfterCreate = rawStockCreate !== null ? parseFloat(rawStockCreate) : null;
       await showPhaseLabel(page, `📊 Stock after create: ${stockAfterCreate ?? 'N/A'}`);
-      if (stockAfterCreate !== null) {
-        expect(stockAfterCreate).toBe(INITIAL_STOCK);
-      }
+      // Hard assertion — baseline before edit must be verified
+      expect(stockAfterCreate).not.toBeNull();
+      expect(stockAfterCreate).toBe(INITIAL_STOCK);
 
       // ─── Phase 4: Find job and Re-save via Edit (delta=0) ───────────────────
       await showPhaseLabel(page, '✏️ Phase 4: Re-save job via Edit (same parts = delta 0)');
@@ -160,14 +156,12 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
       const saveBtn = page.getByRole('button', { name: /guardar cambios|actualizar|guardar/i });
       await expect(saveBtn).toBeVisible({ timeout: 5000 });
       await saveBtn.click();
-      await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
 
       // ─── Phase 5: Verify NO double-deduction ────────────────────────────────
       await showPhaseLabel(page, `✅ Phase 5: Stock must STILL be ${INITIAL_STOCK} (no double-deduction)`);
       await dashboardPage.navigateToModule('inventario');
       await inventarioPage.waitForPageLoad();
-      await page.waitForTimeout(1000);
 
       // Use page object getStockForPart (correct regex, not fragile inline helper)
       const rawStock = await inventarioPage.getStockForPart(partName).catch(() => null);
@@ -208,14 +202,13 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
         stock: INITIAL_STOCK,
         stockMinimo: 1,
       });
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(500);
       expect(await inventarioPage.isPartVisible(partName)).toBe(true);
 
       // ─── Phase 2: Receive stock with decimal quantity ────────────────────────
       // Use receiveStock page object — proves NUMERIC(12,4) column accepts decimals
       await showPhaseLabel(page, `📦 Phase 2: Receive ${DECIMAL_QTY} more units (tests NUMERIC column)`);
       await inventarioPage.receiveStock(partName, DECIMAL_QTY);
-      await page.waitForTimeout(500);
 
       // ─── Phase 3: Verify decimal stock is displayed correctly ───────────────
       await showPhaseLabel(page, `✅ Phase 3: Verify decimal stock (expected: ${INITIAL_STOCK + DECIMAL_QTY})`);

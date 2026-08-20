@@ -162,12 +162,13 @@ export class InventarioPage extends BasePage {
     await this.expandPart(partName);
     const container = this.page.locator(`.border:has(text="${partName}")`).first();
     const input = container.locator('input[type="number"]').last();
-    if (await input.isVisible().catch(() => false)) {
-      await input.fill(String(quantity));
-      const btn = container.getByRole('button', { name: /recibir|\\+/ }).first();
-      await btn.click();
-      await this.page.waitForTimeout(1000);
-    }
+    // Hard fail if the receive input isn't visible — prevents silent no-op
+    await input.waitFor({ state: 'visible', timeout: 8000 });
+    await input.fill(String(quantity));
+    const btn = container.getByRole('button', { name: /recibir|\\+/ }).first();
+    await btn.waitFor({ state: 'visible', timeout: 5000 });
+    await btn.click();
+    await this.page.waitForTimeout(500);
   }
 
   async wasAddSuccessful(partName: string): Promise<boolean> {

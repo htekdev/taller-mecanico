@@ -179,10 +179,10 @@ export class TrabajosPage extends BasePage {
   }
 
   async search(query: string) {
-    if (await this.searchInput.isVisible().catch(() => false)) {
-      await this.fillInput(this.searchInput, query);
-      await this.page.waitForTimeout(500);
-    }
+    // Hard fail if search input isn't rendered — prevents silent no-op that masks test logic
+    await expect(this.searchInput).toBeVisible({ timeout: 5000 });
+    await this.fillInput(this.searchInput, query);
+    await this.page.waitForTimeout(500);
   }
 
   async filterByStatus(status: string) {
