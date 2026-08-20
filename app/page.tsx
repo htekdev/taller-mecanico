@@ -1306,9 +1306,9 @@ export default function TallerMecanico() {
             </label>
             {/* PDF de factura (opcional) */}
             <div className="mb-5">
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
                 PDF de factura <span className="text-slate-400 font-normal normal-case">(opcional)</span>
-              </label>
+              </p>
               <label className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg px-3 py-3 min-h-[44px] transition-colors ${
                 pendingFactura?.pdfFile
                   ? 'border-emerald-400 bg-emerald-50 text-emerald-700'

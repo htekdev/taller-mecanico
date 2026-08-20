@@ -109,7 +109,8 @@ export function VistaFacturas({
         ref={fileInputRef}
         type="file"
         accept="application/pdf,.pdf"
-        className="hidden"
+      data-testid="subir-pdf-hidden-input"
+      className="hidden"
         onChange={async (e) => {
           const file = e.target.files?.[0];
           const pending = pendingUploadRef.current;
@@ -394,7 +395,7 @@ export function VistaFacturas({
                             type="button"
                             data-testid="ver-pdf-header-btn"
                             disabled={isLoadingPdf}
-                            className="text-xs px-3 py-2.5 min-h-[44px] rounded border transition-colors font-medium whitespace-nowrap bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 disabled:opacity-50"
+                            className="text-xs px-3 py-2.5 min-h-[44px] rounded border transition-colors font-medium whitespace-nowrap bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={async (e) => {
                               e.stopPropagation();
                               setLoadingPdfId(factura.id);
