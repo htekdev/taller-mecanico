@@ -25,7 +25,7 @@ BEGIN
     USING (
       bucket_id = 'facturas'
       AND EXISTS (
-        SELECT 1 FROM taller_miembros
+        SELECT 1 FROM taller_members
         WHERE taller_id = (string_to_array(storage.objects.name, '/'))[1]::uuid
         AND user_id = auth.uid()
       )
@@ -33,7 +33,7 @@ BEGIN
     WITH CHECK (
       bucket_id = 'facturas'
       AND EXISTS (
-        SELECT 1 FROM taller_miembros
+        SELECT 1 FROM taller_members
         WHERE taller_id = (string_to_array(storage.objects.name, '/'))[1]::uuid
         AND user_id = auth.uid()
       )
