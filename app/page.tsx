@@ -887,13 +887,14 @@ export default function TallerMecanico() {
       await db.updateTrabajoFacturaPdf(taller.id, trabajoId, pdfPath);
       setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaPdfUrl: pdfPath } : t));
     } catch (err: unknown) {
-      // Best-effort cleanup: if upload succeeded but DB update failed, remove orphaned file
-      if (uploadedPath) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Best-effort cleanup: if upload succeeded but DB update failed, remove orphaned file.
+      // MIME/SIZE/MAGIC errors are thrown before any actual upload — skip cleanup for those.
+      if (uploadedPath && !msg.includes('MIME_ERROR') && !msg.includes('SIZE_ERROR') && !msg.includes('MAGIC_ERROR')) {
         deleteFacturaPdf(uploadedPath).catch(e =>
           console.error('[subirPdfExistente] Storage cleanup failed (orphaned file):', e),
         );
       }
-      const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('MIME_ERROR')) setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
       else if (msg.includes('SIZE_ERROR')) setErrorBanner('El PDF no puede exceder 10 MB.');
       else if (msg.includes('MAGIC_ERROR')) setErrorBanner('El archivo parece estar corrupto. Intenta con otro PDF.');
