@@ -317,10 +317,11 @@ export default function TallerMecanico() {
       });
       try {
         await db.updateRefacciones(nuevoInv.filter(r => data.partes.some(p => p.refaccionId === r.id)));
+        // Only update UI after DB confirmed — prevents UI/DB desync on failure
+        setInventario(nuevoInv);
       } catch (err) {
         console.error('[guardarTrabajo] stock update failed (best-effort, non-fatal):', err);
       }
-      setInventario(nuevoInv);
     }
   };
 
