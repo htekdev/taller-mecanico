@@ -242,7 +242,7 @@ export default function TallerMecanico() {
    *  Navigation to Trabajos tab is driven by the success screen button (onNavToTrabajos). */
   const convertirCotizacionATrabajo = async (data: ConversionTrabajo): Promise<void> => {
     if (!taller) throw new Error('Sin sesión activa');
-    const totalManoDeObra = data.manoDeObraItems.reduce((s, l) => s + l.precio, 0);
+    const totalManoDeObra = data.manoDeObraItems.reduce((s, l) => s + (l.precio * (l.cantidad ?? 1)), 0);
     const totalVentaRef   = data.partes.reduce((s, p) => s + p.subtotal, 0);
     const totalCostoRef   = data.partes.reduce((s, p) => s + p.costoTotal, 0);
     const subtotal        = totalManoDeObra + totalVentaRef;
@@ -341,7 +341,7 @@ export default function TallerMecanico() {
       // If this job has a linked invoice, sync it with the updated costs
       if (existing.facturaId) {
         const conceptos: FacturaConcepto[] = [
-          ...data.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
+          ...data.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: m.cantidad ?? 1, precioUnitario: m.precio, subtotal: m.precio * (m.cantidad ?? 1) })),
           ...data.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
         ];
         const facturaSubtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
@@ -641,7 +641,7 @@ export default function TallerMecanico() {
     const trabajo = trabajos.find(t => t.id === trabajoId);
     if (!trabajo || trabajo.facturaId) throw new Error('[generarFactura] invalid trabajo state');
     const conceptos: FacturaConcepto[] = [
-      ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
+      ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: m.cantidad ?? 1, precioUnitario: m.precio, subtotal: m.precio * (m.cantidad ?? 1) })),
       ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
     ];
     const subtotal = conceptos.reduce((s, c) => s + c.subtotal, 0);
