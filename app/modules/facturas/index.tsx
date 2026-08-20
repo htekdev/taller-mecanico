@@ -138,6 +138,8 @@ export function VistaFacturas({
         }}
       />
 
+      <SectionTitle title="Facturas" subtitle="Facturas generadas desde trabajos. Aquí se registran los pagos de clientes." />
+
       {/* ── Resumen Mensual de Facturación ───────────────────────────────────── */}
       <section
         aria-label="Resumen mensual de facturación"
@@ -727,7 +729,8 @@ export function VistaFacturas({
                           <button
                             type="button"
                             data-testid="ver-pdf-btn"
-                            className="text-xs px-3 py-2.5 min-h-[44px] rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors font-medium"
+                            disabled={isLoading}
+                            className="text-xs px-3 py-2.5 min-h-[44px] rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={async () => {
                               setLoadingPdfId(factura.id);
                               try {

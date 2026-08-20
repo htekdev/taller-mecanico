@@ -14,6 +14,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Blocked in production' }, { status: 403 });
   }
 
+  // Require a secret token to prevent accidental or unauthorized data deletion
+  // on preview deployments. Set E2E_CLEANUP_SECRET in Vercel preview env vars.
+  const expectedSecret = process.env.E2E_CLEANUP_SECRET;
+  if (expectedSecret) {
+    const authHeader = request.headers.get('authorization') ?? '';
+    const providedSecret = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (providedSecret !== expectedSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

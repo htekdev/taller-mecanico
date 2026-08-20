@@ -724,40 +724,39 @@ export default function TallerMecanico() {
         } catch (pdfErr: unknown) {
           // PDF upload failed — roll back the factura for data integrity
           console.error('[confirmarFactura] PDF upload failed — rolling back:', pdfErr);
-        const pdfMsg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
-        // Clean up orphaned storage file for non-preflight errors (MIME/SIZE/MAGIC were already
-        // caught client-side; reaching here means upload succeeded but DB update failed, or
-        // an unexpected storage error occurred AFTER upload — best-effort delete)
-        if (!pdfMsg.includes('MIME_ERROR') && !pdfMsg.includes('SIZE_ERROR') && !pdfMsg.includes('MAGIC_ERROR') && taller) {
-          const orphanPath = `${taller.id}/${pendingFactura.trabajoId}/factura.pdf`;
-          deleteFacturaPdf(orphanPath).catch(e =>
-            console.error('[confirmarFactura] Storage cleanup failed (orphaned file):', e),
-          );
-        }
-        try {
-          if (facturaId) await db.deleteFactura(taller.id, facturaId);
-          await db.resetFacturacionTrabajo(pendingFactura.trabajoId);
-          setFacturas(prev => prev.filter(f => f.id !== facturaId));
-          setTrabajos(prev => prev.map(t =>
-            t.id === pendingFactura.trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
-          ));
-        } catch (_rollbackErr) {
-          console.error('[confirmarFactura] Rollback failed after PDF upload error:', _rollbackErr);
-          setErrorBanner('No se pudo subir el PDF ni revertir los cambios automáticamente. Recarga la página para ver el estado actual.');
+          const pdfMsg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
+          // Clean up orphaned storage file for non-preflight errors (MIME/SIZE/MAGIC are
+          // caught client-side; reaching here means upload succeeded but DB update failed)
+          if (!pdfMsg.includes('MIME_ERROR') && !pdfMsg.includes('SIZE_ERROR') && !pdfMsg.includes('MAGIC_ERROR') && taller) {
+            const orphanPath = `${taller.id}/${pendingFactura.trabajoId}/factura.pdf`;
+            deleteFacturaPdf(orphanPath).catch(e =>
+              console.error('[confirmarFactura] Storage cleanup failed (orphaned file):', e),
+            );
+          }
+          try {
+            if (facturaId) await db.deleteFactura(taller.id, facturaId);
+            await db.resetFacturacionTrabajo(pendingFactura.trabajoId);
+            setFacturas(prev => prev.filter(f => f.id !== facturaId));
+            setTrabajos(prev => prev.map(t =>
+              t.id === pendingFactura.trabajoId ? { ...t, facturaId: undefined, estadoFacturacion: 'sin_facturar' as const } : t,
+            ));
+          } catch (_rollbackErr) {
+            console.error('[confirmarFactura] Rollback failed after PDF upload error:', _rollbackErr);
+            setErrorBanner('No se pudo subir el PDF ni revertir los cambios automáticamente. Recarga la página para ver el estado actual.');
+            setPendingFactura(null);
+            return;
+          }
+          if (pdfMsg.includes('MIME_ERROR')) {
+            setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
+          } else if (pdfMsg.includes('SIZE_ERROR')) {
+            setErrorBanner('El PDF no puede exceder 10 MB.');
+          } else if (pdfMsg.includes('MAGIC_ERROR')) {
+            setErrorBanner('El archivo parece estar corrupto. Intenta con otro PDF.');
+          } else {
+            setErrorBanner('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.');
+          }
           setPendingFactura(null);
           return;
-          }
-        if (pdfMsg.includes('MIME_ERROR')) {
-          setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
-        } else if (pdfMsg.includes('SIZE_ERROR')) {
-          setErrorBanner('El PDF no puede exceder 10 MB.');
-        } else if (pdfMsg.includes('MAGIC_ERROR')) {
-          setErrorBanner('El archivo parece estar corrupto. Intenta con otro PDF.');
-        } else {
-          setErrorBanner('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.');
-        }
-        setPendingFactura(null);
-        return;
         }
       }
       setPendingFactura(null);
@@ -881,11 +880,19 @@ export default function TallerMecanico() {
 
   const subirPdfExistente = async (trabajoId: string, file: File) => {
     if (!taller) return;
+    let uploadedPath: string | null = null;
     try {
       const pdfPath = await uploadFacturaPdf(taller.id, trabajoId, file);
+      uploadedPath = pdfPath; // track path so we can clean up if DB update fails
       await db.updateTrabajoFacturaPdf(taller.id, trabajoId, pdfPath);
       setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaPdfUrl: pdfPath } : t));
     } catch (err: unknown) {
+      // Best-effort cleanup: if upload succeeded but DB update failed, remove orphaned file
+      if (uploadedPath) {
+        deleteFacturaPdf(uploadedPath).catch(e =>
+          console.error('[subirPdfExistente] Storage cleanup failed (orphaned file):', e),
+        );
+      }
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('MIME_ERROR')) setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
       else if (msg.includes('SIZE_ERROR')) setErrorBanner('El PDF no puede exceder 10 MB.');
