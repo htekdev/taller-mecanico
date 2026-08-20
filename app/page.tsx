@@ -635,10 +635,10 @@ export default function TallerMecanico() {
   };
 
   // ── Invoice (Factura) handlers ──
-  const generarFactura = async (trabajoId: string, numeroFactura: string, fechaFactura: string, incluirIva: boolean) => {
-    if (!taller) return;
+  const generarFactura = async (trabajoId: string, numeroFactura: string, fechaFactura: string, incluirIva: boolean): Promise<string> => {
+    if (!taller) throw new Error('[generarFactura] taller is null');
     const trabajo = trabajos.find(t => t.id === trabajoId);
-    if (!trabajo || trabajo.facturaId) return;
+    if (!trabajo || trabajo.facturaId) throw new Error('[generarFactura] invalid trabajo state');
     const conceptos: FacturaConcepto[] = [
       ...trabajo.manoDeObraItems.map(m => ({ tipo: 'mano_de_obra' as const, descripcion: m.concepto, cantidad: 1, precioUnitario: m.precio, subtotal: m.precio })),
       ...trabajo.partes.map(p => ({ tipo: 'parte' as const, descripcion: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioVenta, subtotal: p.subtotal })),
@@ -657,6 +657,7 @@ export default function TallerMecanico() {
     setFacturas(prev => [...prev, nuevaFactura]);
     await db.updateTrabajoFactura(trabajoId, nuevaFactura.id);
     setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaId: nuevaFactura.id, estadoFacturacion: 'facturado' as const } : t));
+    return nuevaFactura.id;
   };
 
   const abrirModalFactura = (trabajoId: string) => {
@@ -708,9 +709,8 @@ export default function TallerMecanico() {
     if (!pendingFactura || !pendingFactura.numero.trim()) return;
     let facturaId: string | null = null;
     try {
-      await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
-      // Retrieve the newly-created factura ID from state
-      facturaId = facturas.find(f => f.trabajoId === pendingFactura.trabajoId)?.id ?? null;
+      // generarFactura returns the new factura ID directly — avoids stale closure on React state
+      facturaId = await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
       // Upload PDF if one was selected
       if (pendingFactura.pdfFile && taller) {
         try {
@@ -863,9 +863,17 @@ export default function TallerMecanico() {
 
   const subirPdfExistente = async (trabajoId: string, file: File) => {
     if (!taller) return;
-    const pdfPath = await uploadFacturaPdf(taller.id, trabajoId, file);
-    await db.updateTrabajoFacturaPdf(taller.id, trabajoId, pdfPath);
-    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaPdfUrl: pdfPath } : t));
+    try {
+      const pdfPath = await uploadFacturaPdf(taller.id, trabajoId, file);
+      await db.updateTrabajoFacturaPdf(taller.id, trabajoId, pdfPath);
+      setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaPdfUrl: pdfPath } : t));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('MIME_ERROR')) setErrorBanner('El archivo no es un PDF válido (tipo MIME incorrecto).');
+      else if (msg.includes('SIZE_ERROR')) setErrorBanner('El PDF no puede exceder 10 MB.');
+      else if (msg.includes('MAGIC_ERROR')) setErrorBanner('El archivo parece estar corrupto. Intenta con otro PDF.');
+      else setErrorBanner('No se pudo subir el PDF. Verifica tu conexión e intenta de nuevo.');
+    }
   };
 
   // ── Gastos handlers ──

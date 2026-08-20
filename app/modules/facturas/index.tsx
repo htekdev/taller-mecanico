@@ -116,6 +116,8 @@ export function VistaFacturas({
           setUploadingPdfId(pending.facturaId);
           try {
             await onSubirPdf(pending.trabajoId, file);
+          } catch {
+            // Errors are handled in subirPdfExistente (page.tsx) via setErrorBanner
           } finally {
             setUploadingPdfId(null);
             pendingUploadRef.current = null;
@@ -377,14 +379,16 @@ export function VistaFacturas({
                             type="button"
                             data-testid="ver-pdf-header-btn"
                             disabled={isLoadingPdf}
-                            className="text-xs px-2 py-1 rounded border transition-colors font-medium whitespace-nowrap bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 disabled:opacity-50"
+                            className="text-xs px-3 py-2.5 min-h-[44px] rounded border transition-colors font-medium whitespace-nowrap bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 disabled:opacity-50"
                             onClick={async (e) => {
                               e.stopPropagation();
                               setLoadingPdfId(factura.id);
                               try {
                                 const url = await createFacturaPdfSignedUrl(pdfPath);
                                 window.open(url, '_blank');
-                              } catch { /* silent */ }
+                              } catch {
+                                // silent — signed URL errors don't require user action
+                              }
                               finally { setLoadingPdfId(null); }
                             }}
                           >
@@ -393,15 +397,17 @@ export function VistaFacturas({
                         );
                       }
 
+                      if (!trab?.id) return null;
+
                       return (
                         <button
                           type="button"
                           data-testid="subir-pdf-header-btn"
                           disabled={isUploading}
-                          className="text-xs px-2 py-1 rounded border transition-colors font-medium whitespace-nowrap bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="text-xs px-3 py-2.5 min-h-[44px] rounded border transition-colors font-medium whitespace-nowrap bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
                           onClick={(e) => {
                             e.stopPropagation();
-                            pendingUploadRef.current = { trabajoId: trab?.id ?? '', facturaId: factura.id };
+                            pendingUploadRef.current = { trabajoId: trab.id, facturaId: factura.id };
                             fileInputRef.current?.click();
                           }}
                         >
@@ -707,7 +713,7 @@ export function VistaFacturas({
                           <button
                             type="button"
                             data-testid="ver-pdf-btn"
-                            className="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                            className="text-xs px-3 py-2.5 min-h-[44px] rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors font-medium"
                             onClick={async () => {
                               setLoadingPdfId(factura.id);
                               try {
