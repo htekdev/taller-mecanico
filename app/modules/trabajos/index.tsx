@@ -604,6 +604,7 @@ export function VistaTrabajo({
 
   // ── Inline edit — Mano de Obra ──────────────────────────────────────────────
   const iniciarEditarLabor = (item: ManoDeObraItem) => {
+    setEditandoParteId(null);   // close any open parts edit first
     setEditandoLaborId(item.id);
     setEditLaborDraft({ concepto: item.concepto, precio: item.precio, cantidad: item.cantidad ?? 1 });
   };
@@ -620,6 +621,7 @@ export function VistaTrabajo({
 
   // ── Inline edit — Refacciones ───────────────────────────────────────────────
   const iniciarEditarParte = (p: TrabajoRefaccion) => {
+    setEditandoLaborId(null);   // close any open labor edit first
     setEditandoParteId(p.refaccionId);
     setEditParteDraft({ cantidad: p.cantidad, precioVenta: p.precioVenta });
   };
@@ -654,6 +656,8 @@ export function VistaTrabajo({
     setExtProveedorId('');
     setCapturandoTftId(null);
     setTftNumeroDraft('');
+    setEditandoLaborId(null);    // clear any open inline edit
+    setEditandoParteId(null);    // clear any open inline edit
     // Clear form draft so it doesn't restore stale data after a successful submit
     clearDraft(TRABAJO_DRAFT_KEY);
     setBuscadorOpen(false);
