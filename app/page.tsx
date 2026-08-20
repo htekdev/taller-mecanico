@@ -861,6 +861,13 @@ export default function TallerMecanico() {
     }
   };
 
+  const subirPdfExistente = async (trabajoId: string, file: File) => {
+    if (!taller) return;
+    const pdfPath = await uploadFacturaPdf(taller.id, trabajoId, file);
+    await db.updateTrabajoFacturaPdf(taller.id, trabajoId, pdfPath);
+    setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, facturaPdfUrl: pdfPath } : t));
+  };
+
   // ── Gastos handlers ──
   const crearGasto = async (data: Omit<Gasto, 'id' | 'tallerId'>) => {
     if (!taller) return;
@@ -1148,7 +1155,8 @@ export default function TallerMecanico() {
               onRegistrarPago={registrarPagoFactura} onEditarFechaFactura={editarFechaFactura}
               onEditarNumeroFactura={editarNumeroFactura}
               onEditarSubtotalFactura={editarSubtotalFactura}
-              onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura} />
+              onCancelarFactura={cancelarFactura} onReactivarFactura={reactivarFactura}
+              onSubirPdf={subirPdfExistente} />
           )}
           {vista === 'cuentas' && (
             <VistaCuentas facturas={facturas} trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
