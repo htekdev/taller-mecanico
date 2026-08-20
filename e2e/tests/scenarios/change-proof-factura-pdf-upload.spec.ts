@@ -309,7 +309,7 @@ test('change-proof: subirPdfExistente — PDF upload via Facturas module works',
 
   // The hidden file input for subirPdfExistente is triggered by the Subir PDF button
   // We inject the file directly to the hidden input
-  const hiddenFileInput = page.locator('input[type="file"][accept*="pdf"]').first();
+  const hiddenFileInput = page.locator('[data-testid="pdf-upload-existing-input"]');
   const validPdfBytes = Buffer.concat([
     Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34]), // %PDF-1.4
     Buffer.from('\n1 0 obj\n<</Type /Catalog /Pages 2 0 R>>\nendobj\n'),

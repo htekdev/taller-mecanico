@@ -37,7 +37,7 @@ export function VistaFacturas({
   onCancelarFactura: (facturaId: string) => void;
   onReactivarFactura: (facturaId: string) => void;
   onSubirPdf: (trabajoId: string, file: File) => Promise<void>;
-  onError?: (msg: string) => void;
+  onError: (msg: string) => void;
 }) {
   const hoy = getHoy();
 
@@ -109,7 +109,7 @@ export function VistaFacturas({
         ref={fileInputRef}
         type="file"
         accept="application/pdf,.pdf"
-      data-testid="subir-pdf-hidden-input"
+      data-testid="pdf-upload-existing-input"
       className="hidden"
         onChange={async (e) => {
           const file = e.target.files?.[0];
@@ -118,12 +118,12 @@ export function VistaFacturas({
           if (!file || !pending) return;
           // Preflight: same size + MIME checks as the modal PDF picker
           if (file.size > 10 * 1024 * 1024) {
-            onError?.('El PDF no puede exceder 10 MB.');
+            onError('El PDF no puede exceder 10 MB.');
             pendingUploadRef.current = null;
             return;
           }
           if (file.type && file.type !== 'application/pdf') {
-            onError?.('El archivo no es un PDF válido (tipo MIME incorrecto).');
+            onError('El archivo no es un PDF válido (tipo MIME incorrecto).');
             pendingUploadRef.current = null;
             return;
           }
@@ -401,15 +401,15 @@ export function VistaFacturas({
                               setLoadingPdfId(factura.id);
                               try {
                                 const url = await createFacturaPdfSignedUrl(pdfPath);
-                                window.open(url, '_blank');
+                                window.open(url, '_blank', 'noopener,noreferrer');
                               } catch {
-                                // Silent URL errors are surfaced via onError prop
-                                onError?.('No se pudo abrir el PDF. Verifica tu conexión e intenta de nuevo.');
+                                onError('No se pudo abrir el PDF. Verifica tu conexión e intenta de nuevo.');
+                              } finally {
+                                setLoadingPdfId(null);
                               }
-                              finally { setLoadingPdfId(null); }
                             }}
                           >
-                            {isLoadingPdf ? '⏳' : '📄 Ver PDF'}
+                            {isLoadingPdf ? '⏳ Abriendo...' : '📄 Ver PDF'}
                           </button>
                         );
                       }
@@ -736,10 +736,10 @@ export function VistaFacturas({
                               setLoadingPdfId(factura.id);
                               try {
                                 const url = await createFacturaPdfSignedUrl(pdfPath);
-                                window.open(url, '_blank');
+                                window.open(url, '_blank', 'noopener,noreferrer');
                               } catch {
                                 // Surface PDF signed URL errors via onError prop
-                                onError?.('No se pudo abrir el PDF. Verifica tu conexión e intenta de nuevo.');
+                                onError('No se pudo abrir el PDF. Verifica tu conexión e intenta de nuevo.');
                               } finally {
                                 setLoadingPdfId(null);
                               }
