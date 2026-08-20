@@ -74,7 +74,8 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
       await trabajosPage.selectClient(1);
       await trabajosPage.descripcionInput.fill(`Aceite job ${runId}`);
       await trabajosPage.saveButton.click();
-      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+      // Intentionally throws on timeout — a failed save must fail the test loudly
+      await page.waitForLoadState('networkidle', { timeout: 15_000 });
 
       // ─── Phase 4: Verify stock is unchanged (no phantom deduction) ──────────
       await showPhaseLabel(page, `✅ Phase 4: Stock must still be ${INITIAL_STOCK}`);
@@ -127,7 +128,8 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
       await trabajosPage.selectVehicle(0);
       await trabajosPage.descripcionInput.fill(DESCRIPTION);
       await trabajosPage.saveButton.click();
-      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+      // Intentionally throws on timeout — a failed save must fail the test loudly
+      await page.waitForLoadState('networkidle', { timeout: 15_000 });
 
       // ─── Phase 3: Read stock (should still be INITIAL — no parts added yet) ──
       await showPhaseLabel(page, `📊 Phase 3: Stock should still be ${INITIAL_STOCK}`);
@@ -157,7 +159,9 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
       const saveBtn = page.getByRole('button', { name: /guardar cambios|actualizar|guardar/i });
       await expect(saveBtn).toBeVisible({ timeout: 5000 });
       await saveBtn.click();
-      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+      // Intentionally throws on timeout — a failed editarTrabajo save must fail loudly
+      // (not silently pass the delta=0 assertion because no save actually happened)
+      await page.waitForLoadState('networkidle', { timeout: 15_000 });
 
       // ─── Phase 5: Verify NO double-deduction ────────────────────────────────
       await showPhaseLabel(page, `✅ Phase 5: Stock must STILL be ${INITIAL_STOCK} (no double-deduction)`);

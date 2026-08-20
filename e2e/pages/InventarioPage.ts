@@ -193,7 +193,7 @@ export class InventarioPage extends BasePage {
     const row = this.page.locator(`:has-text("${partName}")`).first();
     // Pattern: "Stock: 106" or "106 lts" or just the number next to a stock label
     const stockLocator = row.locator(
-      'text=/Stock:\\s*[\\d.]+|[\\d.]+ *(pza|lt|lts|kg|m|litros?)/i',
+      'text=/Stock:\\s*[\\d.]+/i',
     ).first();
     const text = await stockLocator.textContent({ timeout: 5000 }).catch(() => null);
     if (text) {
