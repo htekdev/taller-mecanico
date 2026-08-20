@@ -80,10 +80,11 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
       await inventarioPage.waitForPageLoad();
       await page.waitForTimeout(1000);
 
-      const stockAfter = await inventarioPage.getStockForPart(partName).catch(() => null);
-      if (stockAfter !== null) {
-        expect(parseFloat(stockAfter)).toBe(INITIAL_STOCK);
-      }
+      const rawStockAfter = await inventarioPage.getStockForPart(partName).catch(() => null);
+      const stockAfter = rawStockAfter !== null ? parseFloat(rawStockAfter) : null;
+      // Hard assertions — null means the stock UI element isn't rendered (test infra issue)
+      expect(stockAfter).not.toBeNull();
+      expect(stockAfter).toBe(INITIAL_STOCK);
 
       await showPhaseLabel(page, '🎉 Test A: inventory intact after job creation');
     },
@@ -147,25 +148,20 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
       await dashboardPage.navigateToModule('trabajos');
       await trabajosPage.waitForPageLoad();
 
-      // Find the job row by description
+      // Search for the job and hard-assert it exists — if not found, the test MUST fail
+      await trabajosPage.search(DESCRIPTION);
       const jobRow = page.locator(`text=${DESCRIPTION}`).first();
-      if (await jobRow.isVisible({ timeout: 5000 }).catch(() => false)) {
-        const editBtn = jobRow.locator('..').locator('..').getByRole('button', { name: /editar/i }).first();
-        if (await editBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await editBtn.click();
-          await page.waitForTimeout(1000);
-          // Save without any changes — delta should be 0
-          const saveBtn = page.getByRole('button', { name: /guardar cambios|actualizar|guardar/i });
-          const saveBtnVisible = await saveBtn.isVisible({ timeout: 2000 }).catch(() => false);
-          if (saveBtnVisible) {
-            await saveBtn.click();
-          } else {
-            await trabajosPage.saveButton.click();
-          }
-          await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-          await page.waitForTimeout(2000);
-        }
-      }
+      await expect(jobRow).toBeVisible({ timeout: 8000 }); // hard fail if job not found
+
+      // Click edit using page object (avoids fragile DOM traversal)
+      await trabajosPage.clickEditOnTrabajo(0);
+
+      // Save without any changes — delta should be 0
+      const saveBtn = page.getByRole('button', { name: /guardar cambios|actualizar|guardar/i });
+      await expect(saveBtn).toBeVisible({ timeout: 5000 });
+      await saveBtn.click();
+      await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
+      await page.waitForTimeout(2000);
 
       // ─── Phase 5: Verify NO double-deduction ────────────────────────────────
       await showPhaseLabel(page, `✅ Phase 5: Stock must STILL be ${INITIAL_STOCK} (no double-deduction)`);
@@ -216,18 +212,10 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
       expect(await inventarioPage.isPartVisible(partName)).toBe(true);
 
       // ─── Phase 2: Receive stock with decimal quantity ────────────────────────
-      // Use recibirStock to add a decimal quantity and verify it's accepted
+      // Use receiveStock page object — proves NUMERIC(12,4) column accepts decimals
       await showPhaseLabel(page, `📦 Phase 2: Receive ${DECIMAL_QTY} more units (tests NUMERIC column)`);
-      await inventarioPage.expandPart(partName);
-      const recibirInput = page.locator('input[type="number"][placeholder*="recibir" i], input[placeholder*="cantidad a recibir" i]').last();
-      if (await recibirInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await recibirInput.fill(String(DECIMAL_QTY));
-        const recibirBtn = page.getByRole('button', { name: /recibir|\+/i }).last();
-        if (await recibirBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await recibirBtn.click();
-          await page.waitForTimeout(2000);
-        }
-      }
+      await inventarioPage.receiveStock(partName, DECIMAL_QTY);
+      await page.waitForTimeout(500);
 
       // ─── Phase 3: Verify decimal stock is displayed correctly ───────────────
       await showPhaseLabel(page, `✅ Phase 3: Verify decimal stock (expected: ${INITIAL_STOCK + DECIMAL_QTY})`);
@@ -238,12 +226,12 @@ test.describe('Stock Deduction — Inventory Bug Fix', () => {
       const rawStockDecimal = await inventarioPage.getStockForPart(partName).catch(() => null);
       const stockAfterDecimal = rawStockDecimal !== null ? parseFloat(rawStockDecimal) : null;
       await showPhaseLabel(page, `📊 Stock after decimal receive: ${stockAfterDecimal ?? 'N/A'} (expected ${INITIAL_STOCK + DECIMAL_QTY})`);
-      if (stockAfterDecimal !== null) {
-        // Decimal stock must be accepted — not rounded to integer
-        expect(stockAfterDecimal).toBeGreaterThan(INITIAL_STOCK);
-        // Allow small floating point tolerance
-        expect(Math.abs(stockAfterDecimal - (INITIAL_STOCK + DECIMAL_QTY))).toBeLessThan(0.01);
-      }
+      // Hard assertions — null means stock UI element missing (test infra issue)
+      expect(stockAfterDecimal).not.toBeNull();
+      // Decimal stock must be accepted — not rounded to integer
+      expect(stockAfterDecimal).toBeGreaterThan(INITIAL_STOCK);
+      // Allow small floating point tolerance
+      expect(Math.abs(stockAfterDecimal! - (INITIAL_STOCK + DECIMAL_QTY))).toBeLessThan(0.01);
 
       await showPhaseLabel(page, '🎉 Test C: decimal stock support verified');
     },
