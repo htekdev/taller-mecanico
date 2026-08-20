@@ -335,7 +335,38 @@ export default function TallerMecanico() {
       // updateTrabajo throws on DB error
       await db.updateTrabajo(trabajoId, updated);
       setTrabajos(prev => prev.map(t => t.id === trabajoId ? { ...t, ...updated } : t));
-  
+
+      // Adjust inventory stock based on parts diff (best-effort — non-fatal)
+      // delta = new_qty - old_qty: positive means more parts consumed → deduct from stock
+      //                            negative means parts removed → return to stock
+      const oldPartes = existing.partes ?? [];
+      const newPartes = data.partes ?? [];
+      const deltaMap = new Map<string, number>();
+      for (const p of newPartes) {
+        deltaMap.set(p.refaccionId, (deltaMap.get(p.refaccionId) ?? 0) + p.cantidad);
+      }
+      for (const p of oldPartes) {
+        deltaMap.set(p.refaccionId, (deltaMap.get(p.refaccionId) ?? 0) - p.cantidad);
+      }
+      const refaccionesConCambio = Array.from(deltaMap.entries()).filter(([, d]) => d !== 0);
+      if (refaccionesConCambio.length > 0) {
+        const updatedInv = inventario.map(r => {
+          const delta = deltaMap.get(r.id);
+          return delta ? { ...r, stock: r.stock - delta } : r;
+        });
+        try {
+          await db.updateRefacciones(
+            updatedInv.filter(r => {
+              const d = deltaMap.get(r.id);
+              return d !== undefined && d !== 0;
+            }),
+          );
+        } catch (err) {
+          console.error('[editarTrabajo] stock adjustment failed (non-fatal):', err);
+        }
+        setInventario(updatedInv);
+      }
+
       // If this job has a linked invoice, sync it with the updated costs
       if (existing.facturaId) {
         const conceptos: FacturaConcepto[] = [

@@ -126,7 +126,8 @@ export async function getRefacciones(tallerId: string): Promise<Refaccion[]> {
   return (data ?? []).map(r => ({
     id: r.id, nombre: r.nombre, codigo: r.codigo, categoria: r.categoria,
     unidad: r.unidad, precioCompra: r.precio_compra,
-    stock: r.stock, stockMinimo: r.stock_minimo,
+    // NUMERIC columns return as strings from Supabase JS — parse to number
+    stock: Number(r.stock), stockMinimo: Number(r.stock_minimo),
     vehiculoId: r.vehiculo_id ?? undefined,
     proveedorId: r.proveedor_id ?? undefined,
     compatibilidad: (r.compatibilidad as Refaccion['compatibilidad']) ?? undefined,
@@ -152,7 +153,8 @@ export async function insertRefaccion(tallerId: string, data: Omit<Refaccion, 'i
   return {
     id: row.id, nombre: row.nombre, codigo: row.codigo, categoria: row.categoria,
     unidad: row.unidad, precioCompra: row.precio_compra,
-    stock: row.stock, stockMinimo: row.stock_minimo,
+    // NUMERIC columns return as strings from Supabase JS — parse to number
+    stock: Number(row.stock), stockMinimo: Number(row.stock_minimo),
   };
 }
 

@@ -182,6 +182,27 @@ export class InventarioPage extends BasePage {
   }
 
   /**
+   * Returns the current stock value as a string for the named part.
+   * Tries multiple text patterns used by the inventory UI.
+   * Throws if the part or stock text cannot be found.
+   */
+  async getStockForPart(partName: string): Promise<string> {
+    // Try the part row container and look for the numeric stock display
+    const row = this.page.locator(`:has-text("${partName}")`).first();
+    // Pattern: "Stock: 106" or "106 lts" or just the number next to a stock label
+    const stockLocator = row.locator(
+      'text=/Stock:\\s*[\\d.]+|[\\d.]+ *(pza|lt|lts|kg|m|litros?)/i',
+    ).first();
+    const text = await stockLocator.textContent({ timeout: 5000 }).catch(() => null);
+    if (text) {
+      // Extract numeric value
+      const match = text.match(/[\d.]+/);
+      if (match) return match[0];
+    }
+    throw new Error(`getStockForPart: could not find stock text for "${partName}"`);
+  }
+
+  /**
    * 2-step delete: click the "🗑 Eliminar" button in the row for `name`,
    * then either confirm (true) or cancel (false) the deletion.
    *
