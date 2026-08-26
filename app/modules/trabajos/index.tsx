@@ -443,6 +443,12 @@ export function VistaTrabajo({
   const [tftNumeroDraft, setTftNumeroDraft] = useState('');
   const [verCancelados, setVerCancelados] = useState(false);
 
+  // ── Inline editing state — mano de obra & refacciones ──────────────────────
+  const [editandoLaborId, setEditandoLaborId] = useState<string | null>(null);
+  const [editLaborDraft, setEditLaborDraft] = useState({ concepto: '', precio: 0, cantidad: 1 });
+  const [editandoParteId, setEditandoParteId] = useState<string | null>(null);
+  const [editParteDraft, setEditParteDraft] = useState({ cantidad: 1, precioVenta: 0 });
+
   // ── Departamentos CRUD ──────────────────────────────────────────────────
   const [departamentos, setDepartamentos] = useState<string[]>([]);
   const [showDeptoManager, setShowDeptoManager] = useState(false);
@@ -596,6 +602,45 @@ export function VistaTrabajo({
   const removerParte = (refaccionId: string) =>
     setPartesSeleccionadas(prev => prev.filter(p => p.refaccionId !== refaccionId));
 
+  // ── Inline edit — Mano de Obra ──────────────────────────────────────────────
+  const iniciarEditarLabor = (item: ManoDeObraItem) => {
+    setEditandoParteId(null);   // close any open parts edit first
+    setEditandoLaborId(item.id);
+    setEditLaborDraft({ concepto: item.concepto, precio: item.precio, cantidad: item.cantidad ?? 1 });
+  };
+  const guardarEditarLabor = (id: string) => {
+    if (!editLaborDraft.concepto.trim() || editLaborDraft.precio <= 0) return;
+    setLaborItems(prev => prev.map(l =>
+      l.id === id
+        ? { ...l, concepto: editLaborDraft.concepto.trim(), precio: editLaborDraft.precio, cantidad: editLaborDraft.cantidad }
+        : l
+    ));
+    setEditandoLaborId(null);
+  };
+  const cancelarEditarLabor = () => setEditandoLaborId(null);
+
+  // ── Inline edit — Refacciones ───────────────────────────────────────────────
+  const iniciarEditarParte = (p: TrabajoRefaccion) => {
+    setEditandoLaborId(null);   // close any open labor edit first
+    setEditandoParteId(p.refaccionId);
+    setEditParteDraft({ cantidad: p.cantidad, precioVenta: p.precioVenta });
+  };
+  const guardarEditarParte = (refaccionId: string) => {
+    if (editParteDraft.cantidad <= 0 || editParteDraft.precioVenta <= 0) return;
+    setPartesSeleccionadas(prev => prev.map(p => {
+      if (p.refaccionId !== refaccionId) return p;
+      return {
+        ...p,
+        cantidad: editParteDraft.cantidad,
+        precioVenta: editParteDraft.precioVenta,
+        subtotal: editParteDraft.cantidad * editParteDraft.precioVenta,
+        costoTotal: editParteDraft.cantidad * p.precioCompra,
+      };
+    }));
+    setEditandoParteId(null);
+  };
+  const cancelarEditarParte = () => setEditandoParteId(null);
+
   const resetForm = () => {
     setForm(emptyForm);
     setLaborItems([]);
@@ -611,6 +656,8 @@ export function VistaTrabajo({
     setExtProveedorId('');
     setCapturandoTftId(null);
     setTftNumeroDraft('');
+    setEditandoLaborId(null);    // clear any open inline edit
+    setEditandoParteId(null);    // clear any open inline edit
     // Clear form draft so it doesn't restore stale data after a successful submit
     clearDraft(TRABAJO_DRAFT_KEY);
     setBuscadorOpen(false);
@@ -1055,32 +1102,84 @@ export function VistaTrabajo({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {laborItems.map(l => (
-                        <tr key={l.id} className={l.tipo === 'externo' ? 'bg-orange-50' : 'bg-white'}>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {l.tipo === 'externo' && (
-                                <span className="text-xs font-bold bg-orange-100 text-orange-700 border border-orange-200 px-1.5 py-0.5 rounded">
-                                  🏭 Externo
-                                </span>
-                              )}
-                              <span className="font-medium text-slate-800">{l.concepto}</span>
-                              {l.tipo === 'externo' && l.proveedorNombre && (
-                                <span className="text-xs text-orange-600">{l.proveedorNombre}</span>
-                              )}
-                              {l.tipo === 'externo' && l.costoTaller != null && (
-                                <span className="text-xs text-slate-400">
-                                  Costo: ${fmt(l.costoTaller)} · Ganancia: ${fmt(l.precio - l.costoTaller)}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold text-slate-700">{l.cantidad ?? 1}</td>
-                          <td className="px-3 py-2 text-right font-semibold text-slate-700">${fmt(l.precio)}</td>
-                          <td className="px-3 py-2 text-right font-bold text-slate-900">${fmt(l.precio * (l.cantidad ?? 1))}</td>
-                          <td className="px-3 py-2 text-center">
-                            <Btn size="sm" variant="danger" onClick={() => removerLabor(l.id)}>✕</Btn>
-                          </td>
-                        </tr>
+                        editandoLaborId === l.id ? (
+                          /* ── Inline edit row ── */
+                          <tr key={l.id} className="bg-indigo-50 border-y-2 border-indigo-200">
+                            <td className="px-2 py-2">
+                              <input
+                                type="text"
+                                value={editLaborDraft.concepto}
+                                onChange={e => setEditLaborDraft(d => ({ ...d, concepto: e.target.value }))}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') { e.preventDefault(); guardarEditarLabor(l.id); }
+                                  if (e.key === 'Escape') cancelarEditarLabor();
+                                }}
+                                className="w-full border border-indigo-300 rounded-lg px-2 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                                autoFocus
+                              />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="number" min="1" step="1"
+                                value={editLaborDraft.cantidad || ''}
+                                onChange={e => setEditLaborDraft(d => ({ ...d, cantidad: Math.max(1, Math.floor(Number(e.target.value) || 1)) }))}
+                                className="w-16 border border-indigo-300 rounded-lg px-2 py-1.5 text-sm text-right text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                              />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="number" min="0.01" step="0.01"
+                                value={editLaborDraft.precio || ''}
+                                onChange={e => setEditLaborDraft(d => ({ ...d, precio: Number(e.target.value) }))}
+                                className="w-24 border border-indigo-300 rounded-lg px-2 py-1.5 text-sm text-right text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right font-bold text-indigo-700">
+                              ${fmt(editLaborDraft.precio * editLaborDraft.cantidad)}
+                            </td>
+                            <td className="px-2 py-2">
+                              <div className="flex gap-1 justify-center">
+                                <Btn size="sm" variant="primary"
+                                  onClick={() => guardarEditarLabor(l.id)}
+                                  disabled={!editLaborDraft.concepto.trim() || editLaborDraft.precio <= 0}>
+                                  ✓
+                                </Btn>
+                                <Btn size="sm" variant="ghost" onClick={cancelarEditarLabor}>✕</Btn>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          /* ── Display row ── */
+                          <tr key={l.id} className={l.tipo === 'externo' ? 'bg-orange-50' : 'bg-white'}>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {l.tipo === 'externo' && (
+                                  <span className="text-xs font-bold bg-orange-100 text-orange-700 border border-orange-200 px-1.5 py-0.5 rounded">
+                                    🏭 Externo
+                                  </span>
+                                )}
+                                <span className="font-medium text-slate-800">{l.concepto}</span>
+                                {l.tipo === 'externo' && l.proveedorNombre && (
+                                  <span className="text-xs text-orange-600">{l.proveedorNombre}</span>
+                                )}
+                                {l.tipo === 'externo' && l.costoTaller != null && (
+                                  <span className="text-xs text-slate-400">
+                                    Costo: ${fmt(l.costoTaller)} · Ganancia: ${fmt(l.precio - l.costoTaller)}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold text-slate-700">{l.cantidad ?? 1}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-slate-700">${fmt(l.precio)}</td>
+                            <td className="px-3 py-2 text-right font-bold text-slate-900">${fmt(l.precio * (l.cantidad ?? 1))}</td>
+                            <td className="px-3 py-2 text-center">
+                              <div className="flex gap-1 justify-center">
+                                <Btn size="sm" variant="ghost" onClick={() => iniciarEditarLabor(l)}>✏️</Btn>
+                                <Btn size="sm" variant="danger" onClick={() => removerLabor(l.id)}>✕</Btn>
+                              </div>
+                            </td>
+                          </tr>
+                        )
                       ))}
                     </tbody>
                     <tfoot className="bg-slate-50 border-t-2 border-slate-200">
@@ -1310,7 +1409,53 @@ export function VistaTrabajo({
                       <tbody className="divide-y divide-slate-100">
                         {partesSeleccionadas.map(p => {
                           const margen = (p.subtotal ?? 0) - (p.costoTotal ?? 0);
-                          return (
+                          return editandoParteId === p.refaccionId ? (
+                            /* ── Inline edit row ── */
+                            <tr key={p.refaccionId} className="bg-indigo-50 border-y-2 border-indigo-200">
+                              <td className="px-3 py-2 text-slate-800 font-medium">
+                                {p.nombre}
+                                {p.codigo && <span className="ml-1.5 text-xs font-mono text-slate-400">{p.codigo}</span>}
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="number" min="1" step="1"
+                                  value={editParteDraft.cantidad || ''}
+                                  onChange={e => setEditParteDraft(d => ({ ...d, cantidad: Math.max(1, Math.floor(Number(e.target.value) || 1)) }))}
+                                  className="w-16 border border-indigo-300 rounded-lg px-2 py-1.5 text-sm text-right text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                                  autoFocus
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-right text-slate-400 text-xs">
+                                ${fmt(editParteDraft.cantidad * p.precioCompra)}
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="number" min="0.01" step="0.01"
+                                  value={editParteDraft.precioVenta || ''}
+                                  onChange={e => setEditParteDraft(d => ({ ...d, precioVenta: Number(e.target.value) }))}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') { e.preventDefault(); guardarEditarParte(p.refaccionId); }
+                                    if (e.key === 'Escape') cancelarEditarParte();
+                                  }}
+                                  className="w-24 border border-indigo-300 rounded-lg px-2 py-1.5 text-sm text-right text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-right font-medium text-indigo-700">
+                                ${fmt(editParteDraft.cantidad * editParteDraft.precioVenta - editParteDraft.cantidad * p.precioCompra)}
+                              </td>
+                              <td className="px-2 py-2">
+                                <div className="flex gap-1 justify-center">
+                                  <Btn size="sm" variant="primary"
+                                    onClick={() => guardarEditarParte(p.refaccionId)}
+                                    disabled={editParteDraft.cantidad <= 0 || editParteDraft.precioVenta <= 0}>
+                                    ✓
+                                  </Btn>
+                                  <Btn size="sm" variant="ghost" onClick={cancelarEditarParte}>✕</Btn>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            /* ── Display row ── */
                             <tr key={p.refaccionId} className="bg-white">
                               <td className="px-3 py-2 text-slate-800 font-medium">
                                 {p.nombre}
@@ -1321,7 +1466,10 @@ export function VistaTrabajo({
                               <td className="px-3 py-2 text-right font-semibold text-slate-900">${fmt(p.subtotal ?? 0)}</td>
                               <td className="px-3 py-2 text-right font-medium text-emerald-600">${fmt(margen)}</td>
                               <td className="px-3 py-2 text-center">
-                                <Btn size="sm" variant="danger" onClick={() => removerParte(p.refaccionId)}>✕</Btn>
+                                <div className="flex gap-1 justify-center">
+                                  <Btn size="sm" variant="ghost" onClick={() => iniciarEditarParte(p)}>✏️</Btn>
+                                  <Btn size="sm" variant="danger" onClick={() => removerParte(p.refaccionId)}>✕</Btn>
+                                </div>
                               </td>
                             </tr>
                           );
