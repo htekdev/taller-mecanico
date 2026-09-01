@@ -120,8 +120,15 @@ export function restoreScrollPosition(moduleKey: string): number {
  *
  * - Reads from localStorage synchronously in the useState initializer (no FOUC).
  * - Writes to localStorage with a debounce (default 300ms) on every state change.
+ * - Unmount flush ensures data is saved even if navigation happens before debounce fires.
  * - Handles SSR safely (returns defaultValue when window is undefined).
  * - TTL: 7 days. Expired entries are cleaned up on next read.
+ *
+ * ### Root-cause note (fix for stale-ref bug):
+ * valueRef MUST be updated synchronously in the render body — NOT inside a useEffect.
+ * If it were updated in a useEffect, rapid navigation (within ~50ms of a state change,
+ * before passive effects run) would leave valueRef stale, causing the unmount flush to
+ * write the old value and silently drop the user's filter/tab/search change.
  *
  * @param key - Unique localStorage key. Use the taller_ prefix convention.
  * @param defaultValue - Value to use if nothing is persisted or if persisted data expired.
@@ -139,18 +146,16 @@ export function usePersistedState<T>(
   });
 
   // Keep key ref in sync so the debounced write always uses the latest key.
-  // Must be done inside useEffect — updating a ref synchronously during render
-  // triggers a react-hooks/refs lint error.
   const keyRef = useRef(key);
-  useEffect(() => {
-    keyRef.current = key;
-  }, [key]);
+  keyRef.current = key; // sync update — key is typically constant but kept fresh
 
   // Keep value ref in sync so the unmount flush always writes the latest value.
+  // CRITICAL: updated synchronously in render body, not inside a useEffect.
+  // A useEffect update would be async (after paint), meaning rapid navigation
+  // (user changes filter and clicks nav within ~50ms) would leave this stale,
+  // causing the unmount flush to write the old value and lose the user's change.
   const valueRef = useRef(value);
-  useEffect(() => {
-    valueRef.current = value;
-  }, [value]);
+  valueRef.current = value; // sync update — always reflects the latest rendered value
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -167,6 +172,7 @@ export function usePersistedState<T>(
 
   // Unmount flush — ensures state is always persisted even if the component
   // unmounts before the debounce fires (e.g. user navigates within 300ms).
+  // valueRef.current is always up-to-date (set synchronously in render body above).
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
