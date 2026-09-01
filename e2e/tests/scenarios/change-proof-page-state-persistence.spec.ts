@@ -203,7 +203,7 @@ test.describe('change-proof: page state persistence', () => {
     // At minimum: module loaded without crash
     const facturasSectionTitle = page.locator('h1, h2').filter({ hasText: /facturas/i }).first();
     const titleVisible = await facturasSectionTitle.isVisible({ timeout: 5_000 }).catch(() => false);
-    expect(titleVisible || true, 'El modulo Facturas debe cargar').toBe(true);
+    expect(titleVisible, 'El modulo Facturas debe cargar').toBe(true);
 
     // Cleanup
     await page.evaluate(
@@ -351,6 +351,73 @@ test.describe('change-proof: page state persistence', () => {
     await page.evaluate(
       ({ key }: { key: string }) => localStorage.removeItem(key),
       { key: EXPAND_KEY }
+    );
+  });
+
+  // ── Test 8: Real round-trip — click filter in UI, navigate away, return ───────
+  // This proves the WRITE path of usePersistedState works correctly, including
+  // the unmount-flush (state persists even if navigating in < 300ms).
+  test('round-trip real: filtro cliqueado en UI persiste al navegar y regresar', async ({
+    page, loginPage, dashboardPage, trabajosPage,
+  }) => {
+    test.slow();
+
+    await loginPage.loginAsTestUser();
+    await dashboardPage.waitForPageLoad();
+
+    // Clear any existing filter state so we start clean
+    const ESTADO_KEY = 'taller_trabajos_filtro_estado';
+    await page.evaluate(
+      ({ key }: { key: string }) => localStorage.removeItem(key),
+      { key: ESTADO_KEY }
+    );
+
+    // Navigate to trabajos
+    await dashboardPage.navigateToModule('trabajos');
+    await trabajosPage.waitForPageLoad();
+    await page.waitForTimeout(500);
+
+    // Find a filter button that is NOT "Todos" and click it
+    const filtroBtn = page.locator('button').filter({ hasText: /^En progreso$|^Pendiente$|^Completado$/ }).first();
+    const btnVisible = await filtroBtn.isVisible({ timeout: 8_000 }).catch(() => false);
+
+    if (!btnVisible) {
+      // No filter buttons visible — skip gracefully (empty DB or different UI)
+      await expect(trabajosPage.sectionTitle).toBeVisible();
+      return;
+    }
+
+    // Click the filter button to set a non-default filter value
+    await filtroBtn.click();
+    await page.waitForTimeout(100); // let React state update
+
+    // Immediately navigate to inventario (tests the unmount-flush < 300ms path)
+    await dashboardPage.navigateToModule('inventario');
+    await page.waitForTimeout(300);
+
+    // Navigate back to trabajos
+    await dashboardPage.navigateToModule('trabajos');
+    await trabajosPage.waitForPageLoad();
+    await page.waitForTimeout(500);
+
+    // Assert: the filter value was persisted to localStorage by the unmount-flush
+    const storedValue = await page.evaluate(
+      ({ key }: { key: string }) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        try { return JSON.parse(raw).data; } catch { return null; }
+      },
+      { key: ESTADO_KEY }
+    );
+
+    // The stored value should be a non-default filter (not 'todos' or null)
+    expect(storedValue, 'El filtro cliqueado debe persistir en localStorage').not.toBeNull();
+    expect(storedValue, 'El filtro guardado no debe ser "todos" (valor por defecto)').not.toBe('todos');
+
+    // Cleanup
+    await page.evaluate(
+      ({ key }: { key: string }) => localStorage.removeItem(key),
+      { key: ESTADO_KEY }
     );
   });
 });

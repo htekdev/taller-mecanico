@@ -146,8 +146,15 @@ export function usePersistedState<T>(
     keyRef.current = key;
   }, [key]);
 
+  // Keep value ref in sync so the unmount flush always writes the latest value.
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Debounced write on every value change.
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -157,6 +164,15 @@ export function usePersistedState<T>(
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [value, debounceMs]);
+
+  // Unmount flush — ensures state is always persisted even if the component
+  // unmounts before the debounce fires (e.g. user navigates within 300ms).
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      writePageState(keyRef.current, valueRef.current);
+    };
+  }, []); // intentionally empty — runs only on unmount
 
   return [value, setValue];
 }
