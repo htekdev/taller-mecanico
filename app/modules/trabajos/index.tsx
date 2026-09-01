@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { usePersistedState } from '@/app/lib/page-state';
 import type { Cliente, Vehiculo, Refaccion, Trabajo, Factura, ManoDeObraItem, TrabajoRefaccion, Proveedor } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle, EmptyRow } from '@/app/components/ui';
 import { labelVehiculo, fmt, getMontoPagado, formatearFecha, getHoy } from '@/app/lib/utils';
@@ -431,17 +432,17 @@ export function VistaTrabajo({
   const [buscadorOpen, setBuscadorOpen]       = useState(false);
   const [finalizandoId, setFinalizandoId] = useState<string | null>(null);
   const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [subTab, setSubTab] = useState<'general' | 'ayuntamiento'>('general');
-  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'completado'>('todos');
-  const [filtroFacturacion, setFiltroFacturacion] = useState<'todos' | 'con_factura' | 'sin_factura'>('todos');
-  const [filtroTft, setFiltroTft] = useState<'todos' | 'sin_tft' | 'con_tft'>('todos');
-  const [filtroPendienteRefacciones, setFiltroPendienteRefacciones] = useState(false);
-  const [filtroClienteId, setFiltroClienteId] = useState('');
-  const [filtroVehiculoId, setFiltroVehiculoId] = useState('');
+  const [subTab, setSubTab] = usePersistedState<'general' | 'ayuntamiento'>('taller_trabajos_subtab', 'general');
+  const [filtroEstado, setFiltroEstado] = usePersistedState<'todos' | 'pendiente' | 'completado'>('taller_trabajos_filtro_estado', 'todos');
+  const [filtroFacturacion, setFiltroFacturacion] = usePersistedState<'todos' | 'con_factura' | 'sin_factura'>('taller_trabajos_filtro_facturacion', 'todos');
+  const [filtroTft, setFiltroTft] = usePersistedState<'todos' | 'sin_tft' | 'con_tft'>('taller_trabajos_filtro_tft', 'todos');
+  const [filtroPendienteRefacciones, setFiltroPendienteRefacciones] = usePersistedState<boolean>('taller_trabajos_filtro_refacciones', false);
+  const [filtroClienteId, setFiltroClienteId] = usePersistedState<string>('taller_trabajos_filtro_cliente', '');
+  const [filtroVehiculoId, setFiltroVehiculoId] = usePersistedState<string>('taller_trabajos_filtro_vehiculo', '');
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
   const [capturandoTftId, setCapturandoTftId] = useState<string | null>(null);
   const [tftNumeroDraft, setTftNumeroDraft] = useState('');
-  const [verCancelados, setVerCancelados] = useState(false);
+  const [verCancelados, setVerCancelados] = usePersistedState<boolean>('taller_trabajos_ver_cancelados', false);
 
   // ── Departamentos CRUD ──────────────────────────────────────────────────
   const [departamentos, setDepartamentos] = useState<string[]>([]);

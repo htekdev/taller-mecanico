@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { usePersistedState } from '@/app/lib/page-state';
 import type { Factura, Cliente, Vehiculo, Trabajo, PagoFactura } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { fmt, getEstadoPagoFactura, getMontoPagadoFactura, getSaldoFactura, BADGE_ESTADO, formatearFecha, getHoy } from '@/app/lib/utils';
@@ -43,9 +44,9 @@ export function VistaFacturas({
 
   const [expandido, setExpandido] = useState<string | null>(null);
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
-  const [filtro, setFiltro] = useState<'todos'|'pendiente'|'parcial'|'pagado'>('todos');
-  const [filtroClienteId, setFiltroClienteId] = useState('');
-  const [busquedaNumero, setBusquedaNumero] = useState('');
+  const [filtro, setFiltro] = usePersistedState<'todos'|'pendiente'|'parcial'|'pagado'>('taller_facturas_filtro', 'todos');
+  const [filtroClienteId, setFiltroClienteId] = usePersistedState<string>('taller_facturas_filtro_cliente', '');
+  const [busquedaNumero, setBusquedaNumero] = usePersistedState<string>('taller_facturas_busqueda', '');
   const [editandoFechaId, setEditandoFechaId] = useState<string | null>(null);
   const [nuevaFecha, setNuevaFecha] = useState('');
   const [editandoNumeroId, setEditandoNumeroId] = useState<string | null>(null);
@@ -54,7 +55,7 @@ export function VistaFacturas({
   const [nuevoSubtotal, setNuevoSubtotal] = useState<string>('');
   const [subtotalIncluyeIva, setSubtotalIncluyeIva] = useState(false);
   const [nuevoNumeroAjuste, setNuevoNumeroAjuste] = useState('');
-  const [verCanceladas, setVerCanceladas] = useState(false);
+  const [verCanceladas, setVerCanceladas] = usePersistedState<boolean>('taller_facturas_ver_canceladas', false);
   const [confirmCancelarId, setConfirmCancelarId] = useState<string | null>(null);
   const [mostrarDesglose, setMostrarDesglose] = useState(false);
 

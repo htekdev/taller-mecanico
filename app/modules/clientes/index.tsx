@@ -1,10 +1,9 @@
 ﻿'use client';
 
 import { useState } from 'react';
+import { usePersistedState } from '@/app/lib/page-state';
 import type { Cliente, Vehiculo } from '@/app/types';
 import { Label, Input, Btn, SectionTitle } from '@/app/components/ui';
-
-// ── Modal de edición de cliente ────────────────────────────────────────────────
 function ModalEditarCliente({
   cliente,
   onGuardar,
@@ -214,7 +213,7 @@ export function VistaClientes({
   const [formCliente, setFormCliente] = useState({ nombre: '', telefono: '', email: '', email2: '' });
   const [clienteExpandido, setClienteExpandido] = useState<string | null>(null);
   const [formVehiculo, setFormVehiculo] = useState({ marca: '', modelo: '', anio: '', placa: '' });
-  const [busqueda, setBusqueda] = useState('');
+  const [busqueda, setBusqueda] = usePersistedState<string>('taller_clientes_busqueda', '');
   const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
   const [vehiculoEditando, setVehiculoEditando] = useState<Vehiculo | null>(null);
   const [savingCliente, setSavingCliente] = useState(false);

@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { usePersistedState } from '@/app/lib/page-state';
 import type { Gasto, GastoCategoria } from '@/app/types';
 import { GASTO_CATEGORIAS, GASTO_SUBCATEGORIAS } from '@/app/types';
 import { Btn, Input, Label, Select, SectionTitle } from '@/app/components/ui';
 import { fmt, formatearFecha, getHoy } from '@/app/lib/utils';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 type FiltroCat = 'todos' | GastoCategoria;
 
@@ -262,7 +261,7 @@ export function VistaGastos({
   onEliminar: (id: string) => Promise<void>;
 }) {
   const hoy = getHoy();
-  const [filtro, setFiltro] = useState<FiltroCat>('todos');
+  const [filtro, setFiltro] = usePersistedState<FiltroCat>('taller_gastos_filtro', 'todos');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
