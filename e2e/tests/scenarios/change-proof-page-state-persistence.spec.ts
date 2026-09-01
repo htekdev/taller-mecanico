@@ -190,8 +190,7 @@ test.describe('change-proof: page state persistence', () => {
 
     if (btnVisible) {
       const btnClass = await pagadoBtn.getAttribute('class').catch(() => '');
-      // Active button has an accent class; we just verify the module loaded
-      expect(btnVisible, 'El boton Pagado debe estar visible').toBe(true);
+      expect(btnClass, 'El boton Pagado debe tener clase activa bg-indigo').toContain('bg-indigo');
     }
 
     // At minimum: module loaded without crash
