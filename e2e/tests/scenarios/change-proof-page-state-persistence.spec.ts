@@ -93,16 +93,17 @@ test.describe('change-proof: page state persistence', () => {
     await trabajosPage.waitForPageLoad();
     await page.waitForTimeout(1000);
 
-    // Assert: "Pendiente" button appears visually active (bg-indigo class)
-    // matching the same pattern as Test 3 (Ayuntamiento uses bg-red-600).
-    const pendienteBtn = page.locator('button').filter({ hasText: /^En progreso$|^Pendiente$/ }).first();
+    // Assert: "En progreso" button appears visually active.
+    // Trabajos filter buttons use 'bg-white shadow text-slate-800' for active state.
+    // Button text is '🕐 En progreso' (with emoji) — use partial match without anchors.
+    const pendienteBtn = page.locator('button').filter({ hasText: /En progreso/i }).first();
 
     const pendienteBtnVisible = await pendienteBtn.isVisible({ timeout: 10_000 }).catch(() => false);
 
     if (pendienteBtnVisible) {
-      // Check the "Pendiente" button has the active styling (bg-indigo-600)
+      // Check the "En progreso" button has the active styling (bg-white shadow)
       const btnClass = await pendienteBtn.getAttribute('class').catch(() => '');
-      expect(btnClass, 'El boton Pendiente debe tener clase activa bg-indigo').toContain('bg-indigo');
+      expect(btnClass, 'El boton En progreso debe tener clase activa bg-white shadow').toContain('bg-white');
       await expect(trabajosPage.sectionTitle, 'Seccion Trabajos debe cargar').toBeVisible();
     } else {
       // If filter buttons aren't visible, the module still loaded correctly
@@ -184,8 +185,10 @@ test.describe('change-proof: page state persistence', () => {
     await dashboardPage.navigateToModule('facturas');
     await page.waitForTimeout(2000);
 
-    // Assert: "Pagado" or "Cobrado" filter button appears active
-    const pagadoBtn = page.locator('button').filter({ hasText: /^Pagado$|^Cobrado$/ }).first();
+    // Assert: "Pagado" filter button appears active.
+    // Facturas renders buttons as 'Pagado (N)' with count suffix — use partial match.
+    // Active class is 'bg-indigo-600 text-white shadow-sm'.
+    const pagadoBtn = page.locator('button').filter({ hasText: /Pagado/ }).first();
     const btnVisible = await pagadoBtn.isVisible({ timeout: 8_000 }).catch(() => false);
 
     if (btnVisible) {
