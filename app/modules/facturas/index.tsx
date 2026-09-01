@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { usePersistedState } from '@/app/lib/page-state';
 import type { Factura, Cliente, Vehiculo, Trabajo, PagoFactura } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';

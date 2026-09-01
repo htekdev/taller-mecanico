@@ -107,10 +107,13 @@ export function usePersistedState<T>(
     return saved !== null ? saved : defaultValue;
   });
 
-  // Keep key ref up to date in case the parent re-renders with a different key
-  // (shouldn't happen in this app, but defensive coding is free).
+  // Keep key ref in sync so the debounced write always uses the latest key.
+  // Must be done inside useEffect — updating a ref synchronously during render
+  // triggers a react-hooks/refs lint error.
   const keyRef = useRef(key);
-  keyRef.current = key;
+  useEffect(() => {
+    keyRef.current = key;
+  }, [key]);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
