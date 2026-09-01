@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { usePersistedState } from '@/app/lib/page-state';
 import type { OrdenCompra, Proveedor, Refaccion, CompraItem } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { fmt, BADGE_ORDEN, formatearFecha, getHoy } from '@/app/lib/utils';
@@ -345,9 +346,9 @@ export function VistaOrdenesCompra({
   const [formNumOrden, setFormNumOrden] = useState('');
   const [formConIVA, setFormConIVA] = useState(false);  // ¿la factura del proveedor incluye IVA?
   const [itemsOrden, setItemsOrden] = useState<CompraItem[]>([]);
-  const [filtro, setFiltro] = useState<'todos'|'pendiente'|'recibida'|'cancelada'>('todos');
-  const [expandido, setExpandido] = useState<string | null>(null);
-  const [filtroProveedorId, setFiltroProveedorId] = useState('');
+  const [filtro, setFiltro] = usePersistedState<'todos'|'pendiente'|'recibida'|'cancelada'>('taller_ordenes_filtro', 'todos');
+  const [expandido, setExpandido] = usePersistedState<string | null>('taller_ordenes_expandido', null);
+  const [filtroProveedorId, setFiltroProveedorId] = usePersistedState<string>('taller_ordenes_filtro_proveedor', '');
   const [editandoOrden, setEditandoOrden] = useState<OrdenCompra | null>(null);
 
   // ── Modo agregar pieza ────────────────────────────────────────────────────────

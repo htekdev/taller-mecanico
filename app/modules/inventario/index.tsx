@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { usePersistedState } from '@/app/lib/page-state';
 import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { CATEGORIAS, UNIDADES, labelVehiculo, fmt } from '@/app/lib/utils';
@@ -35,11 +36,11 @@ export function VistaInventario({
   const [formClienteId, setFormClienteId] = useState('');
   const [compatibilidad, setCompatibilidad] = useState<CompatibilidadVehiculo[]>([]);
   const [modeloInputs, setModeloInputs] = useState<Record<number, string>>({});
-  const [expandido, setExpandido] = useState<string | null>(null);
+  const [expandido, setExpandido] = usePersistedState<string | null>('taller_inventario_expandido', null);
   const [recibirCantidad, setRecibirCantidad] = useState<Record<string, number>>({});
-  const [filtroTexto, setFiltroTexto] = useState('');
-  const [filtroProveedor, setFiltroProveedor] = useState('');
-  const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [filtroTexto, setFiltroTexto] = usePersistedState<string>('taller_inventario_filtro_texto', '');
+  const [filtroProveedor, setFiltroProveedor] = usePersistedState<string>('taller_inventario_filtro_proveedor', '');
+  const [filtroCategoria, setFiltroCategoria] = usePersistedState<string>('taller_inventario_filtro_categoria', '');
   const [guardandoForm, setGuardandoForm] = useState(false);
   const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
 
