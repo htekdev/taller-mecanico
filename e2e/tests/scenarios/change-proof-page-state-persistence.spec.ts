@@ -373,8 +373,9 @@ test.describe('change-proof: page state persistence', () => {
     await trabajosPage.waitForPageLoad();
     await page.waitForTimeout(500);
 
-    // Find a filter button that is NOT "Todos" and click it
-    const filtroBtn = page.locator('button').filter({ hasText: /^En progreso$|^Pendiente$|^Completado$/ }).first();
+    // Find a filter button that is NOT "Todos" and click it.
+    // Actual labels: '🕐 En progreso', '✓ Terminados' — use partial match without anchors.
+    const filtroBtn = page.locator('button').filter({ hasText: /En progreso|Terminados/i }).first();
     const btnVisible = await filtroBtn.isVisible({ timeout: 8_000 }).catch(() => false);
 
     if (!btnVisible) {
