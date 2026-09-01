@@ -93,22 +93,16 @@ test.describe('change-proof: page state persistence', () => {
     await trabajosPage.waitForPageLoad();
     await page.waitForTimeout(1000);
 
-    // Assert: "Pendiente" button appears visually active (bg-indigo or similar active class)
-    // or at minimum: "Todos" button is NOT the active/selected one.
-    // We look for a button whose text matches "Pendiente" or "En progreso" that looks active.
+    // Assert: "Pendiente" button appears visually active (bg-indigo class)
+    // matching the same pattern as Test 3 (Ayuntamiento uses bg-red-600).
     const pendienteBtn = page.locator('button').filter({ hasText: /^En progreso$|^Pendiente$/ }).first();
-    const todosBtn = page.locator('button').filter({ hasText: /^Todos$/ }).first();
 
     const pendienteBtnVisible = await pendienteBtn.isVisible({ timeout: 10_000 }).catch(() => false);
 
     if (pendienteBtnVisible) {
-      // Check the "Pendiente" button has an active/selected class (bg-indigo, bg-slate, etc.)
+      // Check the "Pendiente" button has the active styling (bg-indigo-600)
       const btnClass = await pendienteBtn.getAttribute('class').catch(() => '');
-      // The active button has bg-indigo-600 or similar active styling
-      // We just verify that the "Todos" button is NOT exclusively highlighted
-      // (meaning filtroEstado != 'todos' was applied)
-      expect(pendienteBtn, 'El boton Pendiente debe estar visible').toBeTruthy();
-      // Basic sanity: module loaded without crash
+      expect(btnClass, 'El boton Pendiente debe tener clase activa bg-indigo').toContain('bg-indigo');
       await expect(trabajosPage.sectionTitle, 'Seccion Trabajos debe cargar').toBeVisible();
     } else {
       // If filter buttons aren't visible, the module still loaded correctly
