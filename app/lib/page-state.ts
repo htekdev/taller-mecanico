@@ -41,7 +41,7 @@
  *   taller_scroll_{vista}
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 
 // Page state expires after 7 days — long enough for any work week, short enough
 // to avoid surprising the user with stale filters after returning from vacation.
@@ -125,10 +125,12 @@ export function restoreScrollPosition(moduleKey: string): number {
  * - TTL: 7 days. Expired entries are cleaned up on next read.
  *
  * ### Root-cause note (fix for stale-ref bug):
- * valueRef MUST be updated synchronously in the render body — NOT inside a useEffect.
- * If it were updated in a useEffect, rapid navigation (within ~50ms of a state change,
- * before passive effects run) would leave valueRef stale, causing the unmount flush to
- * write the old value and silently drop the user's filter/tab/search change.
+ * valueRef MUST be updated via useLayoutEffect — NOT inside a regular useEffect.
+ * useEffect runs async (after paint); if the user changes a filter and navigates
+ * within ~50ms (before passive effects run), valueRef would be stale, causing the
+ * unmount flush to write the OLD value and silently drop the user's filter change.
+ * useLayoutEffect runs synchronously BEFORE paint — so valueRef is always fresh
+ * before the user can interact with the page and trigger navigation.
  *
  * @param key - Unique localStorage key. Use the taller_ prefix convention.
  * @param defaultValue - Value to use if nothing is persisted or if persisted data expired.
@@ -147,15 +149,24 @@ export function usePersistedState<T>(
 
   // Keep key ref in sync so the debounced write always uses the latest key.
   const keyRef = useRef(key);
-  keyRef.current = key; // sync update — key is typically constant but kept fresh
+  // useLayoutEffect (not useEffect) to update synchronously before paint.
+  // This prevents the React Compiler lint rule "Cannot access refs during render"
+  // while still ensuring keyRef is fresh before any user interaction can trigger navigation.
+  useLayoutEffect(() => {
+    keyRef.current = key;
+  }, [key]);
 
   // Keep value ref in sync so the unmount flush always writes the latest value.
-  // CRITICAL: updated synchronously in render body, not inside a useEffect.
-  // A useEffect update would be async (after paint), meaning rapid navigation
-  // (user changes filter and clicks nav within ~50ms) would leave this stale,
-  // causing the unmount flush to write the old value and lose the user's change.
+  // CRITICAL: use useLayoutEffect (not useEffect) here.
+  // useEffect runs async (after paint) — if the user changes a filter and navigates
+  // within ~50ms (before passive effects run), valueRef would be stale, causing the
+  // unmount flush to write the OLD value and silently lose the user's change.
+  // useLayoutEffect runs synchronously BEFORE paint, so valueRef is always fresh
+  // before the user can click a nav button.
   const valueRef = useRef(value);
-  valueRef.current = value; // sync update — always reflects the latest rendered value
+  useLayoutEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
