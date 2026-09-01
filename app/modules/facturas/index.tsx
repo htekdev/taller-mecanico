@@ -42,7 +42,7 @@ export function VistaFacturas({
   const [mesResumen, setMesResumen] = useState<number>(hoyDate.getMonth() + 1); // 1–12
   const [anioResumen, setAnioResumen] = useState<number>(hoyDate.getFullYear());
 
-  const [expandido, setExpandido] = useState<string | null>(null);
+  const [expandido, setExpandido] = usePersistedState<string | null>('taller_facturas_expandido', null);
   const [pagoForm, setPagoForm] = useState({ monto: 0, fecha: hoy, metodoPago: 'Efectivo' });
   const [filtro, setFiltro] = usePersistedState<'todos'|'pendiente'|'parcial'|'pagado'>('taller_facturas_filtro', 'todos');
   const [filtroClienteId, setFiltroClienteId] = usePersistedState<string>('taller_facturas_filtro_cliente', '');

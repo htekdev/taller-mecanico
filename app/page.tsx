@@ -11,6 +11,7 @@ import {
   getEstadoPagoFactura, getSaldoFactura, getSaldo,
   getEstadoPagoOrden, getSaldoOrden, getMontoPagadoOrden, getHoy, getMesActual,
 } from '@/app/lib/utils';
+import { saveScrollPosition, restoreScrollPosition } from '@/app/lib/page-state';
 import { Card } from '@/app/components/ui';
 import { VistaClientes } from '@/app/modules/clientes';
 import { VistaInventario } from '@/app/modules/inventario';
@@ -89,6 +90,23 @@ export default function TallerMecanico() {
   // Restoration is handled by the lazy useState initializer above (no FOUC).
   useEffect(() => {
     try { localStorage.setItem('taller_last_vista', vista); } catch { /* ignore */ }
+  }, [vista]);
+
+  // ── Scroll restoration: restore exact scroll position when switching modules ─
+  // When the vista changes, restore the saved scroll position for the new module.
+  // The 50ms delay lets React render the new module content before scrolling.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      restoreScrollPosition(vista);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [vista]);
+
+  // ── navigateTo: saves scroll position before switching module ─────────────
+  // Use this instead of setVista directly so scroll is captured before unmounting.
+  const navigateTo = useCallback((newVista: typeof vista) => {
+    saveScrollPosition(vista);
+    setVista(newVista);
   }, [vista]);
 
   // ── Handlers ──
@@ -708,7 +726,7 @@ export default function TallerMecanico() {
     try {
       await generarFactura(pendingFactura.trabajoId, pendingFactura.numero.trim(), pendingFactura.fecha, pendingFactura.incluirIva);
       setPendingFactura(null);
-      setVista('facturas');
+      navigateTo('facturas');
     } catch (err) {
       console.error('[confirmarFactura] FAILED:', err);
       setErrorBanner('No se pudo generar la factura. Verifica tu conexion e intenta de nuevo.');
@@ -1042,7 +1060,7 @@ export default function TallerMecanico() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <nav className="flex gap-1 mb-6 bg-white rounded-xl p-1.5 shadow-sm border border-slate-200 overflow-x-auto">
           {tabs.map(({ key, icon, label, count }) => (
-            <button key={key} onClick={() => setVista(key)}
+            <button key={key} onClick={() => navigateTo(key as typeof vista)}
               className={`relative flex items-center gap-2 px-3 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 whitespace-nowrap ${
                 vista === key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}>
@@ -1087,13 +1105,13 @@ export default function TallerMecanico() {
               onGuardar={guardarTrabajo}
               onEditar={editarTrabajo}
               onFinalizar={finalizarTrabajo}
-              onIrAInventario={() => setVista('inventario')}
+              onIrAInventario={() => navigateTo('inventario')}
               onGenerarFactura={abrirModalFactura}
               onRefacturar={refacturarTrabajo}
               onCancelarTrabajo={cancelarTrabajo}
               onReactivarTrabajo={reactivarTrabajo}
               onActualizarTft={actualizarTft}
-              onIrAFacturas={() => setVista('facturas')} />
+              onIrAFacturas={() => navigateTo('facturas')} />
           )}
           {vista === 'proveedores' && (
             <VistaProveedores proveedores={proveedores} inventario={inventario}
@@ -1103,7 +1121,7 @@ export default function TallerMecanico() {
             <VistaOrdenesCompra ordenes={ordenes} proveedores={proveedores} inventario={inventario}
               onCrearOrden={crearOrden} onRecibirOrden={recibirOrden} onCancelarOrden={cancelarOrden}
               onEditarOrden={editarOrden}
-              onIrAProveedores={() => setVista('proveedores')}
+              onIrAProveedores={() => navigateTo('proveedores')}
               onCrearRefaccionNueva={crearRefaccionDesdeOrden} />
           )}
           {vista === 'facturas' && (
@@ -1126,7 +1144,7 @@ export default function TallerMecanico() {
             <VistaCuentasPorPagar ordenes={ordenes} proveedores={proveedores}
               trabajos={trabajos} clientes={clientes} vehiculos={vehiculos}
               onRegistrarPago={registrarPagoOrden}
-              onIrAOrdenes={() => setVista('ordenes')}
+              onIrAOrdenes={() => navigateTo('ordenes')}
               onPagarServicioExterno={registrarPagoServicioExterno}
               onAnularOrden={cancelarOrden} />
           )}
@@ -1160,7 +1178,7 @@ export default function TallerMecanico() {
               proveedores={proveedores}
               onConvertirATrabajo={convertirCotizacionATrabajo}
               onAgregarRefaccion={agregarRefaccionDesdeCotizacion}
-              onNavToTrabajos={() => setVista('trabajos')}
+              onNavToTrabajos={() => navigateTo('trabajos')}
             />
           )}
           {vista === 'configuracion' && (

@@ -347,7 +347,7 @@ export function VistaOrdenesCompra({
   const [formConIVA, setFormConIVA] = useState(false);  // ¿la factura del proveedor incluye IVA?
   const [itemsOrden, setItemsOrden] = useState<CompraItem[]>([]);
   const [filtro, setFiltro] = usePersistedState<'todos'|'pendiente'|'recibida'|'cancelada'>('taller_ordenes_filtro', 'todos');
-  const [expandido, setExpandido] = useState<string | null>(null);
+  const [expandido, setExpandido] = usePersistedState<string | null>('taller_ordenes_expandido', null);
   const [filtroProveedorId, setFiltroProveedorId] = usePersistedState<string>('taller_ordenes_filtro_proveedor', '');
   const [editandoOrden, setEditandoOrden] = useState<OrdenCompra | null>(null);
 

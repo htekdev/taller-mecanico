@@ -2,19 +2,17 @@
  * page-state.ts
  *
  * Lightweight page-state persistence layer.
- * Saves per-module UI state (filters, search text, active tabs, sort order)
- * to localStorage so users return to exactly where they left off.
+ * Saves per-module UI state (filters, search text, active tabs, scroll position,
+ * expanded rows) to localStorage so users return to exactly where they left off.
  *
  * This is intentionally separate from form-draft.ts — form drafts preserve
  * in-progress form data (48h TTL, cleared on save), while page state preserves
  * navigation choices (7-day TTL, never cleared — they just expire).
  *
- * Usage:
- *   // Replace useState with usePersistedState for filter/tab/search state:
- *   const [filtroEstado, setFiltroEstado] = usePersistedState<'todos'|'pendiente'|'completado'>(
- *     'taller_trabajos_filtro_estado',
- *     'todos'
- *   );
+ * Two main exports:
+ *   usePersistedState   — drop-in useState replacement for filters/tabs/search
+ *   saveScrollPosition  — imperative save of window.scrollY for a module key
+ *   restoreScrollPosition — imperative restore (call after content renders)
  *
  * Keys used across the app:
  *   taller_trabajos_subtab
@@ -28,14 +26,19 @@
  *   taller_inventario_filtro_texto
  *   taller_inventario_filtro_proveedor
  *   taller_inventario_filtro_categoria
+ *   taller_inventario_expandido
  *   taller_facturas_filtro
  *   taller_facturas_filtro_cliente
  *   taller_facturas_busqueda
  *   taller_facturas_ver_canceladas
+ *   taller_facturas_expandido
  *   taller_ordenes_filtro
  *   taller_ordenes_filtro_proveedor
+ *   taller_ordenes_expandido
  *   taller_gastos_filtro
  *   taller_clientes_busqueda
+ *   taller_clientes_expandido
+ *   taller_scroll_{vista}
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -82,6 +85,34 @@ function writePageState<T>(key: string, data: T): void {
   } catch {
     // Ignore storage quota errors
   }
+}
+
+/**
+ * Save the current window scroll position for a given module key.
+ * Called imperatively (before navigating away) — use from the navigation handler.
+ *
+ * @param moduleKey - e.g. 'trabajos', 'inventario', etc.
+ */
+export function saveScrollPosition(moduleKey: string): void {
+  if (typeof window === 'undefined') return;
+  writePageState(`taller_scroll_${moduleKey}`, Math.round(window.scrollY));
+}
+
+/**
+ * Restore the saved scroll position for a given module key.
+ * Call after the module content has rendered (use inside a setTimeout or
+ * requestAnimationFrame to let the DOM settle first).
+ *
+ * Returns the restored scroll Y value, or 0 if nothing was saved.
+ *
+ * @param moduleKey - e.g. 'trabajos', 'inventario', etc.
+ */
+export function restoreScrollPosition(moduleKey: string): number {
+  if (typeof window === 'undefined') return 0;
+  const saved = readPageState<number>(`taller_scroll_${moduleKey}`);
+  const scrollY = typeof saved === 'number' && saved >= 0 ? saved : 0;
+  window.scrollTo({ top: scrollY, behavior: 'instant' });
+  return scrollY;
 }
 
 /**

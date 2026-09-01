@@ -36,7 +36,7 @@ export function VistaInventario({
   const [formClienteId, setFormClienteId] = useState('');
   const [compatibilidad, setCompatibilidad] = useState<CompatibilidadVehiculo[]>([]);
   const [modeloInputs, setModeloInputs] = useState<Record<number, string>>({});
-  const [expandido, setExpandido] = useState<string | null>(null);
+  const [expandido, setExpandido] = usePersistedState<string | null>('taller_inventario_expandido', null);
   const [recibirCantidad, setRecibirCantidad] = useState<Record<string, number>>({});
   const [filtroTexto, setFiltroTexto] = usePersistedState<string>('taller_inventario_filtro_texto', '');
   const [filtroProveedor, setFiltroProveedor] = usePersistedState<string>('taller_inventario_filtro_proveedor', '');
