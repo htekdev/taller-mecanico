@@ -41,7 +41,15 @@
  *   taller_scroll_{vista}
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+
+// SSR safety: Next.js pre-renders Client Components on the server. useLayoutEffect
+// emits a warning when called during server rendering even in client components.
+// This isomorphic version uses useLayoutEffect on the client (synchronous, before
+// paint — critical for the valueRef timing guarantee) and silently falls back to
+// useEffect on the server (where the effect body is a no-op ref assignment anyway).
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 // Page state expires after 7 days — long enough for any work week, short enough
 // to avoid surprising the user with stale filters after returning from vacation.
@@ -120,8 +128,17 @@ export function restoreScrollPosition(moduleKey: string): number {
  *
  * - Reads from localStorage synchronously in the useState initializer (no FOUC).
  * - Writes to localStorage with a debounce (default 300ms) on every state change.
+ * - Unmount flush ensures data is saved even if navigation happens before debounce fires.
  * - Handles SSR safely (returns defaultValue when window is undefined).
  * - TTL: 7 days. Expired entries are cleaned up on next read.
+ *
+ * ### Root-cause note (fix for stale-ref bug):
+ * valueRef MUST be updated via useLayoutEffect — NOT inside a regular useEffect.
+ * useEffect runs async (after paint); if the user changes a filter and navigates
+ * within ~50ms (before passive effects run), valueRef would be stale, causing the
+ * unmount flush to write the OLD value and silently drop the user's filter change.
+ * useLayoutEffect runs synchronously BEFORE paint — so valueRef is always fresh
+ * before the user can interact with the page and trigger navigation.
  *
  * @param key - Unique localStorage key. Use the taller_ prefix convention.
  * @param defaultValue - Value to use if nothing is persisted or if persisted data expired.
@@ -139,16 +156,22 @@ export function usePersistedState<T>(
   });
 
   // Keep key ref in sync so the debounced write always uses the latest key.
-  // Must be done inside useEffect — updating a ref synchronously during render
-  // triggers a react-hooks/refs lint error.
   const keyRef = useRef(key);
-  useEffect(() => {
+  // useIsomorphicLayoutEffect: runs synchronously before paint on the client
+  // (never in SSR where the ref update is a no-op anyway).
+  useIsomorphicLayoutEffect(() => {
     keyRef.current = key;
   }, [key]);
 
   // Keep value ref in sync so the unmount flush always writes the latest value.
+  // CRITICAL: use useIsomorphicLayoutEffect (not useEffect) here.
+  // useEffect runs async (after paint) — if the user changes a filter and navigates
+  // within ~16ms (before passive effects run), valueRef would be stale, causing the
+  // unmount flush to write the OLD value and silently lose the user's change.
+  // useIsomorphicLayoutEffect runs synchronously BEFORE paint, so valueRef is always
+  // fresh before the user can click a nav button.
   const valueRef = useRef(value);
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     valueRef.current = value;
   }, [value]);
 
@@ -167,6 +190,9 @@ export function usePersistedState<T>(
 
   // Unmount flush — ensures state is always persisted even if the component
   // unmounts before the debounce fires (e.g. user navigates within 300ms).
+  // valueRef.current is always up-to-date: synced via useIsomorphicLayoutEffect
+  // above, which runs synchronously before paint — before any user interaction
+  // can trigger navigation.
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);

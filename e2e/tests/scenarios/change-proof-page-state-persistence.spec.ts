@@ -29,7 +29,9 @@ test.describe('change-proof: page state persistence', () => {
     await loginPage.loginAsTestUser();
     await dashboardPage.waitForPageLoad();
 
-    // Seed the localStorage key directly — simulates user having typed a filter
+    // Seed the localStorage key BEFORE navigating to inventario (correct order).
+    // The default vista after login is 'clientes', so inventario is NOT mounted yet —
+    // the useState initializer will read this value when inventario mounts.
     const SEARCH_KEY = 'taller_inventario_filtro_texto';
     const SEARCH_VALUE = 'filtro-aceite-test';
 
@@ -41,25 +43,40 @@ test.describe('change-proof: page state persistence', () => {
       { key: SEARCH_KEY, value: SEARCH_VALUE }
     );
 
-    // Navigate to inventario — state should be read synchronously from localStorage
+    // Navigate to inventario — state is read synchronously from localStorage initializer.
+    // filtroTexto = readPageState('taller_inventario_filtro_texto') = SEARCH_VALUE
     await dashboardPage.navigateToModule('inventario');
+    // Wait > debounceMs (300ms) so the debounced write fires and re-writes SEARCH_VALUE.
+    // If the hook read the default '' instead, the debounce would overwrite to ''.
     await page.waitForTimeout(1500);
 
-    // Assert: search input shows the persisted value
-    const searchInput = page.locator(
-      'input[placeholder*="buscar" i], input[placeholder*="filtrar" i], input[type="search"], input[type="text"]'
-    ).first();
+    // ── Primary assertion: localStorage — data-independent ──────────────────────
+    // If hook read SEARCH_VALUE correctly on mount: debounced write → localStorage = SEARCH_VALUE
+    // If hook read '' (bug): debounced write → localStorage = '' (overwrites seeded value)
+    const storedAfterMount = await page.evaluate(
+      ({ key }: { key: string }) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        try { return JSON.parse(raw).data; } catch { return null; }
+      },
+      { key: SEARCH_KEY }
+    );
+    expect(
+      storedAfterMount,
+      'usePersistedState debe leer correctamente de localStorage en montaje'
+    ).toBe(SEARCH_VALUE);
 
-    const inputVisible = await searchInput.isVisible({ timeout: 8_000 }).catch(() => false);
+    // ── Bonus assertion: UI input — only when search bar is rendered ─────────────
+    // The search bar is inside {inventario.length === 0 ? empty-state : <list with search>}.
+    // Use a precise placeholder to avoid matching the add-form inputs.
+    const searchInput = page.locator('input[placeholder*="Buscar por nombre"]');
+    const inputVisible = await searchInput.isVisible({ timeout: 3_000 }).catch(() => false);
     if (inputVisible) {
       const val = await searchInput.inputValue().catch(() => '');
       expect(val, 'El campo de busqueda debe mostrar el texto guardado').toBe(SEARCH_VALUE);
-    } else {
-      // Fallback: check the filtered list shows the text somewhere on the page
-      const pageText = await page.textContent('body').catch(() => '');
-      // If no input visible, at minimum verify we didn't crash (module loaded)
-      await expect(page.locator('body'), 'Inventario debe cargar sin errores').toBeVisible();
     }
+    // If inventory is empty the search bar is not rendered — localStorage check above
+    // is sufficient to prove the hook restored state correctly.
 
     // Cleanup
     await page.evaluate(
@@ -314,10 +331,18 @@ test.describe('change-proof: page state persistence', () => {
       return;
     }
 
-    // Seed an expandido state (using the first row's potential ID placeholder)
     const EXPAND_KEY = 'taller_inventario_expandido';
     const FAKE_ID = 'test-row-id-12345';
 
+    // ── KEY FIX: navigate AWAY first, THEN seed localStorage ────────────────────
+    // If we seed while inventario is mounted, the unmount flush (triggered when
+    // navigating away) will overwrite localStorage with valueRef.current (which
+    // was read BEFORE the seed, so it's null) — silently erasing the seeded value.
+    // Correct order: let unmount flush fire first, then seed, then remount.
+    await dashboardPage.navigateToModule('trabajos');
+    await page.waitForTimeout(500); // let unmount flush complete
+
+    // NOW seed localStorage — inventario is unmounted, no flush will overwrite this
     await page.evaluate(
       ({ key, value }: { key: string; value: string }) => {
         const envelope = { data: value, savedAt: Date.now() };
@@ -326,13 +351,12 @@ test.describe('change-proof: page state persistence', () => {
       { key: EXPAND_KEY, value: FAKE_ID }
     );
 
-    // Navigate away and back
-    await dashboardPage.navigateToModule('trabajos');
-    await page.waitForTimeout(500);
+    // Navigate back to inventario — mounts with seeded value, debounce fires after 300ms
     await dashboardPage.navigateToModule('inventario');
+    // Wait > debounceMs (300ms) for write to fire
     await page.waitForTimeout(1000);
 
-    // Assert: The expandido value was read from localStorage (state persisted)
+    // Assert: The expandido value was read from localStorage on mount and preserved
     const storedValue = await page.evaluate(
       ({ key }: { key: string }) => {
         const raw = localStorage.getItem(key);
@@ -379,16 +403,19 @@ test.describe('change-proof: page state persistence', () => {
     const btnVisible = await filtroBtn.isVisible({ timeout: 8_000 }).catch(() => false);
 
     if (!btnVisible) {
-      // No filter buttons visible — skip gracefully (empty DB or different UI)
-      await expect(trabajosPage.sectionTitle).toBeVisible();
+      // No filter buttons visible — likely empty test DB. Skip instead of silently passing.
+      test.skip(true, 'No hay botones de filtro visibles — BD de prueba vacia. Verificar manualmente en entorno con datos.');
       return;
     }
 
     // Click the filter button to set a non-default filter value
     await filtroBtn.click();
-    await page.waitForTimeout(100); // let React state update
+    // NO wait here — navigate immediately to exercise the race condition.
+    // useIsomorphicLayoutEffect makes valueRef fresh synchronously in the commit
+    // phase (~0ms). The old useEffect approach would be stale for ~16ms+ (after
+    // paint). Removing this wait ensures the test actually proves the fix.
 
-    // Immediately navigate to inventario (tests the unmount-flush < 300ms path)
+    // Immediately navigate to inventario (tests the unmount-flush < 16ms path)
     await dashboardPage.navigateToModule('inventario');
     await page.waitForTimeout(300);
 
