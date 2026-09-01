@@ -43,6 +43,14 @@
 
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 
+// SSR safety: Next.js pre-renders Client Components on the server. useLayoutEffect
+// emits a warning when called during server rendering even in client components.
+// This isomorphic version uses useLayoutEffect on the client (synchronous, before
+// paint — critical for the valueRef timing guarantee) and silently falls back to
+// useEffect on the server (where the effect body is a no-op ref assignment anyway).
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
 // Page state expires after 7 days — long enough for any work week, short enough
 // to avoid surprising the user with stale filters after returning from vacation.
 const PAGE_STATE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -149,22 +157,21 @@ export function usePersistedState<T>(
 
   // Keep key ref in sync so the debounced write always uses the latest key.
   const keyRef = useRef(key);
-  // useLayoutEffect (not useEffect) to update synchronously before paint.
-  // This prevents the React Compiler lint rule "Cannot access refs during render"
-  // while still ensuring keyRef is fresh before any user interaction can trigger navigation.
-  useLayoutEffect(() => {
+  // useIsomorphicLayoutEffect: runs synchronously before paint on the client
+  // (never in SSR where the ref update is a no-op anyway).
+  useIsomorphicLayoutEffect(() => {
     keyRef.current = key;
   }, [key]);
 
   // Keep value ref in sync so the unmount flush always writes the latest value.
-  // CRITICAL: use useLayoutEffect (not useEffect) here.
+  // CRITICAL: use useIsomorphicLayoutEffect (not useEffect) here.
   // useEffect runs async (after paint) — if the user changes a filter and navigates
-  // within ~50ms (before passive effects run), valueRef would be stale, causing the
+  // within ~16ms (before passive effects run), valueRef would be stale, causing the
   // unmount flush to write the OLD value and silently lose the user's change.
-  // useLayoutEffect runs synchronously BEFORE paint, so valueRef is always fresh
-  // before the user can click a nav button.
+  // useIsomorphicLayoutEffect runs synchronously BEFORE paint, so valueRef is always
+  // fresh before the user can click a nav button.
   const valueRef = useRef(value);
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     valueRef.current = value;
   }, [value]);
 
@@ -183,7 +190,9 @@ export function usePersistedState<T>(
 
   // Unmount flush — ensures state is always persisted even if the component
   // unmounts before the debounce fires (e.g. user navigates within 300ms).
-  // valueRef.current is always up-to-date (set synchronously in render body above).
+  // valueRef.current is always up-to-date: synced via useIsomorphicLayoutEffect
+  // above, which runs synchronously before paint — before any user interaction
+  // can trigger navigation.
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);

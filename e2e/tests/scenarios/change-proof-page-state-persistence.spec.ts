@@ -379,16 +379,19 @@ test.describe('change-proof: page state persistence', () => {
     const btnVisible = await filtroBtn.isVisible({ timeout: 8_000 }).catch(() => false);
 
     if (!btnVisible) {
-      // No filter buttons visible — skip gracefully (empty DB or different UI)
-      await expect(trabajosPage.sectionTitle).toBeVisible();
+      // No filter buttons visible — likely empty test DB. Skip instead of silently passing.
+      test.skip(true, 'No hay botones de filtro visibles — BD de prueba vacia. Verificar manualmente en entorno con datos.');
       return;
     }
 
     // Click the filter button to set a non-default filter value
     await filtroBtn.click();
-    await page.waitForTimeout(100); // let React state update
+    // NO wait here — navigate immediately to exercise the race condition.
+    // useIsomorphicLayoutEffect makes valueRef fresh synchronously in the commit
+    // phase (~0ms). The old useEffect approach would be stale for ~16ms+ (after
+    // paint). Removing this wait ensures the test actually proves the fix.
 
-    // Immediately navigate to inventario (tests the unmount-flush < 300ms path)
+    // Immediately navigate to inventario (tests the unmount-flush < 16ms path)
     await dashboardPage.navigateToModule('inventario');
     await page.waitForTimeout(300);
 
