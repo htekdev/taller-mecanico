@@ -598,28 +598,35 @@ export default function TallerMecanico() {
     // ── Materialise libre- parts into real inventory records ──────────────────
     // libre- IDs are temp placeholders for free-form parts added via the edit modal.
     // Before saving, create a real refaccion record for each and swap the ID.
+    // DEFENSIVE: optional chaining on refaccionId guards against malformed JSONB
     let partesFinal = [...data.partes];
-    const librePartes = partesFinal.filter(p => p.refaccionId.startsWith('libre-'));
+    const librePartes = partesFinal.filter(p => p.refaccionId?.startsWith('libre-') ?? false);
     if (librePartes.length > 0) {
       const nuevasRefs: Refaccion[] = [];
-      for (const part of librePartes) {
-        // For received orders the goods are already in stock; pending orders start at 0
-        const stockInicial = orden?.estado === 'recibida' ? part.cantidad : 0;
-        const nueva = await db.insertRefaccion(taller.id, {
-          nombre: part.nombre,
-          codigo: '',
-          categoria: '',
-          unidad: 'pza',
-          precioCompra: part.precioCompra,
-          stock: stockInicial,
-          stockMinimo: 1,
-        });
-        if (nueva) {
-          partesFinal = partesFinal.map(p =>
-            p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p
-          );
-          nuevasRefs.push(nueva);
+      try {
+        for (const part of librePartes) {
+          // For received orders the goods are already in stock; pending orders start at 0
+          const stockInicial = orden?.estado === 'recibida' ? part.cantidad : 0;
+          const nueva = await db.insertRefaccion(taller.id, {
+            nombre: part.nombre,
+            codigo: '',
+            categoria: '',
+            unidad: 'pza',
+            precioCompra: part.precioCompra,
+            stock: stockInicial,
+            stockMinimo: 1,
+          });
+          if (nueva) {
+            partesFinal = partesFinal.map(p =>
+              p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p
+            );
+            nuevasRefs.push(nueva);
+          }
         }
+      } catch (err) {
+        console.error('[editarOrden] No se pudo crear refaccion libre:', err);
+        setErrorBanner('No se pudo registrar una pieza nueva. Verifica tu conexion e intenta de nuevo.');
+        return;
       }
       if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
     }
