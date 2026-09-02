@@ -207,11 +207,11 @@ export async function updateRefaccionProveedor(id: string, proveedorId: string |
 
 /** Returns true if the Supabase error indicates the migration table doesn't exist yet.
  *  This happens on Vercel preview environments where migrations only apply on merge to main.
- *  42P01 = PostgreSQL undefined_table; PGRST116 = PostgREST relation not found.
- *  We also detect the "schema cache" message from PostgREST v12+. */
+ *  42P01 = PostgreSQL undefined_table (pg error). Message patterns cover PostgREST v12+ schema cache errors.
+ *  Note: PGRST116 is "The result contains 0 rows" — NOT a table-missing error — intentionally excluded. */
 function isTableMissingError(err: { code?: string; message?: string } | null): boolean {
   if (!err) return false;
-  if (err.code === '42P01' || err.code === 'PGRST116') return true;
+  if (err.code === '42P01') return true;  // PostgreSQL undefined_table
   if (err.message?.includes('Could not find the table')) return true;
   if (err.message?.includes('relation') && err.message?.includes('does not exist')) return true;
   return false;
@@ -227,7 +227,8 @@ export async function getHistorialComprasRefaccion(
     .eq('taller_id', tallerId)
     .eq('refaccion_id', refaccionId)
     .order('fecha', { ascending: false })
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(50);
 
   // Migration runs on merge to main only — preview environments may not have the table yet.
   // Return empty array gracefully so the modal shows "no history" instead of a red error.
