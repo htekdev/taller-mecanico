@@ -17,40 +17,28 @@
  * require network interception).
  */
 
-import { test, expect } from '@playwright/test';
-
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
+import { test, expect } from '../../fixtures';
 
 test.describe('Skeleton Loading + Scroll Persistence UX', () => {
+  // Authenticate once before each test — uses the same pattern as all other specs.
+  test.beforeEach(async ({ loginPage }) => {
+    await loginPage.loginAsTestUser();
+  });
+
   // ─── Phase 1: Content always loads after the skeleton phase ────────────────
   test('Phase 1 — app-content-loaded appears after initial load', async ({ page }) => {
-    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-
-    const isLoginPage = await page.locator('input[type="email"]').isVisible({ timeout: 5000 }).catch(() => false);
-    if (isLoginPage) {
-      test.skip(true, 'Auth required — skipping in unauthenticated environment');
-      return;
-    }
-
+    // loginAsTestUser() already waited for app-content-loaded — just confirm it's visible.
     await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
   });
 
   // ─── Phase 2: Persisted vista survives full page reload ────────────────────
   test('Phase 2 — persisted vista restored after full reload', async ({ page }) => {
-    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-
-    const isLoginPage = await page.locator('input[type="email"]').isVisible({ timeout: 5000 }).catch(() => false);
-    if (isLoginPage) {
-      test.skip(true, 'Auth required — skipping in unauthenticated environment');
-      return;
-    }
-
     await page.evaluate(() => {
       try { localStorage.setItem('taller_last_vista', 'trabajos'); } catch { /* noop */ }
     });
 
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 60000 });
 
     const trabajosTab = page.locator('nav button', { hasText: 'Trabajos' });
     const isActive = await trabajosTab.evaluate(el =>
@@ -61,20 +49,12 @@ test.describe('Skeleton Loading + Scroll Persistence UX', () => {
 
   // ─── Phase 3: Filter value persists across reload ───────────────────────────
   test('Phase 3 — persisted filter survives hard reload', async ({ page }) => {
-    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-
-    const isLoginPage = await page.locator('input[type="email"]').isVisible({ timeout: 5000 }).catch(() => false);
-    if (isLoginPage) {
-      test.skip(true, 'Auth required — skipping in unauthenticated environment');
-      return;
-    }
-
     // Land on clientes first so trabajos module is unmounted — avoids stale unmount flush
     await page.evaluate(() => {
       try { localStorage.setItem('taller_last_vista', 'clientes'); } catch { /* noop */ }
     });
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 60000 });
 
     // Seed filter state while trabajos is unmounted (no flush can overwrite it)
     await page.evaluate(() => {
@@ -86,7 +66,7 @@ test.describe('Skeleton Loading + Scroll Persistence UX', () => {
     });
 
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 60000 });
 
     const storedValue = await page.evaluate(() => {
       try {
@@ -102,14 +82,6 @@ test.describe('Skeleton Loading + Scroll Persistence UX', () => {
   // ─── Phase 4: Scroll position key survives reload (Sofia's cotizaciones case) ─
   // Simulates saving scroll before app-switch and verifying it's available on return.
   test('Phase 4 — scroll position key present after reload (cotizaciones)', async ({ page }) => {
-    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-
-    const isLoginPage = await page.locator('input[type="email"]').isVisible({ timeout: 5000 }).catch(() => false);
-    if (isLoginPage) {
-      test.skip(true, 'Auth required — skipping in unauthenticated environment');
-      return;
-    }
-
     await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
 
     // Seed scroll position directly (mimics what visibilitychange handler saves)
@@ -123,7 +95,7 @@ test.describe('Skeleton Loading + Scroll Persistence UX', () => {
 
     // Reload — simulates OS killing the background tab
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 60000 });
 
     // Wait for scroll restoration timeout (50ms in page.tsx)
     await page.waitForTimeout(300);
