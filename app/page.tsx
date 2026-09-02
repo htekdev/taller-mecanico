@@ -493,8 +493,9 @@ export default function TallerMecanico() {
 
     try {
       // Materialise any libre- parts that may have been added via the edit modal
+      // DEFENSIVE: use optional chaining in case any parte has a null/undefined refaccionId
       let partesFinal = [...orden.partes];
-      const librePartes = partesFinal.filter(p => p.refaccionId.startsWith('libre-'));
+      const librePartes = partesFinal.filter(p => p.refaccionId?.startsWith('libre-') ?? false);
       if (librePartes.length > 0) {
         const nuevasRefs: Refaccion[] = [];
         try {
@@ -511,25 +512,47 @@ export default function TallerMecanico() {
             }
           }
         } catch (err) {
-          console.error('[editarOrden] No se pudo crear refaccion libre:', err);
+          console.error('[recibirOrden] No se pudo crear refaccion libre:', err);
           setErrorBanner('No se pudo registrar una pieza nueva. Verifica tu conexion e intenta de nuevo.');
           return;
         }
         if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
         // Persist real IDs in the order before marking received
-        const subtotal = partesFinal.reduce((s, p) => s + p.subtotal, 0);
-        await db.updateOrden(ordenId, { ...orden, partes: partesFinal, subtotalSinIVA: subtotal, ivaAmount: orden.ivaAmount, total: orden.total, conIVA: orden.conIVA });
+        const subtotal = partesFinal.reduce((s, p) => s + (Number(p.subtotal) || 0), 0);
+        try {
+          await db.updateOrden(ordenId, { ...orden, partes: partesFinal, subtotalSinIVA: subtotal, ivaAmount: orden.ivaAmount, total: orden.total, conIVA: orden.conIVA });
+        } catch (err) {
+          console.error('[recibirOrden] updateOrden (libre-parts persist) FAILED:', err);
+          throw err;
+        }
         setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, partes: partesFinal } : o));
       }
 
-      await db.updateOrdenEstado(ordenId, 'recibida', hoy);
+      try {
+        await db.updateOrdenEstado(ordenId, 'recibida', hoy);
+      } catch (err) {
+        console.error('[recibirOrden] updateOrdenEstado FAILED:', err);
+        throw err;
+      }
       setOrdenes(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'recibida' as const, fechaRecibida: hoy } : o));
       if (partesFinal.length > 0) {
+        // DEFENSIVE: ensure stock arithmetic uses proper numbers — JSONB may store numbers
+        // as-is but Number() guards against any unexpected type coercion issues (e.g. NaN from
+        // undefined cantidad) that would cause PostgreSQL to reject the update.
         const nuevoInv = inventario.map(r => {
           const item = partesFinal.find(p => p.refaccionId === r.id);
-          return item ? { ...r, stock: r.stock + item.cantidad } : r;
+          if (!item) return r;
+          const nuevoStock = (Number(r.stock) || 0) + (Number(item.cantidad) || 0);
+          return { ...r, stock: isNaN(nuevoStock) ? r.stock : nuevoStock };
         });
-        await db.updateRefacciones(nuevoInv.filter(r => partesFinal.some(p => p.refaccionId === r.id)));
+        // Only update items that actually appear in this PO (skip items with no quantity change)
+        const itemsToUpdate = nuevoInv.filter(r => partesFinal.some(p => p.refaccionId === r.id));
+        try {
+          await db.updateRefacciones(itemsToUpdate);
+        } catch (err) {
+          console.error('[recibirOrden] updateRefacciones FAILED:', err);
+          throw err;
+        }
         // BUG FIX: backfill proveedorId on existing inventory items that came from this PO
         if (orden.proveedorId) {
           const itemsToBackfill = partesFinal.filter(p => {
@@ -575,28 +598,35 @@ export default function TallerMecanico() {
     // ── Materialise libre- parts into real inventory records ──────────────────
     // libre- IDs are temp placeholders for free-form parts added via the edit modal.
     // Before saving, create a real refaccion record for each and swap the ID.
+    // DEFENSIVE: optional chaining on refaccionId guards against malformed JSONB
     let partesFinal = [...data.partes];
-    const librePartes = partesFinal.filter(p => p.refaccionId.startsWith('libre-'));
+    const librePartes = partesFinal.filter(p => p.refaccionId?.startsWith('libre-') ?? false);
     if (librePartes.length > 0) {
       const nuevasRefs: Refaccion[] = [];
-      for (const part of librePartes) {
-        // For received orders the goods are already in stock; pending orders start at 0
-        const stockInicial = orden?.estado === 'recibida' ? part.cantidad : 0;
-        const nueva = await db.insertRefaccion(taller.id, {
-          nombre: part.nombre,
-          codigo: '',
-          categoria: '',
-          unidad: 'pza',
-          precioCompra: part.precioCompra,
-          stock: stockInicial,
-          stockMinimo: 1,
-        });
-        if (nueva) {
-          partesFinal = partesFinal.map(p =>
-            p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p
-          );
-          nuevasRefs.push(nueva);
+      try {
+        for (const part of librePartes) {
+          // For received orders the goods are already in stock; pending orders start at 0
+          const stockInicial = orden?.estado === 'recibida' ? part.cantidad : 0;
+          const nueva = await db.insertRefaccion(taller.id, {
+            nombre: part.nombre,
+            codigo: '',
+            categoria: '',
+            unidad: 'pza',
+            precioCompra: part.precioCompra,
+            stock: stockInicial,
+            stockMinimo: 1,
+          });
+          if (nueva) {
+            partesFinal = partesFinal.map(p =>
+              p.refaccionId === part.refaccionId ? { ...p, refaccionId: nueva.id } : p
+            );
+            nuevasRefs.push(nueva);
+          }
         }
+      } catch (err) {
+        console.error('[editarOrden] No se pudo crear refaccion libre:', err);
+        setErrorBanner('No se pudo registrar una pieza nueva. Verifica tu conexion e intenta de nuevo.');
+        return;
       }
       if (nuevasRefs.length > 0) setInventario(prev => [...prev, ...nuevasRefs]);
     }
