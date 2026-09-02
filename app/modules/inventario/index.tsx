@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { usePersistedState } from '@/app/lib/page-state';
 import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo, HistorialCompraRefaccion } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
@@ -293,11 +293,11 @@ export function VistaInventario({
     }
   };
 
-  const cerrarHistorial = () => {
+  const cerrarHistorial = useCallback(() => {
     setHistorialModalRefaccion(null);
     setHistorial([]);
     setHistorialError(null);
-  };
+  }, []);
 
   return (
     <div>

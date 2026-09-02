@@ -223,7 +223,7 @@ export async function getHistorialComprasRefaccion(
 ): Promise<HistorialCompraRefaccion[]> {
   const { data, error } = await supabase
     .from('historial_compras_refaccion')
-    .select('*')
+    .select('id, taller_id, refaccion_id, proveedor_id, proveedor_nombre, fecha, cantidad, precio_unitario, total, notas, created_at')
     .eq('taller_id', tallerId)
     .eq('refaccion_id', refaccionId)
     .order('fecha', { ascending: false })
