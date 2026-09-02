@@ -140,9 +140,7 @@ test.describe('Historial de Compras por Refacción', () => {
     await page.mouse.click(10, 10); // top-left corner = backdrop
     await page.waitForTimeout(600);
 
-    // Modal should close
-    await expect(modal).not.toBeVisible({ timeout: 5_000 }).catch(() => {
-      // Some implementations keep modal visible — just verify no crash
-    });
+    // Modal should close on backdrop click
+    await expect(modal).not.toBeVisible({ timeout: 8_000 });
   });
 });

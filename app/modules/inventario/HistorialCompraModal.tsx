@@ -40,10 +40,26 @@ export function HistorialCompraModal({
     if (e.target === e.currentTarget) onCerrar();
   };
 
-  // Close on Escape key + focus trap
+  // Close on Escape key + trap Tab focus within modal (WCAG 2.1 SC 2.1.2)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCerrar();
+      if (e.key === 'Escape') {
+        onCerrar();
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusable = document.querySelectorAll<HTMLElement>(
+          '[role="dialog"] button, [role="dialog"] [href], [role="dialog"] input, [role="dialog"] select, [role="dialog"] textarea, [role="dialog"] [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last  = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+        }
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
@@ -76,8 +92,9 @@ export function HistorialCompraModal({
           </div>
           <button
             type="button"
+            autoFocus
             onClick={onCerrar}
-          className="shrink-0 text-slate-400 hover:text-slate-700 transition-colors p-3 rounded-lg"
+          className="shrink-0 text-slate-400 hover:text-slate-700 transition-colors p-3 rounded-lg focus:ring-2 focus:ring-slate-400 focus:outline-none"
             aria-label="Cerrar"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -151,7 +168,7 @@ export function HistorialCompraModal({
                   )}
                   {/* Latest badge */}
                   {idx === 0 && (
-                    <span className="inline-block text-[10px] font-bold uppercase tracking-wide bg-indigo-100 text-indigo-700 rounded px-2 py-0.5">
+                    <span className="inline-block text-xs font-bold uppercase tracking-wide bg-indigo-100 text-indigo-700 rounded px-2 py-0.5">
                       Última compra
                     </span>
                   )}
