@@ -51,6 +51,46 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 const useIsomorphicLayoutEffect =
   typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
+// ─── Global visibilitychange flush registry ────────────────────────────────
+//
+// Problem: On mobile, the OS can kill a background browser tab at any time.
+// When the user switches from Taller Mecánico to WhatsApp (or any other app),
+// `document.visibilityState` changes to 'hidden'. If the OS then kills the tab,
+// any pending 300ms debounce timers are lost — the filters never reach localStorage.
+//
+// Solution: maintain a module-level Set of flush functions. Each usePersistedState
+// instance registers its own flush on mount and deregisters on unmount. A single
+// visibilitychange listener flushes all of them the moment the app goes to background.
+//
+// This is safe: flush() is idempotent (writes the current value, cancels the timer).
+// The debounce will not fire again after the flush because the timer is cleared.
+
+const _pendingFlushes = new Set<() => void>();
+
+function _registerFlush(fn: () => void): void {
+  _pendingFlushes.add(fn);
+}
+
+function _deregisterFlush(fn: () => void): void {
+  _pendingFlushes.delete(fn);
+}
+
+// Install the visibilitychange listener once at module load time (client only).
+// Uses 'pagehide' as a fallback for iOS Safari where 'beforeunload' is unreliable
+// and visibilitychange may not fire reliably on hard kills.
+if (typeof window !== 'undefined') {
+  const flushAll = () => {
+    if (document.visibilityState === 'hidden') {
+      _pendingFlushes.forEach(fn => fn());
+    }
+  };
+  const flushAllPagehide = () => {
+    _pendingFlushes.forEach(fn => fn());
+  };
+  document.addEventListener('visibilitychange', flushAll);
+  window.addEventListener('pagehide', flushAllPagehide);
+}
+
 // Page state expires after 7 days — long enough for any work week, short enough
 // to avoid surprising the user with stale filters after returning from vacation.
 const PAGE_STATE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -129,10 +169,12 @@ export function restoreScrollPosition(moduleKey: string): number {
  * - Reads from localStorage synchronously in the useState initializer (no FOUC).
  * - Writes to localStorage with a debounce (default 300ms) on every state change.
  * - Unmount flush ensures data is saved even if navigation happens before debounce fires.
+ * - visibilitychange flush ensures data is saved when user switches apps on mobile
+ *   (before the OS can kill the background tab and lose the pending debounce timer).
  * - Handles SSR safely (returns defaultValue when window is undefined).
  * - TTL: 7 days. Expired entries are cleaned up on next read.
  *
- * ### Root-cause note (fix for stale-ref bug):
+ * ### Root-cause note (fix for stale-ref bug, PR #215):
  * valueRef MUST be updated via useLayoutEffect — NOT inside a regular useEffect.
  * useEffect runs async (after paint); if the user changes a filter and navigates
  * within ~50ms (before passive effects run), valueRef would be stale, causing the
@@ -176,6 +218,24 @@ export function usePersistedState<T>(
   }, [value]);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Register this instance's flush function with the global visibilitychange registry.
+  // When the user switches apps (e.g. opens WhatsApp), document.visibilityState becomes
+  // 'hidden' and all registered flushes are called immediately — before the OS can kill
+  // the background tab and lose the pending 300ms debounce timer.
+  // The flush function is stable (captured via closure over the stable refs) and is
+  // deregistered on unmount so there are no leaks.
+  useEffect(() => {
+    const flush = () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      writePageState(keyRef.current, valueRef.current);
+    };
+    _registerFlush(flush);
+    return () => _deregisterFlush(flush);
+  }, []); // intentionally empty — stable flush function, registered once on mount
 
   // Debounced write on every value change.
   useEffect(() => {
