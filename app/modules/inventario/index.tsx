@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { usePersistedState } from '@/app/lib/page-state';
 import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo, HistorialCompraRefaccion } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
@@ -78,6 +78,9 @@ export function VistaInventario({
   const [historial, setHistorial]                             = useState<HistorialCompraRefaccion[]>([]);
   const [historialCargando, setHistorialCargando]             = useState(false);
   const [historialError, setHistorialError]                   = useState<string | null>(null);
+  // Stale-fetch guard: tracks the refaccion ID of the current in-flight request.
+  // If the user closes and reopens the modal quickly, only the latest request's result is applied.
+  const historialRequestIdRef = useRef<string | null>(null);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === formClienteId);
 
@@ -275,6 +278,8 @@ export function VistaInventario({
 
   // ── Historial de compras handlers (Feature #222) ──
   const abrirHistorial = async (r: Refaccion) => {
+    const requestId = r.id;
+    historialRequestIdRef.current = requestId;
     setHistorialModalRefaccion(r);
     setHistorial([]);
     setHistorialError(null);
@@ -285,16 +290,21 @@ export function VistaInventario({
     setEditandoCompat(null);
     try {
       const entradas = await onCargarHistorialCompras(r.id);
+      if (historialRequestIdRef.current !== requestId) return; // stale — discard
       setHistorial(entradas);
     } catch (err) {
+      if (historialRequestIdRef.current !== requestId) return;
       console.error('[abrirHistorial]', err);
       setHistorialError('No se pudo cargar el historial. Intenta de nuevo.');
     } finally {
-      setHistorialCargando(false);
+      if (historialRequestIdRef.current === requestId) {
+        setHistorialCargando(false);
+      }
     }
   };
 
   const cerrarHistorial = useCallback(() => {
+    historialRequestIdRef.current = null; // cancel pending stale result
     setHistorialModalRefaccion(null);
     setHistorial([]);
     setHistorialError(null);
