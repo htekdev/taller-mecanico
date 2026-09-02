@@ -669,7 +669,7 @@ export function VistaInventario({
                               </Btn>
                               <Btn size="sm" variant="primary"
                                 onClick={() => abrirHistorial(r)}
-                                className="border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                                className="border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 min-h-[44px]"
                                 data-testid="ver-historial-btn">
                                 📋 Ver Historial
                               </Btn>

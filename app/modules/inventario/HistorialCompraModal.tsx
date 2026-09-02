@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import type { HistorialCompraRefaccion, Proveedor, Refaccion } from '@/app/types';
 import { fmt } from '@/app/lib/utils';
 
@@ -39,6 +40,15 @@ export function HistorialCompraModal({
     if (e.target === e.currentTarget) onCerrar();
   };
 
+  // Close on Escape key + focus trap
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCerrar();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCerrar]);
+
   return (
     <div
       className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
@@ -67,7 +77,7 @@ export function HistorialCompraModal({
           <button
             type="button"
             onClick={onCerrar}
-            className="shrink-0 text-slate-400 hover:text-slate-700 transition-colors p-1 -m-1 rounded-lg"
+          className="shrink-0 text-slate-400 hover:text-slate-700 transition-colors p-2.5 rounded-lg"
             aria-label="Cerrar"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
