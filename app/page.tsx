@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor, OrdenCompra, Factura,
   Pago, PagoCompra, PagoFactura, FacturaConcepto, CompatibilidadVehiculo, PagoServicioExterno,
@@ -153,6 +153,36 @@ export default function TallerMecanico() {
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vista, cargando]);
+
+  // ── Scroll save on external-app switch (visibilitychange / pagehide) ─────────
+  // saveScrollPosition is called in navigateTo for in-app navigation.
+  // But when Sofia switches to WhatsApp (or any other app) WITHOUT navigating,
+  // navigateTo never fires — scroll position is never saved — and on full reload
+  // she lands at the top of the list.
+  //
+  // Fix: listen for the browser's "going to background" signals and save the
+  // current scroll position immediately, just like visibilitychange saves filter
+  // state in page-state.ts (PR #217).
+  //
+  // vistaRef keeps the ref current without adding vista to the effect deps
+  // (which would cause the listeners to be re-registered on every tab change).
+  const vistaRef = useRef(vista);
+  useEffect(() => { vistaRef.current = vista; }, [vista]);
+
+  useEffect(() => {
+    const handleHide = () => {
+      saveScrollPosition(vistaRef.current);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') handleHide();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handleHide); // iOS Safari fallback
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handleHide);
+    };
+  }, []); // intentionally empty — listeners registered once, vistaRef always current
 
   // ── navigateTo: saves scroll position before switching module ─────────────
   // Use this instead of setVista directly so scroll is captured before unmounting.

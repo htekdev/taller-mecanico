@@ -1,38 +1,37 @@
 /**
  * change-proof-skeleton-loading.spec.ts
  *
- * Walkthrough proof for PR #218 — skeleton loading UX.
+ * Walkthrough proof for PR #219 — skeleton loading UX + scroll persistence.
  *
- * Verifies three things:
- *   Phase 1 — Content loads after skeleton: page starts loading and eventually
- *              shows app-content-loaded (skeleton → content transition).
- *   Phase 2 — Persisted vista survives full reload: navigate to trabajos,
- *              hard-reload, verify trabajos is the active module.
- *   Phase 3 — Scroll restoration waits for data: set saved scroll in localStorage,
- *              reload, verify page scrolled only AFTER content loaded (not before).
+ * Verifies four things:
+ *   Phase 1 — Content loads after skeleton: page eventually shows
+ *              app-content-loaded (skeleton → content transition).
+ *   Phase 2 — Persisted vista survives full reload: seed 'trabajos',
+ *              reload, verify trabajos tab is active.
+ *   Phase 3 — Persisted filter value survives hard reload.
+ *   Phase 4 — Scroll key survives reload (read path for scroll restoration):
+ *              seeds a taller_scroll_cotizaciones key, reloads, verifies it's
+ *              still present and non-zero (scroll restoration uses it on load).
  *
- * This test intentionally focuses on the observable outcomes (content appears,
- * persisted state restores) rather than testing skeleton rendering internals
- * (which requires intercepting network requests).
+ * Test focuses on observable outcomes — not skeleton internals (which would
+ * require network interception).
  */
 
 import { test, expect } from '@playwright/test';
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
 
-test.describe('Skeleton Loading UX', () => {
+test.describe('Skeleton Loading + Scroll Persistence UX', () => {
   // ─── Phase 1: Content always loads after the skeleton phase ────────────────
   test('Phase 1 — app-content-loaded appears after initial load', async ({ page }) => {
     await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
 
-    // Wait for auth (login page or app)
     const isLoginPage = await page.locator('input[type="email"]').isVisible({ timeout: 5000 }).catch(() => false);
     if (isLoginPage) {
       test.skip(true, 'Auth required — skipping in unauthenticated environment');
       return;
     }
 
-    // Wait for the content card to appear (skeleton should disappear and give way to real content)
     await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
   });
 
@@ -40,25 +39,19 @@ test.describe('Skeleton Loading UX', () => {
   test('Phase 2 — persisted vista restored after full reload', async ({ page }) => {
     await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
 
-    // Check for login
     const isLoginPage = await page.locator('input[type="email"]').isVisible({ timeout: 5000 }).catch(() => false);
     if (isLoginPage) {
       test.skip(true, 'Auth required — skipping in unauthenticated environment');
       return;
     }
 
-    // Seed the last vista as 'trabajos'
     await page.evaluate(() => {
       try { localStorage.setItem('taller_last_vista', 'trabajos'); } catch { /* noop */ }
     });
 
-    // Hard reload
     await page.reload({ waitUntil: 'domcontentloaded' });
-
-    // Wait for content to load
     await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
 
-    // The nav tab for 'trabajos' should be the active one (has indigo background)
     const trabajosTab = page.locator('nav button', { hasText: 'Trabajos' });
     const isActive = await trabajosTab.evaluate(el =>
       el.className.includes('bg-indigo-600') || el.className.includes('text-white'),
@@ -66,8 +59,8 @@ test.describe('Skeleton Loading UX', () => {
     expect(isActive).toBe(true);
   });
 
-  // ─── Phase 3: Filters restored on full reload ───────────────────────────────
-  test('Phase 3 — persisted filter restored after full reload', async ({ page }) => {
+  // ─── Phase 3: Filter value persists across reload ───────────────────────────
+  test('Phase 3 — persisted filter survives hard reload', async ({ page }) => {
     await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
 
     const isLoginPage = await page.locator('input[type="email"]').isVisible({ timeout: 5000 }).catch(() => false);
@@ -76,7 +69,14 @@ test.describe('Skeleton Loading UX', () => {
       return;
     }
 
-    // Seed: save vista=trabajos and filtroEstado=pendiente
+    // Land on clientes first so trabajos module is unmounted — avoids stale unmount flush
+    await page.evaluate(() => {
+      try { localStorage.setItem('taller_last_vista', 'clientes'); } catch { /* noop */ }
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
+
+    // Seed filter state while trabajos is unmounted (no flush can overwrite it)
     await page.evaluate(() => {
       try {
         localStorage.setItem('taller_last_vista', 'trabajos');
@@ -85,13 +85,9 @@ test.describe('Skeleton Loading UX', () => {
       } catch { /* noop */ }
     });
 
-    // Hard reload
     await page.reload({ waitUntil: 'domcontentloaded' });
-
-    // Wait for content
     await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
 
-    // Verify the localStorage envelope is still present and not overwritten
     const storedValue = await page.evaluate(() => {
       try {
         const raw = localStorage.getItem('taller_trabajos_filtro_estado');
@@ -100,7 +96,48 @@ test.describe('Skeleton Loading UX', () => {
       } catch { return null; }
     });
 
-    // The persisted filter should survive the reload
     expect(storedValue).toBe('pendiente');
+  });
+
+  // ─── Phase 4: Scroll position key survives reload (Sofia's cotizaciones case) ─
+  // Simulates saving scroll before app-switch and verifying it's available on return.
+  test('Phase 4 — scroll position key present after reload (cotizaciones)', async ({ page }) => {
+    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+
+    const isLoginPage = await page.locator('input[type="email"]').isVisible({ timeout: 5000 }).catch(() => false);
+    if (isLoginPage) {
+      test.skip(true, 'Auth required — skipping in unauthenticated environment');
+      return;
+    }
+
+    await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
+
+    // Seed scroll position directly (mimics what visibilitychange handler saves)
+    await page.evaluate(() => {
+      try {
+        const envelope = { data: 350, savedAt: Date.now() };
+        localStorage.setItem('taller_scroll_cotizaciones', JSON.stringify(envelope));
+        localStorage.setItem('taller_last_vista', 'cotizaciones');
+      } catch { /* noop */ }
+    });
+
+    // Reload — simulates OS killing the background tab
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-testid="app-content-loaded"]')).toBeVisible({ timeout: 30000 });
+
+    // Wait for scroll restoration timeout (50ms in page.tsx)
+    await page.waitForTimeout(300);
+
+    // Scroll key must survive the reload so restoreScrollPosition can use it
+    const scrollData = await page.evaluate(() => {
+      try {
+        const raw = localStorage.getItem('taller_scroll_cotizaciones');
+        if (!raw) return null;
+        return JSON.parse(raw)?.data ?? null;
+      } catch { return null; }
+    });
+
+    expect(typeof scrollData).toBe('number');
+    expect(scrollData).toBeGreaterThan(0);
   });
 });
