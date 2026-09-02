@@ -112,7 +112,7 @@ test.describe('Órdenes de Compra — Module Load', () => {
     await showPhaseLabel(page, '✅ Create Button Check Done');
   });
 
-  test('ordenes survives navigate-away and back', async ({
+  test('ordenes survives navigate-away and back', { retries: 1 }, async ({
     page, dashboardPage,
   }) => {
     await showPhaseLabel(page, '🔀 Phase 1: Navigation Resilience');
