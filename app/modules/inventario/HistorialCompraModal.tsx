@@ -108,7 +108,7 @@ export function HistorialCompraModal({
             </div>
           )}
 
-          {!cargando && historial.length > 0 && (
+          {!cargando && !errorCarga && historial.length > 0 && (
             <div className="space-y-3" data-testid="historial-list">
               {historial.map((entrada, idx) => (
                 <div

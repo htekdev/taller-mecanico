@@ -23,13 +23,9 @@ CREATE TABLE IF NOT EXISTS historial_compras_refaccion (
   created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index to fetch history for a specific part quickly
-CREATE INDEX IF NOT EXISTS idx_historial_compras_refaccion_refaccion_id
-  ON historial_compras_refaccion (refaccion_id);
-
--- Index for taller_id queries (RLS filtering)
-CREATE INDEX IF NOT EXISTS idx_historial_compras_refaccion_taller_id
-  ON historial_compras_refaccion (taller_id);
+-- Composite index: queries always filter by taller_id + refaccion_id, ordered by fecha DESC
+CREATE INDEX IF NOT EXISTS idx_historial_compras_refaccion_lookup
+  ON historial_compras_refaccion (taller_id, refaccion_id, fecha DESC);
 
 -- ── Row Level Security ────────────────────────────────────────────────────────
 ALTER TABLE historial_compras_refaccion ENABLE ROW LEVEL SECURITY;
