@@ -106,7 +106,7 @@ export function HistorialCompraModal({
         {/* ── Scrollable history list ── */}
         <div className="overflow-y-auto flex-1 p-5">
           {cargando && (
-            <div className="text-center py-10">
+            <div role="status" aria-live="polite" className="text-center py-10">
               <div className="inline-block w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
               <p className="text-xs text-slate-400 mt-2">Cargando historial…</p>
             </div>

@@ -668,7 +668,7 @@ export function VistaInventario({
                                 className="border border-slate-300">
                                 {editandoProveedor === r.id ? '✕ Cerrar' : '🏪 Proveedor'}
                               </Btn>
-                              <Btn size="sm" variant="primary"
+                              <Btn size="sm" variant="ghost"
                                 onClick={() => abrirHistorial(r)}
                                 className="border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 min-h-[44px]"
                                 data-testid="ver-historial-btn">
