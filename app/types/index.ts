@@ -36,6 +36,22 @@ export interface Refaccion {
   compatibilidad?: CompatibilidadVehiculo[];  // vacío/undefined = universal (aplica a todos)
 }
 
+/** Single purchase entry in the history for a specific inventory part (refacción).
+ *  Feature #222 — historial de compras por pieza solicitado por Sofia. */
+export interface HistorialCompraRefaccion {
+  id: string;
+  tallerId: string;
+  refaccionId: string;
+  proveedorId?: string;         // optional FK — may not exist in system
+  proveedorNombre: string;      // snapshot of supplier name at purchase time
+  fecha: string;                // ISO date YYYY-MM-DD
+  cantidad: number;
+  precioUnitario: number;
+  total: number;                // cantidad × precioUnitario (computed by DB)
+  notas?: string;
+  createdAt: string;
+}
+
 export interface TrabajoRefaccion {
   refaccionId: string;
   nombre: string;         // SNAPSHOT

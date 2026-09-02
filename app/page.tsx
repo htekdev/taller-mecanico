@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor, OrdenCompra, Factura,
   Pago, PagoCompra, PagoFactura, FacturaConcepto, CompatibilidadVehiculo, PagoServicioExterno,
-  Gasto,
+  Gasto, HistorialCompraRefaccion,
 } from '@/app/types';
 import {
   generarNumeroFactura, generarNumeroOrden,
@@ -181,6 +181,27 @@ export default function TallerMecanico() {
       console.error('[actualizarProveedorRefaccion] FAILED:', err);
       setErrorBanner('No se pudo actualizar el proveedor. Verifica tu conexión e intenta de nuevo.');
     }
+  };
+
+  // ── Historial de Compras por Refacción (Feature #222) ─────────────────────
+  const cargarHistorialCompras = async (refaccionId: string): Promise<HistorialCompraRefaccion[]> => {
+    if (!taller) return [];
+    return db.getHistorialComprasRefaccion(taller.id, refaccionId);
+  };
+
+  const agregarHistorialCompra = async (
+    refaccionId: string,
+    data: {
+      proveedorId?: string;
+      proveedorNombre: string;
+      fecha: string;
+      cantidad: number;
+      precioUnitario: number;
+      notas?: string;
+    },
+  ): Promise<void> => {
+    if (!taller) return;
+    await db.insertHistorialCompraRefaccion(taller.id, { refaccionId, ...data });
   };
   const recibirStock = async (refaccionId: string, cantidad: number) => {
     const ref = inventario.find(r => r.id === refaccionId);
@@ -1127,7 +1148,9 @@ export default function TallerMecanico() {
               onActualizarCompatibilidad={actualizarCompatibilidad}
               onEliminarRefaccion={eliminarRefaccion}
               onActualizarProveedor={actualizarProveedorRefaccion}
-              onGuardarProveedor={guardarProveedor} />
+              onGuardarProveedor={guardarProveedor}
+              onCargarHistorialCompras={cargarHistorialCompras}
+              onAgregarHistorialCompra={agregarHistorialCompra} />
           )}
           {vista === 'trabajos' && (
             <VistaTrabajo clientes={clientes} vehiculos={vehiculos} inventario={inventario}

@@ -10,7 +10,7 @@ import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor,
   OrdenCompra, Factura, TrabajoRefaccion, ManoDeObraItem,
   Pago, PagoCompra, PagoFactura, FacturaConcepto, CompraItem,
-  Gasto, GastoCategoria,
+  Gasto, GastoCategoria, HistorialCompraRefaccion,
 } from '@/app/types';
 
 // ── Clientes ──────────────────────────────────────────────────
@@ -201,6 +201,81 @@ export async function updateRefaccionProveedor(id: string, proveedorId: string |
     .eq('id', id);
   if (error) throw new Error('updateRefaccionProveedor: ' + error.message);
 }
+
+// ── Historial de Compras por Refacción ────────────────────────
+// Feature #222 — requested by Sofia: purchase history log per inventory part.
+
+export async function getHistorialComprasRefaccion(
+  tallerId: string,
+  refaccionId: string,
+): Promise<HistorialCompraRefaccion[]> {
+  const { data, error } = await supabase
+    .from('historial_compras_refaccion')
+    .select('*')
+    .eq('taller_id', tallerId)
+    .eq('refaccion_id', refaccionId)
+    .order('fecha', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error('[getHistorialComprasRefaccion] ' + error.message);
+  return (data ?? []).map(r => ({
+    id: r.id,
+    tallerId: r.taller_id,
+    refaccionId: r.refaccion_id,
+    proveedorId: r.proveedor_id ?? undefined,
+    proveedorNombre: r.proveedor_nombre ?? '',
+    fecha: r.fecha,
+    cantidad: r.cantidad,
+    precioUnitario: Number(r.precio_unitario),
+    total: Number(r.total),
+    notas: r.notas ?? undefined,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function insertHistorialCompraRefaccion(
+  tallerId: string,
+  data: {
+    refaccionId: string;
+    proveedorId?: string;
+    proveedorNombre: string;
+    fecha: string;
+    cantidad: number;
+    precioUnitario: number;
+    notas?: string;
+  },
+): Promise<HistorialCompraRefaccion> {
+  const { data: row, error } = await supabase
+    .from('historial_compras_refaccion')
+    .insert({
+      taller_id: tallerId,
+      refaccion_id: data.refaccionId,
+      proveedor_id: data.proveedorId || null,
+      proveedor_nombre: data.proveedorNombre,
+      fecha: data.fecha,
+      cantidad: data.cantidad,
+      precio_unitario: data.precioUnitario,
+      notas: data.notas ?? null,
+    })
+    .select()
+    .single();
+
+  if (error || !row) throw new Error(`insertHistorialCompraRefaccion: ${error?.message ?? 'no row returned'}`);
+  return {
+    id: row.id,
+    tallerId: row.taller_id,
+    refaccionId: row.refaccion_id,
+    proveedorId: row.proveedor_id ?? undefined,
+    proveedorNombre: row.proveedor_nombre ?? '',
+    fecha: row.fecha,
+    cantidad: row.cantidad,
+    precioUnitario: Number(row.precio_unitario),
+    total: Number(row.total),
+    notas: row.notas ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
 // ── Proveedores ───────────────────────────────────────────────
 
 export async function getProveedores(tallerId: string): Promise<Proveedor[]> {

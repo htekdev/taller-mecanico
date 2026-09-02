@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { usePersistedState } from '@/app/lib/page-state';
-import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo } from '@/app/types';
+import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo, HistorialCompraRefaccion } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { CATEGORIAS, UNIDADES, labelVehiculo, fmt } from '@/app/lib/utils';
+import { HistorialCompraModal } from './HistorialCompraModal';
 
 export function VistaInventario({
   inventario,
@@ -17,6 +18,8 @@ export function VistaInventario({
   onEliminarRefaccion,
   onActualizarProveedor,
   onGuardarProveedor,
+  onCargarHistorialCompras,
+  onAgregarHistorialCompra,
 }: {
   inventario: Refaccion[];
   clientes: Cliente[];
@@ -28,6 +31,15 @@ export function VistaInventario({
   onEliminarRefaccion: (id: string) => Promise<void>;
   onActualizarProveedor: (id: string, proveedorId: string) => Promise<void>;
   onGuardarProveedor: (data: Omit<Proveedor, 'id'>) => Promise<void>;
+  onCargarHistorialCompras: (refaccionId: string) => Promise<HistorialCompraRefaccion[]>;
+  onAgregarHistorialCompra: (refaccionId: string, data: {
+    proveedorId?: string;
+    proveedorNombre: string;
+    fecha: string;
+    cantidad: number;
+    precioUnitario: number;
+    notas?: string;
+  }) => Promise<void>;
 }) {
   const [form, setForm] = useState({
     nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza',
@@ -69,6 +81,12 @@ export function VistaInventario({
   const [nuevoMarca, setNuevoMarca]         = useState('');
   const [nuevoModelo, setNuevoModelo]       = useState('');
   const [savedId, setSavedId]               = useState<string | null>(null);
+
+  // ── Estado para historial de compras (Feature #222) ──
+  const [historialModalRefaccion, setHistorialModalRefaccion] = useState<Refaccion | null>(null);
+  const [historial, setHistorial]                             = useState<HistorialCompraRefaccion[]>([]);
+  const [historialCargando, setHistorialCargando]             = useState(false);
+  const [historialError, setHistorialError]                   = useState<string | null>(null);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === formClienteId);
 
@@ -262,6 +280,54 @@ export function VistaInventario({
     } finally {
       setGuardandoProveedorEdit(false);
     }
+  };
+
+  // ── Historial de compras handlers (Feature #222) ──
+  const abrirHistorial = async (r: Refaccion) => {
+    setHistorialModalRefaccion(r);
+    setHistorial([]);
+    setHistorialError(null);
+    setHistorialCargando(true);
+    // Close other overlays so they don't stack
+    setExpandido(null);
+    setEditandoProveedor(null);
+    setEditandoCompat(null);
+    try {
+      const entradas = await onCargarHistorialCompras(r.id);
+      setHistorial(entradas);
+    } catch (err) {
+      setHistorialError(err instanceof Error ? err.message : 'No se pudo cargar el historial. Intenta de nuevo.');
+    } finally {
+      setHistorialCargando(false);
+    }
+  };
+
+  const agregarHistorialCompra = async (data: {
+    proveedorId?: string;
+    proveedorNombre: string;
+    fecha: string;
+    cantidad: number;
+    precioUnitario: number;
+    notas?: string;
+  }) => {
+    if (!historialModalRefaccion) return;
+    await onAgregarHistorialCompra(historialModalRefaccion.id, data);
+    // Refresh historial after adding entry
+    setHistorialCargando(true);
+    try {
+      const entradas = await onCargarHistorialCompras(historialModalRefaccion.id);
+      setHistorial(entradas);
+    } catch {
+      // Don't replace success — entry was added but reload failed. User can close and reopen.
+    } finally {
+      setHistorialCargando(false);
+    }
+  };
+
+  const cerrarHistorial = () => {
+    setHistorialModalRefaccion(null);
+    setHistorial([]);
+    setHistorialError(null);
   };
 
   return (
@@ -632,6 +698,12 @@ export function VistaInventario({
                                 className="border border-slate-300">
                                 {editandoProveedor === r.id ? '✕ Cerrar' : '🏪 Proveedor'}
                               </Btn>
+                              <Btn size="sm" variant="primary"
+                                onClick={() => abrirHistorial(r)}
+                                className="border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                                data-testid="ver-historial-btn">
+                                📋 Ver Historial
+                              </Btn>
                               {confirmandoEliminar === r.id ? (
                                 <div className="flex flex-col gap-1 mt-0.5 items-center">
                                   <div className="flex gap-1">
@@ -762,6 +834,19 @@ export function VistaInventario({
           );
           })()}
         </div>
+      )}
+
+      {/* ── Historial de Compras Modal (Feature #222) ── */}
+      {historialModalRefaccion && (
+        <HistorialCompraModal
+          refaccion={historialModalRefaccion}
+          historial={historial}
+          proveedores={proveedores}
+          cargando={historialCargando}
+          errorCarga={historialError}
+          onAgregarEntrada={agregarHistorialCompra}
+          onCerrar={cerrarHistorial}
+        />
       )}
     </div>
   );
