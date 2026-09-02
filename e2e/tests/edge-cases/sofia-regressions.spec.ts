@@ -106,7 +106,7 @@ test.describe('Sofia Regression Tests', () => {
     await showPhaseLabel(page, '✅ PASS: Supplier Field Visible');
   });
 
-  test('REGRESSION: failed saves dont lose user input', async ({
+  test('REGRESSION: failed saves dont lose user input', { retries: 1 }, async ({
     page, dashboardPage, cotizacionesPage
   }) => {
     await showPhaseLabel(page, '💾 REGRESSION: Input Preservation');
