@@ -19,7 +19,6 @@ export function VistaInventario({
   onActualizarProveedor,
   onGuardarProveedor,
   onCargarHistorialCompras,
-  onAgregarHistorialCompra,
 }: {
   inventario: Refaccion[];
   clientes: Cliente[];
@@ -32,14 +31,6 @@ export function VistaInventario({
   onActualizarProveedor: (id: string, proveedorId: string) => Promise<void>;
   onGuardarProveedor: (data: Omit<Proveedor, 'id'>) => Promise<void>;
   onCargarHistorialCompras: (refaccionId: string) => Promise<HistorialCompraRefaccion[]>;
-  onAgregarHistorialCompra: (refaccionId: string, data: {
-    proveedorId?: string;
-    proveedorNombre: string;
-    fecha: string;
-    cantidad: number;
-    precioUnitario: number;
-    notas?: string;
-  }) => Promise<void>;
 }) {
   const [form, setForm] = useState({
     nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza',
@@ -297,28 +288,6 @@ export function VistaInventario({
       setHistorial(entradas);
     } catch (err) {
       setHistorialError(err instanceof Error ? err.message : 'No se pudo cargar el historial. Intenta de nuevo.');
-    } finally {
-      setHistorialCargando(false);
-    }
-  };
-
-  const agregarHistorialCompra = async (data: {
-    proveedorId?: string;
-    proveedorNombre: string;
-    fecha: string;
-    cantidad: number;
-    precioUnitario: number;
-    notas?: string;
-  }) => {
-    if (!historialModalRefaccion) return;
-    await onAgregarHistorialCompra(historialModalRefaccion.id, data);
-    // Refresh historial after adding entry
-    setHistorialCargando(true);
-    try {
-      const entradas = await onCargarHistorialCompras(historialModalRefaccion.id);
-      setHistorial(entradas);
-    } catch {
-      // Don't replace success — entry was added but reload failed. User can close and reopen.
     } finally {
       setHistorialCargando(false);
     }
@@ -844,7 +813,6 @@ export function VistaInventario({
           proveedores={proveedores}
           cargando={historialCargando}
           errorCarga={historialError}
-          onAgregarEntrada={agregarHistorialCompra}
           onCerrar={cerrarHistorial}
         />
       )}

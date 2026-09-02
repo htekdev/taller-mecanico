@@ -189,20 +189,6 @@ export default function TallerMecanico() {
     return db.getHistorialComprasRefaccion(taller.id, refaccionId);
   };
 
-  const agregarHistorialCompra = async (
-    refaccionId: string,
-    data: {
-      proveedorId?: string;
-      proveedorNombre: string;
-      fecha: string;
-      cantidad: number;
-      precioUnitario: number;
-      notas?: string;
-    },
-  ): Promise<void> => {
-    if (!taller) return;
-    await db.insertHistorialCompraRefaccion(taller.id, { refaccionId, ...data });
-  };
   const recibirStock = async (refaccionId: string, cantidad: number) => {
     const ref = inventario.find(r => r.id === refaccionId);
     if (!ref) return;
@@ -1149,8 +1135,7 @@ export default function TallerMecanico() {
               onEliminarRefaccion={eliminarRefaccion}
               onActualizarProveedor={actualizarProveedorRefaccion}
               onGuardarProveedor={guardarProveedor}
-              onCargarHistorialCompras={cargarHistorialCompras}
-              onAgregarHistorialCompra={agregarHistorialCompra} />
+              onCargarHistorialCompras={cargarHistorialCompras} />
           )}
           {vista === 'trabajos' && (
             <VistaTrabajo clientes={clientes} vehiculos={vehiculos} inventario={inventario}
