@@ -184,10 +184,13 @@ export default function TallerMecanico() {
   };
 
   // ── Historial de Compras por Refacción (Feature #222) ─────────────────────
-  const cargarHistorialCompras = async (refaccionId: string): Promise<HistorialCompraRefaccion[]> => {
-    if (!taller) return [];
-    return db.getHistorialComprasRefaccion(taller.id, refaccionId);
-  };
+  const cargarHistorialCompras = useCallback(
+    async (refaccionId: string): Promise<HistorialCompraRefaccion[]> => {
+      if (!taller) return [];
+      return db.getHistorialComprasRefaccion(taller.id, refaccionId);
+    },
+    [taller],
+  );
 
   const recibirStock = async (refaccionId: string, cantidad: number) => {
     const ref = inventario.find(r => r.id === refaccionId);
