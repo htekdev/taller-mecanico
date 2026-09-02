@@ -68,12 +68,29 @@ test.describe('Historial de Compras por Refacción', () => {
 
     // ── Phase 6: Verify empty state (history loads from DB — may be empty) ────
     await showPhaseLabel(page, '📭 Phase 6: Empty state or history list');
-    await page.waitForTimeout(2000); // let DB call finish
+
+    // Wait for loading spinner to disappear first (cold preview can take >2s)
+    const loadingSpinner = modal.locator('.animate-spin');
+    await loadingSpinner.waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => {
+      // If spinner never appeared or already gone, continue
+    });
 
     // Either empty state OR historial-list must be visible — no error banner
     const emptyMsg = modal.locator('text=/Aún no hay entradas/i');
     const histList  = modal.locator('[data-testid="historial-list"]');
     const errorBnr  = modal.locator('[role="alert"]');
+
+    // Poll until content is visible (up to 10s for slow preview DB)
+    await page.waitForFunction(() => {
+      const modal = document.querySelector('[role="dialog"]');
+      if (!modal) return false;
+      const empty = modal.querySelector('[class*="text-slate-500"]');
+      const list  = modal.querySelector('[data-testid="historial-list"]');
+      const alert = modal.querySelector('[role="alert"]');
+      return !!(empty?.textContent?.includes('Aún no hay') || list || alert);
+    }, { timeout: 15_000 }).catch(() => {
+      // If timeout, we'll catch it in the assertions below
+    });
 
     const hasEmpty = await emptyMsg.isVisible().catch(() => false);
     const hasList  = await histList.isVisible().catch(() => false);
