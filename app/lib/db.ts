@@ -253,48 +253,8 @@ export async function getHistorialComprasRefaccion(
   }));
 }
 
-export async function insertHistorialCompraRefaccion(
-  tallerId: string,
-  data: {
-    refaccionId: string;
-    proveedorId?: string;
-    proveedorNombre: string;
-    fecha: string;
-    cantidad: number;
-    precioUnitario: number;
-    notas?: string;
-  },
-): Promise<HistorialCompraRefaccion> {
-  const { data: row, error } = await supabase
-    .from('historial_compras_refaccion')
-    .insert({
-      taller_id: tallerId,
-      refaccion_id: data.refaccionId,
-      proveedor_id: data.proveedorId || null,
-      proveedor_nombre: data.proveedorNombre,
-      fecha: data.fecha,
-      cantidad: data.cantidad,
-      precio_unitario: data.precioUnitario,
-      notas: data.notas ?? null,
-    })
-    .select()
-    .single();
-
-  if (error || !row) throw new Error(`insertHistorialCompraRefaccion: ${error?.message ?? 'no row returned'}`);
-  return {
-    id: row.id,
-    tallerId: row.taller_id,
-    refaccionId: row.refaccion_id,
-    proveedorId: row.proveedor_id ?? undefined,
-    proveedorNombre: row.proveedor_nombre ?? '',
-    fecha: row.fecha,
-    cantidad: row.cantidad,
-    precioUnitario: Number(row.precio_unitario),
-    total: Number(row.total),
-    notas: row.notas ?? undefined,
-    createdAt: row.created_at,
-  };
-}
+// insertHistorialCompraRefaccion removed — modal is read-only per Sofia's request.
+// Purchase entries are created through the ordenes de compra flow.
 
 // ── Proveedores ───────────────────────────────────────────────
 

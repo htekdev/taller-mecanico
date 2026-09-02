@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS historial_compras_refaccion (
   proveedor_nombre TEXT NOT NULL DEFAULT '',   -- snapshot so history survives proveedor deletion
   -- Purchase details
   fecha            DATE NOT NULL,
-  cantidad         INTEGER NOT NULL DEFAULT 1,
-  precio_unitario  DECIMAL(12,2) NOT NULL DEFAULT 0,
+  cantidad         INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+  precio_unitario  DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK (precio_unitario >= 0),
   total            DECIMAL(12,2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED,
   notas            TEXT,
   created_at       TIMESTAMPTZ DEFAULT NOW()
@@ -34,6 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_historial_compras_refaccion_taller_id
 -- ── Row Level Security ────────────────────────────────────────────────────────
 ALTER TABLE historial_compras_refaccion ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "crud_historial_compras_refaccion" ON historial_compras_refaccion;
 CREATE POLICY "crud_historial_compras_refaccion"
   ON historial_compras_refaccion
   FOR ALL

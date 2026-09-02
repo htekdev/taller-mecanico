@@ -287,7 +287,8 @@ export function VistaInventario({
       const entradas = await onCargarHistorialCompras(r.id);
       setHistorial(entradas);
     } catch (err) {
-      setHistorialError(err instanceof Error ? err.message : 'No se pudo cargar el historial. Intenta de nuevo.');
+      console.error('[abrirHistorial]', err);
+      setHistorialError('No se pudo cargar el historial. Intenta de nuevo.');
     } finally {
       setHistorialCargando(false);
     }
