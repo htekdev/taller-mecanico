@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor, OrdenCompra, Factura,
   Pago, PagoCompra, PagoFactura, FacturaConcepto, CompatibilidadVehiculo, PagoServicioExterno,
@@ -32,6 +32,53 @@ import * as db          from '@/app/lib/db';
 
 type Vista = 'clientes'|'inventario'|'trabajos'|'proveedores'|'ordenes'|'facturas'|'cuentas'|'pagos'|'resumen'|'historial'|'configuracion'|'cotizaciones'|'gastos'|'reportes';
 
+// ─── Skeleton loading ─────────────────────────────────────────────────────────
+// Shown instead of the plain "Cargando datos..." spinner while Supabase data
+// loads on page reload. The skeleton mirrors the Card structure so the transition
+// from loading → content is smooth — no jarring blank-screen flash.
+
+function SkeletonPulse({ className }: { className?: string }) {
+  return <div className={`bg-slate-200 rounded animate-pulse ${className ?? ''}`} />;
+}
+
+function SkeletonLoading() {
+  return (
+    <Card className="p-6 sm:p-8">
+      {/* Filter / tab row */}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        <SkeletonPulse className="h-8 w-16" />
+        <SkeletonPulse className="h-8 w-24" />
+        <SkeletonPulse className="h-8 w-20" />
+        <div className="ml-auto flex gap-2">
+          <SkeletonPulse className="h-8 w-32" />
+          <SkeletonPulse className="h-8 w-28" />
+        </div>
+      </div>
+      {/* Section header + sort button */}
+      <div className="flex items-center justify-between mb-4">
+        <SkeletonPulse className="h-5 w-40" />
+        <SkeletonPulse className="h-6 w-28 rounded-full" />
+      </div>
+      {/* List rows */}
+      {[0, 1, 2, 3].map(i => (
+        <div key={i} className="border border-slate-100 rounded-xl p-4 mb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <SkeletonPulse className="w-10 h-10 rounded-full flex-shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <SkeletonPulse className="h-4 w-3/5" />
+                <SkeletonPulse className="h-3 w-2/5" />
+              </div>
+            </div>
+            <SkeletonPulse className="h-6 w-20 rounded-full ml-3 flex-shrink-0" />
+          </div>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+// ─── Main component ──────────────────────────────────────────────────────────
 export default function TallerMecanico() {
   const { taller, talleres, selectTaller, user, signOut } = useAuth();
   const [showTallerMenu, setShowTallerMenu] = useState(false);
@@ -93,14 +140,49 @@ export default function TallerMecanico() {
   }, [vista]);
 
   // ── Scroll restoration: restore exact scroll position when switching modules ─
-  // When the vista changes, restore the saved scroll position for the new module.
-  // The 50ms delay lets React render the new module content before scrolling.
+  // Guard: only run after data has loaded (cargando=false).
+  // If we attempt to scroll while cargando=true, the content isn't rendered yet
+  // and the page height is wrong — the scroll is a no-op or lands in the wrong place.
+  // Adding cargando to the dep array means the effect re-runs when cargando goes
+  // false on initial load, correctly restoring the saved position for the initial vista.
   useEffect(() => {
+    if (cargando) return;
     const timer = setTimeout(() => {
       restoreScrollPosition(vista);
     }, 50);
     return () => clearTimeout(timer);
-  }, [vista]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vista, cargando]);
+
+  // ── Scroll save on external-app switch (visibilitychange / pagehide) ─────────
+  // saveScrollPosition is called in navigateTo for in-app navigation.
+  // But when Sofia switches to WhatsApp (or any other app) WITHOUT navigating,
+  // navigateTo never fires — scroll position is never saved — and on full reload
+  // she lands at the top of the list.
+  //
+  // Fix: listen for the browser's "going to background" signals and save the
+  // current scroll position immediately, just like visibilitychange saves filter
+  // state in page-state.ts (PR #217).
+  //
+  // vistaRef keeps the ref current without adding vista to the effect deps
+  // (which would cause the listeners to be re-registered on every tab change).
+  const vistaRef = useRef(vista);
+  useEffect(() => { vistaRef.current = vista; }, [vista]);
+
+  useEffect(() => {
+    const handleHide = () => {
+      saveScrollPosition(vistaRef.current);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') handleHide();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handleHide); // iOS Safari fallback
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handleHide);
+    };
+  }, []); // intentionally empty — listeners registered once, vistaRef always current
 
   // ── navigateTo: saves scroll position before switching module ─────────────
   // Use this instead of setVista directly so scroll is captured before unmounting.
@@ -1080,9 +1162,7 @@ export default function TallerMecanico() {
         </nav>
 
         {cargando ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="text-slate-400 text-sm">Cargando datos del taller...</div>
-          </div>
+          <SkeletonLoading />
         ) : (
         <Card className="p-6 sm:p-8" data-testid="app-content-loaded">
           {vista === 'clientes' && (

@@ -38,6 +38,7 @@
  *   taller_gastos_filtro
  *   taller_clientes_busqueda
  *   taller_clientes_expandido
+ *   taller_cotizaciones_filtro_cliente
  *   taller_scroll_{vista}
  */
 
