@@ -2,21 +2,30 @@ import { test, expect } from '../../fixtures';
 import { showPhaseLabel } from '../visual-assert';
 
 /**
- * Change Proof — Nota jobs must NOT appear as "pendiente de facturar" (Issue #226)
+ * Change Proof — Nota jobs must NOT appear as "pendiente de facturar" (Issue #226 / regression fix #228)
  *
- * Root cause: Counters and badges used `tipoDocumento !== 'nota'` which evaluates
+ * Root cause (Issue #226): Counters and badges used `tipoDocumento !== 'nota'` which evaluates
  * to `true` when tipoDocumento is undefined (pending/legacy jobs), causing ALL
  * sin_facturar jobs to appear as pending to invoice.
  *
- * Fix: Changed to `tipoDocumento === 'factura'` in 4 places:
- *   - app/page.tsx (tab badge counter)
- *   - app/modules/facturas/index.tsx (module counter)
- *   - app/modules/trabajos/index.tsx (counter + per-row badge)
+ * Regression (PR #227 fix): Changed to `tipoDocumento === 'factura'` which was too aggressive —
+ * it excluded jobs where tipoDocumento is null because Phase 2 (best-effort) silently failed.
+ * Many real jobs have requiereFactura=true but tipoDocumento=null (column write failed silently).
+ *
+ * Correct fix (PR #228):
+ *   `tipoDocumento !== 'nota' && requiereFactura === true && estadoFacturacion !== 'facturado'`
+ *
+ * This correctly handles:
+ *   - tipoDocumento='nota' → excluded ✓
+ *   - tipoDocumento='factura' + requiereFactura=true → included ✓
+ *   - tipoDocumento=null + requiereFactura=true (Phase 2 failed) → included ✓ (was broken in PR #227)
+ *   - tipoDocumento=null + requiereFactura=false (nota where Phase 2 failed) → excluded ✓
+ *
+ * Applied in 3 counter locations + 1 per-row badge condition.
  *
  * This test verifies:
- * 1. The "trabajos" module loads without "Pendiente de facturar" banners on nota jobs
- * 2. After finalizing a job as nota, no "Pendiente de facturar" badge appears on that job
- * 3. The "pendientes de facturar" counter in facturas module does NOT include nota jobs
+ * 1. Nota rows in working jobs list do NOT show "Pendiente de facturar" badge
+ * 2. The module renders without errors
  */
 
 test('change-proof-nota-no-pendiente-facturar: nota jobs excluded from facturar counter', async ({
@@ -124,7 +133,7 @@ test('change-proof-nota-no-pendiente-facturar: nota jobs excluded from facturar 
     }
 
     // Every table row containing "Nota" (the tipo_documento badge) must NOT have the invoice button.
-    // This directly tests app/modules/trabajos/index.tsx line 1643: {trabajo.tipoDocumento === 'factura' && ...}
+    // This directly tests app/modules/trabajos/index.tsx: {trabajo.tipoDocumento !== 'nota' && trabajo.requiereFactura && ...}
     const notaRows = page.locator('tr').filter({ hasText: 'Nota' });
     const notaRowCount = await notaRows.count();
     for (let i = 0; i < notaRowCount; i++) {
