@@ -10,7 +10,7 @@ import type {
   Cliente, Vehiculo, Refaccion, Trabajo, Proveedor,
   OrdenCompra, Factura, TrabajoRefaccion, ManoDeObraItem,
   Pago, PagoCompra, PagoFactura, FacturaConcepto, CompraItem,
-  Gasto, GastoCategoria,
+  Gasto, GastoCategoria, HistorialCompraRefaccion,
 } from '@/app/types';
 
 // ── Clientes ──────────────────────────────────────────────────
@@ -201,6 +201,62 @@ export async function updateRefaccionProveedor(id: string, proveedorId: string |
     .eq('id', id);
   if (error) throw new Error('updateRefaccionProveedor: ' + error.message);
 }
+
+// ── Historial de Compras por Refacción ────────────────────────
+// Feature #222 — requested by Sofia: purchase history log per inventory part.
+
+/** Returns true if the Supabase error indicates the migration table doesn't exist yet.
+ *  This happens on Vercel preview environments where migrations only apply on merge to main.
+ *  42P01 = PostgreSQL undefined_table (pg error). Message patterns cover PostgREST v12+ schema cache errors.
+ *  Note: PGRST116 is "The result contains 0 rows" — NOT a table-missing error — intentionally excluded. */
+function isTableMissingError(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  if (err.code === '42P01') return true;  // PostgreSQL undefined_table
+  if (err.message?.includes('Could not find the table')) return true;
+  if (err.message?.includes('relation') && err.message?.includes('does not exist')) return true;
+  return false;
+}
+
+export async function getHistorialComprasRefaccion(
+  tallerId: string,
+  refaccionId: string,
+): Promise<HistorialCompraRefaccion[]> {
+  const { data, error } = await supabase
+    .from('historial_compras_refaccion')
+    .select('id, taller_id, refaccion_id, proveedor_id, proveedor_nombre, fecha, cantidad, precio_unitario, total, notas, created_at')
+    .eq('taller_id', tallerId)
+    .eq('refaccion_id', refaccionId)
+    .order('fecha', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  // Migration runs on merge to main only — preview environments may not have the table yet.
+  // Return empty array gracefully so the modal shows "no history" instead of a red error.
+  if (error) {
+    if (isTableMissingError(error)) {
+      console.warn('[getHistorialComprasRefaccion] Table historial_compras_refaccion not yet in DB (migration pending merge). Returning empty array.');
+      return [];
+    }
+    throw new Error('[getHistorialComprasRefaccion] ' + error.message);
+  }
+  return (data ?? []).map(r => ({
+    id: r.id,
+    tallerId: r.taller_id,
+    refaccionId: r.refaccion_id,
+    proveedorId: r.proveedor_id ?? undefined,
+    proveedorNombre: r.proveedor_nombre ?? '',
+    fecha: r.fecha,
+    cantidad: r.cantidad,
+    precioUnitario: Number(r.precio_unitario),
+    total: Number(r.total),
+    notas: r.notas ?? undefined,
+    createdAt: r.created_at,
+  }));
+}
+
+// insertHistorialCompraRefaccion removed — modal is read-only per Sofia's request.
+// Purchase entries are created through the ordenes de compra flow.
+
 // ── Proveedores ───────────────────────────────────────────────
 
 export async function getProveedores(tallerId: string): Promise<Proveedor[]> {

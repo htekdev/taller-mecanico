@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { usePersistedState } from '@/app/lib/page-state';
-import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo } from '@/app/types';
+import type { Refaccion, Cliente, Vehiculo, Proveedor, CompatibilidadVehiculo, HistorialCompraRefaccion } from '@/app/types';
 import { Label, Input, Select, Btn, SectionTitle } from '@/app/components/ui';
 import { CATEGORIAS, UNIDADES, labelVehiculo, fmt } from '@/app/lib/utils';
+import { HistorialCompraModal } from './HistorialCompraModal';
 
 export function VistaInventario({
   inventario,
@@ -17,6 +18,7 @@ export function VistaInventario({
   onEliminarRefaccion,
   onActualizarProveedor,
   onGuardarProveedor,
+  onCargarHistorialCompras,
 }: {
   inventario: Refaccion[];
   clientes: Cliente[];
@@ -28,6 +30,7 @@ export function VistaInventario({
   onEliminarRefaccion: (id: string) => Promise<void>;
   onActualizarProveedor: (id: string, proveedorId: string) => Promise<void>;
   onGuardarProveedor: (data: Omit<Proveedor, 'id'>) => Promise<void>;
+  onCargarHistorialCompras: (refaccionId: string) => Promise<HistorialCompraRefaccion[]>;
 }) {
   const [form, setForm] = useState({
     nombre: '', codigo: '', categoria: 'Filtros', unidad: 'pza',
@@ -69,6 +72,15 @@ export function VistaInventario({
   const [nuevoMarca, setNuevoMarca]         = useState('');
   const [nuevoModelo, setNuevoModelo]       = useState('');
   const [savedId, setSavedId]               = useState<string | null>(null);
+
+  // ── Estado para historial de compras (Feature #222) ──
+  const [historialModalRefaccion, setHistorialModalRefaccion] = useState<Refaccion | null>(null);
+  const [historial, setHistorial]                             = useState<HistorialCompraRefaccion[]>([]);
+  const [historialCargando, setHistorialCargando]             = useState(false);
+  const [historialError, setHistorialError]                   = useState<string | null>(null);
+  // Stale-fetch guard: tracks the refaccion ID of the current in-flight request.
+  // If the user closes and reopens the modal quickly, only the latest request's result is applied.
+  const historialRequestIdRef = useRef<string | null>(null);
 
   const vehiculosDelCliente = vehiculos.filter(v => v.clienteId === formClienteId);
 
@@ -263,6 +275,40 @@ export function VistaInventario({
       setGuardandoProveedorEdit(false);
     }
   };
+
+  // ── Historial de compras handlers (Feature #222) ──
+  const abrirHistorial = async (r: Refaccion) => {
+    const requestId = r.id;
+    historialRequestIdRef.current = requestId;
+    setHistorialModalRefaccion(r);
+    setHistorial([]);
+    setHistorialError(null);
+    setHistorialCargando(true);
+    // Close other overlays so they don't stack
+    setExpandido(null);
+    setEditandoProveedor(null);
+    setEditandoCompat(null);
+    try {
+      const entradas = await onCargarHistorialCompras(r.id);
+      if (historialRequestIdRef.current !== requestId) return; // stale — discard
+      setHistorial(entradas);
+    } catch (err) {
+      if (historialRequestIdRef.current !== requestId) return;
+      console.error('[abrirHistorial]', err);
+      setHistorialError('No se pudo cargar el historial. Intenta de nuevo.');
+    } finally {
+      if (historialRequestIdRef.current === requestId) {
+        setHistorialCargando(false);
+      }
+    }
+  };
+
+  const cerrarHistorial = useCallback(() => {
+    historialRequestIdRef.current = null; // cancel pending stale result
+    setHistorialModalRefaccion(null);
+    setHistorial([]);
+    setHistorialError(null);
+  }, []);
 
   return (
     <div>
@@ -632,6 +678,12 @@ export function VistaInventario({
                                 className="border border-slate-300">
                                 {editandoProveedor === r.id ? '✕ Cerrar' : '🏪 Proveedor'}
                               </Btn>
+                              <Btn size="sm" variant="ghost"
+                                onClick={() => abrirHistorial(r)}
+                                className="border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 min-h-[44px]"
+                                data-testid="ver-historial-btn">
+                                📋 Ver Historial
+                              </Btn>
                               {confirmandoEliminar === r.id ? (
                                 <div className="flex flex-col gap-1 mt-0.5 items-center">
                                   <div className="flex gap-1">
@@ -762,6 +814,18 @@ export function VistaInventario({
           );
           })()}
         </div>
+      )}
+
+      {/* ── Historial de Compras Modal (Feature #222) ── */}
+      {historialModalRefaccion && (
+        <HistorialCompraModal
+          refaccion={historialModalRefaccion}
+          historial={historial}
+          proveedores={proveedores}
+          cargando={historialCargando}
+          errorCarga={historialError}
+          onCerrar={cerrarHistorial}
+        />
       )}
     </div>
   );
