@@ -85,7 +85,8 @@ export function VistaFacturas({
 
   const counts = { todos: facturasActivas.length, pendiente: facturasActivas.filter(f => getEstadoPagoFactura(f) === 'pendiente').length, parcial: facturasActivas.filter(f => getEstadoPagoFactura(f) === 'parcial').length, pagado: facturasActivas.filter(f => getEstadoPagoFactura(f) === 'pagado').length };
   const totalPendiente = facturasActivas.filter(f => getEstadoPagoFactura(f) !== 'pagado').reduce((s, f) => s + getSaldoFactura(f), 0);
-  const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
+  // Only count jobs explicitly marked as 'factura' — nota jobs and unfinalized jobs (tipoDocumento=undefined) never need invoicing
+  const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento === 'factura' && t.estadoFacturacion !== 'facturado').length;
 
   const handlePago = (facturaId: string, saldo: number) => {
     if (pagoForm.monto <= 0) return;

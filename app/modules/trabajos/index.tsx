@@ -721,7 +721,8 @@ export function VistaTrabajo({
   const trabajosCanceladosDelTab = trabajosCancelados.filter(coincideTab);
 
   const trabajosPendientes = trabajosDelTab.filter(t => t.estado === 'pendiente');
-  const trabajosPendientesFacturar = trabajosDelTab.filter(t => t.tipoDocumento !== 'nota' && t.estadoFacturacion !== 'facturado').length;
+  // Only count jobs explicitly marked as 'factura' — nota jobs and unfinalized jobs (tipoDocumento=undefined) never need invoicing
+  const trabajosPendientesFacturar = trabajosDelTab.filter(t => t.tipoDocumento === 'factura' && t.estadoFacturacion !== 'facturado').length;
   const trabajosSinRefacciones = trabajosDelTab.filter(t => t.pendienteRefacciones === true);
   const [ordenHistorial, setOrdenHistorial] = useState<'desc' | 'asc'>('desc');
   const [generandoComprobanteId, setGenerandoComprobanteId] = useState<string | null>(null);
@@ -1639,7 +1640,7 @@ export function VistaTrabajo({
                           {trabajo.partes.length} pieza{trabajo.partes.length !== 1 ? 's' : ''}
                         </span>
                       )}
-                      {trabajo.tipoDocumento !== 'nota' && (
+                      {trabajo.tipoDocumento === 'factura' && (
                         trabajo.estadoFacturacion === 'facturado' ? (
                           <span className="ml-2 inline-flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-1.5 py-0.5 rounded-full">✓ Facturado</span>
