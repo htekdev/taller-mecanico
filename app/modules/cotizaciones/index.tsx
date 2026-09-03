@@ -1322,6 +1322,20 @@ export function VistaCotizaciones({
     setVehiculosCliente(form.clienteId ? vehiculos.filter(v => v.clienteId === form.clienteId) : []);
   }, [form.clienteId, vehiculos]);
 
+  // ── Ayuntamiento vehicles — vehicles belonging to "Ayuntamiento de Mérida" client ──
+  // Computed from the `clientes` list so it always stays in sync with registered data.
+  const [vehiculosAyuntamiento, setVehiculosAyuntamiento] = useState<Vehiculo[]>([]);
+  useEffect(() => {
+    const ayuntamientoCliente = clientes.find(c =>
+      c.nombre.toLowerCase().includes('ayuntamiento')
+    );
+    setVehiculosAyuntamiento(
+      ayuntamientoCliente
+        ? vehiculos.filter(v => v.clienteId === ayuntamientoCliente.id)
+        : []
+    );
+  }, [clientes, vehiculos]);
+
   // ── Draft restore: run once when tallerId is known ─────────────────────────
   // Restores in-progress form data if the user navigated away while filling it out.
   const draftRestoreRan = useRef(false);
@@ -1631,7 +1645,7 @@ export function VistaCotizaciones({
           )}
         </div>
 
-        {/* Ayuntamiento Departamento */}
+        {/* Ayuntamiento Departamento + Vehicle Selector */}
         {plantilla === 'ayuntamiento' && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
             <div>
@@ -1644,6 +1658,18 @@ export function VistaCotizaciones({
                 ))}
               </select>
             </div>
+            {vehiculosAyuntamiento.length > 0 && (
+              <div>
+                <Label>Vehículo registrado</Label>
+                <select value={form.vehiculoId} onChange={e => handleVehiculoChange(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                  <option value="">— Seleccionar vehículo —</option>
+                  {vehiculosAyuntamiento.map(v => (
+                    <option key={v.id} value={v.id}>{[v.marca, v.modelo, v.anio, v.placa].filter(Boolean).join(' · ')}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         )}
 
