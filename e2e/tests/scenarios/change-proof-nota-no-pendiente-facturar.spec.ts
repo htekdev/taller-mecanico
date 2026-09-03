@@ -105,18 +105,32 @@ test('change-proof-nota-no-pendiente-facturar: nota jobs excluded from facturar 
 
   await page.screenshot({ path: 'e2e/tmp-nota-facturar-counter.png', fullPage: false });
 
-  // ── Phase 6: Back to Trabajos — verify nota jobs show "Nota" or no badge ──
-  await showPhaseLabel(page, '🔍 Phase 6: Back to Trabajos — completado jobs with nota must not show badge');
+  // ── Phase 6: Back to Trabajos — verify nota rows never show "Pendiente de facturar" ──
+  await showPhaseLabel(page, '🔍 Phase 6: Back to Trabajos — all nota rows must NOT show invoice badge');
   await dashboardPage.navigateToModule('trabajos');
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(1500);
 
-  // Navigate to "completados" tab if available
-  const completadosTab = page.getByRole('button', { name: /completado/i }).first();
-  const hasCompletadosTab = await completadosTab.isVisible({ timeout: 2000 }).catch(() => false);
-  if (hasCompletadosTab) {
-    await completadosTab.click();
-    await page.waitForTimeout(1000);
+  // Check both "todos" and "completados" tabs for nota rows with rogue badge.
+  // This is the unconditional fallback assertion — ensures the fix is validated
+  // even when Phase 4 is skipped because no pending job was available to finalize.
+  const tabs = [{ name: /todos/i }, { name: /completado/i }];
+  for (const tab of tabs) {
+    const tabBtn = page.getByRole('button', tab).first();
+    const tabVisible = await tabBtn.isVisible({ timeout: 1500 }).catch(() => false);
+    if (tabVisible) {
+      await tabBtn.click();
+      await page.waitForTimeout(800);
+    }
+
+    // Every table row containing "Nota" (the tipo_documento badge) must NOT have the invoice button.
+    // This directly tests app/modules/trabajos/index.tsx line 1643: {trabajo.tipoDocumento === 'factura' && ...}
+    const notaRows = page.locator('tr').filter({ hasText: 'Nota' });
+    const notaRowCount = await notaRows.count();
+    for (let i = 0; i < notaRowCount; i++) {
+      await expect(notaRows.nth(i)).not.toContainText('Pendiente de facturar');
+    }
+    await showPhaseLabel(page, `✅ ${tab.name} tab: ${notaRowCount} nota row(s) — none show "Pendiente de facturar"`);
   }
 
   await page.screenshot({ path: 'e2e/tmp-nota-completados.png', fullPage: false });
