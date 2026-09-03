@@ -75,5 +75,16 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    // Mobile and tablet: targeted at historial feature — validates mobile-first bottom-sheet modal
+    {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 5'] },
+      testMatch: ['**/historial-compras-inventario.spec.ts'],
+    },
+    {
+      name: 'tablet',
+      use: { ...devices['iPad (gen 7)'] },
+      testMatch: ['**/historial-compras-inventario.spec.ts'],
+    },
   ],
 });

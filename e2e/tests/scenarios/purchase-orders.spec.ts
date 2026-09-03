@@ -32,6 +32,12 @@ test.describe('Purchase Orders', { retries: 1 }, () => {
     await ordenesCompraPage.waitForPageLoad();
     await expectVisible(ordenesCompraPage.sectionTitle, 'Órdenes section');
 
+    // Guard: skip if no proveedores configured — form hides without one
+    const noProveedores = await page.locator('text=Registra un proveedor primero.').isVisible({ timeout: 2_000 }).catch(() => false);
+    if (noProveedores) {
+      test.skip(true, 'Entorno sin proveedores — creación de OC requiere al menos uno configurado');
+    }
+
     // ─── Phase 2: Create new order ──────────────────────────────────────────
     await showPhaseLabel(page, '📝 Phase 2: Create Order');
 

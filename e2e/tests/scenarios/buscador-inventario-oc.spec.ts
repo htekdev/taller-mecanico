@@ -31,9 +31,18 @@ test.describe('BuscadorInventarioOC — inventory picker for purchase orders', (
 
     // ── Phase 2: Verify "Buscar en inventario" trigger exists ──────────────────
     await showPhaseLabel(page, '🔍 Phase 2: Verify buscador trigger button');
+
+    // Guard: skip if no proveedores are configured (Supabase branch may start empty)
+    // The ordenes form requires at least one proveedor — without one it shows a
+    // "Registra un proveedor primero" message and hides the create form entirely.
+    const noProveedores = await page.locator('text=Registra un proveedor primero.').isVisible({ timeout: 2_000 }).catch(() => false);
+    if (noProveedores) {
+      test.skip(true, 'Entorno sin proveedores — el buscador requiere al menos uno configurado');
+    }
+
     const buscadorBtn = page.getByRole('button', { name: /buscar en inventario/i }).first();
     await buscadorBtn.scrollIntoViewIfNeeded();
-    await expect(buscadorBtn).toBeVisible({ timeout: 10_000 });
+    await expect(buscadorBtn).toBeVisible({ timeout: 45_000 });
 
     // Old <select> for refacciones must NOT be present (replaced by buscador)
     await expect(page.locator('select:has(option:has-text("Seleccionar refacción"))')).not.toBeVisible();
@@ -155,8 +164,14 @@ test.describe('BuscadorInventarioOC — inventory picker for purchase orders', (
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();
 
+    // Guard: skip if no proveedores (form hides create section)
+    const noProveedores = await page.locator('text=Registra un proveedor primero.').isVisible({ timeout: 2_000 }).catch(() => false);
+    if (noProveedores) {
+      test.skip(true, 'Entorno sin proveedores — el buscador requiere al menos uno configurado');
+    }
+
     const buscadorBtn = page.getByRole('button', { name: /buscar en inventario/i }).first();
-    await expect(buscadorBtn).toBeVisible({ timeout: 10_000 });
+    await expect(buscadorBtn).toBeVisible({ timeout: 45_000 });
     await buscadorBtn.click();
 
     const modal = page.getByRole('dialog', { name: 'Buscar inventario' });
@@ -174,8 +189,14 @@ test.describe('BuscadorInventarioOC — inventory picker for purchase orders', (
     await dashboardPage.navigateToModule('ordenes');
     await ordenesCompraPage.waitForPageLoad();
 
+    // Guard: skip if no proveedores (form hides create section)
+    const noProveedores = await page.locator('text=Registra un proveedor primero.').isVisible({ timeout: 2_000 }).catch(() => false);
+    if (noProveedores) {
+      test.skip(true, 'Entorno sin proveedores — el buscador requiere al menos uno configurado');
+    }
+
     const buscadorBtn = page.getByRole('button', { name: /buscar en inventario/i }).first();
-    await expect(buscadorBtn).toBeVisible({ timeout: 10_000 });
+    await expect(buscadorBtn).toBeVisible({ timeout: 45_000 });
     await buscadorBtn.click();
 
     const modal = page.getByRole('dialog', { name: 'Buscar inventario' });

@@ -45,10 +45,9 @@ test.describe('Historial de Compras por Refacción', () => {
     await inventarioPage.expandPart(partData.nombre);
     await page.waitForTimeout(500);
 
-    // Scope to the specific part's container — use filter() not :has(text=) CSS
-    // to avoid CSS parse errors when part name contains quotes or special chars
-    const partContainer = page.locator('.border').filter({ hasText: partData.nombre }).first();
-    const historialBtn = partContainer.locator('[data-testid="ver-historial-btn"]');
+    // Scope to the exact table row to avoid strict mode violation
+    const partRow = page.getByRole('row').filter({ hasText: partData.nombre });
+    const historialBtn = partRow.getByTestId('ver-historial-btn');
     await historialBtn.waitFor({ state: 'visible', timeout: 15_000 });
     await historialBtn.click();
     await page.waitForTimeout(800);
@@ -130,10 +129,9 @@ test.describe('Historial de Compras por Refacción', () => {
     await inventarioPage.expandPart(partData.nombre);
     await page.waitForTimeout(500);
 
-    // Scope to the specific part's container — use filter() not :has(text=) CSS
-    // to avoid CSS parse errors when part name contains quotes or special chars
-    const partContainer = page.locator('.border').filter({ hasText: partData.nombre }).first();
-    const historialBtn = partContainer.locator('[data-testid="ver-historial-btn"]');
+    // Scope to the exact table row to avoid strict mode violation
+    const partRow = page.getByRole('row').filter({ hasText: partData.nombre });
+    const historialBtn = partRow.getByTestId('ver-historial-btn');
     await historialBtn.waitFor({ state: 'visible', timeout: 15_000 });
     await historialBtn.click();
     await page.waitForTimeout(600);
