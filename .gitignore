@@ -48,3 +48,8 @@ e2e/results/
 playwright-report/
 playwright-report/data/
 test-results/
+
+# E2E test run logs
+e2e-run-*.log
+e2e-test-run.log
+e2e_test_output.log
