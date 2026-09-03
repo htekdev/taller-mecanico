@@ -45,8 +45,9 @@ test.describe('Historial de Compras por Refacción', () => {
     await inventarioPage.expandPart(partData.nombre);
     await page.waitForTimeout(500);
 
-    // Scope to the specific part's container to avoid grabbing a different part's button
-    const partContainer = page.locator(`.border:has(text="${partData.nombre}")`).first();
+    // Scope to the specific part's container — use filter() not :has(text=) CSS
+    // to avoid CSS parse errors when part name contains quotes or special chars
+    const partContainer = page.locator('.border').filter({ hasText: partData.nombre }).first();
     const historialBtn = partContainer.locator('[data-testid="ver-historial-btn"]');
     await historialBtn.waitFor({ state: 'visible', timeout: 15_000 });
     await historialBtn.click();
@@ -129,8 +130,9 @@ test.describe('Historial de Compras por Refacción', () => {
     await inventarioPage.expandPart(partData.nombre);
     await page.waitForTimeout(500);
 
-    // Scope to the specific part's container to avoid grabbing a different part's button
-    const partContainer = page.locator(`.border:has(text="${partData.nombre}")`).first();
+    // Scope to the specific part's container — use filter() not :has(text=) CSS
+    // to avoid CSS parse errors when part name contains quotes or special chars
+    const partContainer = page.locator('.border').filter({ hasText: partData.nombre }).first();
     const historialBtn = partContainer.locator('[data-testid="ver-historial-btn"]');
     await historialBtn.waitFor({ state: 'visible', timeout: 15_000 });
     await historialBtn.click();
