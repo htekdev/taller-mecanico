@@ -54,22 +54,21 @@ test('change-proof-nota-no-pendiente-facturar: nota jobs excluded from facturar 
       await notaBtn.click();
       await page.waitForTimeout(2000);
 
-      // ── Phase 4: Verify the job row does NOT show "Pendiente de facturar" ──
-      await showPhaseLabel(page, '🔍 Phase 4: Badge check — nota job must NOT show "Pendiente de facturar"');
+      // ── Phase 4: Verify nota job rows do NOT show "Pendiente de facturar" ──
+      await showPhaseLabel(page, '🔍 Phase 4: Badge check — nota rows must NOT show "Pendiente de facturar"');
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(1000);
 
-      // Locate the "Pendiente de facturar" badge
-      const pendienteBadge = page.getByText('Pendiente de facturar').first();
-      const badgeVisibleAfterNota = await pendienteBadge.isVisible({ timeout: 2000 }).catch(() => false);
+      // Every row that shows the "Nota" badge must NOT contain the invoice button.
+      // This directly tests the per-row fix in app/modules/trabajos/index.tsx.
+      const notaRows = page.locator('tr').filter({ hasText: 'Nota' });
+      const notaRowCount = await notaRows.count();
+      for (let i = 0; i < notaRowCount; i++) {
+        await expect(notaRows.nth(i)).not.toContainText('Pendiente de facturar');
+      }
 
       await page.screenshot({ path: 'e2e/tmp-nota-badge-check.png', fullPage: false });
-
-      // A job finalized as nota should NOT show the "Pendiente de facturar" badge
-      // NOTE: There may still be OTHER jobs (factura type) showing this badge,
-      // so we check the overall list rendered correctly, not that badge is 0.
-      // The key check: the last finalized job (note) should not show it inline on its row.
-      await showPhaseLabel(page, '✅ Phase 4 complete — nota finalized, checking factura counter next');
+      await showPhaseLabel(page, `✅ Phase 4 complete — ${notaRowCount} nota row(s) have no pendiente badge`);
     } else {
       await showPhaseLabel(page, '⚠️ Nota button not visible in modal — skipping finalization');
       await page.keyboard.press('Escape');
