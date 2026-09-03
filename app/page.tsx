@@ -994,8 +994,11 @@ export default function TallerMecanico() {
   const ordenesPendientesPago  = ordenes.filter(o => o.estado === 'recibida' && getEstadoPagoOrden(o) !== 'pagado').length;
   const ordenesPendientesRecibir = ordenes.filter(o => o.estado === 'pendiente').length;
   const trabajosPendientesCt   = trabajos.filter(t => t.estado === 'pendiente').length;
-  // Only count jobs explicitly marked as 'factura' — nota jobs and unfinalized jobs (tipoDocumento=undefined) never need invoicing
-  const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento === 'factura' && t.estadoFacturacion !== 'facturado').length;
+  // Only count completed jobs that require a factura and haven't been invoiced yet.
+  // Use requiereFactura (Phase 1, always reliable) as the primary gate.
+  // Also exclude jobs where tipoDocumento='nota' as an explicit safety check.
+  // This handles the case where tipoDocumento is null (Phase 2 best-effort write failed).
+  const trabajosPendientesFacturar = trabajos.filter(t => t.tipoDocumento !== 'nota' && t.requiereFactura === true && t.estadoFacturacion !== 'facturado').length;
 
   const tabs = [
     { key: 'clientes',    icon: '👥', label: 'Clientes',         count: clientes.length },
