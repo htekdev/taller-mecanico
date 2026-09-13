@@ -8,6 +8,7 @@ import * as db from '@/app/lib/db';
 import type { CotizacionRow } from '@/app/lib/db';
 import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
 import { readDraft, writeDraft, clearDraft } from '@/app/lib/form-draft';
+import { usePersistedState, restoreScrollPosition } from '@/app/lib/page-state';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1039,7 +1040,8 @@ function HistorialCotizaciones({
   onCancelar: (id: string) => void;
   onConvertir?: (entry: CotizacionGuardada) => void;
 }) {
-  const [filtroCliente, setFiltroCliente] = useState('');
+  // filtroCliente persisted so it survives app-switching and page reloads
+  const [filtroCliente, setFiltroCliente] = usePersistedState('taller_cotizaciones_filtro_cliente', '');
   const [confirmando, setConfirmando] = useState<string | null>(null);
 
   const clientesUnicos = Array.from(new Set(history.map(h => h.cliente))).filter(Boolean).sort();
@@ -1304,8 +1306,18 @@ export function VistaCotizaciones({
     })();
   }, [tallerId]);
 
-  // ── Nav persistence: save/clear the last-viewed cotización ──────────────────
-  // When pantalla='preview' with an active viewEntry → save its id so we can
+  // ── Scroll restoration: cotizaciones has its own async loading phase ──────────
+  // The page-level scroll restoration fires 50ms after the PARENT's cargando=false,
+  // but VistaCotizaciones fetches its own data from Supabase AFTER that point.
+  // While loading=true the page is too short → window.scrollTo lands wrong.
+  // Fix: restore scroll 50ms after OUR OWN loading finishes (page is full height).
+  useEffect(() => {
+    if (loading) return;
+    const timer = setTimeout(() => {
+      restoreScrollPosition('cotizaciones');
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [loading]);
   // restore it if the component unmounts (user switches sections) or the page refreshes.
   // When pantalla='inicio' → user returned to the list intentionally → clear saved id.
   useEffect(() => {
