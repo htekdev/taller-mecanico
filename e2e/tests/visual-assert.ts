@@ -116,8 +116,11 @@ async function flashResult(locator: Locator, passed: boolean) {
 /** Assert element is visible with green pulsing highlight. */
 export async function expectVisible(locator: Locator, label?: string) {
   const page = locator.page();
-  await highlight(locator, '#00ff00', label || '✓ visible');
+  // Assert BEFORE highlighting — highlight() injects a child div with the label text,
+  // which can match getByText() locators and cause toBeVisible() to fail on the
+  // injected (position:absolute, top:-30px) label instead of the real element.
   await expect(locator).toBeVisible();
+  await highlight(locator, '#00ff00', label || '✓ visible');
   const count = incrementCount(page);
   await updateAssertionCounter(page, count);
   await flashResult(locator, true);
