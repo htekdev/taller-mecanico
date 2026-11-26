@@ -8,6 +8,7 @@ import * as db from '@/app/lib/db';
 import type { CotizacionRow } from '@/app/lib/db';
 import { DEPTOS_KEY, DEFAULT_DEPTOS } from '@/app/lib/departamentos-constants';
 import { readDraft, writeDraft, clearDraft } from '@/app/lib/form-draft';
+import { createPdfPagination } from '@/app/lib/pdf-pagination';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -192,12 +193,13 @@ const hoy = () => getHoy();
 
 // ─── PDF Generator ────────────────────────────────────────────────────────────
 
-async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion, filename?: string) {
+/** Download the complete quotation, flowing long content across Letter pages. */
+export async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion, filename?: string) {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
 
-  const pw = 215.9, ph = 279.4, ml = 14, mr = 14, cw = pw - ml - mr;
-  void ph;
+  const pw = 215.9, ml = 14, mr = 14, cw = pw - ml - mr;
+  const flow = createPdfPagination(doc, ml, cw);
 
   // Load logo
   let logoData: string | null = null;
@@ -267,7 +269,8 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion, 
     y += 2; doc.setDrawColor(200, 200, 200); doc.line(ml, y, ml + cw, y); y += 4;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.text('TRABAJO / DESCRIPCIÓN:', ml, y); y += 4;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-    const tl = doc.splitTextToSize(form.trabajo, cw); doc.text(tl, ml, y); y += tl.length * 4 + 2;
+    const tl = doc.splitTextToSize(form.trabajo, cw);
+    y = flow.textLines(tl, y) + 2;
   }
   y += 3;
 
@@ -276,18 +279,27 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion, 
     let ty = sy;
     const cols = { no: 10, qty: 18, desc: cw - 10 - 18 - 30 - 28, price: 30, tot: 28 };
     const rh = 6, hh = 7;
-    doc.setFillColor(...hColor); doc.rect(ml, ty, cw, hh, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-    doc.text(title, ml + 3, ty + 5); doc.setTextColor(0, 0, 0); ty += hh;
-    doc.setFillColor(240, 244, 255); doc.rect(ml, ty, cw, rh, 'F');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
-    let cx = ml;
-    doc.text('NO', cx + 2, ty + 4.2); cx += cols.no;
-    doc.text('CANTIDAD', cx + 1, ty + 4.2); cx += cols.qty;
-    doc.text('DESCRIPCIÓN', cx + 1, ty + 4.2); cx += cols.desc;
-    doc.text('PRECIO UNIT.', cx + 1, ty + 4.2); cx += cols.price;
-    doc.text('TOTAL', cx + 1, ty + 4.2);
-    ty += rh; doc.setDrawColor(200, 210, 230); doc.line(ml, ty, ml + cw, ty);
+    // Keep a section header with at least one row. Repeat it on continuation pages.
+    const tableHeader = () => {
+      doc.setFillColor(...hColor); doc.rect(ml, ty, cw, hh, 'F');
+      doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.text(title, ml + 3, ty + 5); doc.setTextColor(0, 0, 0); ty += hh;
+      doc.setFillColor(240, 244, 255); doc.rect(ml, ty, cw, rh, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
+      let cx = ml;
+      doc.text('NO', cx + 2, ty + 4.2); cx += cols.no;
+      doc.text('CANTIDAD', cx + 1, ty + 4.2); cx += cols.qty;
+      doc.text('DESCRIPCIÓN', cx + 1, ty + 4.2); cx += cols.desc;
+      doc.text('PRECIO UNIT.', cx + 1, ty + 4.2); cx += cols.price;
+      doc.text('TOTAL', cx + 1, ty + 4.2);
+      ty += rh; doc.setDrawColor(200, 210, 230); doc.line(ml, ty, ml + cw, ty);
+    };
+    ty = flow.ensureSpace(ty, hh + rh + 8);
+    tableHeader();
+    const nextTablePage = () => {
+      ty = flow.newPage();
+      tableHeader();
+    };
     if (items.length === 0) {
       doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
       doc.text('(Sin partidas)', ml + cw / 2, ty + 4.2, { align: 'center' }); doc.setTextColor(0, 0, 0); ty += rh;
@@ -300,24 +312,45 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion, 
         // Generous spacing: topPad=3mm, 4.5mm between baselines, min row height 8mm
         const topPad = 3;
         const lineSpacing = 4.5;
-        const rowH = Math.max(8, topPad + Math.max(0, descLines.length - 1) * lineSpacing + 3);
         const bg: [number, number, number] = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
-        doc.setFillColor(...bg); doc.rect(ml, ty, cw, rowH, 'F');
-        cx = ml;
-        const midY = ty + rowH / 2 + 1.5;
-        doc.text(String(idx + 1), cx + 2, midY); cx += cols.no;
-        doc.text(item.cantidad || '1', cx + 2, midY); cx += cols.qty;
-        // Render each line individually with explicit spacing for readability
-        descLines.forEach((line, li) => {
-          doc.text(line, cx + 2, ty + topPad + li * lineSpacing);
-        });
-        cx += cols.desc;
-        doc.text('$' + fmtPeso(parseNum(item.precioUnitario)), cx + 1, midY); cx += cols.price;
-        doc.text('$' + fmtPeso(rowTotal), cx + 1, midY);
-        ty += rowH; doc.setDrawColor(230, 235, 245); doc.line(ml, ty, ml + cw, ty);
+        const rowH = Math.max(8, topPad + Math.max(0, descLines.length - 1) * lineSpacing + 3);
+        const pageRowCapacity = flow.bottom - flow.top - hh - rh;
+        // Ordinary rows stay intact. A row taller than an entire page is split
+        // into line-sized fragments, with its quantity/prices printed only once.
+        if (ty + Math.min(rowH, pageRowCapacity) > flow.bottom) nextTablePage();
+        let offset = 0;
+        do {
+          const availableLines = Math.max(1, Math.floor((flow.bottom - ty - 6) / lineSpacing) + 1);
+          const fragment = descLines.slice(offset, offset + availableLines);
+          const fragmentH = Math.max(8, topPad + Math.max(0, fragment.length - 1) * lineSpacing + 3);
+          // A continuation header changes the active font; restore row metrics.
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(0, 0, 0);
+          doc.setFillColor(...bg); doc.rect(ml, ty, cw, fragmentH, 'F');
+          let cx = ml;
+          const midY = ty + fragmentH / 2 + 1.5;
+          if (offset === 0) {
+            doc.text(String(idx + 1), cx + 2, midY); cx += cols.no;
+            doc.text(item.cantidad || '1', cx + 2, midY); cx += cols.qty;
+          } else {
+            cx += cols.no + cols.qty;
+          }
+          // Render each line individually with explicit spacing for readability
+          fragment.forEach((line, li) => {
+            doc.text(line, cx + 2, ty + topPad + li * lineSpacing);
+          });
+          cx += cols.desc;
+          if (offset === 0) {
+            doc.text('$' + fmtPeso(parseNum(item.precioUnitario)), cx + 1, midY); cx += cols.price;
+            doc.text('$' + fmtPeso(rowTotal), cx + 1, midY);
+          }
+          ty += fragmentH; doc.setDrawColor(230, 235, 245); doc.line(ml, ty, ml + cw, ty);
+          offset += fragment.length;
+          if (offset < descLines.length) nextTablePage();
+        } while (offset < descLines.length);
       });
     }
     // Section subtotal row — just "Subtotal:" without the section name
+    if (ty + rh > flow.bottom) nextTablePage();
     doc.setFillColor(245, 247, 250); doc.rect(ml, ty, cw, rh, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
     const lx = ml + cols.no + cols.qty + cols.desc;
@@ -333,6 +366,7 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion, 
   // ── Totals block — simplified: Subtotal / IVA / TOTAL ──
   const tx = ml + cw - 58, tw = 58;
   const numTotRows = form.incluirIVA ? 3 : 2;
+  y = flow.ensureSpace(y, 6 * numTotRows + 2);
   doc.setDrawColor(180, 190, 210); doc.rect(tx, y, tw, 6 * numTotRows + 2, 'S');
 
   const totRow = (label: string, value: string, bold = false, bg?: [number, number, number]) => {
@@ -359,19 +393,24 @@ async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotizacion, 
 
   // ── Observaciones ──
   if (form.observaciones) {
+    y = flow.ensureSpace(y, 17);
     y += 4; doc.setDrawColor(200, 200, 200); doc.line(ml, y, ml + cw, y); y += 5;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.text('OBSERVACIONES:', ml, y); y += 4;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-    const ol = doc.splitTextToSize(form.observaciones, cw); doc.text(ol, ml, y); y += ol.length * 4 + 3;
+    const ol = doc.splitTextToSize(form.observaciones, cw);
+    y = flow.textLines(ol, y) + 3;
   }
 
   // ── Signature + Autorizador ──
-  y += 10;
-  doc.setDrawColor(100, 100, 100); doc.line(ml, y, ml + 65, y);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
   const autoLabel = form.autorizadoPor ? form.autorizadoPor : 'Autorizado por';
-  doc.text(autoLabel, ml + 3, y + 4);
+  const signatureLines = doc.splitTextToSize(autoLabel, cw);
+  // Gap + label offset + all wrapped lines must fit before drawing the rule.
+  y = flow.ensureSpace(y, 14 + signatureLines.length * 4) + 10;
+  doc.setDrawColor(100, 100, 100); doc.line(ml, y, ml + 65, y);
+  flow.textLines(signatureLines, y + 4);
 
+  flow.numberPages();
   doc.save(`${filename || form.numeroCotizacion || 'Cotizacion'}.pdf`);
 }
 
@@ -444,10 +483,12 @@ function TablaItems({ titulo, color, items, onChange }: {
 
 // ─── Preview screen ───────────────────────────────────────────────────────────
 
-function VistaPreviaContenido({ plantilla, form, entry, onEditar, onNueva }: {
+/** Saved quotation preview with its downloadable PDF. */
+export function VistaPreviaContenido({ plantilla, form, entry, onEditar, onNueva }: {
   plantilla: Plantilla; form: FormCotizacion; entry: CotizacionGuardada | null; onEditar: () => void; onNueva: () => void;
 }) {
   const [generando, setGenerando] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const [nombreArchivo, setNombreArchivo] = useState(form.numeroCotizacion || 'Cotizacion');
   const { subtotalRef, subtotalMO, subtotal, iva, total } = calcTotales(form);
   const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de Mérida'
@@ -481,10 +522,22 @@ function VistaPreviaContenido({ plantilla, form, entry, onEditar, onNueva }: {
             />
             <span className="px-2 py-1.5 text-xs text-slate-400 bg-slate-50 border-l border-slate-200 select-none">.pdf</span>
           </div>
-          <Btn variant="success" onClick={async () => { setGenerando(true); try { await generarYDescargarPDF(plantilla, form, nombreArchivo || form.numeroCotizacion); } finally { setGenerando(false); } }} disabled={generando}>
+          <Btn variant="success" className="min-h-[44px] min-w-[44px]" onClick={async () => {
+            if (generando) return;
+            setPdfError(null);
+            setGenerando(true);
+            try {
+              await generarYDescargarPDF(plantilla, form, nombreArchivo || form.numeroCotizacion);
+            } catch {
+              setPdfError('No se pudo generar el PDF. Intenta descargarlo de nuevo.');
+            } finally {
+              setGenerando(false);
+            }
+          }} disabled={generando}>
             {generando ? '⏳ Generando...' : '⬇️ Descargar PDF'}
           </Btn>
         </div>
+        {pdfError && <p role="alert" className="w-full text-sm text-red-700">{pdfError}</p>}
       </div>
 
       <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
@@ -1756,4 +1809,3 @@ export function VistaCotizaciones({
     />
   );
 }
-
