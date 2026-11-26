@@ -145,4 +145,23 @@ describe('downloaded quotation PDFs', () => {
       expect(pages.at(-1)).toContain('Autorización de prueba');
     },
   );
+
+  it.each([11, 12, 13])('keeps signing rule and authorization together with %i boundary notes', async (count) => {
+    const form = quotationFixture(1);
+    form.observaciones = Array.from({ length: count }, (_, i) => `NOTE-${i}`).join('\n');
+    await generarYDescargarPDF('general', form);
+    const pages = await readPdf();
+    // Inspect the actual uncompressed PDF content streams, not a draw-call spy.
+    const streams = [...document.output().matchAll(/(?:^|\n)stream\r?\n([\s\S]*?)\r?\nendstream/g)].map(match => match[1]);
+    expect(streams).toHaveLength(pages.length);
+    const scale = 72 / 25.4;
+    const signingPage = streams.findIndex(stream =>
+      [...stream.matchAll(/([-\d.]+) ([-\d.]+) m\s+([-\d.]+) ([-\d.]+) l/g)].some(match =>
+        Math.abs(Number(match[1]) - 14 * scale) < 0.01 &&
+        Math.abs(Number(match[3]) - 79 * scale) < 0.01 &&
+        Math.abs(Number(match[2]) - Number(match[4])) < 0.01));
+    expect(signingPage).toBeGreaterThanOrEqual(0);
+    expect(pages.findIndex(page => page.includes(form.autorizadoPor))).toBe(signingPage);
+    expect(pages.length).toBeLessThanOrEqual(2);
+  });
 });

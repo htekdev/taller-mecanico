@@ -48,9 +48,42 @@ test('change-proof-quotation-pdf-pagination — descarga completa y páginas leg
   await page.getByRole('button', { name: 'Ver →', exact: true }).click();
   const downloadButton = page.getByRole('button', { name: /Descargar PDF/ });
   await expectVisible(downloadButton, 'Descargar cotización completa');
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    const target = await downloadButton.boundingBox();
+    expect(target, `botón visible a ${width}px`).not.toBeNull();
+    expect(target!.height).toBeGreaterThanOrEqual(44);
+    expect(target!.width).toBeGreaterThanOrEqual(44);
+    expect(target!.x).toBeGreaterThanOrEqual(0);
+    expect(target!.x + target!.width).toBeLessThanOrEqual(width);
+    await expectVisible(downloadButton, `Descargar PDF: área táctil de 44px a ${width}px`);
+  }
+  const browserErrors: string[] = [];
+  page.on('pageerror', error => browserErrors.push(error.message));
+  // Fail exactly one native PDF save, without replacing the real exporter.
+  await page.evaluate(() => {
+    const original = URL.createObjectURL;
+    URL.createObjectURL = function (blob) {
+      if (blob instanceof Blob && blob.type === 'application/pdf') {
+        URL.createObjectURL = original;
+        throw new Error('Synthetic PDF save failure');
+      }
+      return original.call(URL, blob);
+    };
+  });
+  await showPhaseLabel(page, 'Fallo simulado: aviso visible y descarga recuperable');
+  await downloadButton.click();
+  const pdfError = page.getByRole('alert').filter({ hasText: 'No se pudo generar el PDF.' });
+  await expectVisible(pdfError, 'La descarga fallida muestra un aviso');
+  await expect(pdfError).toHaveText('No se pudo generar el PDF. Intenta descargarlo de nuevo.');
+  await expect(downloadButton).toBeEnabled();
+  expect(browserErrors).toEqual([]);
+  await showPhaseLabel(page, 'Reintento: descargar el PDF completo sin volver a cargar');
   const downloadEvent = page.waitForEvent('download');
   await downloadButton.click();
   const download = await downloadEvent;
+  await expect(pdfError).toHaveCount(0);
+  expect(browserErrors).toEqual([]);
   expect(download.suggestedFilename()).toBe('COT-PRUEBA-PDF.pdf');
   const filename = testInfo.outputPath('cotizacion-sintetica-completa.pdf');
   await download.saveAs(filename);

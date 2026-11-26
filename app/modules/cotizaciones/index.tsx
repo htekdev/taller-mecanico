@@ -402,11 +402,12 @@ export async function generarYDescargarPDF(plantilla: Plantilla, form: FormCotiz
   }
 
   // ── Signature + Autorizador ──
-  y = flow.ensureSpace(y, 16) + 10;
-  doc.setDrawColor(100, 100, 100); doc.line(ml, y, ml + 65, y);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
   const autoLabel = form.autorizadoPor ? form.autorizadoPor : 'Autorizado por';
   const signatureLines = doc.splitTextToSize(autoLabel, cw);
+  // Gap + label offset + all wrapped lines must fit before drawing the rule.
+  y = flow.ensureSpace(y, 14 + signatureLines.length * 4) + 10;
+  doc.setDrawColor(100, 100, 100); doc.line(ml, y, ml + 65, y);
   flow.textLines(signatureLines, y + 4);
 
   flow.numberPages();
@@ -482,10 +483,12 @@ function TablaItems({ titulo, color, items, onChange }: {
 
 // ─── Preview screen ───────────────────────────────────────────────────────────
 
-function VistaPreviaContenido({ plantilla, form, entry, onEditar, onNueva }: {
+/** Saved quotation preview with its downloadable PDF. */
+export function VistaPreviaContenido({ plantilla, form, entry, onEditar, onNueva }: {
   plantilla: Plantilla; form: FormCotizacion; entry: CotizacionGuardada | null; onEditar: () => void; onNueva: () => void;
 }) {
   const [generando, setGenerando] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const [nombreArchivo, setNombreArchivo] = useState(form.numeroCotizacion || 'Cotizacion');
   const { subtotalRef, subtotalMO, subtotal, iva, total } = calcTotales(form);
   const clienteNombre = plantilla === 'ayuntamiento' ? 'Ayuntamiento de Mérida'
@@ -519,10 +522,22 @@ function VistaPreviaContenido({ plantilla, form, entry, onEditar, onNueva }: {
             />
             <span className="px-2 py-1.5 text-xs text-slate-400 bg-slate-50 border-l border-slate-200 select-none">.pdf</span>
           </div>
-          <Btn variant="success" onClick={async () => { setGenerando(true); try { await generarYDescargarPDF(plantilla, form, nombreArchivo || form.numeroCotizacion); } finally { setGenerando(false); } }} disabled={generando}>
+          <Btn variant="success" className="min-h-[44px] min-w-[44px]" onClick={async () => {
+            if (generando) return;
+            setPdfError(null);
+            setGenerando(true);
+            try {
+              await generarYDescargarPDF(plantilla, form, nombreArchivo || form.numeroCotizacion);
+            } catch {
+              setPdfError('No se pudo generar el PDF. Intenta descargarlo de nuevo.');
+            } finally {
+              setGenerando(false);
+            }
+          }} disabled={generando}>
             {generando ? '⏳ Generando...' : '⬇️ Descargar PDF'}
           </Btn>
         </div>
+        {pdfError && <p role="alert" className="w-full text-sm text-red-700">{pdfError}</p>}
       </div>
 
       <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">

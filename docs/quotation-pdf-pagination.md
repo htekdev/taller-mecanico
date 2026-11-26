@@ -50,12 +50,28 @@ npx playwright test --config=e2e/pdf.playwright.config.ts
 - PDF.js and canvas are test-only, pinned to releases compatible with the
   repository's existing Node 20 CI. The production PDF library is unchanged.
 
-Local validation: 475 tests pass; existing project coverage thresholds pass
-(71.26% statements/lines, 76.58% branches, 92.78% functions; pagination helper
+Local validation after review repairs: 480 tests pass; existing project coverage thresholds pass
+(71.26% statements/lines, 76.63% branches, 92.78% functions; pagination helper
 100% across all four). Lint has no errors; existing warnings remain. The isolated
 download test passes and produces a four-page sample; all four rendered page
 boundaries were visually inspected without clipping/overlap. The repository's
 existing coverage scope excludes UI modules; it has not been weakened here.
+
+## Review repairs
+
+- Reserve the complete signature block before drawing its rule: 10 mm gap,
+  4 mm label offset and 4 mm for each wrapped line (18 mm for one line).
+  Real-PDF tests with 11/12/13 notes compare the signing-path stream's page to
+  the authorization text's page. The 12-note case failed before this repair:
+  the rule was on page 1 and the name alone on page 2.
+- Catch failures in this download handler and show an accessible Spanish alert.
+  Keep the button disabled while pending, clear the alert on retry and restore
+  the enabled state after failure. Component tests reproduce initialization
+  and serialization failures; both failed with unhandled rejections before repair.
+- Only this export control receives a minimum 44×44 CSS-pixel target.
+  The structured E2E measures it at 375/768/1280px, fails one native PDF save,
+  verifies the alert, then retries successfully without reloading and parses/
+  renders the actual four-page download. No other buttons or shared UI changed.
 
 ## Primary API references
 
@@ -66,6 +82,10 @@ existing coverage scope excludes UI modules; it has not been weakened here.
 - PDF.js actual-document loading, text extraction and rendering:
   https://mozilla.github.io/pdf.js/examples/
   and https://github.com/mozilla/pdf.js/blob/master/examples/node/getinfo.mjs
+- React event-handler errors are not captured by error boundaries:
+  https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary
+- React Testing Library rendering and async state updates:
+  https://testing-library.com/docs/react-testing-library/api/
 
 Publication remains gated by the working Vercel preview, current-HEAD CI,
 required independent reviews, proof and the repository's native merge contract.
